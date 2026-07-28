@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 
 import {
   createWedgeMachine,
+  matchScanTail,
   WEDGE_DEFAULTS,
   type WedgeKey,
+  type WedgeStep,
 } from '../keyboard-wedge';
 
 const key = (k: string, timeMs: number, extra: Partial<WedgeKey> = {}): WedgeKey => ({
@@ -14,110 +16,171 @@ const key = (k: string, timeMs: number, extra: Partial<WedgeKey> = {}): WedgeKey
   ...extra,
 });
 
-/** Feed a string at a fixed inter-key interval; returns emits and suppressions. */
+/** Feed a string at a fixed inter-key interval, then a terminator. */
 function feed(
   machine: ReturnType<typeof createWedgeMachine>,
   text: string,
   intervalMs: number,
   startMs = 1000,
   terminator = 'Enter',
-) {
-  const emits: string[] = [];
-  let suppressed = 0;
+): { final: WedgeStep; suppressedDuringText: number } {
+  let suppressedDuringText = 0;
   let t = startMs;
   for (const ch of text) {
-    const step = machine.step(key(ch, t));
-    if (step.suppress) suppressed++;
-    if (step.emit) emits.push(step.emit);
+    if (machine.step(key(ch, t)).suppress) suppressedDuringText++;
     t += intervalMs;
   }
-  const final = machine.step(key(terminator, t));
-  if (final.suppress) suppressed++;
-  if (final.emit) emits.push(final.emit);
-  return { emits, suppressed };
+  return { final: machine.step(key(terminator, t)), suppressedDuringText };
 }
 
-describe('keyboard-wedge burst machine', () => {
-  it('captures a scanner-speed burst terminated by Enter', () => {
+describe('matchScanTail', () => {
+  it('matches a delimited code at the end of unrelated text', () => {
+    expect(matchScanTail('note about x 1:04:SN-TEST-8')).toBe('1:04:SN-TEST-8');
+  });
+
+  it('matches lowercase, digits, dot, underscore, dash targets', () => {
+    expect(matchScanTail('1:99:abc.def_9-x')).toBe('1:99:abc.def_9-x');
+  });
+
+  it('matches a fixed digits-only code', () => {
+    expect(matchScanTail('20175433211')).toBe('20175433211');
+  });
+
+  it('returns null for text without a code tail', () => {
+    expect(matchScanTail('hello world')).toBeNull();
+    expect(matchScanTail('1:4:short')).toBeNull(); // one-digit category
+    expect(matchScanTail('0:04:x')).toBeNull();    // version 0 reserved
+  });
+});
+
+describe('keyboard-wedge capture (pattern-anchored)', () => {
+  it('captures a scanner burst and consumes the full code length', () => {
     const machine = createWedgeMachine();
-    const { emits } = feed(machine, '1:01:SN-123', 20);
-    expect(emits).toEqual(['1:01:SN-123']);
+    const { final } = feed(machine, '1:04:SN-TEST-8', 20);
+    expect(final.emit).toBe('1:04:SN-TEST-8');
+    expect(final.suppress).toBe(true);
+    expect(final.consumedLength).toBe('1:04:SN-TEST-8'.length);
   });
 
-  it('captures at Bluetooth-iPad speeds (60ms between keys)', () => {
+  it('never suppresses during accumulation — only the matched terminator', () => {
     const machine = createWedgeMachine();
-    const { emits } = feed(machine, '1:02:75949975930', 60);
-    expect(emits).toEqual(['1:02:75949975930']);
+    const { final, suppressedDuringText } = feed(machine, '1:04:SN-TEST-8', 20);
+    expect(suppressedDuringText).toBe(0);
+    expect(final.suppress).toBe(true);
   });
 
-  it('never emits for human typing (200ms between keys)', () => {
+  it('survives slow scanner pacing (150ms keys — Bluetooth HID)', () => {
     const machine = createWedgeMachine();
-    const { emits, suppressed } = feed(machine, '1:01:SN-123', 200);
-    expect(emits).toEqual([]);
-    expect(suppressed).toBe(0);
+    const { final } = feed(machine, '1:04:SN-TEST-8', 150);
+    expect(final.emit).toBe('1:04:SN-TEST-8');
   });
 
-  it('suppresses burst keys so they never reach a focused field', () => {
+  it('captures Shift-chorded streams (capitals and colons on a real scanner)', () => {
     const machine = createWedgeMachine();
-    const { suppressed } = feed(machine, '1:01:AB', 20);
-    // First char leaks (no prefix); the rest of the burst + Enter suppress.
-    expect(suppressed).toBe('1:01:AB'.length - 1 + 1);
+    let t = 1000;
+    for (const ch of '1:04:SN-TEST-8') {
+      if (/[A-Z:]/.test(ch)) {
+        machine.step(key('Shift', t));
+        t += 5;
+      }
+      machine.step(key(ch, t));
+      t += 20;
+    }
+    const final = machine.step(key('Enter', t));
+    expect(final.emit).toBe('1:04:SN-TEST-8');
   });
 
-  it('suppresses everything from the first key when a prefix is configured', () => {
-    const machine = createWedgeMachine({ ...WEDGE_DEFAULTS, prefixChar: '§' });
-    const { emits, suppressed } = feed(machine, '§1:01:AB', 20);
-    expect(emits).toEqual(['1:01:AB']);
-    expect(suppressed).toBe('§1:01:AB'.length + 1); // every key + Enter
-  });
-
-  it('suppresses the terminator of a too-short burst without emitting', () => {
+  it('captures the code typed after unrelated text in the same field', () => {
     const machine = createWedgeMachine();
-    const { emits, suppressed } = feed(machine, 'ab', 20);
-    expect(emits).toEqual([]);
-    expect(suppressed).toBeGreaterThan(0); // the armed Enter never submits a form
+    const { final } = feed(machine, 'measured twice 1:04:SN-TEST-8', 80);
+    expect(final.emit).toBe('1:04:SN-TEST-8');
+    expect(final.consumedLength).toBe('1:04:SN-TEST-8'.length);
   });
 
-  it('ignores modifier chords and key repeats', () => {
+  it('passes plain typing + Enter through untouched (form submits work)', () => {
+    const machine = createWedgeMachine();
+    const { final } = feed(machine, 'hello there', 120);
+    expect(final.emit).toBeNull();
+    expect(final.suppress).toBe(false);
+  });
+
+  it('a long pause between keys starts a new capture episode', () => {
     const machine = createWedgeMachine();
     machine.step(key('1', 1000));
-    machine.step(key('c', 1010, { hasModifier: true })); // Cmd+C mid-stream
-    const step = machine.step(key('Enter', 1020));
-    expect(step.emit).toBeNull();
-
-    machine.reset();
-    machine.step(key('1', 2000));
-    machine.step(key('1', 2010, { isRepeat: true }));
-    expect(machine.step(key('Enter', 2020)).emit).toBeNull();
+    machine.step(key(':', 1100));
+    // 2s stall — whatever was typed before no longer counts as one episode
+    machine.step(key('9', 3100));
+    const final = machine.step(key('Enter', 3200));
+    expect(final.emit).toBeNull();
   });
 
-  it('skips Unidentified keys (iPadOS quirk) by resetting', () => {
+  it('editing keys (Backspace, arrows, chords, repeats) restart the episode', () => {
     const machine = createWedgeMachine();
-    machine.step(key('1', 1000));
-    machine.step(key(':', 1020));
-    machine.step(key('Unidentified', 1040));
-    expect(machine.step(key('Enter', 1060)).emit).toBeNull();
+    for (const editKey of ['Backspace', 'ArrowLeft']) {
+      feedPartial(machine, '1:04:SN-', 20, 1000);
+      machine.step(key(editKey, 1400));
+      feedPartial(machine, 'X', 20, 1500);
+      expect(machine.step(key('Enter', 1600)).emit).toBeNull();
+      machine.reset();
+    }
+    feedPartial(machine, '1:04:SN-TEST-8', 20, 5000);
+    machine.step(key('c', 5400, { hasModifier: true })); // Cmd+C
+    expect(machine.step(key('Enter', 5500)).emit).toBeNull();
   });
 
-  it('abandons a burst that goes cold mid-capture', () => {
-    const machine = createWedgeMachine();
-    machine.step(key('1', 1000));
-    machine.step(key(':', 1020)); // capture armed
-    machine.step(key('0', 1500)); // 480ms gap — human resumed typing
-    expect(machine.step(key('Enter', 1520)).emit).toBeNull();
-  });
-
-  it('honors a custom threshold', () => {
-    const machine = createWedgeMachine({ ...WEDGE_DEFAULTS, interKeyThresholdMs: 150 });
-    const { emits } = feed(machine, '1:01:SN-9', 120);
-    expect(emits).toEqual(['1:01:SN-9']);
+  it('rejects captures below minLength', () => {
+    const machine = createWedgeMachine({ ...WEDGE_DEFAULTS, minLength: 20 });
+    const { final } = feed(machine, '1:04:SN-1', 20);
+    expect(final.emit).toBeNull();
+    expect(final.suppress).toBe(false);
   });
 
   it('captures back-to-back scans independently', () => {
     const machine = createWedgeMachine();
-    const first = feed(machine, '1:01:AAA1', 20, 1000);
-    const second = feed(machine, '1:02:BBB2', 20, 5000);
-    expect(first.emits).toEqual(['1:01:AAA1']);
-    expect(second.emits).toEqual(['1:02:BBB2']);
+    const first = feed(machine, '1:01:aaa-1', 20, 1000);
+    const second = feed(machine, '1:02:bbb-2', 20, 60_000);
+    expect(first.final.emit).toBe('1:01:aaa-1');
+    expect(second.final.emit).toBe('1:02:bbb-2');
+  });
+
+  it('offers an auto-fire candidate for a suffix-less scanner burst', () => {
+    // The DS2278 stream shape observed on the floor: 0-6ms keys, no Enter.
+    const machine = createWedgeMachine();
+    feedPartial(machine, '1:04:SN-TEST-8', 3, 1000);
+    const pending = machine.pendingAutoFire();
+    expect(pending).not.toBeNull();
+    expect(pending!.code).toBe('1:04:SN-TEST-8');
+    expect(pending!.consumedLength).toBe('1:04:SN-TEST-8'.length);
+  });
+
+  it('never offers auto-fire for hand-typed codes (human key speed)', () => {
+    const machine = createWedgeMachine();
+    feedPartial(machine, '1:04:SN-TEST-8', 150, 1000);
+    expect(machine.pendingAutoFire()).toBeNull();
+  });
+
+  it('never offers auto-fire without a full code tail', () => {
+    const machine = createWedgeMachine();
+    feedPartial(machine, '1:04:', 3, 1000);
+    expect(machine.pendingAutoFire()).toBeNull();
+  });
+
+  it('honors a custom key gap limit', () => {
+    const machine = createWedgeMachine({ ...WEDGE_DEFAULTS, maxKeyGapMs: 100 });
+    const { final } = feed(machine, '1:04:SN-TEST-8', 150);
+    expect(final.emit).toBeNull(); // every key lands in its own episode
   });
 });
+
+function feedPartial(
+  machine: ReturnType<typeof createWedgeMachine>,
+  text: string,
+  intervalMs: number,
+  startMs: number,
+): void {
+  let t = startMs;
+  for (const ch of text) {
+    machine.step(key(ch, t));
+    t += intervalMs;
+  }
+}

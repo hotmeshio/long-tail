@@ -157,17 +157,28 @@ easter-egg Features panel carries a local **Scan input** override to test
 either state on one browser. The execute and config APIs work regardless —
 the flag gates the dashboard surface.
 
-When enabled, the dashboard listens for scans globally — any page, any focus state. A
-scanner paired as an HID keyboard "types" its decode rapidly and finishes
-with Enter; a capture-phase window listener feeds every keystroke to a burst
-detector that separates scanner speed from human speed:
+When enabled, the dashboard listens for scans globally — any page, any focus
+state. A scanner paired as an HID keyboard "types" its decode and finishes
+with Enter; capture is **pattern-anchored**: a capture-phase window listener
+accumulates keystrokes freely, and when the terminator arrives it checks
+whether the recent keys end with a scan-code shape
+(`[1-9]:[0-9]{2}:target` or the digits-only fixed form).
 
-- Keys arriving within the **burst threshold** (default 75 ms, tunable in
-  the scan panel — Bluetooth HID on iPadOS runs slower than USB wedges)
-  accumulate as a candidate scan.
-- The terminator submits the capture; captured keys are suppressed so they
-  stay out of focused form fields.
-- Modifier chords, key repeats, and `Unidentified` keys reset the machine.
+- On a match, the terminator is swallowed, the code's characters are
+  stripped back out of whatever editable held focus (byte-exact, at the
+  cursor), and the code executes. Cursor focus never diverts a scan.
+- Scanner pacing is irrelevant: slow Bluetooth HID links, Shift-chorded
+  capitals and colons, and mid-burst stalls all capture, because nothing has
+  to be recognized mid-flight. The one tunable is the **key gap limit**
+  (default 500 ms in the scan panel) separating distinct typing episodes.
+- Typing a valid code and pressing Enter fires it too, anywhere — that is
+  the contract: the scanner is a keyboard, so the keyboard is a scanner.
+- Scanners with no suffix programmed work through **quiet-period auto-fire**:
+  a full code shape typed at scanner speed (avg ≤ 50 ms/key) followed by
+  300 ms of silence fires without a terminator. Hand-typed codes never
+  auto-fire — humans type slower than the ceiling; they submit on Enter.
+- Delimited targets carry `a-z A-Z 0-9 . _ -`; lowercase is the recommended
+  label vocabulary. Case is preserved — metadata matching is case-sensitive.
 
 Capture sources are pluggable (`dashboard/src/lib/scan-sources/`): the
 keyboard wedge is one provider behind a `ScanSource` contract; an RFID or
@@ -184,13 +195,10 @@ any symbology it decodes (UPC-A/EAN, Code 128, QR, DataMatrix, PDF417). The
 decoded string arrives as keystrokes regardless of symbology, so `delimited`
 codes print colons literally.
 
-Two optional scanner-side settings sharpen capture:
-
-- **Suffix** — keep the factory Enter suffix; it is the burst terminator.
-- **Prefix** — program a preamble character and set the same character in
-  the scan panel. With a prefix, suppression is airtight from the first
-  keystroke; without one, the first character of a scan can reach a focused
-  field before the burst is recognized.
+An **Enter suffix** on the scanner gives the crispest capture (the code
+fires the instant the suffix arrives); scanners without one fire after the
+quiet period. The scan panel's diagnostics view traces every keydown the
+capture sees — the tool for pinning any scanner's stream shape.
 
 Label guidance: QR or DataMatrix survive small corner labels and floor
 grime best; Code 128 suits wider flat labels; `fixed` encoding packs into
