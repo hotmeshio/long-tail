@@ -451,6 +451,12 @@ The Inbox icon in the header shows a badge count when the current user has pendi
 
 The bottom bar contains a collapsible live event stream showing workflow start/completion events, task state transitions, escalation activity, and activity checkpoints. Events stream via NATS subscription.
 
+### Claim Hand-off
+
+The shell monitors the role-scoped `claimed` events across the viewer's roles; when one carries `assigned_to = viewer`, the dashboard navigates to that escalation's detail page. Pre-assignment is the system saying "this is yours next," and the UI honors it: a resolve → side-effect → follow-on chain (e.g. submit, a label prints, the harvest task opens) lands the user on the next step instead of history's previous page.
+
+Workflows need no UI coupling — assigning the follow-on escalation to the resolving user is the whole contract. The gesture is naturally idempotent: a claim the user made themselves resolves to the page their click already opened.
+
 ### Contextual Documentation
 
 Each page header includes a documentation icon that opens the in-app docs drawer to the relevant section. The drawer supports navigation history, anchor linking, and markdown rendering.
