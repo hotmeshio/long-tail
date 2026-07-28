@@ -4,6 +4,7 @@ import { ScanBarcode, Plus } from 'lucide-react';
 import { useScanSchemes, useUpsertScanScheme, type ScanScheme } from '../../../api/scan-codes';
 import { useRoleDetails } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { CodeShape } from './CodeShape';
 
 /**
  * Scan schemes — the nine version slots. A scheme declares what the leading
@@ -25,9 +26,8 @@ export function ScanCodesPage() {
     <div>
       <PageHeader title="Scan Codes" />
       <p className="text-sm text-text-secondary max-w-form mb-8">
-        A scan code reads <span className="font-mono">version:category:target</span>.
-        Pick a version slot to define what the target identifies and what each
-        category does when scanned.
+        Scan codes are organized into 3 parts: <CodeShape highlight="version" />.
+        Pick a single-digit <span className="font-semibold text-text-primary">version</span> to begin (1-9).
       </p>
 
       {isLoading ? (

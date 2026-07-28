@@ -46,6 +46,8 @@ export interface ScanResult {
   at: number;
   response: ScanExecuteResponse | null;
   error: string | null;
+  /** True when the outcome answered with navigation (detail page, list, confirm). */
+  navigated: boolean;
 }
 
 /** One observed keydown, as the capture machine saw it. */
@@ -113,14 +115,15 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
   const diagSeqRef = useRef(0);
   const lastKeyAtRef = useRef(0);
 
-  const navigateForResponse = useCallback((response: ScanExecuteResponse) => {
+  /** Navigate per the outcome; true when navigation was the answer. */
+  const navigateForResponse = useCallback((response: ScanExecuteResponse): boolean => {
     const { outcome } = response;
 
     if (outcome === SCAN_OUTCOMES.CONFIRM_REQUIRED && response.pendingAction) {
       navigate(`/escalations/detail/${response.pendingAction.escalationId}`, {
         state: { [SCAN_PENDING_ACTION_STATE]: response.pendingAction },
       });
-      return;
+      return true;
     }
 
     if (outcome === SCAN_OUTCOMES.EXECUTED && response.escalation) {
@@ -132,8 +135,9 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
       ];
       if (response.verb && showVerbs.includes(response.verb)) {
         navigate(`/escalations/detail/${response.escalation.id}`);
+        return true;
       }
-      return;
+      return false;
     }
 
     if (outcome === SCAN_OUTCOMES.MATCHED_LIST && response.listQuery) {
@@ -141,12 +145,14 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
         targetFacet: string; target: string; roles?: string[];
       };
       navigate(metadataFacetsUrl({ [targetFacet]: target }, roles?.[0] ?? null));
-      return;
+      return true;
     }
 
     if (outcome === SCAN_OUTCOMES.NO_MATCH_FALLBACK && response.fallback?.route) {
       navigate(response.fallback.route);
+      return true;
     }
+    return false;
   }, [navigate]);
 
   const submitCode = useCallback(async (code: string, source: ScanSourceId = SCAN_SOURCE_IDS.MANUAL) => {
@@ -154,10 +160,10 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     const at = Date.now();
     try {
       const response = await executeScanCode(code);
-      setLastResult({ code, source, at, response, error: null });
-      navigateForResponse(response);
+      const navigated = navigateForResponse(response);
+      setLastResult({ code, source, at, response, error: null, navigated });
     } catch (err: any) {
-      setLastResult({ code, source, at, response: null, error: err.message });
+      setLastResult({ code, source, at, response: null, error: err.message, navigated: false });
     } finally {
       setBusy(false);
     }

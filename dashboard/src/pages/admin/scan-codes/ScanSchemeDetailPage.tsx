@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { ScanBarcode, SlidersHorizontal, Grid3X3 } from 'lucide-react';
-import { useScanScheme, useUpsertScanScheme, type ScanRule } from '../../../api/scan-codes';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ScanBarcode, SlidersHorizontal, Grid3X3, Trash2 } from 'lucide-react';
+import { useScanScheme, useUpsertScanScheme, useDeleteScanScheme, type ScanRule } from '../../../api/scan-codes';
+import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ScanRuleEditor } from './ScanRuleEditor';
+import { CodeShape } from './CodeShape';
 
 const CATEGORIES = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
 
@@ -11,19 +13,24 @@ function SectionGroup({
   icon: Icon,
   label,
   annotation,
+  aside,
   children,
 }: {
   icon: React.ElementType;
   label: string;
   annotation?: string;
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-5 min-w-0">
-        <Icon className="w-3 h-3 text-text-tertiary shrink-0" strokeWidth={1.5} />
-        <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">{label}</span>
-        {annotation && <span className="text-2xs text-text-quaternary truncate">— {annotation}</span>}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Icon className="w-3 h-3 text-text-tertiary shrink-0" strokeWidth={1.5} />
+          <span className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">{label}</span>
+          {annotation && <span className="text-2xs text-text-quaternary truncate">— {annotation}</span>}
+        </div>
+        {aside}
       </div>
       <div className="border-l-2 pl-5 border-surface-border/60">{children}</div>
     </div>
@@ -67,12 +74,19 @@ export function ScanSchemeDetailPage() {
     <div className="space-y-10">
       <PageHeader title={scheme.name} />
 
-      <SchemeSettings key={scheme.version} scheme={scheme} />
+      <p className="text-sm text-text-secondary max-w-form -mt-4">
+        This scheme owns version <span className="font-mono text-text-primary">{scheme.version}</span>.
+        Its codes read <CodeShape highlight="category" />.
+        Pick a <span className="font-semibold text-text-primary">category</span> to
+        define what scanning it does — a tinted cell already carries a rule.
+      </p>
+
+      <SchemeSettings key={scheme.version} scheme={scheme} ruleCount={rules.length} />
 
       <SectionGroup
         icon={Grid3X3}
         label="Categories"
-        annotation="pick a two-digit slot to define what scanning it does"
+        annotation="00–99 — tinted cells carry a rule; empty cells are open"
       >
         <div className="grid grid-cols-10 gap-1 max-w-form">
           {CATEGORIES.map((category) => {
@@ -86,9 +100,9 @@ export function ScanSchemeDetailPage() {
                 title={configured ? ruleByCategory.get(category)!.name : `Define ${category}`}
                 className={`h-8 text-xs font-mono rounded-sm border transition-colors ${
                   isSelected
-                    ? 'border-accent bg-accent/10 text-accent'
+                    ? 'border-accent bg-accent/20 text-accent font-semibold'
                     : configured
-                      ? 'border-accent/30 text-accent hover:border-accent'
+                      ? 'border-accent/30 bg-accent/10 text-accent hover:border-accent'
                       : 'border-surface-border text-text-quaternary hover:text-text-secondary hover:border-surface-border/80'
                 }`}
               >
@@ -119,16 +133,32 @@ export function ScanSchemeDetailPage() {
   );
 }
 
-function SchemeSettings({ scheme }: { scheme: { version: number; name: string; description: string | null; target_facet: string; encoding: 'fixed' | 'delimited'; delimiter: string; target_length: number | null; enabled: boolean } }) {
+function SchemeSettings({ scheme, ruleCount }: { scheme: { version: number; name: string; description: string | null; target_facet: string; encoding: 'fixed' | 'delimited'; delimiter: string; target_length: number | null; enabled: boolean }; ruleCount: number }) {
+  const navigate = useNavigate();
   const upsert = useUpsertScanScheme();
+  const remove = useDeleteScanScheme();
   const [name, setName] = useState(scheme.name);
   const [targetFacet, setTargetFacet] = useState(scheme.target_facet);
   const [enabled, setEnabled] = useState(scheme.enabled);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const dirty = name !== scheme.name || targetFacet !== scheme.target_facet || enabled !== scheme.enabled;
 
   return (
-    <SectionGroup icon={SlidersHorizontal} label="Scheme" annotation={`version digit ${scheme.version}`}>
+    <SectionGroup
+      icon={SlidersHorizontal}
+      label="Scheme"
+      annotation={`version digit ${scheme.version}`}
+      aside={(
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="flex items-center gap-1 text-xs text-status-error/80 hover:text-status-error"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Delete scheme
+        </button>
+      )}
+    >
       <div className="flex flex-wrap items-end gap-4 max-w-form">
         <label className="block flex-1 min-w-[16rem]">
           <span className="block text-xs text-text-secondary mb-1">Name <span className="text-status-error">*</span></span>
@@ -169,6 +199,22 @@ function SchemeSettings({ scheme }: { scheme: { version: number; name: string; d
         )}
       </div>
       {upsert.error && <p className="text-xs text-status-error mt-2">{(upsert.error as Error).message}</p>}
+
+      <ConfirmDeleteModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => remove.mutate(scheme.version, {
+          onSuccess: () => navigate('/admin/scan-codes'),
+        })}
+        title={`Delete scheme ${scheme.version}`}
+        description={
+          ruleCount > 0
+            ? `This deletes "${scheme.name}" and its ${ruleCount} ${ruleCount === 1 ? 'rule' : 'rules'}. Codes starting with ${scheme.version} stop resolving, and labels already printed with them report unconfigured.`
+            : `This deletes "${scheme.name}". Codes starting with ${scheme.version} stop resolving.`
+        }
+        isPending={remove.isPending}
+        error={remove.error as Error | null}
+      />
     </SectionGroup>
   );
 }
