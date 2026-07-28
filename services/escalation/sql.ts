@@ -109,13 +109,18 @@ export function searchEscalationsQuery(orderBy: string): string {
  * 3. `metadata.signal_id` present, row already claimed and claim not expired →
  *    a concurrent caller is handling the signal. `signal_already_claimed = true`;
  *    caller returns 409 without re-signaling.
- * 4. `signal_key` present (atomic conditionLT) → `claimed` and `resolved` both skip.
+ * 4. `signal_key` present (atomic conditionLT) → the write skips entirely.
  *    Caller invokes SDK resolve to atomically mark resolved + deliver the signal.
  *
- * Signal_id hardening: the `claimed` CTE runs for signal_id rows (previously excluded).
- * This stamps `assigned_to` on the row inside the FOR UPDATE transaction, so a
- * concurrent second caller sees `signal_already_claimed = true` and aborts.
- * The `resolved` CTE still skips signal_id rows — the workflow resolves durably.
+ * Signal_id hardening: the write runs for signal_id rows too, stamping
+ * `assigned_to` inside the FOR UPDATE transaction so a concurrent second caller
+ * sees `signal_already_claimed = true` and aborts. The resolve columns skip
+ * signal_id rows (CASE branches) — the workflow resolves durably.
+ *
+ * ONE UPDATE does both claim and resolve: Postgres does not support a second
+ * same-statement UPDATE of a row already updated by an earlier CTE (the second
+ * silently no-ops), so a chained claim→resolve pair leaves the row claimed but
+ * pending. The resolve columns ride the claim UPDATE as CASE branches instead.
  *
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
  * $4 = metadata patch (jsonb, nullable), $5 = write_all roles (text[], null = global /
@@ -152,7 +157,7 @@ WITH target AS MATERIALIZED (
   LIMIT 1
   FOR UPDATE
 ),
-claimed AS (
+written AS (
   UPDATE public.hmsh_escalations e
   SET assigned_to = COALESCE(e.assigned_to, $2),
       claimed_at = COALESCE(e.claimed_at, NOW()),
@@ -165,26 +170,21 @@ claimed AS (
       metadata = CASE WHEN $4::jsonb IS NOT NULL
         THEN COALESCE(e.metadata, '{}'::jsonb) || $4::jsonb
         ELSE e.metadata END,
+      status = CASE WHEN (target.metadata->>'signal_id') IS NULL
+        THEN 'resolved' ELSE e.status END,
+      resolved_at = CASE WHEN (target.metadata->>'signal_id') IS NULL
+        THEN NOW() ELSE e.resolved_at END,
+      resolver_payload = CASE WHEN (target.metadata->>'signal_id') IS NULL
+        THEN $3 ELSE e.resolver_payload END,
       updated_at = NOW()
   FROM target
   WHERE e.id = target.id
     AND target.signal_key IS NULL
     AND ($7::text[] IS NULL OR NOT (target.role = ANY($7)))
   RETURNING e.*
-),
-resolved AS (
-  UPDATE public.hmsh_escalations e
-  SET status = 'resolved',
-      resolved_at = NOW(),
-      resolver_payload = $3,
-      updated_at = NOW()
-  FROM claimed
-  WHERE e.id = claimed.id
-    AND (claimed.metadata->>'signal_id') IS NULL
-  RETURNING e.*
 )
 SELECT
-  resolved.*,
+  written.*,
   target.id AS target_id,
   target.role AS target_role,
   target.metadata AS target_metadata,
@@ -199,12 +199,12 @@ SELECT
     AND target.assigned_until IS NOT NULL
     AND target.assigned_until > NOW()) AS signal_already_claimed,
   CASE
-    WHEN resolved.id IS NOT NULL THEN 'resolved'
+    WHEN written.status = 'resolved' THEN 'resolved'
     WHEN $7::text[] IS NOT NULL AND target.role = ANY($7) THEN 'validation_required'
     ELSE 'signal_required'
   END AS outcome
 FROM target
-LEFT JOIN resolved ON resolved.id = target.id`;
+LEFT JOIN written ON written.id = target.id`;
 
 // ---------------------------------------------------------------------------
 // Station metrics — split into two queries with very different cost profiles.

@@ -725,3 +725,58 @@ export const claimByFacetsSchema = z.object({
   durationMinutes: z.number().int().min(1).optional().describe('Claim TTL in minutes'),
   allOrNone: z.boolean().optional().describe('Commit only if the full limit was acquired'),
 });
+
+// ── Scan codes ──────────────────────────────────────────────────────────────
+
+export const executeScanCodeSchema = z.object({
+  code: z.string().min(1).describe('Raw scan string, e.g. "1:01:SN123" or "10175433211"'),
+});
+
+export const listScanSchemesSchema = z.object({});
+
+export const upsertScanSchemeSchema = z.object({
+  version: z.number().int().min(1).max(9).describe('Scheme version digit (1-9)'),
+  name: z.string().describe('Scheme display name'),
+  description: z.string().optional(),
+  target_facet: z.string().describe('Escalation metadata key the scanned target resolves against'),
+  encoding: z.enum(['fixed', 'delimited']).optional().describe('fixed = digits only (UPC), delimited = text with separators'),
+  delimiter: z.string().optional().describe('Separator character for delimited encoding (default ":")'),
+  target_length: z.number().int().min(1).optional().describe('Target digit count for fixed encoding'),
+  enabled: z.boolean().optional(),
+});
+
+export const upsertScanRuleSchema = z.object({
+  scheme_version: z.number().int().min(1).max(9),
+  category: z.string().regex(/^[0-9]{2}$/).describe('Two-digit category (00-99)'),
+  name: z.string().describe('Friendly label — printed next to the physical code'),
+  steps: z.array(z.object({
+    query: z.object({
+      roles: z.array(z.string()).optional().describe('Expected queue(s)'),
+      status: z.enum(['pending', 'resolved', 'cancelled']).optional(),
+      availability: z.enum(['available', 'claimed', 'mine', 'any']).optional(),
+      facets: z.record(z.any()).optional().describe('Extra metadata guards'),
+    }),
+    cardinality: z.enum(['first', 'many']).optional(),
+    verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel']),
+    confirm: z.object({ prompt: z.string() }).optional(),
+    params: z.object({
+      resolverPayload: z.record(z.any()).optional(),
+      metadata: z.record(z.any()).optional(),
+      targetRole: z.string().optional(),
+      escalationType: z.string().optional(),
+      description: z.string().optional(),
+      closeCurrent: z.enum(['resolve', 'cancel']).optional(),
+      durationMinutes: z.number().int().min(1).optional(),
+    }).optional(),
+  })).describe('Ordered condition/action steps — first match wins'),
+  fallback: z.object({
+    markdown: z.string().optional(),
+    route: z.string().optional(),
+  }).optional().describe('Rendered when no step matches'),
+  enabled: z.boolean().optional(),
+});
+
+export const deleteScanRuleSchema = z.object({
+  scheme_version: z.number().int().min(1).max(9),
+  category: z.string().regex(/^[0-9]{2}$/),
+});

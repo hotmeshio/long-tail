@@ -9,6 +9,7 @@ import { seedPersonas as seedPersonaSpecs } from '../services/persona';
 import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS, SEED_PERSONAS } from './seed-data';
 import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
+import { seedScanCodes } from './seed-scan-codes';
 import { seedRichFormRole } from './seed-rich-form';
 import { seedAcmeRoles } from './seed-acme';
 import { seedRelatedEscalationsRoles } from './seed-related-escalations';
@@ -96,6 +97,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedRoles();
   await seedOrthoRoles();
   await seedTwinRoles();
+  await seedScanCodes();
   await seedRichFormRole();
   await seedAcmeRoles();
   await seedRelatedEscalationsRoles();

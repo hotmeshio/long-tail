@@ -13,6 +13,7 @@ import {
 import { ApiError } from '../../../api/client';
 import { isValidationErrorBody } from '../../../lib/validation';
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
+import { ScanConfirmModal } from '../../../components/scan/ScanConfirmModal';
 import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
@@ -507,6 +508,10 @@ function EscalationDetailView({ id }: { id: string }) {
         isPending={cancel.isPending}
         error={cancel.error as Error | null}
       />
+
+      {/* Scan hand-off: a scanned confirm-step lands here with the pending
+          action in route state; the modal asks the rule's prompt. */}
+      <ScanConfirmModal escalationId={id} />
 
       {claimedByMe && !isTerminal && esc.assigned_until && (
         <ClaimExpiryModal

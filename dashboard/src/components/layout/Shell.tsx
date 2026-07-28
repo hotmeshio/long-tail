@@ -18,6 +18,7 @@ import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
+import { ScanInputProvider } from '../../hooks/useScanInput';
 
 /**
  * The canonical container layout. Every authenticated page renders inside it:
@@ -174,7 +175,9 @@ export function Shell() {
     <SidebarProvider>
       <ShellPanelProvider>
         <HelpAssistantProvider>
-          <ShellLayout />
+          <ScanInputProvider>
+            <ShellLayout />
+          </ScanInputProvider>
         </HelpAssistantProvider>
       </ShellPanelProvider>
     </SidebarProvider>

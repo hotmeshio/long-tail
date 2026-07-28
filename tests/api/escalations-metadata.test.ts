@@ -366,11 +366,13 @@ describe('resolveByMetadata', () => {
       metadata: { completedBy: 'jimbo' },
     }, SYSTEM_AUTH);
 
-    // Global caller → both write-scope filters null (no role filter); the
-    // trailing null is the enforcing-role set (empty here → single-call path).
+    // Global caller → both write-scope filters null (no role filter); then the
+    // enforcing-role set (empty → single-call path), the assertId (first pass),
+    // and the extra-facet guards (none supplied).
     expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid',
       { approved: true }, { completedBy: 'jimbo' }, null, null, null,
+      null, undefined,
     );
   });
 });

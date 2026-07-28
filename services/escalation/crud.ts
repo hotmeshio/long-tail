@@ -689,10 +689,13 @@ export async function resolveByMetadataAtomic(
   writeSelfRoles?: string[] | null,
   enforcingRoles?: string[] | null,
   assertId?: string | null,
+  extraFacets?: Record<string, any> | null,
 ): Promise<ResolveByMetadataResult> {
   await ensureEscalationCompatView();
   const pool = getPool();
-  const filter = JSON.stringify({ [key]: value });
+  // The statement's filter is jsonb containment — extra facet guards simply
+  // widen the containment object and ride the same atomic WHERE.
+  const filter = JSON.stringify({ [key]: value, ...(extraFacets ?? {}) });
   const payloadJson = JSON.stringify(resolverPayload);
   const metaPatch = metadata ? JSON.stringify(metadata) : null;
   // null write_all roles = global (no filter). A scoped caller passes its arrays

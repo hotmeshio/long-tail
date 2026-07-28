@@ -164,6 +164,35 @@ export type {
 } from './sdk';
 
 export type {
+  ScanEncoding,
+  ScanVerb,
+  ScanOutcome,
+  ScanAvailability,
+  ScanCardinality,
+  ScanScheme,
+  ScanStepQuery,
+  ScanStepParams,
+  ScanStep,
+  ScanRuleFallback,
+  ScanRule,
+  ParsedScanCode,
+  ScanExecuteRequest,
+  ScanPendingAction,
+  ScanExecuteResponse,
+} from './scan-code';
+
+export {
+  SCAN_ENCODINGS,
+  SCAN_VERBS,
+  SCAN_MUTATING_VERBS,
+  SCAN_OUTCOMES,
+  SCAN_AVAILABILITY,
+  SCAN_CARDINALITY,
+  SCAN_PROVENANCE_KEYS,
+  SCAN_TEMPLATE_TOKENS,
+} from './scan-code';
+
+export type {
   LTAgent,
   LTAgentStatus,
   LTAgentStats,
