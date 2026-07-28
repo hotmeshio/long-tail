@@ -48,7 +48,7 @@ export function ListToolbar({ onRefresh, isFetching = false, apiPath, standalone
     copyToClipboard(cmd, 'curl');
   };
 
-  const BTN = 'p-1 text-text-quaternary hover:text-accent transition-colors rounded';
+  const BTN = 'p-1 icon-link rounded';
   const ICON = 'w-2.5 h-2.5';
 
   return (

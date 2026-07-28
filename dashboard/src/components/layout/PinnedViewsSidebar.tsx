@@ -9,13 +9,18 @@ import { useEscalations, useAvailableEscalations } from '../../api/escalations';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
 import { useMemberEscalationPatterns } from '../../hooks/useMemberEscalationPatterns';
 import { useQueryClient } from '@tanstack/react-query';
+import { displayRoleTitle } from '../../lib/role-display';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
 
 /**
  * "Pinned" — the persona's exact queries, one click away. The user's own pins
- * lead (drag to reorder, ✕ to remove); role-provided defaults follow, marked,
- * with promote (make mine) and hide affordances. Badges are live counts of the
- * pinned query itself, refreshed by escalation events — never polled.
+ * lead (drag to reorder, ✕ to remove); role-provided defaults follow GROUPED
+ * by their role's display title — the same composition the persona config
+ * screen previews. A group label only exists over visible pins (a role whose
+ * pins are all hidden or promoted contributes no label), and pins never
+ * indent under it — the label is a caption, not a tree level. Badges are live
+ * counts of the pinned query itself, refreshed by escalation events — never
+ * polled.
  */
 export function PinnedViewsSidebar() {
   const { collapsed } = useSidebar();
@@ -42,6 +47,25 @@ export function PinnedViewsSidebar() {
   );
   const pins = useMemo(() => resolvePins(prefs, roleDefaults), [prefs, roleDefaults]);
 
+  // Role pins group under their role's display title, in role order. Only
+  // groups with visible pins render — hidden/promoted pins never leave an
+  // orphan label behind.
+  const titleByRole = useMemo(
+    () => new Map((roleData?.roles ?? []).map((r) => [r.role, displayRoleTitle(r)])),
+    [roleData],
+  );
+  const ownResolved = useMemo(() => pins.filter((p) => !p.fromRole), [pins]);
+  const groups = useMemo(
+    () => roleDefaults
+      .map(({ role }) => ({
+        role,
+        title: titleByRole.get(role) ?? role,
+        pins: pins.filter((p) => p.fromRole === role),
+      }))
+      .filter((g) => g.pins.length > 0),
+    [roleDefaults, titleByRole, pins],
+  );
+
   const ownPins = prefs?.pinnedViews ?? [];
   const dragFrom = useRef<number | null>(null);
 
@@ -61,17 +85,22 @@ export function PinnedViewsSidebar() {
 
   if (pins.length === 0) return null;
 
+  // Each group is a first-class nav section — the same heading recipe as
+  // Monitor/Orchestrate/Storage. No "Pinned" umbrella; the role names ARE
+  // the categories. Own pins, when present, form their own leading section.
+  const sectionHeading =
+    'px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary truncate';
+
   return (
     <div className="space-y-1">
-      {collapsed ? (
-        <div className="h-px bg-surface-border mx-3 my-2" title="Pinned" />
-      ) : (
-        <p className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-accent/80">
-          Pinned
-        </p>
+      {collapsed && <div className="h-px bg-surface-border mx-3 my-2" title="Pinned" />}
+
+      {/* Own pins lead — the user's order, not a role's. */}
+      {!collapsed && ownResolved.length > 0 && (
+        <p className={sectionHeading}>Pinned</p>
       )}
-      {pins.map((pin) => {
-        const ownIndex = pin.fromRole ? -1 : ownPins.findIndex((p) => p.id === pin.id);
+      {ownResolved.map((pin) => {
+        const ownIndex = ownPins.findIndex((p) => p.id === pin.id);
         return (
           <PinnedItem
             key={pin.id}
@@ -83,12 +112,37 @@ export function PinnedViewsSidebar() {
               if (dragFrom.current !== null && ownIndex !== -1) reorder(dragFrom.current, ownIndex);
               dragFrom.current = null;
             }}
-            onRemove={pin.fromRole ? undefined : () => removeOwn(pin.id)}
-            onPromote={pin.fromRole ? () => promote(pin) : undefined}
-            onHide={pin.fromRole ? () => hideRolePin(pin.label) : undefined}
+            onRemove={() => removeOwn(pin.id)}
           />
         );
       })}
+
+      {/* Role groups — a quiet caption over its pins, never an indent level. */}
+      {groups.map((g) => (
+        <div key={g.role}>
+          {!collapsed && (
+            <p
+              className={sectionHeading}
+              title={`${g.title} — pins from the ${g.role} role`}
+              data-testid="pin-group-label"
+            >
+              {g.title}
+            </p>
+          )}
+          {g.pins.map((pin) => (
+            <PinnedItem
+              key={pin.id}
+              pin={pin}
+              collapsed={collapsed}
+              draggable={false}
+              onDragStart={() => {}}
+              onDropOn={() => {}}
+              onPromote={() => promote(pin)}
+              onHide={() => hideRolePin(pin.label)}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -121,23 +175,27 @@ function PinnedItem({ pin, collapsed, draggable, onDragStart, onDropOn, onRemove
 
   return (
     <div
-      className={`${base} ${tone}`}
+      className={`${base} ${tone} relative`}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDropOn}
     >
-      <NavLink to={pin.url} className="flex items-center gap-3 pl-4 py-2 text-sm flex-1 min-w-0">
-        <Pin className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} {...(pin.fromRole ? {} : { fill: 'currentColor', fillOpacity: 0.15 })} />
-        <span className="truncate">{pin.label}</span>
+      {/* The label owns the full row width — the count rides the right edge
+          and the actions are a hover OVERLAY (zero flow width), so nothing
+          invisible ever costs the label a character. */}
+      <NavLink
+        to={pin.url}
+        title={pin.label}
+        className="flex items-center gap-2.5 pl-4 pr-3 py-1.5 text-[0.7875rem] flex-1 min-w-0"
+      >
+        <Pin className="w-4 h-4 shrink-0 text-accent/75" strokeWidth={1.5} {...(pin.fromRole ? {} : { fill: 'currentColor', fillOpacity: 0.15 })} />
+        <span className="truncate flex-1 min-w-0">{pin.label}</span>
         {pin.badge && <PinBadge url={pin.url} />}
-        {pin.fromRole && (
-          <span className="shrink-0 text-2xs uppercase tracking-wider text-text-quaternary" title={`Provided by the ${pin.fromRole} role`}>
-            role
-          </span>
-        )}
       </NavLink>
-      <span className="flex items-center pr-2 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Overlays the row end on hover; its fill matches the hovered row's, so
+          it reads as the row revealing tools, not a panel sliding over. */}
+      <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 rounded px-0.5 bg-surface-hover opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
         {onPromote && (
           <button onClick={onPromote} title="Make mine — copy into my pins" className="p-1 text-text-quaternary hover:text-accent transition-colors">
             <Plus className="w-3 h-3" />
@@ -179,8 +237,14 @@ function PinBadge({ url }: { url: string }) {
   if (!spec) return null;
   const q = spec.available ? availableQ : listQ;
   if (q.isError || q.data?.total === undefined) return null;
+  // Superscript count hugging the row's right edge — bare tabular digits,
+  // right aligned so counts read as a column, no pill chrome, no reserved
+  // width beyond the digits themselves.
   return (
-    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-2xs font-semibold tabular-nums">
+    <span
+      className="shrink-0 text-right text-2xs leading-none tabular-nums text-accent/80 relative -top-[0.35em]"
+      title={`${q.data.total} matching now`}
+    >
       {q.data.total}
     </span>
   );

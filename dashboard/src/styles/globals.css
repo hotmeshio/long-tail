@@ -194,9 +194,30 @@
   * {
     @apply border-surface-border;
   }
+
+  /* Scroll chrome — panes scroll clean, with no visible track or gutter.
+     The OS "always show scroll bars" mode (auto-enabled when a mouse is
+     connected) paints a persistent native gutter that light color-scheme
+     themes render pale over dark surfaces; the app opts out entirely and
+     scrolling stays on wheel, trackpad, keys, and drag. */
+  * {
+    scrollbar-width: none;             /* Firefox, Chrome 121+ */
+  }
+  *::-webkit-scrollbar {
+    width: 0;                          /* Safari + older Chromium */
+    height: 0;
+  }
 }
 
 @layer components {
+  /* Icon links — clickable glyphs (toolbar icons, view toggles) carry the
+     theme's link color in EVERY theme: muted accent at rest, full accent on
+     hover. Neutral-toned glyphs are reserved for static, non-interactive
+     marks — if it's colored, it's clickable. */
+  .icon-link {
+    @apply text-accent/65 hover:text-accent transition-colors;
+  }
+
   /* Buttons share the control radius with fields — one knob rounds every
      interactive rectangle in the product. */
   .btn-primary {

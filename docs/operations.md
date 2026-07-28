@@ -123,4 +123,4 @@ See [MCP Admin Tools — Ortho Pipeline](api/mcp/admin.md#ortho-pipeline) for th
 
 ## Navigation
 
-The Operations entry lives in the choreography sidebar (the left rail visible on `/operations` and `/escalations`), separate from the Admin sidebar. The `/operations` route admits admin-type users, superadmins, and engineers — the same audience the sidebar shows the entry to.
+The Operations entry lives in the choreography sidebar (the left rail visible on `/operations` and `/escalations`), separate from the Admin sidebar. The `/operations` route admits every authenticated user — the board is aggregate counts and trends, readonly by nature. Station metrics span all roles for any login while the `features.publicPaceBoard` flag (default on) stands; a deployment that sets it false (e.g. one provisioning external one-time accounts) narrows metrics back to role membership and the board back to admin-type users and superadmins.

@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import { configureFeatureFlags } from '../../../modules/features';
 
 vi.mock('../../../services/escalation', () => ({
   listEscalations: vi.fn(),
@@ -198,6 +200,19 @@ describe('getStationMetrics', () => {
     wait: { p99: 0.5, p50: 0.3, avg: 0.4, max: 1.2 },
     work: { p99: 0.67, p50: 0.5, avg: 0.55, max: 0.9 },
   };
+
+  // publicPaceBoard (the default) spans all stations for any login; the
+  // membership-scoping contract below is the flag-off behavior.
+  beforeEach(() => configureFeatureFlags({ publicPaceBoard: false }));
+  afterEach(() => configureFeatureFlags());
+
+  it('publicPaceBoard (default): any login sees every station, no scope lookup', async () => {
+    configureFeatureFlags();
+    mockStations.mockResolvedValue([stationRow]);
+    await getStationMetrics({ period: '24h' }, AUTH);
+    expect(mockStations).toHaveBeenCalledWith(undefined, '24h');
+    expect(mockScope).not.toHaveBeenCalled();
+  });
 
   it('returns empty stations when user has no read_all roles', async () => {
     mockScope.mockResolvedValue(EMPTY);

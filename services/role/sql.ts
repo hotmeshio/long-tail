@@ -89,9 +89,16 @@ export const DELETE_ROLE = `
  * enforce_schema ($33 = provided sentinel, $34 = value) is unversioned config:
  * the server-side resolver-validation opt-in. The service layer invalidates
  * the enforcement cache after this statement commits.
+ *
+ * ops_home_default ($35 = provided sentinel, $36 = value) is single-holder:
+ * setting it true clears the flag on every other role in the same statement
+ * (the home_clear CTE touches only OTHER rows, so the two UPDATEs never meet).
  */
 export const UPDATE_ROLE_METADATA = `
-  WITH updated AS (
+  WITH home_clear AS (
+    UPDATE lt_roles SET ops_home_default = false
+    WHERE $35::boolean AND COALESCE($36::boolean, false) AND role <> $1 AND ops_home_default
+  ), updated AS (
     UPDATE lt_roles SET
       title           = CASE WHEN $2::boolean  THEN $3                                ELSE title           END,
       description     = CASE WHEN $4::boolean  THEN $5                                ELSE description     END,
@@ -109,6 +116,7 @@ export const UPDATE_ROLE_METADATA = `
       list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
       default_pins    = CASE WHEN $31::boolean THEN $32::jsonb                        ELSE default_pins    END,
       enforce_schema  = CASE WHEN $33::boolean THEN COALESCE($34::boolean, false)     ELSE enforce_schema  END,
+      ops_home_default = CASE WHEN $35::boolean THEN COALESCE($36::boolean, false)    ELSE ops_home_default END,
       current_schema_version = CASE
         WHEN ($6::boolean AND $7::jsonb IS DISTINCT FROM form_schema)
           OR ($8::boolean AND $9::jsonb IS DISTINCT FROM metadata_schema)
@@ -121,7 +129,7 @@ export const UPDATE_ROLE_METADATA = `
     WHERE role = $1
     RETURNING
       role, title, description, form_schema, metadata_schema, properties,
-      ops_visible, parent_role, sla_minutes, target_per_hour, worker_count,
+      ops_visible, ops_home_default, parent_role, sla_minutes, target_per_hour, worker_count,
       priority_threshold_minutes, priority_facet,
       current_schema_version, list_schema, current_list_schema_version,
       default_pins, enforce_schema
@@ -270,6 +278,7 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.metadata_schema,
     r.properties,
     r.ops_visible,
+    r.ops_home_default,
     r.parent_role,
     r.sla_minutes,
     r.target_per_hour,

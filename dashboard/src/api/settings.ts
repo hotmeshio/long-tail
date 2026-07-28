@@ -15,6 +15,8 @@ export interface AppSettings {
   features?: {
     /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
     dbMaintenance?: boolean;
+    /** Pace Board readable by every login (aggregate counts and trends). Default: true. */
+    publicPaceBoard?: boolean;
     /**
      * Graph workflow section visibility.
      * true  → always shown.

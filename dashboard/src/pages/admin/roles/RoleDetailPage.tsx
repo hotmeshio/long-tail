@@ -315,6 +315,7 @@ interface Draft {
   title: string;
   description: string;
   ops_visible: boolean;
+  ops_home_default: boolean;
   enforce_schema: boolean;
   parent_role: string;
   metadata_schema: string;
@@ -331,6 +332,7 @@ function draftFrom(role: RoleDetail): Draft {
     title: role.title ?? '',
     description: role.description ?? '',
     ops_visible: role.ops_visible,
+    ops_home_default: role.ops_home_default,
     enforce_schema: role.enforce_schema,
     parent_role: role.parent_role ?? '',
     metadata_schema: safePrettyPrint(role.metadata_schema),
@@ -360,7 +362,7 @@ export function RoleDetailPage() {
   const role = roles.find((r) => r.role === roleKey);
 
   const [draft, setDraft] = useState<Draft>({
-    title: '', description: '', ops_visible: false, enforce_schema: false, parent_role: '',
+    title: '', description: '', ops_visible: false, ops_home_default: false, enforce_schema: false, parent_role: '',
     metadata_schema: '', properties: '{}',
     sla_minutes: '', target_per_hour: '', worker_count: '',
     priority_threshold_minutes: '', priority_facet: '',
@@ -425,6 +427,7 @@ export function RoleDetailPage() {
         title: draft.title.trim() || null,
         description: draft.description.trim() || null,
         ops_visible: draft.ops_visible,
+        ops_home_default: draft.ops_home_default,
         enforce_schema: draft.enforce_schema,
         parent_role: draft.parent_role || null,
         metadata_schema: metaResult.value ?? null,
@@ -740,6 +743,35 @@ export function RoleDetailPage() {
                     <LiveBadge />
                   </div>
                   <UpstreamSection role={role} allRoles={roles} />
+                </div>
+
+                {/* Home segment — which sequence leads everyone's home board.
+                    Single-holder: saving this on releases the previous holder. */}
+                <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
+                      Home Segment
+                    </label>
+                    <button
+                      onClick={() => update({ ops_home_default: !draft.ops_home_default })}
+                      className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${
+                        draft.ops_home_default ? 'bg-accent' : 'bg-surface-border'
+                      }`}
+                      title="Lead the home Pace Board with this role's sequence"
+                    >
+                      <span
+                        className={`absolute top-[3px] left-0 w-3.5 h-3.5 rounded-full bg-text-inverse transition-transform shadow ${
+                          draft.ops_home_default ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-2xs text-text-tertiary leading-relaxed mt-1.5">
+                    Lead the home page's Pace Board with this role's sequence.
+                    One role holds this — saving it here releases the previous
+                    holder. Unset everywhere, the board opens on its first
+                    sequence.
+                  </p>
                 </div>
               </div>
             </SectionGroup>

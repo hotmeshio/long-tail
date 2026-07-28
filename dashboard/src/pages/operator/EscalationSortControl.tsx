@@ -51,7 +51,7 @@ export function EscalationSortControl({ orderBy, onChange }: {
           role="radio"
           aria-checked={direction === 'desc'}
           onClick={() => set('desc')}
-          className={`px-1.5 py-1 transition-colors ${direction === 'desc' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:bg-surface-hover'}`}
+          className={`px-1.5 py-1 transition-colors ${direction === 'desc' ? 'bg-accent text-text-inverse' : 'icon-link hover:bg-surface-hover'}`}
           title={isDefaultField ? 'Newest first' : `${sortLabel(field)} descending`}
         >
           <ArrowDown className="w-3.5 h-3.5" />
@@ -61,7 +61,7 @@ export function EscalationSortControl({ orderBy, onChange }: {
           role="radio"
           aria-checked={direction === 'asc'}
           onClick={() => set('asc')}
-          className={`px-1.5 py-1 border-l border-surface-border transition-colors ${direction === 'asc' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:bg-surface-hover'}`}
+          className={`px-1.5 py-1 border-l border-surface-border transition-colors ${direction === 'asc' ? 'bg-accent text-text-inverse' : 'icon-link hover:bg-surface-hover'}`}
           title={isDefaultField ? 'Oldest first' : `${sortLabel(field)} ascending`}
         >
           <ArrowUp className="w-3.5 h-3.5" />

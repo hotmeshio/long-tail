@@ -12,10 +12,20 @@ export interface FeatureFlags {
    * Default: true. Set `features.dbMaintenance: false` in start config to hide it.
    */
   dbMaintenance: boolean;
+  /**
+   * The Pace Board is readable by every authenticated user: station metrics
+   * (aggregate queue-shape counts and trends — never item content) span all
+   * roles for any login, and the board leads everyone's home page. Default:
+   * true. Set `features.publicPaceBoard: false` to scope metrics back to role
+   * membership — the right call for deployments that provision external
+   * one-time accounts (e.g. a customer resolving a single form).
+   */
+  publicPaceBoard: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   dbMaintenance: true,
+  publicPaceBoard: true,
 };
 
 let flags: FeatureFlags = { ...DEFAULT_FLAGS };

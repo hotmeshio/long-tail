@@ -235,6 +235,14 @@ export interface LTStartConfig {
   features?: {
     /** Show the DB Maintenance admin page (nav + route). Default: true. */
     dbMaintenance?: boolean;
+    /**
+     * Pace Board for every login: station metrics (aggregate counts and
+     * trends, never item content) span all roles for any authenticated user,
+     * and the board leads everyone's home page. Default: true. Set false to
+     * scope metrics back to role membership (deployments provisioning
+     * external one-time accounts).
+     */
+    publicPaceBoard?: boolean;
   };
 
   /**

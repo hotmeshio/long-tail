@@ -287,6 +287,7 @@ export const updateRoleSchema = z.object({
   metadata_schema: z.record(z.any()).nullable().optional().describe('JSON Schema declaring the expected shape of lt_escalations.metadata for this role. Drives creation-time validation and faceted-query key autocomplete.'),
   properties: z.record(z.any()).nullable().optional().describe('Free user-owned bag (icon, color, tags, etc.). No reserved keys — use the typed columns below for operational values.'),
   ops_visible: z.boolean().optional().describe('When true, role appears as a station on the /operations view'),
+  ops_home_default: z.boolean().optional().describe('Make this role\'s sequence the home Pace Board\'s default segment. Single-holder — setting it true clears the flag on every other role.'),
   parent_role: z.string().nullable().optional().describe('Parent role in the process dependency graph (nullable; roots have no parent)'),
   sla_minutes: z.number().nullable().optional().describe('Target resolution time in minutes. One of the capacity settings: target_per_hour = worker_count / (sla_minutes / 60)'),
   target_per_hour: z.number().nullable().optional().describe('Intended throughput (items resolved per hour). Drives the station pace baseline on the Operations view.'),

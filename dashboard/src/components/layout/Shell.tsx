@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
+import { useFollowMyClaims } from '../../hooks/useFollowMyClaims';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
@@ -35,6 +36,8 @@ import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 function ShellLayout() {
   const { isBuilder, isOps, viewAs } = useAccess();
   const { canSeePaceBoard } = usePersona();
+  // Claim hand-off: anything claimed in the viewer's name pulls them to it.
+  useFollowMyClaims();
   const { data: settings } = useSettings();
   const aiOverride = getAiOverride();
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;

@@ -26,6 +26,7 @@ vi.mock('../../../api/escalations', async (importOriginal) => ({
 vi.mock('../../../api/roles', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRoles: () => ({ data: { roles: ['walk-role'] } }),
+  useRoleDetails: () => ({ data: { roles: [{ role: 'walk-role', title: 'Walk Role' }] } }),
   useRoleListSchema: (role: string, _v?: number, enabled = true) => ({
     data: enabled && role ? { list_schema: state.listSchema } : undefined,
   }),
@@ -38,7 +39,11 @@ vi.mock('../../../api/preferences', async (importOriginal) => ({
 }));
 
 vi.mock('../../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { userId: 'resolver-1' } }),
+  useAuth: () => ({
+    user: { userId: 'resolver-1', roles: [{ role: 'walk-role' }] },
+    isSuperAdmin: false,
+    hasRoleType: () => false,
+  }),
 }));
 
 vi.mock('../../../hooks/useEventHooks', async (importOriginal) => ({

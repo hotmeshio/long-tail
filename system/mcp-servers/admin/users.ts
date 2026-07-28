@@ -235,6 +235,7 @@ export function registerUserTools(server: McpServer): void {
         metadata_schema: args.metadata_schema as Record<string, any> | null | undefined,
         properties: args.properties as Record<string, any> | null | undefined,
         ops_visible: args.ops_visible,
+        ops_home_default: args.ops_home_default,
         parent_role: args.parent_role,
         sla_minutes: args.sla_minutes,
         target_per_hour: args.target_per_hour,

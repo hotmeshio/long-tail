@@ -22,6 +22,13 @@ export interface RoleDetail {
   /** Free-form user-owned bag. No reserved keys — use for icons, colors, tags, etc. */
   properties: Record<string, any>;
   ops_visible: boolean;
+  /**
+   * Marks this role's sequence as the HOME page's default Pace Board segment.
+   * Single-holder: setting it on one role clears it everywhere else. Only
+   * meaningful while ops_visible is on; unset anywhere → the home board shows
+   * the primary (first) segment.
+   */
+  ops_home_default: boolean;
   parent_role: string | null;
   /** Target resolution time (minutes). Part of the ops triangle. */
   sla_minutes: number | null;
@@ -133,6 +140,8 @@ export interface UpdateRoleInput {
   default_pins?: { label: string; url: string; badge?: boolean }[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
+  /** Make this role's sequence the home Pace Board's default segment (single-holder). */
+  ops_home_default?: boolean;
   parent_role?: string | null;
   sla_minutes?: number | null;
   target_per_hour?: number | null;

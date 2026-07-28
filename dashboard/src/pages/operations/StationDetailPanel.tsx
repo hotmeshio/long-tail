@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, ExternalLink, Settings, List } from 'lucide-react';
+import { X, ExternalLink } from 'lucide-react';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
 import type { RoleDetail } from '../../api/roles';
@@ -52,7 +52,7 @@ function PeriodSelector({ period, onChange }: { period: Period; onChange: (p: Pe
           className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
             period === p
               ? 'bg-accent/10 text-accent font-semibold'
-              : 'text-text-quaternary hover:text-text-secondary'
+              : 'icon-link'
           }`}
         >
           {p}
@@ -89,28 +89,24 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         </div>
         <button
           onClick={onClose}
-          className="text-text-quaternary hover:text-text-secondary transition-colors mt-0.5 shrink-0 ml-2"
+          className="icon-link mt-0.5 shrink-0 ml-2"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="flex items-center gap-3 mb-6">
+      {/* Jeopardy leads — the one line that demands action never scrolls out of view. */}
+      {metric && metric.priority_count > 0 && (
         <Link
-          to={`/admin/roles/${encodeURIComponent(role.role)}`}
-          className="flex items-center gap-1 text-2xs text-accent hover:underline"
+          to={jeopardyQueueLink(role)}
+          className="flex items-center justify-between group mb-4"
         >
-          <Settings className="w-2.5 h-2.5" />
-          Edit in Roles
+          <span className="text-2xs" style={{ color: PRIORITY_TEXT_COLOR }}>
+            {metric.priority_count} in jeopardy — pull oldest first
+          </span>
+          <ExternalLink className="w-3 h-3 transition-colors" style={{ color: PRIORITY_TEXT_COLOR }} />
         </Link>
-        <Link
-          to={`/escalations/available?role=${encodeURIComponent(role.role)}`}
-          className="flex items-center gap-1 text-2xs text-accent hover:underline"
-        >
-          <List className="w-2.5 h-2.5" />
-          View full queue
-        </Link>
-      </div>
+      )}
 
       <PeriodSelector period={period} onChange={setPeriod} />
 
@@ -152,26 +148,15 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
         </div>
       </div>
 
-      {/* SLA + priority */}
-      <div className="border-t border-surface-border/40 pt-4 mt-5 space-y-2.5">
-        {slaMinutes && (
+      {/* SLA */}
+      {slaMinutes && (
+        <div className="border-t border-surface-border/40 pt-4 mt-5">
           <div className="flex items-center justify-between">
             <span className="text-2xs text-text-tertiary">SLA target</span>
             <span className="text-xs font-mono text-text-secondary">{slaMinutes}m</span>
           </div>
-        )}
-        {metric && metric.priority_count > 0 && (
-          <Link
-            to={jeopardyQueueLink(role)}
-            className="flex items-center justify-between group"
-          >
-            <span className="text-2xs" style={{ color: PRIORITY_TEXT_COLOR }}>
-              {metric.priority_count} in jeopardy — pull oldest first
-            </span>
-            <ExternalLink className="w-3 h-3 transition-colors" style={{ color: PRIORITY_TEXT_COLOR }} />
-          </Link>
-        )}
-      </div>
+        </div>
+      )}
 
     </>
   );
@@ -267,13 +252,18 @@ function OverviewPanel({
                 className={`text-2xs font-mono flex-1 truncate ${
                   hasLoad ? 'text-text-primary' : 'text-text-quaternary'
                 }`}
+                title={label}
               >
                 {label}
-                {hasAlert && (
-                  <span className="ml-1 text-2xs font-semibold" style={{ color: PRIORITY_TEXT_COLOR }}>
-                    {priorityCount} PRIORITY
-                  </span>
-                )}
+              </span>
+              {/* Priority as a bare right-aligned number — the slot always
+                  renders so the count column stays aligned across rows. */}
+              <span
+                className="text-[0.625rem] leading-none font-semibold tabular-nums w-4 text-right shrink-0"
+                style={{ color: PRIORITY_TEXT_COLOR }}
+                title={hasAlert ? `${priorityCount} priority — pull oldest first` : undefined}
+              >
+                {hasAlert ? priorityCount : ''}
               </span>
               <span
                 className={`text-2xs font-mono tabular-nums w-8 text-right shrink-0 ${

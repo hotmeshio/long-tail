@@ -11,7 +11,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { getConnection } from '../../../lib/db';
 import * as escalationCrud from '../../../services/escalation/crud';
-import { bulkAssignEscalationsByQuery } from '../../../services/escalation/bulk';
+import { bulkAssign } from '../../../api/escalations';
 import { parseResolverPayload } from '../../../lib/typed-resolution';
 
 import {
@@ -76,12 +76,22 @@ export async function assignWalk(input: {
   originId: string;
   walker: string;
 }): Promise<{ assigned: number }> {
-  const { assigned } = await bulkAssignEscalationsByQuery(
-    { role: REL_PLATE_ROLE, facets: { originId: input.originId } },
-    input.walker,
-    60,
+  // Through the public api/ surface, as the walker: RBAC applies (the walker
+  // works rel-plate, so they hold it) and the per-row `claimed` events publish
+  // with `assigned_to` — the dashboard's claim hand-off follows the walker to
+  // their plates.
+  const result = await bulkAssign(
+    {
+      query: { role: REL_PLATE_ROLE, facets: { originId: input.originId } },
+      targetUserId: input.walker,
+      durationMinutes: 60,
+    },
+    { userId: input.walker },
   );
-  return { assigned };
+  if (result.status !== 200) {
+    throw new Error(`walk assignment failed: ${result.error}`);
+  }
+  return { assigned: (result.data?.assigned as number) ?? 0 };
 }
 
 /**
