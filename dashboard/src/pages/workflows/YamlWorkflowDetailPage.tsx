@@ -7,6 +7,7 @@ import { useYamlWorkflow, useYamlWorkflowVersions } from '../../api/yaml-workflo
 import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { NamespacePill } from '../../components/common/display/NamespacePill';
 import { Pill } from '../../components/common/display/Pill';
+import { SimpleMarkdown } from '../../components/common/display/SimpleMarkdown';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -130,7 +131,9 @@ export function YamlWorkflowDetailPage() {
       </div>
 
       {flow.description && (
-        <p className="text-sm text-text-secondary mb-8 max-w-2xl leading-relaxed">{flow.description}</p>
+        <div className="text-sm text-text-secondary mb-8 max-w-2xl leading-relaxed">
+          <SimpleMarkdown content={flow.description} />
+        </div>
       )}
 
       {flow.tags?.length > 0 && (

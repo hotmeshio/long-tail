@@ -8,6 +8,7 @@ import { DataTable } from '../../../components/common/data/DataTable';
 import type { LTWorkflowConfig } from '../../../api/types';
 import { DEFAULT_ENVELOPE } from './helpers';
 import { describeCron, COMMON_PATTERNS, extractFormFields, jobColumns } from '../cron/helpers';
+import { SimpleMarkdown } from '../../../components/common/display/SimpleMarkdown';
 
 export function SchedulePanel({
   selected,
@@ -113,9 +114,9 @@ export function SchedulePanel({
           )}
         </div>
         {selected.description && (
-          <p className="text-xs text-text-quaternary mt-1 leading-relaxed">
-            {selected.description}
-          </p>
+          <div className="text-xs text-text-secondary mt-1 leading-relaxed">
+            <SimpleMarkdown content={selected.description} compact />
+          </div>
         )}
       </div>
 
