@@ -243,6 +243,12 @@ export interface LTStartConfig {
      * external one-time accounts).
      */
     publicPaceBoard?: boolean;
+    /**
+     * Scan-code input surfaces (header scan affordance, panel, keyboard-wedge
+     * capture) for every persona. Opt-in: default false. Set true for
+     * deployments where scanners drive the floor workflow.
+     */
+    scanCodes?: boolean;
   };
 
   /**

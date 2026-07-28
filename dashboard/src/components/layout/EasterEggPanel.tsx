@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { X, Eye, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../api/settings';
-import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, type ViewAsRole } from '../../lib/view-as';
+import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, getScanOverride, setScanOverride, clearScanOverride, type ViewAsRole } from '../../lib/view-as';
 import { LT_BASE } from '../../lib/base-path';
 
 type RealTier = 'superadmin' | 'admin' | 'engineer' | 'operator';
@@ -50,6 +50,14 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
   const graphUserControlled = serverGraph === undefined || serverGraph === null;
   const [graphToggle, setGraphToggle] = useState(
     serverGraph === true || (graphUserControlled && getGraphEnabled()),
+  );
+
+  // Scan input is opt-in: the deployment default (features.scanCodes, false
+  // when omitted) unless a local override is set for testing.
+  const serverScanEnabled = !!settings?.features?.scanCodes;
+  const scanOverride = getScanOverride();
+  const [scanToggle, setScanToggle] = useState(
+    scanOverride !== null ? scanOverride : serverScanEnabled,
   );
 
   const realTier: RealTier = isSuperAdmin
@@ -101,6 +109,14 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
     const next = !graphToggle;
     setGraphToggle(next);
     setGraphEnabled(next);
+    window.location.reload();
+  };
+
+  const toggleScan = () => {
+    const next = !scanToggle;
+    setScanToggle(next);
+    if (next === serverScanEnabled) clearScanOverride();
+    else setScanOverride(next);
     window.location.reload();
   };
 
@@ -237,6 +253,22 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                 </span>
               </button>
             )}
+            <button
+              onClick={toggleScan}
+              className="w-full text-left flex items-center justify-between py-2.5 px-1 group"
+            >
+              <span>
+                <span className="block text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
+                  Scan input
+                </span>
+                <span className="block text-xs text-text-secondary mt-0.5">
+                  {scanToggle ? 'Enabled — header scan affordance, panel, and keyboard-wedge capture' : 'Hidden — the deployment opts in with features.scanCodes'}
+                </span>
+              </span>
+              <span className={`shrink-0 ml-4 w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${scanToggle ? 'bg-accent' : 'bg-surface-border'}`}>
+                <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${scanToggle ? 'translate-x-4' : 'translate-x-0'}`} />
+              </span>
+            </button>
           </div>
         )}
 

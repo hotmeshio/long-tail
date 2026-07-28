@@ -12,6 +12,7 @@ import {
 } from './helpers';
 import { IdentitySummary } from './IdentitySummary';
 import { EnvelopeEditor } from './EnvelopeEditor';
+import { SimpleMarkdown } from '../../../components/common/display/SimpleMarkdown';
 
 export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfig; executionsPath: string }) {
   const navigate = useNavigate();
@@ -125,9 +126,9 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
       <div>
         <h2 className="text-lg font-mono font-medium text-text-primary">{selected.workflow_type}</h2>
         {selected.description && (
-          <p className="text-xs text-text-quaternary mt-1 leading-relaxed">
-            {selected.description}
-          </p>
+          <div className="text-xs text-text-secondary mt-1 leading-relaxed">
+            <SimpleMarkdown content={selected.description} compact />
+          </div>
         )}
       </div>
 

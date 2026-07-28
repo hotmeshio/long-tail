@@ -21,6 +21,7 @@
  *   topics.ts              — routes/topics.ts
  *   settings.ts            — routes/settings.ts
  *   exports.ts             — routes/exports.ts
+ *   scan-codes.ts          — routes/scan-codes.ts
  *
  * This server replaces three previously separate servers:
  *   - long-tail-db-query (read-only task/escalation/health queries)
@@ -55,8 +56,9 @@ import { registerExportTools } from './exports';
 import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 import { registerOrthoTools } from './ortho';
+import { registerScanCodeTools } from './scan-codes';
 
-const TOOL_COUNT = 100;
+const TOOL_COUNT = 105;
 
 let server: McpServer | null = null;
 
@@ -93,7 +95,8 @@ export async function createAdminServer(options?: {
   registerOverviewTools(instance);          //  1 tool
   registerDiagnosticsTools(instance);       //  3 tools
   registerOrthoTools(instance);             //  4 tools
-  // Total: 100
+  registerScanCodeTools(instance);          //  5 tools (scan schemes + rules + execute)
+  // Total: 105
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

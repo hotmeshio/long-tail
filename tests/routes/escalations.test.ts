@@ -378,15 +378,10 @@ describe('Escalation routes', () => {
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
-      // Non-signal: { escalation: { status: 'resolved' } }
-      // Both are valid 200 outcomes
-      if (body.escalation) {
-        expect(body.escalation.status).toBe('resolved');
-      } else {
-        // CTE returned signal_required due to connection pool behavior —
-        // verify via find that it resolved
-        expect(body.signaled).toBeDefined();
-      }
+      // Non-signal rows resolve in the single atomic statement — the response
+      // carries the resolved escalation, never a signal handoff.
+      expect(body.escalation).toBeDefined();
+      expect(body.escalation.status).toBe('resolved');
     });
 
     it('signal-backed escalation is not resolved in DB (signal path taken)', async () => {

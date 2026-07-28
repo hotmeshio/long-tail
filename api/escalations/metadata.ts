@@ -11,6 +11,23 @@ import { validationFailure } from './resolve';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 /**
+ * Intersect the caller's scope roles with an optional caller-supplied
+ * restriction (e.g. a scan step's expected queues). Global scope with no
+ * restriction stays unfiltered (null); a restriction always applies. An
+ * empty intersection returns [] — which matches nothing in the SQL filter,
+ * the correct fail-closed outcome.
+ */
+export function restrictScopeRoles(
+  scopeRoles: string[],
+  global: boolean,
+  restrictRoles?: string[],
+): string[] | null {
+  if (!restrictRoles || restrictRoles.length === 0) return global ? null : scopeRoles;
+  if (global) return restrictRoles;
+  return scopeRoles.filter((r) => restrictRoles.includes(r));
+}
+
+/**
  * Find escalations by a metadata key-value pair.
  *
  * Single query with window function for count. Results are
@@ -49,7 +66,7 @@ export async function findByMetadata(
  * the claim never happens. No pre-flight find, no TOCTOU.
  */
 export async function claimByMetadata(
-  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>; provisionIfAbsent?: ProvisionIfAbsent },
+  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>; provisionIfAbsent?: ProvisionIfAbsent; restrictRoles?: string[] },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -64,9 +81,12 @@ export async function claimByMetadata(
     // Write-scope: global → no filter; otherwise restrict to write_all roles. The
     // SDK claim-by-metadata uses a flat role filter and cannot enforce write_self
     // ownership, so self-scope members are excluded from this path (their items
-    // are pre-claimed and acted on by id).
+    // are pre-claimed and acted on by id). An optional caller restriction
+    // (expected queues) intersects with the scope inside the same SQL filter.
     const writeScope = await getEscalationWriteScope(auth.userId);
-    const allowedRoles = writeScope.global ? null : writeScope.allRoles;
+    const allowedRoles = restrictScopeRoles(
+      writeScope.allRoles, writeScope.global, input.restrictRoles,
+    );
 
     const result = await escalationService.claimByMetadata(
       input.key, input.value, claimUserId, input.durationMinutes,
@@ -101,7 +121,7 @@ export async function claimByMetadata(
  * claim + resolve (or signal detection) in one round-trip.
  */
 export async function resolveByMetadata(
-  input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any> },
+  input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any>; restrictRoles?: string[]; extraFacets?: Record<string, any> },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -119,10 +139,16 @@ export async function resolveByMetadata(
     // Write-scope folds into the atomic resolve SQL: global → no filter; otherwise
     // write_all roles match any item, write_self roles match only items assigned
     // to the resolver. A non-global caller cannot pass a foreign assignee, so the
-    // self-branch (assigned_to = resolveUserId) is the caller's own items.
+    // self-branch (assigned_to = resolveUserId) is the caller's own items. An
+    // optional caller restriction (expected queues) intersects with both arrays
+    // inside the same SQL filter.
     const writeScope = await getEscalationWriteScope(auth.userId);
-    const writeAllRoles = writeScope.global ? null : writeScope.allRoles;
-    const writeSelfRoles = writeScope.global ? null : writeScope.selfRoles;
+    const writeAllRoles = restrictScopeRoles(
+      writeScope.allRoles, writeScope.global, input.restrictRoles,
+    );
+    const writeSelfRoles = writeScope.global
+      ? (input.restrictRoles?.length ? [] : null)
+      : restrictScopeRoles(writeScope.selfRoles, false, input.restrictRoles);
 
     // Schema enforcement rides the atomic statement: with the cached enforcing
     // set empty (the common case) the single-call behavior is unchanged. When
@@ -134,6 +160,7 @@ export async function resolveByMetadata(
       input.key, input.value, resolveUserId,
       input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
       enforcing.size > 0 ? [...enforcing] : null,
+      null, input.extraFacets,
     );
 
     if (result.outcome === 'validation_required' && result.row) {
@@ -142,7 +169,7 @@ export async function resolveByMetadata(
       result = await escalationService.resolveByMetadataAtomic(
         input.key, input.value, resolveUserId,
         input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
-        null, result.row.id,
+        null, result.row.id, input.extraFacets,
       );
       // The asserted row left pending between the two passes — a concurrent
       // resolution won the row; surface it as the conflict it is.

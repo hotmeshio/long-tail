@@ -18,6 +18,8 @@ import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
+import { ScanInputProvider } from '../../hooks/useScanInput';
+import { ScanToast } from '../scan/ScanToast';
 
 /**
  * The canonical container layout. Every authenticated page renders inside it:
@@ -149,6 +151,8 @@ function ShellLayout() {
       <DocsDrawer open={docsOpen} onClose={() => { setDocsOpen(false); history.replaceState(null, '', window.location.pathname + window.location.search); }} />
       {aiEnabled && <HelpButton />}
       {aiEnabled && <HelpPanel />}
+      {/* Transient outcome notice for scans that answer without navigating. */}
+      <ScanToast />
     </div>
   );
 }
@@ -174,7 +178,9 @@ export function Shell() {
     <SidebarProvider>
       <ShellPanelProvider>
         <HelpAssistantProvider>
-          <ShellLayout />
+          <ScanInputProvider>
+            <ShellLayout />
+          </ScanInputProvider>
         </HelpAssistantProvider>
       </ShellPanelProvider>
     </SidebarProvider>

@@ -24,6 +24,12 @@ export interface AppSettings {
      * absent → user-controlled via easter egg (default off).
      */
     graphWorkflows?: boolean;
+    /**
+     * Scan-code input surfaces (header scan affordance, panel, keyboard-wedge
+     * capture) for every persona. Opt-in: default false. A local easter-egg
+     * override tests either state without a deployment change.
+     */
+    scanCodes?: boolean;
   };
   branding?: {
     appName?: string;

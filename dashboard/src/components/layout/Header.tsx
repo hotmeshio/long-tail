@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Inbox, User, BookOpen, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Inbox, User, BookOpen, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight, ScanBarcode } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
@@ -11,8 +11,12 @@ import { AppLogo } from '../common/display/AppLogo';
 import { EasterEggPanel } from './EasterEggPanel';
 import { clearViewAs } from '../../lib/view-as';
 import { getAllThemes, registerThemes, getTheme, setTheme, type Theme } from '../../lib/theme';
+import { useShellPanel } from '../../hooks/useShellPanel';
+import { useScanEnabled } from '../../hooks/useScanInput';
+import { ScanPanel } from '../scan/ScanPanel';
 
 const BOOKMARKS_KEY = 'lt:bookmarks';
+const SCAN_PANEL_KEY = 'scan';
 
 type Bookmark = { label: string; url: string };
 
@@ -39,7 +43,20 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
   usePersona();
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
+  const { setPanel, closePanel, open: panelOpen, ownerKey } = useShellPanel();
+  const scanEnabled = useScanEnabled();
   const location = useLocation();
+
+  const toggleScanPanel = () => {
+    if (panelOpen && ownerKey === SCAN_PANEL_KEY) {
+      closePanel(SCAN_PANEL_KEY);
+    } else {
+      setPanel(<ScanPanel onClose={() => closePanel(SCAN_PANEL_KEY)} />, {
+        width: 360,
+        key: SCAN_PANEL_KEY,
+      });
+    }
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [theme, setActiveTheme] = useState<Theme>(getTheme);
@@ -173,6 +190,22 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           </Link>
 
           <div className="hidden lg:block w-px h-4 bg-surface-border" />
+
+          {/* Scan — manual code entry + wedge capture settings. Every persona
+              sees it when the deployment opts in (features.scanCodes, easter
+              egg override for testing). Hardware scans work from any page;
+              this opens the panel that reports them. */}
+          {scanEnabled && (
+            <button
+              type="button"
+              onClick={toggleScanPanel}
+              className="flex items-center gap-1.5 text-xs text-text-quaternary hover:text-text-secondary transition-colors"
+              title="Scan a code"
+            >
+              <ScanBarcode className="w-4 h-4" strokeWidth={1.5} />
+              <span className="hidden lg:inline">scan</span>
+            </button>
+          )}
 
           {/* Events — every login watches the floor live; the stream itself is
               role-scoped server-side, so members simply receive fewer events. */}
