@@ -91,11 +91,22 @@ describe('scheme and rule CRUD', () => {
     )).rejects.toThrow(/400.*targetRole/);
   });
 
-  it('denies rule writes to non-admins', async () => {
+  it('denies rule writes to plain members', async () => {
     await expect(reviewer.put(
       `/api/scan-codes/schemes/${VERSION}/actions/98`,
       { name: 'nope', steps: [{ query: {}, verb: 'show-detail' }] },
     )).rejects.toThrow(/403/);
+  });
+
+  it('engineers can write rules (role-manager gate)', async () => {
+    const engineer = new ApiClient();
+    await engineer.login('engineer', PASSWORD);
+    const { status } = await engineer.put(
+      `/api/scan-codes/schemes/${VERSION}/actions/97`,
+      { name: 'engineer-case', steps: [{ query: {}, verb: 'show-detail' }] },
+    );
+    expect(status).toBe(200);
+    await engineer.delete(`/api/scan-codes/schemes/${VERSION}/actions/97`);
   });
 });
 

@@ -257,6 +257,20 @@ describe('getSettings — feature flags', () => {
     const result = await getSettings();
     expect(result.data.features.dbMaintenance).toBe(true);
   });
+
+  it('defaults scanCodes to false (opt-in)', async () => {
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags();
+    const result = await getSettings();
+    expect(result.data.features.scanCodes).toBe(false);
+  });
+
+  it('reports scanCodes: true when the start config opts in', async () => {
+    const { configureFeatureFlags } = await import('../../modules/features');
+    configureFeatureFlags({ scanCodes: true });
+    const result = await getSettings();
+    expect(result.data.features.scanCodes).toBe(true);
+  });
 });
 
 describe('getSettings — SSO', () => {

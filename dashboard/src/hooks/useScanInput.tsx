@@ -24,6 +24,20 @@ import {
 } from '../lib/scan-sources/keyboard-wedge';
 import { SCAN_SOURCE_IDS, type ScanSourceId } from '../lib/scan-sources/types';
 import { metadataFacetsUrl } from '../lib/facet-url';
+import { getScanOverride } from '../lib/view-as';
+import { useSettings } from '../api/settings';
+
+/**
+ * Effective scan-input state: the deployment's `features.scanCodes` flag
+ * (opt-in, default false) unless a local easter-egg override is set. Gates
+ * every scan surface — the header affordance, the panel, and the global
+ * keyboard-wedge capture.
+ */
+export function useScanEnabled(): boolean {
+  const { data: settings } = useSettings();
+  const override = getScanOverride();
+  return override !== null ? override : !!settings?.features?.scanCodes;
+}
 
 export interface ScanResult {
   code: string;
@@ -69,6 +83,7 @@ export const SCAN_PENDING_ACTION_STATE = 'scanPendingAction';
  */
 export function ScanInputProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const enabled = useScanEnabled();
   const navigate = useNavigate();
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -132,7 +147,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
   // every key before focused inputs do; the burst machine decides which
   // keys belong to a scan and directs their suppression.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !enabled) return;
     const machine = createWedgeMachine(wedgeConfig);
     const onKeyDown = (e: KeyboardEvent) => {
       const { suppress, emit } = machine.step({
@@ -149,7 +164,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [user, wedgeConfig]);
+  }, [user, enabled, wedgeConfig]);
 
   const updateWedgeConfig = useCallback((patch: Partial<WedgeConfig>) => {
     setWedgeConfig(saveWedgeConfig(patch));

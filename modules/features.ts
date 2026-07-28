@@ -21,11 +21,20 @@ export interface FeatureFlags {
    * one-time accounts (e.g. a customer resolving a single form).
    */
   publicPaceBoard: boolean;
+  /**
+   * Scan-code input on every login: the header scan affordance, the panel,
+   * and the global keyboard-wedge capture. Opt-IN: default false — a
+   * deployment turns it on with `features.scanCodes: true` when scanners are
+   * part of the floor workflow. The scan-code execute/config API stays
+   * available either way (the flag gates the dashboard surface).
+   */
+  scanCodes: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   dbMaintenance: true,
   publicPaceBoard: true,
+  scanCodes: false,
 };
 
 let flags: FeatureFlags = { ...DEFAULT_FLAGS };

@@ -1,6 +1,7 @@
 const VIEW_AS_KEY = 'lt_view_as';
 const AI_OVERRIDE_KEY = 'lt_ai_override';
 const GRAPH_ENABLED_KEY = 'lt_graph_enabled';
+const SCAN_OVERRIDE_KEY = 'lt_scan_override';
 
 /** Returns the local AI override, or null if no override is set (falls back to server setting). */
 export function getAiOverride(): boolean | null {
@@ -50,4 +51,22 @@ export function setGraphEnabled(enabled: boolean): void {
     if (enabled) localStorage.setItem(GRAPH_ENABLED_KEY, 'true');
     else localStorage.removeItem(GRAPH_ENABLED_KEY);
   } catch {}
+}
+
+/** Local scan-input override, or null when no override is set (falls back to settings.features.scanCodes). */
+export function getScanOverride(): boolean | null {
+  try {
+    const v = localStorage.getItem(SCAN_OVERRIDE_KEY);
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+  } catch { /* localStorage unavailable */ }
+  return null;
+}
+
+export function setScanOverride(enabled: boolean): void {
+  try { localStorage.setItem(SCAN_OVERRIDE_KEY, String(enabled)); } catch {}
+}
+
+export function clearScanOverride(): void {
+  try { localStorage.removeItem(SCAN_OVERRIDE_KEY); } catch {}
 }

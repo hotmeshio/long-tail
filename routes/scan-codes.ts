@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import * as api from '../api/scan-codes';
-import { requireAdmin } from '../modules/auth';
+import { requireRoleManager } from '../modules/auth';
 
 const router = Router();
 
@@ -17,7 +17,7 @@ router.post('/execute', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
-// ── Scheme CRUD (admin) ───────────────────────────────────────────────────
+// ── Scheme CRUD (admin, engineer, superadmin) ─────────────────────────────
 
 /**
  * GET /api/scan-codes/schemes
@@ -39,9 +39,9 @@ router.get('/schemes/:version', async (req, res) => {
 
 /**
  * PUT /api/scan-codes/schemes/:version
- * Create or replace a scan scheme. Admin only.
+ * Create or replace a scan scheme. Admin, engineer, or superadmin.
  */
-router.put('/schemes/:version', requireAdmin, async (req, res) => {
+router.put('/schemes/:version', requireRoleManager, async (req, res) => {
   const result = await api.upsertScanScheme({
     version: Number(req.params.version),
     name: req.body.name,
@@ -57,14 +57,14 @@ router.put('/schemes/:version', requireAdmin, async (req, res) => {
 
 /**
  * DELETE /api/scan-codes/schemes/:version
- * Delete a scheme and its rules (cascade). Admin only.
+ * Delete a scheme and its rules (cascade). Admin, engineer, or superadmin.
  */
-router.delete('/schemes/:version', requireAdmin, async (req, res) => {
+router.delete('/schemes/:version', requireRoleManager, async (req, res) => {
   const result = await api.deleteScanScheme({ version: Number(req.params.version) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
-// ── Rule CRUD (admin) ─────────────────────────────────────────────────────
+// ── Rule CRUD (admin, engineer, superadmin) ───────────────────────────────
 
 /**
  * GET /api/scan-codes/schemes/:version/actions
@@ -89,9 +89,9 @@ router.get('/schemes/:version/actions/:category', async (req, res) => {
 
 /**
  * PUT /api/scan-codes/schemes/:version/actions/:category
- * Create or replace a rule. Admin only.
+ * Create or replace a rule. Admin, engineer, or superadmin.
  */
-router.put('/schemes/:version/actions/:category', requireAdmin, async (req, res) => {
+router.put('/schemes/:version/actions/:category', requireRoleManager, async (req, res) => {
   const result = await api.upsertScanRule({
     scheme_version: Number(req.params.version),
     category: req.params.category as string,
@@ -105,9 +105,9 @@ router.put('/schemes/:version/actions/:category', requireAdmin, async (req, res)
 
 /**
  * DELETE /api/scan-codes/schemes/:version/actions/:category
- * Delete a rule. Admin only.
+ * Delete a rule. Admin, engineer, or superadmin.
  */
-router.delete('/schemes/:version/actions/:category', requireAdmin, async (req, res) => {
+router.delete('/schemes/:version/actions/:category', requireRoleManager, async (req, res) => {
   const result = await api.deleteScanRule({
     version: Number(req.params.version),
     category: req.params.category as string,

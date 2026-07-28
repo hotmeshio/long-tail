@@ -149,7 +149,15 @@ it: a barcode scanner, an RFID reader, a camera decode, an MCP tool
 
 ## Capture on the dashboard
 
-The dashboard listens for scans globally — any page, any focus state. A
+Scan surfaces are **opt-in**. The deployment turns them on with
+`features.scanCodes: true` in the `start()` config (default false, like every
+`features` flag surfaced through `/api/settings`); when on, every persona
+gets the header scan affordance, the panel, and the global capture. The
+easter-egg Features panel carries a local **Scan input** override to test
+either state on one browser. The execute and config APIs work regardless —
+the flag gates the dashboard surface.
+
+When enabled, the dashboard listens for scans globally — any page, any focus state. A
 scanner paired as an HID keyboard "types" its decode rapidly and finishes
 with Enter; a capture-phase window listener feeds every keystroke to a burst
 detector that separates scanner speed from human speed:
