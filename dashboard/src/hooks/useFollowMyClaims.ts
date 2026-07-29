@@ -4,14 +4,27 @@ import { useAuth } from './useAuth';
 import { useEventSubscriptions } from './useEventContext';
 import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
 
+const DETAIL_PREFIX = '/escalations/detail/';
+
+/** The escalation id the viewer is currently on, or undefined off a detail page. */
+function currentEscalationId(pathname: string): string | undefined {
+  if (!pathname.startsWith(DETAIL_PREFIX)) return undefined;
+  const rest = pathname.slice(DETAIL_PREFIX.length);
+  const id = rest.split('/')[0];
+  return id || undefined;
+}
+
 /**
- * The claim hand-off: monitor `system.escalation.<role>.*.claimed` across the
- * viewer's roles, and when the payload's assignee is the viewer, navigate to
- * that escalation's detail page. Pre-assignment is the system saying "this is
- * yours next" — a resolve → side-effect → follow-on chain lands the user on
- * the next step instead of history's previous page. Claims the user made
- * themselves resolve to the page they already navigated to, so the gesture is
- * naturally idempotent.
+ * The chained hand-off: when the escalation the viewer is currently looking at
+ * spawns a follow-on that is BORN ASSIGNED to them, land them on it. The engine
+ * states the hand-off definitively — a `claimed` event carrying
+ * `assignedAtCreation === true` (a directed, system-issued assignment, not an
+ * interactive claim), `data.assigned_to === viewer`, and `data.parent_id` equal
+ * to the escalation on screen. All three must hold, so an unrelated assignment
+ * or a claim the viewer made themselves can never redirect them. Navigation is
+ * scoped to being on the parent's page, so nothing yanks a viewer working
+ * elsewhere. The submitting form's `x-lt-transition` shows a wait screen across
+ * the brief gap; this hook is what ends it.
  */
 export function useFollowMyClaims(): void {
   const { user } = useAuth();
@@ -26,10 +39,17 @@ export function useFollowMyClaims(): void {
   userIdRef.current = user?.userId;
 
   const handler = useCallback((event: any) => {
-    const id: string | undefined = event?.escalationId;
+    // Only a directed, born-assigned hand-off pulls the viewer — never an
+    // interactive claim (assignedAtCreation false/absent) they observe.
+    if (event?.assignedAtCreation !== true) return;
+    const childId: string | undefined = event?.escalationId ?? event?.data?.id;
     const assignedTo: string | undefined = event?.data?.assigned_to;
-    if (!id || !assignedTo || assignedTo !== userIdRef.current) return;
-    const target = `/escalations/detail/${id}`;
+    const parentId: string | undefined = event?.data?.parent_id;
+    if (!childId || assignedTo !== userIdRef.current) return;
+    // The child must descend from the escalation on screen — the hand-off from
+    // what the viewer just did, not some other assignment that happened to land.
+    if (!parentId || parentId !== currentEscalationId(pathRef.current)) return;
+    const target = `${DETAIL_PREFIX}${childId}`;
     if (pathRef.current !== target) navigate(target);
   }, [navigate]);
 

@@ -334,6 +334,7 @@ export async function listEscalations(filters: {
   type?: string;
   subtype?: string;
   assigned_to?: string;
+  parent_id?: string;
   claimed?: boolean;
   priority?: number;
   limit?: number;
@@ -390,6 +391,7 @@ export async function listEscalations(filters: {
     roles: scoped.roles,
   };
   if (filters.assigned_to) where.assignedTo = filters.assigned_to;
+  if (filters.parent_id) where.parentId = filters.parent_id;
   if (heldNow) where.available = false;
   if (filters.metadata) where.metadata = filters.metadata;
 

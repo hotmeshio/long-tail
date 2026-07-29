@@ -14,6 +14,8 @@ import * as acmeStationsWorkflow from './workflows/acme-stations';
 import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
 import * as relatedEscalationsWorkflow from './workflows/related-escalations';
 import { REL_ORIGINATOR_ROLE } from './workflows/related-escalations/forms';
+import * as transitionChainWorkflow from './workflows/transition-chain';
+import { TXN_STEP1_ROLE, TXN_STEP2_ROLE, TXN_STEP3_ROLE } from './workflows/transition-chain/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as policyDocumentWorkflow from './workflows/policy-document';
@@ -184,6 +186,40 @@ const relatedEscalationsConfig: LTWorkerConfig = {
       customerId: 'CUST-0001',
       amount: '249.99',
     },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const transitionChainConfig: LTWorkerConfig = {
+  description: [
+    '### Transition Chain',
+    '',
+    'A three-step onboarding **wizard** that feels like one multi-page form — submit a step',
+    'and you are carried straight to the next, with no queue to hunt through.',
+    '',
+    '**How it flows**',
+    '',
+    '- **Step 1 · Account** — open to the pool; whoever claims and submits it becomes the *owner*.',
+    '- **Step 2 · Preferences** — _born assigned_ to the owner and opened automatically.',
+    '- **Step 3 · Confirm** — the final step; submitting lands you on the onboarding queue.',
+    '',
+    '**What it demonstrates**',
+    '',
+    '- `condition({ assignee, durationMinutes, parentId })` — the follow-on is created **already',
+    '  assigned** in one atomic commit (HotMesh 0.27.0), with no create-then-claim race.',
+    '- `x-lt-transition` — the friendly wait screen bridging one step to the next.',
+    '- `x-lt-transition-done` — the client-side "where next" for the terminal step.',
+    '',
+    'Invoke with an `account` name and walk the chain end to end.',
+  ].join('\n'),
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: TXN_STEP1_ROLE,
+  roles: [TXN_STEP1_ROLE, TXN_STEP2_ROLE, TXN_STEP3_ROLE],
+  // Registered, never certified — configs with roles derive certified=true otherwise.
+  certified: false,
+  envelopeSchema: {
+    data: { account: 'Acme Corp' },
     metadata: { source: 'dashboard' },
   },
 };
@@ -467,6 +503,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relatedEscalationsWorkflow, config: relatedEscalationsConfig },
   { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relPlateWorkflow, config: relPlateConfig },
+  { taskQueue: 'long-tail-examples', workflow: transitionChainWorkflow.transitionChain, config: transitionChainConfig },
   { taskQueue: 'long-tail-examples', workflow: policyDocumentWorkflow.policyDocument, config: policyDocumentConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printOrder, config: printOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printRoutingWorkflow.printer, config: printerConfig },

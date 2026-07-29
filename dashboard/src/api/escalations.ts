@@ -30,6 +30,7 @@ interface EscalationFilters extends FacetFilters {
   type?: string;
   subtype?: string;
   assigned_to?: string;
+  parent_id?: string;
   claimed?: boolean;
   priority?: number;
   limit?: number;
@@ -129,6 +130,7 @@ export function useEscalations(filters: EscalationFilters) {
   if (rest.type) params.set('type', rest.type);
   if (rest.subtype) params.set('subtype', rest.subtype);
   if (rest.assigned_to) params.set('assigned_to', rest.assigned_to);
+  if (rest.parent_id) params.set('parent_id', rest.parent_id);
   if (rest.claimed) params.set('claimed', 'true');
   if (rest.priority) params.set('priority', String(rest.priority));
   if (rest.limit) params.set('limit', String(rest.limit));

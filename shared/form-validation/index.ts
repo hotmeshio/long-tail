@@ -7,6 +7,7 @@
 export * from './derive-field-label';
 export * from './x-lt-bind';
 export * from './x-lt-help';
+export * from './x-lt-transition';
 export * from './x-lt-show-if';
 export * from './field-validator';
 export * from './validate-resolver-payload';
