@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ScanBarcode, SlidersHorizontal, Grid3X3, Trash2 } from 'lucide-react';
+import { ScanBarcode, SlidersHorizontal, ListChecks, Plus, Trash2 } from 'lucide-react';
 import { useScanScheme, useUpsertScanScheme, useDeleteScanScheme, type ScanRule } from '../../../api/scan-codes';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ScanRuleEditor } from './ScanRuleEditor';
-import { CodeShape } from './CodeShape';
 
-const CATEGORIES = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
+/** The first free single-digit category (0-9), or null when all are taken. */
+function nextCategory(used: Set<string>): string | null {
+  for (let c = 0; c <= 9; c++) if (!used.has(String(c))) return String(c);
+  return null;
+}
 
 function SectionGroup({
   icon: Icon,
@@ -63,6 +66,7 @@ export function ScanSchemeDetailPage() {
   const { scheme, rules } = data;
   const ruleByCategory = new Map<string, ScanRule>(rules.map((r) => [r.category, r]));
   const selectedRule = selected ? ruleByCategory.get(selected) ?? null : null;
+  const nextCat = nextCategory(new Set(rules.map((r) => r.category)));
 
   const sampleTarget = scheme.encoding === 'fixed' ? '7'.repeat(scheme.target_length ?? 8) : 'SN-1234';
   const codeFor = (category: string) =>
@@ -75,49 +79,64 @@ export function ScanSchemeDetailPage() {
       <PageHeader title={scheme.name} />
 
       <p className="text-sm text-text-secondary max-w-form -mt-4">
-        This scheme owns version <span className="font-mono text-text-primary">{scheme.version}</span>.
-        Its codes read <CodeShape highlight="category" />.
-        Pick a <span className="font-semibold text-text-primary">category</span> to
-        define what scanning it does — a tinted cell already carries a rule.
+        Codes for this scheme start with <span className="font-mono text-text-primary">{scheme.version}</span>.
+        Add an action, name it, and configure what a scan does — each action gets its own
+        slot automatically.
       </p>
 
       <SchemeSettings key={scheme.version} scheme={scheme} ruleCount={rules.length} />
 
       <SectionGroup
-        icon={Grid3X3}
-        label="Categories"
-        annotation="00–99 — tinted cells carry a rule; empty cells are open"
+        icon={ListChecks}
+        label="Actions"
+        annotation="what a scan of this scheme does — named, in the order you add them"
       >
-        <div className="grid grid-cols-10 gap-1 max-w-form">
-          {CATEGORIES.map((category) => {
-            const configured = ruleByCategory.has(category);
-            const isSelected = selected === category;
+        <div className="divide-y divide-surface-border border-y border-surface-border max-w-form">
+          {rules.map((rule) => {
+            const isSelected = selected === rule.category;
             return (
               <button
-                key={category}
+                key={rule.category}
                 type="button"
-                onClick={() => selectCategory(isSelected ? null : category)}
-                title={configured ? ruleByCategory.get(category)!.name : `Define ${category}`}
-                className={`h-8 text-xs font-mono rounded-sm border transition-colors ${
-                  isSelected
-                    ? 'border-accent bg-accent/20 text-accent font-semibold'
-                    : configured
-                      ? 'border-accent/30 bg-accent/10 text-accent hover:border-accent'
-                      : 'border-surface-border text-text-quaternary hover:text-text-secondary hover:border-surface-border/80'
+                onClick={() => selectCategory(isSelected ? null : rule.category)}
+                className={`w-full flex items-center gap-4 py-3 px-2 text-left transition-colors ${
+                  isSelected ? 'bg-accent/10' : 'hover:bg-surface-sunken'
                 }`}
               >
-                {category}
+                <span className="w-9 h-8 flex items-center justify-center text-xs font-mono text-accent border border-surface-border rounded shrink-0">
+                  {rule.category}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-text-primary truncate">{rule.name}</div>
+                  <div className="text-2xs text-text-tertiary font-mono truncate">{codeFor(rule.category)}</div>
+                </div>
               </button>
             );
           })}
+          <div className="flex items-center gap-4 py-3 px-2">
+            <span className="w-9 h-8 flex items-center justify-center text-text-quaternary shrink-0">
+              <ScanBarcode className="w-4 h-4" strokeWidth={1.5} />
+            </span>
+            {nextCat == null ? (
+              <span className="text-2xs text-text-quaternary">All 10 action slots are in use.</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => selectCategory(nextCat)}
+                className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add an action
+              </button>
+            )}
+          </div>
         </div>
       </SectionGroup>
 
       {selected && (
         <SectionGroup
           icon={ScanBarcode}
-          label={`Rule ${scheme.version}:${selected}`}
-          annotation={`a label like this prints beside the code — e.g. ${codeFor(selected)}`}
+          label={selectedRule ? selectedRule.name : 'New action'}
+          annotation={`this label prints beside the code — e.g. ${codeFor(selected)}`}
         >
           <ScanRuleEditor
             key={`${scheme.version}:${selected}`}

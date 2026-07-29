@@ -3,10 +3,11 @@
  *
  * A scan code is a plain string from any input source (barcode scanner,
  * RFID reader, manual entry) encoding version:category:target. The scheme
- * (selected by the leading version digit) declares which escalation
+ * (selected by the leading TWO digits, 10-99) declares which escalation
  * metadata facet the target resolves against and how the string parses.
- * The rule (selected by the two-digit category) is an ordered list of
- * condition/action steps over the escalation surface plus a fallback.
+ * The rule (selected by the single-digit category, 0-9) is an ordered list
+ * of condition/action steps over the escalation surface plus a fallback.
+ * Both indices are assigned automatically; operators name entries, not numbers.
  */
 
 export const SCAN_ENCODINGS = {
@@ -147,7 +148,7 @@ export interface ScanRuleFallback {
 
 export interface ScanRule {
   scheme_version: number;
-  /** Two digits, '00'–'99'. */
+  /** Single digit, '0'–'9' (auto-assigned). */
   category: string;
   /** Friendly label — this is what gets printed next to the physical code. */
   name: string;

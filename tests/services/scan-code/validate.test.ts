@@ -4,7 +4,7 @@ import { assertValidScheme, assertValidSteps } from '../../../services/scan-code
 import { SCAN_ENCODINGS, SCAN_VERBS, type ScanStep } from '../../../types';
 
 const validScheme = {
-  version: 1,
+  version: 10,
   name: 'Serial',
   target_facet: 'serialNumber',
   encoding: SCAN_ENCODINGS.DELIMITED,
@@ -22,9 +22,9 @@ describe('assertValidScheme', () => {
     ).not.toThrow();
   });
 
-  it('rejects a version outside 1-9', () => {
-    expect(() => assertValidScheme({ ...validScheme, version: 0 })).toThrow(/1 and 9/);
-    expect(() => assertValidScheme({ ...validScheme, version: 10 })).toThrow(/1 and 9/);
+  it('rejects a version outside 10-99', () => {
+    expect(() => assertValidScheme({ ...validScheme, version: 9 })).toThrow(/10 and 99/);
+    expect(() => assertValidScheme({ ...validScheme, version: 100 })).toThrow(/10 and 99/);
   });
 
   it('rejects a missing target facet', () => {

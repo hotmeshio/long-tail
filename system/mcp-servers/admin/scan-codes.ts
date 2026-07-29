@@ -1,9 +1,9 @@
 /**
  * Scan-code tools — mirrors routes/scan-codes.ts
  *
- * Schemes map a code's leading version digit to a target metadata facet and
- * parse shape; rules map a two-digit category to ordered condition/action
- * steps over the escalation surface. execute_scan_code runs a raw code as
+ * Schemes map a code's leading two digits (10-99) to a target metadata facet
+ * and parse shape; rules map a single-digit category (0-9) to ordered
+ * condition/action steps over the escalation surface. execute_scan_code runs a raw code as
  * the lt-system principal (see escalations.ts for the principal rationale).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

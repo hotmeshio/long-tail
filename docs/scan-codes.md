@@ -35,26 +35,29 @@ A scan code encodes three parts: `version : category : target`.
 
 | Part | Width | Meaning |
 |------|-------|---------|
-| version | 1 digit (1–9) | Selects the **scheme** — what the target identifies and how the code parses |
-| category | 2 digits (00–99) | Selects the **rule** — what scanning this code does |
+| version | 2 digits (10–99) | Selects the **scheme** — what the target identifies and how the code parses. Two digits so a code never starts with a leading zero. |
+| category | 1 digit (0–9) | Selects the **rule** — what scanning this code does |
 | target | scheme-defined | The value matched against the scheme's metadata facet |
 
-`1:01:75949975930` reads: scheme 1, rule 01, target `75949975930`.
+`10:1:75949975930` reads: scheme 10, rule 1, target `75949975930`.
+
+Both indices are assigned automatically as you add named entries — operators
+name schemes and actions, never pick numbers.
 
 ## Schemes
 
-A scheme (one of nine version slots, `lt_config_scan_schemes`) declares:
+A scheme (`lt_config_scan_schemes`, indexed 10–99) declares:
 
 - **`target_facet`** — the escalation metadata key the target resolves
   against (`serialNumber`, `assetTag`, `batchId`…). The physical label and
   the digital twin share this value; the scan is the join.
 - **`encoding`** — how the code string parses:
   - `delimited` — text separated by a single character (default `:`), e.g.
-    `1:01:SN-123`. Use with Code 128, QR, or DataMatrix labels; targets may
+    `10:1:SN-123`. Use with Code 128, QR, or DataMatrix labels; targets may
     be any text.
   - `fixed` — digits only with a declared target width, e.g.
-    `10175949975930`. Fits UPC-A/EAN/ITF labels; a trailing check digit is
-    accepted. One digit of version + two of category + `target_length`
+    `1015949975930`. Fits UPC-A/EAN/ITF labels; a trailing check digit is
+    accepted. Two digits of version + one of category + `target_length`
     digits of target.
 
 ## Rules and steps
@@ -128,7 +131,7 @@ renders the markdown; a configured route navigates.
 
 ## Executing a scan
 
-`POST /api/scan-codes/execute` takes `{ "code": "1:01:SN-123" }` and runs
+`POST /api/scan-codes/execute` takes `{ "code": "10:1:SN-123" }` and runs
 as the calling user under normal RBAC. Every terminal state is a structured
 200 outcome:
 
@@ -162,7 +165,7 @@ state. A scanner paired as an HID keyboard "types" its decode and finishes
 with Enter; capture is **pattern-anchored**: a capture-phase window listener
 accumulates keystrokes freely, and when the terminator arrives it checks
 whether the recent keys end with a scan-code shape
-(`[1-9]:[0-9]{2}:target` or the digits-only fixed form).
+(`[1-9][0-9]:[0-9]:target` or the digits-only fixed form).
 
 - On a match, the terminator is swallowed, the code's characters are
   stripped back out of whatever editable held focus (byte-exact, at the
@@ -206,8 +209,9 @@ UPC-A where numeric-only labels are already in circulation.
 
 ## Admin configuration
 
-**Admin → Scan Codes** manages the nine scheme slots. A scheme's detail page
-shows the 00–99 category grid; picking a slot opens the rule editor:
+**Admin → Scan Codes** lists your schemes. Add a scheme, name it, and point it
+at a target facet — its two-digit index is assigned for you. A scheme's detail
+page lists its actions; **Add an action** opens the rule editor:
 
 1. **Name it** — the friendly label printed beside the physical code.
 2. **Order the conditions** — each step picks a queue, a held-by filter,
@@ -222,18 +226,18 @@ rules fail the write with the exact problem — an `escalate` step names its
 
 ## The printer demo
 
-The example seed (`examples/seed-scan-codes.ts`) configures scheme 1 over
+The example seed (`examples/seed-scan-codes.ts`) configures scheme 10 over
 the [printer-twin](../examples/workflows/printer-twin/) farm: the target
 facet is the twin's `serialNumber`, and four rules map to the four corners
 of each machine:
 
 | Corner | Code | Rule |
 |--------|------|------|
-| upper-left | `1:01:<serial>` | **Send Printer Home** — cancel the twin's fleet row (confirmed); the twin escalates to its service surface |
-| upper-right | `1:02:<serial>` | **Collect Print** — resolve the in-flight `printing` row as success |
-| lower-right | `1:03:<serial>` | **Print Failed** — resolve the `printing` row as fail; plate cleared, machine reset |
-| lower-left | `1:04:<serial>` | **Offline for Service** — cancel the fleet row and open a service item in the servicer queue |
+| upper-left | `10:0:<serial>` | **Send Printer Home** — cancel the twin's fleet row (confirmed); the twin escalates to its service surface |
+| upper-right | `10:1:<serial>` | **Collect Print** — resolve the in-flight `printing` row as success |
+| lower-right | `10:2:<serial>` | **Print Failed** — resolve the `printing` row as fail; plate cleared, machine reset |
+| lower-left | `10:3:<serial>` | **Offline for Service** — cancel the fleet row and open a service item in the servicer queue |
 
 Each rule ends on a broad `show-detail` and the "no twin found" fallback.
 Walk it hardware-free: run the twin farm, open the scan panel, and paste
-`1:02:<a-printing-serial>`.
+`10:1:<a-printing-serial>`.
