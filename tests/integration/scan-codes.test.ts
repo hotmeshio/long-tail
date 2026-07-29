@@ -7,6 +7,8 @@
  * step fallthrough, confirm two-phase, fallback, RBAC, and concurrent
  * double-scan serialization.
  *
+ * The scheme index is two digits (10-99); the category is one digit (0-9).
+ *
  * Requires: docker compose up -d --build (app + Postgres)
  */
 
@@ -15,7 +17,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { ApiClient, log } from './helpers';
 
 const PASSWORD = 'l0ngt@1l';
-const VERSION = 8; // clear of seeded demo schemes
+const VERSION = 98; // two-digit scheme, clear of the seeded demo (10)
 const QUEUE = 'scan-case-queue';
 const SERVICE_QUEUE = 'scan-case-service';
 const FACET = 'assetTag';
@@ -86,14 +88,14 @@ describe('scheme and rule CRUD', () => {
   it('rejects an incoherent rule with 400', async () => {
     // The client throws on non-2xx; the write-time invariant is the message.
     await expect(admin.put(
-      `/api/scan-codes/schemes/${VERSION}/actions/99`,
+      `/api/scan-codes/schemes/${VERSION}/actions/9`,
       { name: 'broken', steps: [{ query: {}, verb: 'escalate' }] },
     )).rejects.toThrow(/400.*targetRole/);
   });
 
   it('denies rule writes to plain members', async () => {
     await expect(reviewer.put(
-      `/api/scan-codes/schemes/${VERSION}/actions/98`,
+      `/api/scan-codes/schemes/${VERSION}/actions/9`,
       { name: 'nope', steps: [{ query: {}, verb: 'show-detail' }] },
     )).rejects.toThrow(/403/);
   });
@@ -102,40 +104,41 @@ describe('scheme and rule CRUD', () => {
     const engineer = new ApiClient();
     await engineer.login('engineer', PASSWORD);
     const { status } = await engineer.put(
-      `/api/scan-codes/schemes/${VERSION}/actions/97`,
+      `/api/scan-codes/schemes/${VERSION}/actions/8`,
       { name: 'engineer-case', steps: [{ query: {}, verb: 'show-detail' }] },
     );
     expect(status).toBe(200);
-    await engineer.delete(`/api/scan-codes/schemes/${VERSION}/actions/97`);
+    await engineer.delete(`/api/scan-codes/schemes/${VERSION}/actions/8`);
   });
 });
 
 describe('execute — parse outcomes', () => {
   it('reports invalid_code for a malformed string', async () => {
-    const data = await scan(`${VERSION}:1:oops`);
+    // Two-digit category is malformed now that the category is a single digit.
+    const data = await scan(`${VERSION}:12:oops`);
     expect(data.outcome).toBe('invalid_code');
   });
 
   it('reports unconfigured for an unknown version', async () => {
-    const data = await scan('7:01:whatever');
+    const data = await scan('71:1:whatever');
     expect(data.outcome).toBe('unconfigured');
   });
 
   it('reports unconfigured for an unknown category', async () => {
-    const data = await scan(`${VERSION}:77:whatever`);
+    const data = await scan(`${VERSION}:9:whatever`);
     expect(data.outcome).toBe('unconfigured');
   });
 });
 
 describe('execute — verbs', () => {
   it('show-detail locates the escalation (scan as query)', async () => {
-    await putRule('01', {
+    await putRule('0', {
       name: 'Where is it',
       steps: [{ query: { roles: [QUEUE] }, verb: 'show-detail' }],
       fallback: { markdown: 'Nothing found.' },
     });
     const created = await seedEscalation(tag('TAG-SHOW'));
-    const data = await scan(`${VERSION}:01:${tag('TAG-SHOW')}`);
+    const data = await scan(`${VERSION}:0:${tag('TAG-SHOW')}`);
     expect(data.outcome).toBe('executed');
     expect(data.verb).toBe('show-detail');
     expect(data.escalation.id).toBe(created.id);
@@ -144,26 +147,26 @@ describe('execute — verbs', () => {
   });
 
   it('falls back when nothing matches', async () => {
-    const data = await scan(`${VERSION}:01:${tag('TAG-MISSING')}`);
+    const data = await scan(`${VERSION}:0:${tag('TAG-MISSING')}`);
     expect(data.outcome).toBe('no_match_fallback');
     expect(data.fallback.markdown).toBe('Nothing found.');
   });
 
   it('claim assigns the row and stamps provenance', async () => {
-    await putRule('02', {
+    await putRule('1', {
       name: 'Claim it',
       steps: [{ query: { roles: [QUEUE] }, verb: 'claim-show-detail' }],
     });
     await seedEscalation(tag('TAG-CLAIM'));
-    const data = await scan(`${VERSION}:02:${tag('TAG-CLAIM')}`);
+    const data = await scan(`${VERSION}:1:${tag('TAG-CLAIM')}`);
     expect(data.outcome).toBe('executed');
     expect(data.escalation.assigned_to).toBeTruthy();
     expect(data.escalation.metadata.scanActionName).toBe('Claim it');
-    expect(data.escalation.metadata.scanCategory).toBe('02');
+    expect(data.escalation.metadata.scanCategory).toBe('1');
   });
 
   it('resolve closes the row with the interpolated payload', async () => {
-    await putRule('03', {
+    await putRule('2', {
       name: 'Print failed',
       steps: [{
         query: { roles: [QUEUE] },
@@ -172,7 +175,7 @@ describe('execute — verbs', () => {
       }],
     });
     const created = await seedEscalation(tag('TAG-RESOLVE'));
-    const data = await scan(`${VERSION}:03:${tag('TAG-RESOLVE')}`);
+    const data = await scan(`${VERSION}:2:${tag('TAG-RESOLVE')}`);
     expect(data.outcome).toBe('executed');
     const { data: after } = await admin.get(`/api/escalations/${created.id}`);
     expect(after.status).toBe('resolved');
@@ -180,7 +183,7 @@ describe('execute — verbs', () => {
   });
 
   it('escalate closes the current row and creates one in the target queue', async () => {
-    await putRule('04', {
+    await putRule('3', {
       name: 'Send to servicing',
       steps: [{
         query: { roles: [QUEUE] },
@@ -194,7 +197,7 @@ describe('execute — verbs', () => {
       }],
     });
     const created = await seedEscalation(tag('TAG-ESCALATE'));
-    const data = await scan(`${VERSION}:04:${tag('TAG-ESCALATE')}`);
+    const data = await scan(`${VERSION}:3:${tag('TAG-ESCALATE')}`);
     expect(data.outcome).toBe('executed');
     expect(data.verb).toBe('escalate');
     // the located row closed…
@@ -203,17 +206,17 @@ describe('execute — verbs', () => {
     // …and the twin re-homed in the service queue, findable by the same tag
     expect(data.escalation.role).toBe(SERVICE_QUEUE);
     expect(data.escalation.metadata[FACET]).toBe(tag('TAG-ESCALATE'));
-    expect(data.escalation.metadata.serviceReason).toBe('scan 04');
+    expect(data.escalation.metadata.serviceReason).toBe('scan 3');
     expect(data.escalation.status).toBe('pending');
   });
 
   it('cancel locks then cancels', async () => {
-    await putRule('05', {
+    await putRule('4', {
       name: 'Cancel it',
       steps: [{ query: { roles: [QUEUE] }, verb: 'cancel' }],
     });
     const created = await seedEscalation(tag('TAG-CANCEL'));
-    const data = await scan(`${VERSION}:05:${tag('TAG-CANCEL')}`);
+    const data = await scan(`${VERSION}:4:${tag('TAG-CANCEL')}`);
     expect(data.outcome).toBe('executed');
     const { data: after } = await admin.get(`/api/escalations/${created.id}`);
     expect(after.status).toBe('cancelled');
@@ -222,7 +225,7 @@ describe('execute — verbs', () => {
 
 describe('execute — step semantics', () => {
   it('falls through a guarded step to the broader locator', async () => {
-    await putRule('06', {
+    await putRule('5', {
       name: 'Collect from harvest',
       steps: [
         {
@@ -234,7 +237,7 @@ describe('execute — step semantics', () => {
       ],
     });
     const created = await seedEscalation(tag('TAG-FALLTHROUGH'));
-    const data = await scan(`${VERSION}:06:${tag('TAG-FALLTHROUGH')}`);
+    const data = await scan(`${VERSION}:5:${tag('TAG-FALLTHROUGH')}`);
     // step 1 targets a queue the item is not in → step 2 reports where it IS
     expect(data.outcome).toBe('executed');
     expect(data.stepIndex).toBe(1);
@@ -244,7 +247,7 @@ describe('execute — step semantics', () => {
   });
 
   it('confirm locates without mutating and returns the pending action', async () => {
-    await putRule('07', {
+    await putRule('6', {
       name: 'Cancel with confirmation',
       steps: [{
         query: { roles: [QUEUE] },
@@ -253,7 +256,7 @@ describe('execute — step semantics', () => {
       }],
     });
     const created = await seedEscalation(tag('TAG-CONFIRM'));
-    const data = await scan(`${VERSION}:07:${tag('TAG-CONFIRM')}`);
+    const data = await scan(`${VERSION}:6:${tag('TAG-CONFIRM')}`);
     expect(data.outcome).toBe('confirm_required');
     expect(data.pendingAction.escalationId).toBe(created.id);
     expect(data.pendingAction.verb).toBe('cancel');
@@ -265,13 +268,13 @@ describe('execute — step semantics', () => {
   });
 
   it('show-list returns the match set and the list query', async () => {
-    await putRule('09', {
+    await putRule('7', {
       name: 'Show all with tag',
       steps: [{ query: { roles: [QUEUE] }, cardinality: 'many', verb: 'show-list' }],
     });
     await seedEscalation(tag('TAG-LIST'));
     await seedEscalation(tag('TAG-LIST'));
-    const data = await scan(`${VERSION}:09:${tag('TAG-LIST')}`);
+    const data = await scan(`${VERSION}:7:${tag('TAG-LIST')}`);
     expect(data.outcome).toBe('matched_list');
     expect(data.escalations.length).toBe(2);
     expect(data.listQuery.targetFacet).toBe(FACET);
@@ -280,7 +283,7 @@ describe('execute — step semantics', () => {
 
   it('serializes a concurrent double-scan to one winner', async () => {
     await seedEscalation(tag('TAG-RACE'));
-    const code = `${VERSION}:05:${tag('TAG-RACE')}`; // cancel rule
+    const code = `${VERSION}:4:${tag('TAG-RACE')}`; // cancel rule
     const [a, b] = await Promise.all([scan(code), scan(code)]);
     const outcomes = [a.outcome, b.outcome].sort();
     // exactly one cancel executes; the loser either finds nothing pending
@@ -292,7 +295,7 @@ describe('execute — step semantics', () => {
 describe('execute — RBAC', () => {
   it('a caller without write access cannot mutate through a scan', async () => {
     await seedEscalation(tag('TAG-RBAC'));
-    const data = await scan(`${VERSION}:05:${tag('TAG-RBAC')}`, reviewer); // cancel rule
+    const data = await scan(`${VERSION}:4:${tag('TAG-RBAC')}`, reviewer); // cancel rule
     // reviewer has no membership in the scan-case queue: the atomic filter
     // matches nothing they may act on — never a partial write
     expect(['forbidden', 'no_match_fallback']).toContain(data.outcome);

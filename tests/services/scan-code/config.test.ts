@@ -11,8 +11,8 @@ import { SCAN_ENCODINGS, SCAN_VERBS } from '../../../types';
 const { Connection } = Durable;
 
 // Scheme/rule CRUD against real Postgres — the config store the execute
-// path reads at scan time. Uses version 9 to stay clear of seeded demos.
-const VERSION = 9;
+// path reads at scan time. Uses version 99 to stay clear of seeded demos.
+const VERSION = 99;
 
 const scheme = {
   version: VERSION,
@@ -61,7 +61,7 @@ describe('scan-code config CRUD (integration)', () => {
   it('upserts and reads back a rule with steps and fallback', async () => {
     await scanCodeService.upsertScanRule({
       scheme_version: VERSION,
-      category: '07',
+      category: '7',
       name: 'Send to servicing',
       steps: [
         {
@@ -73,7 +73,7 @@ describe('scan-code config CRUD (integration)', () => {
       ],
       fallback: { markdown: 'Nothing here.' },
     });
-    const rule = await scanCodeService.getScanRule(VERSION, '07');
+    const rule = await scanCodeService.getScanRule(VERSION, '7');
     expect(rule).not.toBeNull();
     expect(rule!.name).toBe('Send to servicing');
     expect(rule!.steps).toHaveLength(2);
@@ -85,7 +85,7 @@ describe('scan-code config CRUD (integration)', () => {
     await expect(
       scanCodeService.upsertScanRule({
         scheme_version: VERSION,
-        category: '08',
+        category: '8',
         name: 'broken',
         steps: [{ query: {}, verb: SCAN_VERBS.ESCALATE }],
       }),
@@ -96,7 +96,7 @@ describe('scan-code config CRUD (integration)', () => {
     await expect(
       scanCodeService.upsertScanRule({
         scheme_version: VERSION,
-        category: '09',
+        category: '9',
         name: 'empty',
         steps: [],
       }),
@@ -105,20 +105,20 @@ describe('scan-code config CRUD (integration)', () => {
 
   it('lists rules for a scheme and deletes one', async () => {
     const rules = await scanCodeService.listScanRules(VERSION);
-    expect(rules.map((r) => r.category)).toContain('07');
-    expect(await scanCodeService.deleteScanRule(VERSION, '07')).toBe(true);
-    expect(await scanCodeService.getScanRule(VERSION, '07')).toBeNull();
+    expect(rules.map((r) => r.category)).toContain('7');
+    expect(await scanCodeService.deleteScanRule(VERSION, '7')).toBe(true);
+    expect(await scanCodeService.getScanRule(VERSION, '7')).toBeNull();
   });
 
   it('cascades rule deletion when the scheme is deleted', async () => {
     await scanCodeService.upsertScanRule({
       scheme_version: VERSION,
-      category: '11',
+      category: '5',
       name: 'cascade-case',
       steps: [{ query: {}, verb: SCAN_VERBS.SHOW_DETAIL }],
     });
     await scanCodeService.deleteScanScheme(VERSION);
     expect(await scanCodeService.getScanScheme(VERSION)).toBeNull();
-    expect(await scanCodeService.getScanRule(VERSION, '11')).toBeNull();
+    expect(await scanCodeService.getScanRule(VERSION, '5')).toBeNull();
   });
 });

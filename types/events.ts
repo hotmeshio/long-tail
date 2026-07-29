@@ -111,6 +111,13 @@ export interface LTEvent extends LTEventBase {
   activityName?: string;
   /** Milestones — present on milestone/task events. */
   milestones?: LTMilestone[];
+  /**
+   * Assignment provenance on `escalation.claimed` events: true when the row was
+   * born assigned (a directed, system-issued hand-off via `condition({ assignee })`),
+   * false/absent when a caller claimed it interactively. Sourced from the SDK
+   * SystemEvent envelope; see lib/events/system-events.ts.
+   */
+  assignedAtCreation?: boolean;
 }
 
 // ── Per-family event extensions ("the system injects fields by type") ─────────
@@ -146,6 +153,8 @@ export interface LTEscalationEvent extends LTEventBase, LTWorkflowContext {
   escalationId: string;
   role: string;
   status: string;
+  /** True on a `claimed` event when the row was born assigned (directed hand-off). */
+  assignedAtCreation?: boolean;
 }
 
 /** `system.activity.{workflowId}.{activityName}.{started|completed|failed}`. */

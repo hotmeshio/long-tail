@@ -66,6 +66,10 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
       escalationId: (row.id as string) || segments[2],
       originId: (row.origin_id as string) || event.origin_id || undefined,
       status: ESCALATION_STATUS_BY_VERB[verb] ?? verb,
+      // Assignment provenance rides the SystemEvent envelope, NOT the row (it is
+      // not a column). Forward it so a consumer can tell a born-assigned,
+      // system-directed hand-off (`claimed` with true) from an interactive claim.
+      assignedAtCreation: event.assigned_at_creation,
       data: row,
       timestamp: event.ts,
     };

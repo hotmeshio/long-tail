@@ -58,6 +58,27 @@ describe('mapSystemEvent', () => {
     expect(mapped.status).toBe('expired');
   });
 
+  it('forwards the born-assigned marker (envelope) and parent_id (row/data)', () => {
+    const mapped = mapSystemEvent(makeEscalationEvent({
+      type: 'system.escalation.esc-1.claimed',
+      assigned_at_creation: true,
+      data: { id: 'esc-1', role: 'qc_inspector', assigned_to: 'user-7', parent_id: 'esc-0' },
+    } as Partial<Types.SystemEvent>));
+    expect(mapped.type).toBe('system.escalation.qc_inspector.esc-1.claimed');
+    expect(mapped.status).toBe('claimed');
+    expect(mapped.assignedAtCreation).toBe(true);
+    expect((mapped.data as any).assigned_to).toBe('user-7');
+    expect((mapped.data as any).parent_id).toBe('esc-0');
+  });
+
+  it('leaves the marker undefined for an interactive claim (no envelope flag)', () => {
+    const mapped = mapSystemEvent(makeEscalationEvent({
+      type: 'system.escalation.esc-1.claimed',
+      data: { id: 'esc-1', role: 'qc_inspector', assigned_to: 'user-7' },
+    } as Partial<Types.SystemEvent>));
+    expect(mapped.assignedAtCreation).toBeUndefined();
+  });
+
   it('non-escalation events pass through with their canonical type', () => {
     const mapped = mapSystemEvent({
       event_id: 'e-1',

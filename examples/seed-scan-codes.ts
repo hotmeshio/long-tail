@@ -1,17 +1,17 @@
 /**
  * Scan-code demo config — the four corners of a printer.
  *
- * Scheme 1 resolves scanned targets against the twin's `serialNumber` facet,
+ * Scheme 10 resolves scanned targets against the twin's `serialNumber` facet,
  * so a code stuck to a physical machine addresses its digital twin wherever
  * the twin's escalation currently lives. Each corner is one category:
  *
- *   01 upper-left  — Send Printer Home: cancel the twin's fleet row (with
+ *   0 upper-left  — Send Printer Home: cancel the twin's fleet row (with
  *      confirmation); the twin reacts by escalating to its service surface.
- *   02 upper-right — Collect Print: resolve the in-flight `printing` row as
+ *   1 upper-right — Collect Print: resolve the in-flight `printing` row as
  *      success — plate collected, machine reports done.
- *   03 lower-right — Print Failed: resolve the `printing` row as fail —
+ *   2 lower-right — Print Failed: resolve the `printing` row as fail —
  *      plate cleared, machine reset, twin records the outcome.
- *   04 lower-left  — Offline for Service: cancel the fleet row AND open a
+ *   3 lower-left  — Offline for Service: cancel the fleet row AND open a
  *      service item in the servicer queue carrying the same serial.
  *
  * Every rule ends on a broad "show the item" step — a scan of a machine
@@ -31,7 +31,7 @@ import {
   TWIN_STATE,
 } from './workflows/printer-twin/types';
 
-const SCHEME_VERSION = 1;
+const SCHEME_VERSION = 10;
 
 /** Every rule's terminal locator: report where the twin actually is. */
 const SHOW_ANYWHERE: ScanStep = { query: {}, verb: SCAN_VERBS.SHOW_DETAIL };
@@ -56,7 +56,7 @@ export async function seedScanCodes(): Promise<void> {
 
     await seedScanRule({
       scheme_version: SCHEME_VERSION,
-      category: '01',
+      category: '0',
       name: 'Send Printer Home',
       steps: [
         {
@@ -74,7 +74,7 @@ export async function seedScanCodes(): Promise<void> {
 
     await seedScanRule({
       scheme_version: SCHEME_VERSION,
-      category: '02',
+      category: '1',
       name: 'Collect Print',
       steps: [
         {
@@ -94,7 +94,7 @@ export async function seedScanCodes(): Promise<void> {
 
     await seedScanRule({
       scheme_version: SCHEME_VERSION,
-      category: '03',
+      category: '2',
       name: 'Print Failed',
       steps: [
         {
@@ -114,7 +114,7 @@ export async function seedScanCodes(): Promise<void> {
 
     await seedScanRule({
       scheme_version: SCHEME_VERSION,
-      category: '04',
+      category: '3',
       name: 'Offline for Service',
       steps: [
         {
@@ -133,7 +133,7 @@ export async function seedScanCodes(): Promise<void> {
       fallback: FALLBACK,
     });
 
-    loggerRegistry.info('[examples] scan-code scheme 1 verified (printer four-corner rules)');
+    loggerRegistry.info('[examples] scan-code scheme 10 verified (printer four-corner rules)');
   } catch (err: any) {
     loggerRegistry.warn(`[examples] failed to seed scan codes: ${err.message}`);
   }

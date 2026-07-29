@@ -12,8 +12,8 @@
  * be recognized mid-flight.
  *
  * The code vocabulary is ours, so the shape is strict:
- *   delimited — [1-9]:[0-9]{2}:target, target of [a-zA-Z0-9._-]
- *   fixed     — [1-9] + 2 category digits + 5+ target digits (digits only)
+ *   delimited — [1-9][0-9]:[0-9]:target, target of [a-zA-Z0-9._-]
+ *   fixed     — 2 scheme digits + 1 category digit + 5+ target digits (digits only)
  * Typing a valid code and pressing Enter fires it too, anywhere — that is the
  * contract, not an accident: the scanner IS a keyboard, so the keyboard is a
  * scanner.
@@ -74,8 +74,8 @@ export function saveWedgeConfig(config: Partial<WedgeConfig>): WedgeConfig {
  * and preserved (metadata matching is case-sensitive).
  */
 const TAIL_SHAPES = [
-  /[1-9]:[0-9]{2}:[a-zA-Z0-9._-]+$/, // delimited
-  /[1-9][0-9]{7,}$/,                 // fixed: version + category + 5+ target digits
+  /[1-9][0-9]:[0-9]:[a-zA-Z0-9._-]+$/, // delimited: ##:#:target
+  /[1-9][0-9]{7,}$/,                   // fixed: 2 scheme + 1 category + 5+ target digits
 ];
 
 /** The longest scan-code tail of the buffer, or null. */

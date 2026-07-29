@@ -34,6 +34,10 @@ import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
 import { useClaimClock } from '../../../hooks/useClaimClock';
 import { readDraft, saveDraft, clearDraft } from '../../../lib/draft-store';
+import { readTransitionConfig, readTransitionDone } from '../../../lib/x-lt-transition';
+import { interpolateHelp } from '../../../lib/x-lt-help';
+import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
+import { apiFetch } from '../../../api/client';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,6 +113,13 @@ function EscalationDetailView({ id }: { id: string }) {
   // the claim button's wiggle — the answer to "why can't I type here."
   const [claimNudge, setClaimNudge] = useState(0);
   const [panelActiveView, setPanelActiveView] = useState<string | undefined>(undefined);
+  // Set after a successful resolve when the form opted into a hand-off
+  // (x-lt-transition). Holds the screen on a wait modal instead of returning to
+  // the list; the global useFollowMyClaims navigates to the born-assigned
+  // follow-on when its `claimed` event arrives. The timeout below is the
+  // fallback for the SDK's at-most-once delivery (a dropped event); `doneDest`
+  // is where to land if the follow-on never comes (an x-lt-transition-done URL).
+  const [waiting, setWaiting] = useState<{ message: string; maxWaitSeconds: number; doneDest: string | null } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -201,6 +212,47 @@ function EscalationDetailView({ id }: { id: string }) {
     return () => window.clearTimeout(timer);
   }, [json, esc?.id, esc?.status]);
 
+  // Hand-off fallback. The follow-on's `claimed` event normally arrives and
+  // useFollowMyClaims navigates (this view unmounts, clearing the timer). SDK
+  // delivery is at-most-once, so if that event was dropped, on timeout we query
+  // the child of this escalation assigned to the viewer — precise, no heuristic
+  // — and land on it; only if none exists do we return to the list.
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          parent_id: id,
+          assigned_to: user?.userId ?? '',
+          status: 'pending',
+          limit: '1',
+        });
+        const res = await apiFetch<{ escalations: Array<{ id: string; parent_id?: string }> }>(`/escalations?${params}`);
+        const child = res?.escalations?.[0];
+        // Guard the correlation on the row itself, so a query path that does not
+        // filter by parent_id (self-scope search) can never land a wrong child.
+        if (child?.id && child.parent_id === id) {
+          setWaiting(null);
+          navigate(`/escalations/detail/${child.id}`);
+          return;
+        }
+      } catch { /* fall through to the declared destination / previous page */ }
+      setWaiting(null);
+      queryClient.resetQueries({ queryKey: ['escalations'] });
+      queryClient.resetQueries({ queryKey: ['escalationStats'] });
+      // No follow-on arrived: prefer the form's declared destination over
+      // history.back() (which is wrong for a page reached via a transition).
+      const dest = waiting.doneDest;
+      if (dest) {
+        if (dest.startsWith('/')) navigate(dest);
+        else window.location.assign(dest);
+      } else {
+        navigate(-1);
+      }
+    }, waiting.maxWaitSeconds * 1000);
+    return () => window.clearTimeout(timer);
+  }, [waiting, id, user?.userId, navigate, queryClient]);
+
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
   if (isLoading) {
@@ -261,6 +313,23 @@ function EscalationDetailView({ id }: { id: string }) {
     navigate(-1);
   };
 
+  // The declared x-lt-transition-done destination for this form, interpolated
+  // against the escalation context ({{metadata.account}} etc.), or null.
+  const resolveDoneDest = (): string | null => {
+    const tmpl = readTransitionDone(effectiveSchema as Record<string, unknown> | null);
+    if (!tmpl) return null;
+    return interpolateHelp(tmpl, buildShowIfContext(esc)) || null;
+  };
+
+  // Navigate to a resolved destination — internal path in-app, else external —
+  // refreshing the queue caches first (as goBack does).
+  const navigateDone = (dest: string) => {
+    queryClient.resetQueries({ queryKey: ['escalations'] });
+    queryClient.resetQueries({ queryKey: ['escalationStats'] });
+    if (dest.startsWith('/')) navigate(dest);
+    else window.location.assign(dest);
+  };
+
   const handleResolve = async (payload: Record<string, unknown>) => {
     try {
       await resolve.mutateAsync({ id, resolverPayload: payload });
@@ -277,6 +346,23 @@ function EscalationDetailView({ id }: { id: string }) {
       throw err;
     }
     clearDraft(id);
+    // Hand-off resolution, in order:
+    //  1. x-lt-transition → hold on the wait screen while the born-assigned
+    //     follow-on is prepared (doneDest is where to land if it never comes).
+    //  2. x-lt-transition-done → an explicit destination. A terminal chain step
+    //     was reached by a forward navigation, so history.back() is wrong; go
+    //     where the form says (a canonical page or a rich worklist URL).
+    //  3. neither → return to the previous page.
+    const transition = readTransitionConfig(effectiveSchema as Record<string, unknown> | null);
+    const doneDest = resolveDoneDest();
+    if (transition) {
+      setWaiting({ ...transition, doneDest });
+      return;
+    }
+    if (doneDest) {
+      navigateDone(doneDest);
+      return;
+    }
     goBack();
   };
 
@@ -512,6 +598,10 @@ function EscalationDetailView({ id }: { id: string }) {
       {/* Scan hand-off: a scanned confirm-step lands here with the pending
           action in route state; the modal asks the rule's prompt. */}
       <ScanConfirmModal escalationId={id} />
+
+      {/* Transition hand-off: shown after a resolve on an x-lt-transition form,
+          bridging the brief gap until the born-assigned follow-on arrives. */}
+      <TransitionWaitModal open={!!waiting} message={waiting?.message ?? ''} />
 
       {claimedByMe && !isTerminal && esc.assigned_until && (
         <ClaimExpiryModal

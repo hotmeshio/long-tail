@@ -59,6 +59,7 @@ export function registerListRoutes(router: Router): void {
         type: req.query.type as string,
         subtype: req.query.subtype as string,
         assigned_to: req.query.assigned_to as string,
+        parent_id: req.query.parent_id as string,
         claimed: req.query.claimed === 'true',
         priority: req.query.priority ? parseInt(req.query.priority as string, 10) : undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,

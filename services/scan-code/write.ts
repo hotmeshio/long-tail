@@ -65,8 +65,8 @@ export async function deleteScanScheme(version: number): Promise<boolean> {
 }
 
 export async function upsertScanRule(input: ScanRuleInput): Promise<ScanRule> {
-  if (!/^[0-9]{2}$/.test(input.category)) {
-    throw new Error('category must be exactly two digits (00-99)');
+  if (!/^[0-9]$/.test(input.category)) {
+    throw new Error('category must be a single digit (0-9)');
   }
   if (!input.name) throw new Error('rule name is required');
   assertValidSteps(input.steps);

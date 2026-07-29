@@ -14,8 +14,8 @@ const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
  * than a loud upsert failure.
  */
 export function assertValidScheme(scheme: Partial<ScanScheme>): void {
-  if (!Number.isInteger(scheme.version) || scheme.version! < 1 || scheme.version! > 9) {
-    throw new Error('scheme version must be an integer between 1 and 9');
+  if (!Number.isInteger(scheme.version) || scheme.version! < 10 || scheme.version! > 99) {
+    throw new Error('scheme version must be a two-digit integer between 10 and 99');
   }
   if (!scheme.name) throw new Error('scheme name is required');
   if (!scheme.target_facet) throw new Error('scheme target_facet is required');

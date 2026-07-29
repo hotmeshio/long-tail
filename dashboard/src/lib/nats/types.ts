@@ -17,6 +17,11 @@ export interface NatsLTEvent {
   status?: string;
   activityName?: string;
   milestones?: Array<{ name: string; value: unknown }>;
+  /**
+   * On `escalation.claimed`: true when the row was born assigned (a directed,
+   * system-issued hand-off), false/absent for an interactive claim.
+   */
+  assignedAtCreation?: boolean;
   data?: Record<string, unknown>;
   timestamp: string;
 }
