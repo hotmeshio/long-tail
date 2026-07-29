@@ -62,11 +62,11 @@ describe('removeFromActiveEditable', () => {
 
 describe('removeFromActiveEditable — code-length strips', () => {
   it('strips a full scan code the wedge accumulated in the input', () => {
-    const code = '1:04:SN-TEST-8';
-    input.value = `1:04:SN-TEST-8${code}`; // typed value + scanned characters
+    const code = '10:4:SN-TEST-8';
+    input.value = `10:4:SN-TEST-8${code}`; // typed value + scanned characters
     setCaret(input.value.length);
     removeFromActiveEditable(code.length);
-    expect(input.value).toBe('1:04:SN-TEST-8');
-    expect(input.selectionStart).toBe('1:04:SN-TEST-8'.length);
+    expect(input.value).toBe('10:4:SN-TEST-8');
+    expect(input.selectionStart).toBe('10:4:SN-TEST-8'.length);
   });
 });

@@ -40,7 +40,7 @@ function offendingChars(value: string): string[] {
 /**
  * Live Code 128 rendering of the typed code — scan it straight off the
  * screen with a real scanner. Code 128 carries full ASCII, so delimited
- * codes ("1:04:SN-TEST-8") print verbatim.
+ * codes ("10:4:SN-TEST-8") print verbatim.
  */
 function BarcodePreview({ value }: { value: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -130,7 +130,7 @@ export function ScanPanel({ onClose }: { onClose: () => void }) {
             <input
               value={manualCode}
               onChange={(e) => setManualCode(normalizeScanCodeText(e.target.value))}
-              placeholder="1:01:SN-12345"
+              placeholder="10:1:SN-12345"
               className="flex-1 px-2 py-1.5 text-sm bg-surface-raised border border-surface-border rounded text-text-primary"
               data-scan-manual-entry
             />
