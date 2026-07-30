@@ -49,17 +49,17 @@ export function Pagination({
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="btn-ghost text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-xs font-medium text-accent hover:text-accent-hover hover:bg-surface-hover transition-colors rounded-[var(--lt-radius-field)] disabled:opacity-30 disabled:text-text-tertiary disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             Previous
           </button>
-          <span className="px-3 text-xs text-text-secondary">
+          <span className="px-3 text-xs text-text-secondary tabular-nums">
             {page} / {totalPages}
           </span>
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            className="btn-ghost text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-xs font-medium text-accent hover:text-accent-hover hover:bg-surface-hover transition-colors rounded-[var(--lt-radius-field)] disabled:opacity-30 disabled:text-text-tertiary disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             Next
           </button>

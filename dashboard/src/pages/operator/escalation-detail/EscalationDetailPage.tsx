@@ -408,7 +408,7 @@ function EscalationDetailView({ id }: { id: string }) {
       />
       <button
         onClick={() => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; })}
-        className="ml-2 text-text-tertiary hover:text-accent transition-colors"
+        className="ml-2 text-accent/60 hover:text-accent transition-colors"
         title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
       >
         {sidePanelOpen

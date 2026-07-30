@@ -111,7 +111,7 @@ export function SlidePanelViews({ views, activeId, onViewChange, onClose, header
                 className={`p-1.5 rounded-md transition-colors ${
                   isActive
                     ? 'bg-accent/10 text-accent'
-                    : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
+                    : 'text-accent/60 hover:text-accent hover:bg-surface-hover'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -125,7 +125,7 @@ export function SlidePanelViews({ views, activeId, onViewChange, onClose, header
             <button
               onClick={onClose}
               title="Close panel"
-              className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors"
+              className="p-1 rounded text-accent/60 hover:text-accent hover:bg-surface-hover transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>

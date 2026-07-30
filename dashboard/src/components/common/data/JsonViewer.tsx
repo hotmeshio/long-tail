@@ -27,7 +27,7 @@ function JsonToolbar({ mode, setMode, isCollapsed, onToggleCollapse, onCopy, cop
   large?: boolean;
 }) {
   const icon = large ? 'w-5 h-5' : 'w-3.5 h-3.5';
-  const btn = `${large ? 'p-2' : 'p-1.5'} rounded text-text-tertiary hover:text-text-primary hover:bg-surface-raised transition-colors duration-150`;
+  const btn = `${large ? 'p-2' : 'p-1.5'} rounded text-accent/60 hover:text-accent hover:bg-surface-raised transition-colors duration-150`;
   return (
     <div className="flex items-center gap-0.5 bg-surface-sunken/80 rounded-md backdrop-blur-sm">
       {mode === 'json' && (

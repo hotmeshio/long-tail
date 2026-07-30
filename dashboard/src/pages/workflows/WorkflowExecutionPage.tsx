@@ -38,7 +38,7 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-2xs font-medium text-text-tertiary hover:text-accent hover:bg-surface-hover transition-colors"
+        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-2xs font-medium text-accent hover:text-accent-hover hover:bg-surface-hover transition-colors"
         title="Actions"
       >
         Actions
@@ -195,7 +195,7 @@ export function WorkflowExecutionPage() {
           actions={
             <button
               onClick={() => toggle('side-panel')}
-              className="text-text-tertiary hover:text-accent transition-colors"
+              className="text-accent/60 hover:text-accent transition-colors"
               title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
             >
               {sidePanelOpen

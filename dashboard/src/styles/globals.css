@@ -19,7 +19,10 @@
    * restyle the entire product — including dark themes — with zero source
    * changes. Themes override any of these under their [data-theme] block. */
   :root {
-    --lt-radius-field: 0.25rem;    /* 4px — the soft corner on every field and button */
+    --lt-radius-field: 0.375rem;   /* 6px — the soft corner on every field and button */
+    --lt-radius-section: 0.625rem; /* 10px — the softer corner on sections, the filter
+                                      band, and other framed surfaces. One knob rounds
+                                      every framed rectangle, a step up from the control. */
 
     /* Native form-control rendering. Dark themes set this to `dark` so
        scrollbars, date pickers, and checkboxes follow the surface. */
@@ -69,10 +72,12 @@
 
     /* The universal field: a well a shade DARKER than the white surface it
        sits on, carrying the THEME'S hue at whisper saturation (each theme
-       overrides) with a light neutral border. Themes keep their tint on the
-       focus fill (--lt-field-focus). */
+       overrides). The resting border is a light, clearly-tinted step of the
+       accent (each theme sets --lt-field-border), and the focus fill deepens
+       it (--lt-field-focus). Borders are thin — a bright tint reads as
+       thematic definition, never as chroma on a slab. */
     --lt-field-bg: 230 235 242;         /* #E6EBF2 — neutral fallback */
-    --lt-field-border: 203 213 225;     /* #CBD5E1 */
+    --lt-field-border: 203 213 225;     /* #CBD5E1 — neutral fallback; themes tint it */
 
     /* Select chevron — the whole url() is the token because an SVG data URI
        cannot reference CSS variables. Dark themes swap in a light stroke. */
@@ -115,7 +120,8 @@
     --lt-surface-hover: 232 239 247;  /* #E8EFF7 */
     --lt-field-bg: 248 250 253;         /* #F8FAFD — the themed field well */
     --lt-field-focus: 236 243 254;    /* #ECF3FE — focus fill carries the theme tint */
-    --lt-surface-border: 208 217 231; /* #D0D9E7 */
+    --lt-field-border: 160 197 245;   /* #A0C5F5 — resting field border, a clear blue tint */
+    --lt-surface-border: 186 214 250; /* #BAD6FA — dividers and outlines carry the accent hue */
   }
 
   /* Electric-blue only: the pineapple mark runs a purer, less-violet blue than
@@ -134,7 +140,8 @@
     --lt-surface-hover: 236 234 245;  /* #ECEAF5 */
     --lt-field-bg: 249 248 252;         /* #F9F8FC — the themed field well */
     --lt-field-focus: 244 238 252;    /* #F4EEFC */
-    --lt-surface-border: 215 210 228; /* #D7D2E4 */
+    --lt-field-border: 200 178 240;   /* #C8B2F0 — resting field border, a clear violet tint */
+    --lt-surface-border: 216 198 245; /* #D8C6F5 — dividers and outlines carry the accent hue */
   }
 
   [data-theme='red'] {
@@ -146,7 +153,8 @@
     --lt-surface-hover: 244 236 233;  /* #F4ECE9 */
     --lt-field-bg: 252 250 249;         /* #FCFAF9 — the themed field well */
     --lt-field-focus: 252 242 240;    /* #FCF2F0 */
-    --lt-surface-border: 226 211 208; /* #E2D3D0 */
+    --lt-field-border: 240 180 174;   /* #F0B4AE — resting field border, a clear red tint */
+    --lt-surface-border: 246 202 197; /* #F6CAC5 — dividers and outlines carry the accent hue */
   }
 
   [data-theme='green'] {
@@ -158,7 +166,8 @@
     --lt-surface-hover: 234 242 237;  /* #EAF2ED */
     --lt-field-bg: 248 251 249;         /* #F8FBF9 — the themed field well */
     --lt-field-focus: 240 253 244;    /* #F0FDF4 */
-    --lt-surface-border: 205 223 211; /* #CDDFD3 */
+    --lt-field-border: 150 224 178;   /* #96E0B2 — resting field border, a clear green tint */
+    --lt-surface-border: 180 232 199; /* #B4E8C7 — dividers and outlines carry the accent hue */
   }
 
   [data-theme='rose'] {
@@ -170,7 +179,8 @@
     --lt-surface-hover: 244 235 239;  /* #F4EBEF */
     --lt-field-bg: 252 249 250;         /* #FCF9FA — the themed field well */
     --lt-field-focus: 253 242 248;    /* #FDF2F8 */
-    --lt-surface-border: 228 209 218; /* #E4D1DA */
+    --lt-field-border: 248 185 216;   /* #F8B9D8 — resting field border, a clear rose tint */
+    --lt-surface-border: 250 206 228; /* #FACEE4 — dividers and outlines carry the accent hue */
   }
 
   [data-theme='orange'] {
@@ -182,7 +192,8 @@
     --lt-surface-hover: 244 237 230;  /* #F4EDE6 */
     --lt-field-bg: 252 250 248;         /* #FCFAF8 — the themed field well */
     --lt-field-focus: 255 247 237;    /* #FFF7ED */
-    --lt-surface-border: 228 216 202; /* #E4D8CA */
+    --lt-field-border: 250 203 166;   /* #FACBA6 — resting field border, a clear orange tint */
+    --lt-surface-border: 252 216 188; /* #FCD8BC — dividers and outlines carry the accent hue */
   }
 
 

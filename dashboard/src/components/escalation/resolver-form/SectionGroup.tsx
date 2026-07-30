@@ -61,7 +61,7 @@ export function SectionGroup({ name, entries, formSchema, layout, renderField }:
         // Sections are distinct surfaces on the page wash — white paper in
         // light themes, the deeper well at night — with field wells stepping
         // away from them. Theme-driven, never a hardcoded hex.
-        ? 'border border-surface-border/60 bg-surface-sunken rounded-[0.25em] p-4 animate-[section-enter_0.25s_ease-out]'
+        ? 'border border-surface-border bg-surface-sunken rounded-[var(--lt-radius-section)] p-4 animate-[section-enter_0.25s_ease-out]'
         : ''}
     >
       {name && (

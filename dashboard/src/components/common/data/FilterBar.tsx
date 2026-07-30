@@ -100,7 +100,7 @@ export function FilterBar({ children, actions, activeFilterCount }: FilterBarPro
 
   return (
     <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-      <div className="bg-surface-sunken rounded-lg px-4 py-2.5 @container/filters">
+      <div className="bg-surface-sunken border border-surface-border rounded-[var(--lt-radius-section)] px-4 py-2.5 @container/filters">
         {/* One row, one actions slot. The children swap geometry: inline
             controls at @filters width, one Filters button below it. */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
@@ -121,7 +121,7 @@ export function FilterBar({ children, actions, activeFilterCount }: FilterBarPro
                 );
               }
             }}
-            className="@filters/filters:hidden inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+            className="@filters/filters:hidden inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-hover transition-colors"
             aria-expanded={foldOpen}
             aria-label="Filters"
           >
