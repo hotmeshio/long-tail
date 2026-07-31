@@ -227,7 +227,8 @@ A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve but
       "assigned": "me"
     },
     "mustBeEmpty": true,
-    "message": "{{count}} item(s) still pending — pick them before closing the order."
+    "message": "{{count}} item(s) still pending — pick them before closing the order.",
+    "autoResolveWhenEmpty": true
   },
   "type": "object",
   "properties": { ... }
@@ -239,12 +240,15 @@ A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve but
 | `query` | `object` | Same shape as `x-lt-query` — including the `assigned` ownership scope; facet string values interpolate against the host escalation's context |
 | `mustBeEmpty` | `boolean` | The gate condition (default `true`) |
 | `message` | `string` | Shown beside the disabled submit; `{{count}}` carries the live row count, `{{domain.path}}` tokens also interpolate |
+| `autoResolveWhenEmpty` | `boolean` | Auto-submit the claimed parent the moment the query is confirmed empty |
 
-The guard and an escalation-list embed declaring the same query resolve through one shared mapping — the count and the visible rows always agree, whatever the scope.
+The guard and an escalation-list embed declaring the same query resolve through one shared mapping — the count and the visible rows always agree, whatever the scope. Pair it with an `escalation-list` embed on the same query so the operator sees exactly which rows are holding the gate.
 
-Pair it with an `escalation-list` embed on the same query so the operator sees exactly which rows are holding the gate.
+**Only a confirmed empty read clears the gate** — a successful query returning zero rows. While it is loading, or on an error or a 403, the submit stays disabled: the gate opens only when it can prove there is nothing left.
 
-The guard is a UI layer: it makes the form honest, it does not enforce. A resolve arriving through the raw API bypasses it by design — the consuming workflow's own verification (reject and re-park with the remainder) is the durable backstop. Triage is never gated: when the guarded work itself is the problem, "Send to Triage" stays available.
+**Enforced on both sides.** The dashboard disables the submit; for `enforce_schema` roles the API server runs the same query and rejects a resolve with a canonical `422` while it returns rows, so the rule holds through the raw API too. The server counts the true children regardless of the resolver's read scope, so a role that cannot see them can never falsely clear the gate. A surface with no resolving user (an MCP resolve of an `assigned:"me"` guard) and roles that do not `enforce_schema` fall back to the consuming workflow's own verification (reject and re-park with the remainder) as the durable backstop. Triage is never gated: when the guarded work itself is the problem, "Send to Triage" stays available.
+
+**`autoResolveWhenEmpty`** closes the loop. With it set, the claimed parent submits itself the moment the query is confirmed empty — re-checked on page-load and after each inline child-resolve — so a person clears the children (resolving them in place via `x-lt-actions`) and the parent closes with no extra click. A parent launched from a list with [`x-lt-submit-on-claim`](./x-lt-footer.md) that carries a guard claims, shows its children, and auto-closes as they drain; if the parent has a [transition](./x-lt-transition.md), it then hands off to the follow-on. The parent's own form must still validate — an incomplete parent is left for the person rather than auto-closed.
 
 ---
 

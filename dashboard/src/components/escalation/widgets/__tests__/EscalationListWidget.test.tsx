@@ -197,7 +197,7 @@ describe('EscalationListWidget', () => {
       isLoading: false,
     });
     renderWidget({ title: 'List', 'x-lt-query': { role: 'rel-originator' } });
-    const link = screen.getByTitle('Open escalation detail');
+    const link = screen.getByTitle('View details');
     expect(link).toHaveAttribute('href', '/escalations/detail/ORD-001');
   });
 });

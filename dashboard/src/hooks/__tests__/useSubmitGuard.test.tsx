@@ -24,15 +24,19 @@ const GUARD: SubmitGuardDef = {
 
 const CTX = { metadata: { walkId: 'walk-7' } };
 
+/** A confirmed read (isSuccess) with the given total. */
+const confirmed = (total: number) => ({ data: { escalations: [], total }, isSuccess: true });
+
 describe('useSubmitGuard', () => {
   beforeEach(() => {
     mockUseEscalations.mockReset();
-    mockUseEscalations.mockReturnValue({ data: { escalations: [], total: 0 } });
+    mockUseEscalations.mockReturnValue(confirmed(0));
   });
 
   it('is inert without a guard definition — query disabled, never blocked', () => {
     const { result } = renderHook(() => useSubmitGuard(undefined, CTX));
     expect(result.current.blocked).toBe(false);
+    expect(result.current.confirmedEmpty).toBe(false);
     expect(mockUseEscalations.mock.calls[0][0].enabled).toBe(false);
   });
 
@@ -46,32 +50,45 @@ describe('useSubmitGuard', () => {
   });
 
   it('blocks with the interpolated {{count}} message while rows remain', () => {
-    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 3 } });
+    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 3 }, isSuccess: true });
     const { result } = renderHook(() => useSubmitGuard(GUARD, CTX));
     expect(result.current.blocked).toBe(true);
+    expect(result.current.confirmedEmpty).toBe(false);
     expect(result.current.count).toBe(3);
-    expect(result.current.message).toBe(
-      '3 plates still pending — bag them before closing the walk.',
-    );
+    expect(result.current.message).toBe('3 plates still pending — bag them before closing the walk.');
   });
 
-  it('unblocks the moment the query drains', () => {
-    mockUseEscalations.mockReturnValue({ data: { escalations: [], total: 0 } });
+  it('clears only on a confirmed empty read', () => {
+    mockUseEscalations.mockReturnValue(confirmed(0));
     const { result } = renderHook(() => useSubmitGuard(GUARD, CTX));
     expect(result.current.blocked).toBe(false);
+    expect(result.current.confirmedEmpty).toBe(true);
     expect(result.current.message).toBe('');
   });
 
+  it('stays blocked while loading — an unconfirmed read never clears', () => {
+    mockUseEscalations.mockReturnValue({ data: undefined, isSuccess: false });
+    const { result } = renderHook(() => useSubmitGuard(GUARD, CTX));
+    expect(result.current.blocked).toBe(true);
+    expect(result.current.confirmedEmpty).toBe(false);
+    expect(result.current.message).toBe('Checking related items…');
+  });
+
+  it('stays blocked on error — a 403 or failure never clears the gate', () => {
+    mockUseEscalations.mockReturnValue({ data: undefined, isSuccess: false, isError: true });
+    const { result } = renderHook(() => useSubmitGuard(GUARD, CTX));
+    expect(result.current.blocked).toBe(true);
+    expect(result.current.confirmedEmpty).toBe(false);
+  });
+
   it('falls back to the default message when none is declared', () => {
-    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 2 } });
-    const { result } = renderHook(() =>
-      useSubmitGuard({ query: { role: 'print-harvest' } }, CTX),
-    );
+    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 2 }, isSuccess: true });
+    const { result } = renderHook(() => useSubmitGuard({ query: { role: 'print-harvest' } }, CTX));
     expect(result.current.message).toBe('2 related items are still pending');
   });
 
   it('assigned:"me" evaluates the viewer-claimed scope — same mapping as the embed', () => {
-    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 2 } });
+    mockUseEscalations.mockReturnValue({ data: { escalations: [{}], total: 2 }, isSuccess: true });
     const { result } = renderHook(() =>
       useSubmitGuard(
         { query: { role: 'print-harvest', facets: { walkId: '{{metadata.walkId}}' }, assigned: 'me' } },

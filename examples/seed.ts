@@ -19,6 +19,7 @@ import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
 import { seedConstraintFormRole, seedConstraintFormEscalations } from './seed-constraint-form';
 import { seedFleetSimRole, seedFleetSimEscalations } from './seed-fleet-sim';
+import { seedAutoResolveDemoRoles, seedAutoResolveDemoEscalations } from './seed-auto-resolve-demo';
 
 // ── Seed functions ───────────────────────────────────────────────────────────
 
@@ -111,9 +112,12 @@ export async function seedExamples(client: any): Promise<void> {
   await seedConstraintFormEscalations();
   await seedFleetSimRole();
   await seedFleetSimEscalations();
+  await seedAutoResolveDemoRoles();
   await seedPersonas();
   await seedUsers();
   await seedEscalationChains();
+  // Escalations born-claimed to superadmin — must run after seedUsers.
+  await seedAutoResolveDemoEscalations();
 
   for (const { workflowName, taskQueue, envelope, label } of SEED_ENVELOPES) {
     try {

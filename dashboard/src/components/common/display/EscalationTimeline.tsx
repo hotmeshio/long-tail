@@ -12,7 +12,7 @@ const COLORS = {
   cancelled: 'rgb(var(--lt-status-error))',           // red       — cancelled or expired
 } as const;
 
-const BAR_H = 5; // px
+const BAR_H = 4; // px
 
 /** A duration label tethered to a point on the bar by a thin vertical tick. */
 function Marker({ pct, place, label, title, emphasis }: {
@@ -22,9 +22,9 @@ function Marker({ pct, place, label, title, emphasis }: {
   title: string;
   emphasis?: boolean;
 }) {
-  const tick = <span className="w-px h-1.5 bg-text-quaternary" aria-hidden />;
+  const tick = <span className="w-px h-1 bg-text-quaternary/70" aria-hidden />;
   const text = (
-    <span className={`whitespace-nowrap leading-none tabular-nums ${emphasis ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+    <span className={`whitespace-nowrap leading-none tabular-nums text-[10px] ${emphasis ? 'text-text-tertiary' : 'text-text-quaternary'}`}>
       {label}
     </span>
   );
@@ -86,7 +86,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
   return (
     <div className={className} title={legend}>
       {/* claim split label (above bar) */}
-      <div className="relative h-3 text-2xs font-mono">
+      <div className="relative h-2.5 font-mono">
         {showClaimed && (
           <Marker
             pct={pendingPct}
@@ -118,7 +118,7 @@ export function EscalationTimeline({ esc, className = '' }: { esc: LTEscalationR
       </div>
 
       {/* Total / age label (below bar, anchored at right edge) */}
-      <div className="relative h-3 text-2xs font-mono">
+      <div className="relative h-2.5 font-mono">
         <Marker pct={100} place="below" emphasis label={totalStr} title={totalTip} />
       </div>
     </div>

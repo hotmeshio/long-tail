@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FilterBar, FilterSelect } from '../../../components/common/data/FilterBar';
+import { FilterSelect } from '../../../components/common/data/FilterBar';
 import { Collapsible } from '../../../components/common/layout/Collapsible';
 import type { WorkflowExecutionEvent, LTTaskRecord } from '../../../api/types';
 import { EventDetailPanel } from './EventDetailPanel';
@@ -145,7 +145,10 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
             </button>
           )}
         </div>
-        <FilterBar>
+        {/* Inline filter controls — a compact set the table header owns directly.
+            The page-level FilterBar band is for full-width list pages; inside
+            this narrowed header it would fold and clip. */}
+        <div className="flex items-center gap-3 flex-wrap">
           <FilterSelect
             label="Category"
             value={categoryFilter}
@@ -164,7 +167,7 @@ export function EventTable({ events, childTasks, jid, appId }: EventTableProps) 
           >
             {sortOrder === 'asc' ? 'Oldest first' : 'Newest first'}
           </button>
-        </FilterBar>
+        </div>
       </div>
 
       <div>

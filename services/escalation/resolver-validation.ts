@@ -17,7 +17,8 @@
  * A role that enforces but declares no schema has no contract to enforce —
  * the gate passes.
  */
-import { validateResolverPayload } from '../../shared/form-validation';
+import { validateResolverPayload, type ShowIfContext } from '../../shared/form-validation';
+import { checkSubmitGuard } from './submit-guard';
 import { getEnforcingRoles, getEnforcedFormSchema } from '../role/enforcement-cache';
 import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import { LT_ERROR_CODES, type LTFieldViolation, type LTValidationErrorBody } from '../../types/validation';
@@ -70,6 +71,7 @@ export async function checkResolverPayload(
   escalation: ResolvableEscalationRow,
   resolverPayload: Record<string, any>,
   loadEnvelope?: () => Promise<Record<string, any>>,
+  resolvingUserId?: string,
 ): Promise<ResolverSchemaViolationReport | null> {
   const role = escalation.role;
   if (!role) return null;
@@ -91,15 +93,23 @@ export async function checkResolverPayload(
     ? await loadEnvelope()
     : parseJsonOrNull(escalation.envelope) ?? {};
 
-  const violations = validateResolverPayload(schema, resolverPayload, {
+  const ctx: ShowIfContext = {
     escalation: escalation as Record<string, unknown>,
     metadata,
     envelope,
     payload: parseJsonOrNull(escalation.escalation_payload),
-  });
-  if (violations.length === 0) return null;
+  };
 
-  return { role, schemaVersion: pin, violations };
+  const violations = validateResolverPayload(schema, resolverPayload, ctx);
+
+  // The query precondition (x-lt-submit-guard): reject while the embedded query
+  // still returns rows. Enforced on the same enforce_schema opt-in as the field
+  // contract, so a raw-API resolve honors the gate the dashboard shows.
+  const guardViolation = await checkSubmitGuard(schema, ctx, resolvingUserId);
+  const allViolations = guardViolation ? [...violations, guardViolation] : violations;
+  if (allViolations.length === 0) return null;
+
+  return { role, schemaVersion: pin, violations: allViolations };
 }
 
 /** The canonical 422 body for a violation report (types/validation.ts). */

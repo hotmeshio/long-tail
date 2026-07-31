@@ -164,7 +164,7 @@ export async function resolveByMetadata(
     );
 
     if (result.outcome === 'validation_required' && result.row) {
-      const report = await checkResolverPayload(result.row, input.resolverPayload);
+      const report = await checkResolverPayload(result.row, input.resolverPayload, undefined, resolveUserId);
       if (report) return validationFailure(report);
       result = await escalationService.resolveByMetadataAtomic(
         input.key, input.value, resolveUserId,

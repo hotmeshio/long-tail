@@ -65,7 +65,7 @@ export interface SlidePanelView {
  * background with a left divider so it reads as a callout beside the main
  * content.
  */
-export function SlidePanelViews({ views, activeId, onViewChange, onClose, headerActions, stickyClassName }: {
+export function SlidePanelViews({ views, activeId, onViewChange, onClose, headerActions, stickyClassName, labelInline }: {
   views: SlidePanelView[];
   activeId: string;
   onViewChange: (id: string) => void;
@@ -80,6 +80,13 @@ export function SlidePanelViews({ views, activeId, onViewChange, onClose, header
    * independent scroll, like the left nav) pass `"h-full min-h-0"`.
    */
   stickyClassName?: string;
+  /**
+   * Put the active view's label on the same row as the icons, and give the
+   * content roomier vertical padding — for panels with only a few views. The
+   * default stacks the label on its own line below the icons (right for panels
+   * with a long icon set).
+   */
+  labelInline?: boolean;
 }) {
   const active = views.find((v) => v.id === activeId) ?? views[0];
   if (!active) return null;
@@ -96,46 +103,55 @@ export function SlidePanelViews({ views, activeId, onViewChange, onClose, header
           so neighbors never paint over the panel, while page-level sticky
           bars (FilterBar, z-20) still win. */}
       <div className={`flex flex-col ${stickyClassName ?? 'sticky top-0 z-10 max-h-[calc(100vh-3.5rem)]'}`}>
-      <div className="flex items-center justify-between pl-4 pr-3 pt-3 shrink-0">
-        <div className="flex items-center gap-1" role="radiogroup" aria-label="Panel view">
-          {views.map((v) => {
-            const Icon = v.icon;
-            const isActive = v.id === active.id;
-            return (
-              <button
-                key={v.id}
-                role="radio"
-                aria-checked={isActive}
-                onClick={() => onViewChange(v.id)}
-                title={v.label}
-                className={`p-1.5 rounded-md transition-colors ${
-                  isActive
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-text-tertiary hover:text-text-primary hover:bg-surface-hover'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-              </button>
-            );
-          })}
+      <div className={`flex items-center justify-between pl-4 pr-3 shrink-0 ${labelInline ? 'pt-10 pb-2' : 'pt-3'}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1 shrink-0" role="radiogroup" aria-label="Panel view">
+            {views.map((v) => {
+              const Icon = v.icon;
+              const isActive = v.id === active.id;
+              return (
+                <button
+                  key={v.id}
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => onViewChange(v.id)}
+                  title={v.label}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-accent/60 hover:text-accent hover:bg-surface-hover'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              );
+            })}
+          </div>
+          {labelInline && (
+            <span className="text-2xs font-semibold uppercase tracking-widest text-text-secondary truncate">
+              {active.label}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {headerActions}
           {onClose && (
             <button
               onClick={onClose}
               title="Close panel"
-              className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors"
+              className="p-1 rounded text-accent/60 hover:text-accent hover:bg-surface-hover transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
-      <p className="px-5 pt-2 pb-1 text-2xs font-semibold uppercase tracking-widest text-text-secondary shrink-0">
-        {active.label}
-      </p>
-      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-1">
+      {!labelInline && (
+        <p className="px-5 pt-2 pb-1 text-2xs font-semibold uppercase tracking-widest text-text-secondary shrink-0">
+          {active.label}
+        </p>
+      )}
+      <div className={`flex-1 overflow-y-auto px-5 ${labelInline ? 'pt-4 pb-8' : 'pb-5 pt-1'}`}>
         {active.content}
       </div>
       </div>

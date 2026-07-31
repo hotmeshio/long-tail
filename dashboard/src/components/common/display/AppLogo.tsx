@@ -80,8 +80,8 @@ export function AppLogo({ size = 'sm', hideLabel = false, className = '', appNam
   }
 
   const imgClass = isLarge
-    ? 'w-[16rem] h-[16rem] -rotate-[120deg] opacity-40 -ml-10'
-    : 'w-[12.5rem] h-[12.5rem] -rotate-[120deg] opacity-40 -ml-8';
+    ? 'w-[16rem] h-[16rem] -rotate-[120deg] opacity-55 -ml-10'
+    : 'w-[12.5rem] h-[12.5rem] -rotate-[120deg] opacity-55 -ml-8';
 
   const textClass = isLarge
     ? 'text-[44px] font-normal text-text-primary tracking-[0.15em] -ml-[12.5rem]'

@@ -31,15 +31,22 @@ Every layout carries a persistent action button — the active card's CTA, a tra
 
 ```jsonc
 "x-lt-row-action": {
-  "action": "claim",        // "claim" | "view" — default "claim"
-  "label": "Service",       // button text; defaults "Claim" / "View"
-  "durationMinutes": 60     // claim hold time; default 30
+  "action": "claim",         // "claim" | "view" — default "claim"
+  "label": "Service",        // button text; defaults "Claim" / "View"
+  "durationMinutes": 60,     // claim hold time; default 30
+  "submitOnClaim": true      // claim AND submit, then transition on (see below)
 }
 ```
 
 `claim` is one click: the row is claimed for the template's duration and the detail page opens already claimed — the fast path for working a queue. The button appears only on claimable rows (pending, no live claim window), and a rejected claim (someone else won the race) surfaces its message inline. `view` opens the detail page — for read-only templates where claiming from the list is wrong. Row and card clicks continue to navigate; the button is the deliberate gesture.
 
 On My Escalations (`/escalations/queue`) every row is already held by the viewer, so a `claim` template renders as a View action there: the button opens the detail page with the default "View" label. Authored `view` actions keep their label.
+
+### Start from the list — `submitOnClaim`
+
+`submitOnClaim: true` turns the row action into a one-gesture start: the row is claimed and its form's seeded defaults are submitted, then — when the resolve spawns a follow-on born assigned to the person — the wait screen bridges to it. A "Start Harvesting" button on the list claims, submits, and lands the person on the next step, no detail-page stop in between.
+
+The behavior itself lives on the form: the claim-and-submit and the hand-off are the form schema's [`x-lt-submit-on-claim`](./x-lt-footer.md) and [`x-lt-transition`](./x-lt-transition.md). The list action only launches that flow with the authored claim duration — so one role owns the outcome and the list template just points to it. If the seeded defaults fail validation the claim still lands and the person finishes on the detail page. Applies to claimable rows; on My Escalations the row already belongs to the viewer, so it opens as a View.
 
 ---
 

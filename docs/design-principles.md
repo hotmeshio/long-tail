@@ -24,9 +24,11 @@ swatches, and overlay scrims.
 
 Chroma is spent, not spread.
 
-- **Surfaces are near-neutral.** Hover fills, section bands, and borders
-  carry only a whisper of the theme hue. Chroma never lands on a large
-  rectangle — a colored slab makes every real accent invisible.
+- **Surfaces are near-neutral; lines carry the hue.** Hover fills and section
+  bands stay a whisper off-neutral, but the thin structure — borders,
+  dividers, outlines, field rules — carries a clear, light tint of the accent
+  so the frame reads as thematic. Chroma never lands on a large rectangle — a
+  colored slab makes every real accent invisible — but a hairline may glow.
 - **One elevation logic, both polarities.** The page carries the base wash
   (a light theme tint by day, the deep shade at night); sections and sheets
   are distinct surfaces on it (white paper by day, the deeper well at
@@ -64,10 +66,10 @@ Chroma is spent, not spread.
 
 ## 4. Fields and controls
 
-- **One recipe** (`.field/.input/.select/.textarea`): white body, light
-  neutral border, 3px radius (`--lt-radius-field`), border deepens to accent
-  and fill takes the theme tint on focus. Every field-like control uses the
-  recipe or the tokens — no bespoke field styling.
+- **One recipe** (`.field/.input/.select/.textarea`): white body, a light
+  accent-tinted border, soft radius (`--lt-radius-field`), border deepens to
+  accent and fill takes the theme tint on focus. Every field-like control uses
+  the recipe or the tokens — no bespoke field styling.
 - **Width follows content, capped by the measure:**
   - Generated forms hold a readable measure (`max-w-form`, 56rem). A wide
     monitor gets margin, never a 2000px input.

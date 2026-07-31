@@ -374,7 +374,7 @@ export function EscalationSidePanel({
             the same visual line as the page-title icons beside them; only the
             view content below scrolls. */}
         <div className="h-full flex flex-col bg-surface-hover">
-          <div className="shrink-0 pt-1.5 pb-0.5 flex justify-center">
+          <div className="shrink-0 pt-2 pb-0 flex justify-center">
             <EscalationTimeline esc={esc} className="w-[80%]" />
           </div>
           <div className="flex-1 min-h-0">

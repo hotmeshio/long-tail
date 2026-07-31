@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
 import { DataTable, type Column as TableColumn } from '../common/data/DataTable';
 import { Search } from 'lucide-react';
@@ -77,6 +77,15 @@ export interface RowActionDef {
   label?: string;
   /** Claim hold time in minutes. Default 30 (the platform claim default). */
   durationMinutes?: number;
+  /**
+   * Launch the detail page's claim-and-submit flow instead of a plain claim:
+   * the row is claimed, the form's seeded defaults are resolved, and — when the
+   * form declares `x-lt-transition` — the wait screen bridges to the born-assigned
+   * follow-on. One list gesture ("Start Harvesting") starts the work and lands
+   * the person on the next step. The behavior lives on the detail page (form
+   * defaults, validation, transition); the list only points there with intent.
+   */
+  submitOnClaim?: boolean;
 }
 
 interface ListSchema {
@@ -184,6 +193,8 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
     ? def.label
     : action === 'claim' ? 'Claim' : 'View';
   const claim = useClaimEscalation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState('');
 
   if (action === 'claim' && !isClaimable(row)) return null;
@@ -192,6 +203,15 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
     e.stopPropagation();
     if (action === 'view') {
       onView?.();
+      return;
+    }
+    // Launch the detail page's claim → submit → transition flow. The detail
+    // page owns the heavy lifting (seed defaults, validate, resolve, hand-off);
+    // the list points there with the intent and the authored claim duration.
+    if (def?.submitOnClaim) {
+      navigate(`/escalations/detail/${row.id}`, {
+        state: { autoStart: true, durationMinutes: def?.durationMinutes, from: location.pathname },
+      });
       return;
     }
     setError('');
@@ -445,10 +465,14 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
           : null,
     },
     {
+      // The action column sizes to hold its button — a fixed table won't grow a
+      // cell to fit content, so the width is set for the authored label (e.g.
+      // "Start Onboarding") and the button never wraps or truncates. The
+      // description column absorbs the remaining width and truncates instead.
       key: '_action',
       label: '',
       priority: 1,
-      className: 'w-24 text-right',
+      className: 'w-44 text-right whitespace-nowrap',
       render: (row) => (
         <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
       ),

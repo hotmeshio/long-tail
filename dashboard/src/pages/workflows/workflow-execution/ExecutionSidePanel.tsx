@@ -155,7 +155,6 @@ export function ExecutionSidePanel({
       content: (
         <div className="space-y-6">
           <div>
-            <SectionLabel>Escalations</SectionLabel>
             {escalations.length > 0
               ? <EscalationRows escalations={escalations} />
               : <p className="text-xs text-text-tertiary italic">This workflow has not escalated.</p>}
@@ -172,14 +171,15 @@ export function ExecutionSidePanel({
   ];
 
   return (
-    <SlidePanel open={open} width={384} className="self-stretch">
+    <SlidePanel open={open} width={384} className="h-full">
       <div className="h-full pl-6">
         <SlidePanelViews
           views={views}
           activeId={activeView}
           onViewChange={setActiveView}
           headerActions={headerActions}
-          stickyClassName="sticky top-0 z-10 h-[calc(100vh-5.25rem)] pt-9"
+          stickyClassName="h-full min-h-0"
+          labelInline
         />
       </div>
     </SlidePanel>

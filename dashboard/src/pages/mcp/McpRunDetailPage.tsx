@@ -3,28 +3,22 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMcpRunExecution, useInterruptJob } from '../../api/pipelines';
 import { useSettings } from '../../api/settings';
-import { StatusBadge } from '../../components/common/display/StatusBadge';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { CopyableId } from '../../components/common/display/CopyableId';
-import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
+import { SegmentedTabs } from '../../components/common/layout/SegmentedTabs';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useEventSubscription } from '../../hooks/useEventContext';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
-import { DateValue } from '../../components/common/display/DateValue';
-import { DurationValue } from '../../components/common/display/DurationValue';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
+import { PanelRightClose, PanelRightOpen, ChevronDown, Info, Activity, List } from 'lucide-react';
 
 import { SwimlaneTimeline } from '../workflows/workflow-execution/SwimlaneTimeline';
 import { EventTable } from '../workflows/workflow-execution/EventTable';
+import { McpExecutionSidePanel } from './McpExecutionSidePanel';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const statusMap: Record<string, string> = {
-  running: 'in_progress',
-  completed: 'completed',
-  failed: 'failed',
-};
+type McpTab = 'details' | 'timeline' | 'events';
+const MCP_TABS = ['details', 'timeline', 'events'] as const;
+const MCP_TAB_KEY = 'lt:mcp-run-detail:tab';
 
 // ── Actions dropdown ────────────────────────────────────────────────────────
 
@@ -48,8 +42,13 @@ function ActionsDropdown({ isRunning, onTerminate }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="btn-primary text-xs">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-0.5 pl-2 pr-1 py-1 rounded-md text-2xs font-medium text-accent hover:text-accent-hover hover:bg-surface-hover transition-colors"
+        title="Actions"
+      >
         Actions
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100]">
@@ -77,8 +76,23 @@ export function McpRunDetailPage() {
   const { data: settings } = useSettings();
   const { isCollapsed, toggle } = useCollapsedSections('mcp-run-detail');
 
-
+  const sidePanelOpen = !isCollapsed('side-panel');
   const traceUrl = settings?.telemetry?.traceUrl ?? null;
+
+  // The main content is a segmented switch, not an accordion: one section at a
+  // time, tabs at the top, the choice persisted across visits.
+  const [tab, setTab] = useState<McpTab>(() => {
+    try {
+      const saved = localStorage.getItem(MCP_TAB_KEY) as McpTab | null;
+      return saved && MCP_TABS.includes(saved) ? saved : 'details';
+    } catch {
+      return 'details';
+    }
+  });
+  const selectTab = (next: McpTab) => {
+    setTab(next);
+    try { localStorage.setItem(MCP_TAB_KEY, next); } catch { /* private mode */ }
+  };
 
   // Subscribe to activity events for this job — refetch execution on each step
   const activityHandler = useCallback((event: any) => {
@@ -114,7 +128,7 @@ export function McpRunDetailPage() {
     );
   }
 
-  const { events, summary } = execution;
+  const { events } = execution;
 
   // The trigger activity's result is the effective input to the flow —
   // it accepts outside job input and provides it to descendant activities.
@@ -128,11 +142,75 @@ export function McpRunDetailPage() {
   const result = rawResult?.data ?? rawResult ?? null;
 
   return (
-    <div>
-      <PageHeader
-        title="Pipeline Execution"
-        actions={
-          <div className="flex items-center gap-2">
+    // Two fixed-height columns, like the workflow-execution page: the header and
+    // tabs stay put while only the active section scrolls, and the panel is
+    // affixed with its own internal scroll and bleeds to the page edge.
+    <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-8 -mr-page-x -mb-16">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* Fixed header: title + the panel toggle, then the tab strip. Facts,
+            the toolbar, and the Actions menu all live in the panel. */}
+        <div className="shrink-0 pt-8 pr-page-x">
+          <PageHeader
+            title="Pipeline Execution"
+            actions={
+              <button
+                onClick={() => toggle('side-panel')}
+                className="text-accent/60 hover:text-accent transition-colors"
+                title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+              >
+                {sidePanelOpen
+                  ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+                  : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+              </button>
+            }
+          />
+
+          {interruptMutation.error && (
+            <p className="text-xs text-status-error py-2">
+              Interrupt failed: {(interruptMutation.error as Error).message}
+            </p>
+          )}
+
+          <div className="mt-2">
+            <SegmentedTabs<McpTab>
+              aria-label="Execution section"
+              active={tab}
+              onChange={selectTab}
+              tabs={[
+                { key: 'details', label: 'Details', icon: <Info className="w-3.5 h-3.5" /> },
+                { key: 'timeline', label: 'Execution Timeline', icon: <Activity className="w-3.5 h-3.5" /> },
+                { key: 'events', label: 'Events', icon: <List className="w-3.5 h-3.5" /> },
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Only the active section scrolls; the key restarts the reveal and
+            resets the scroll position on each switch. */}
+        <div key={tab} className="flex-1 min-h-0 overflow-y-auto pr-page-x pt-6 pb-16 animate-page-in">
+          {tab === 'details' && (
+            <div className="@container">
+              <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4">
+                <JsonViewer data={triggerInput ?? {}} label="Input" />
+                {result !== null && <JsonViewer data={result} label="Result" />}
+              </div>
+            </div>
+          )}
+          {tab === 'timeline' && (
+            <SwimlaneTimeline events={events} outline jid={jobId} appId={namespace || 'durable'} />
+          )}
+          {tab === 'events' && (
+            <EventTable events={events} jid={jobId} appId={namespace || 'durable'} />
+          )}
+        </div>
+      </div>
+
+      <McpExecutionSidePanel
+        execution={execution}
+        namespace={namespace}
+        traceUrl={traceUrl}
+        headerActions={
+          <>
             <ListToolbar
               onRefresh={() => refetch()}
               isFetching={isFetching}
@@ -149,106 +227,10 @@ export function McpRunDetailPage() {
                 }
               }}
             />
-          </div>
+          </>
         }
+        open={sidePanelOpen}
       />
-
-      {/* ── Header card ─────────────────────────────────── */}
-      <div className="bg-surface-sunken/50 rounded-md p-5 mb-8">
-        {/* Row 1: Job ID + stats + status */}
-        <div className="flex items-center gap-4 mb-4">
-          <h2 className="text-sm font-mono text-text-primary truncate flex-1">{execution.workflow_id}</h2>
-          <div className="flex items-center gap-4 shrink-0">
-            <Stat label="Tools" value={summary.activities.user} />
-            <Stat label="System" value={summary.activities.system} muted />
-            {summary.child_workflows.total > 0 && (
-              <Stat label="Children" value={summary.child_workflows.total} />
-            )}
-            {summary.timers > 0 && <Stat label="Timers" value={summary.timers} />}
-            {summary.signals > 0 && <Stat label="Signals" value={summary.signals} />}
-            <StatusBadge status={statusMap[execution.status] ?? execution.status} />
-          </div>
-        </div>
-
-        {/* Row 2: Namespace, Topic, Duration, Started, Trace */}
-        <div className="grid grid-cols-6 gap-x-6">
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Server</p>
-            <p className="text-xs font-mono text-text-primary truncate">{namespace}</p>
-          </div>
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Tool</p>
-            <p className="text-xs font-mono text-text-primary truncate">{execution.workflow_type || '—'}</p>
-          </div>
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Duration</p>
-            <DurationValue ms={execution.duration_ms} className="font-mono text-text-primary" />
-          </div>
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Started</p>
-            {execution.start_time
-              ? <DateValue date={execution.start_time} format="datetime" className="font-mono text-text-primary" />
-              : <span className="text-xs text-text-tertiary">--</span>}
-          </div>
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Completed</p>
-            {execution.close_time
-              ? <DateValue date={execution.close_time} format="datetime" className="font-mono text-text-primary" />
-              : <span className="text-xs text-text-tertiary">--</span>}
-          </div>
-          <div>
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-0.5">Trace</p>
-            {execution.trace_id ? (
-              <CopyableId
-                label=""
-                value={execution.trace_id}
-                href={traceUrl ? traceUrl.replace('{traceId}', execution.trace_id) : undefined}
-                external
-              />
-            ) : (
-              <span className="text-xs text-text-tertiary">—</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Sections ────────────────────────────────────── */}
-      <div className="space-y-6">
-        {/* Details: Input + Result */}
-        <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle}>
-          <div className="grid grid-cols-1 @form-cols:grid-cols-2 gap-4 mb-6">
-            <div>
-              <JsonViewer data={triggerInput ?? {}} label="Input" />
-            </div>
-            {result !== null && (
-              <div>
-                <JsonViewer data={result} label="Result" />
-              </div>
-            )}
-          </div>
-        </CollapsibleSection>
-
-        {/* Execution Timeline (swimlane) */}
-        <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle}>
-          <SwimlaneTimeline events={events} outline jid={jobId} appId={namespace || 'durable'} />
-        </CollapsibleSection>
-
-        {/* Events (table) */}
-        <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle}>
-          <EventTable events={events} jid={jobId} appId={namespace || 'durable'} />
-        </CollapsibleSection>
-      </div>
-    </div>
-  );
-}
-
-// ── Stat pill ────────────────────────────────────────────────────────────────
-
-function Stat({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5 text-xs">
-      <span className="text-text-tertiary">{label}</span>
-      <span className={`font-medium tabular-nums ${muted ? 'text-text-tertiary' : 'text-text-primary'}`}>{value}</span>
     </div>
   );
 }

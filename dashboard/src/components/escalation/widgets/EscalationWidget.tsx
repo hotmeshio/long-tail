@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { OpenDetailButton } from './OpenDetailButton';
 
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { getDeep } from '../../../lib/x-lt-bind';
@@ -143,13 +143,7 @@ function EscalationCard({
         <span className="text-2xs text-text-quaternary">
           {esc.role} · {formatAgoCompact(esc.created_at)}
         </span>
-        <Link
-          to={`/escalations/detail/${esc.id}`}
-          className="text-2xs text-accent hover:text-accent-hover transition-colors"
-          title="Open escalation detail"
-        >
-          Detail
-        </Link>
+        <OpenDetailButton to={`/escalations/detail/${esc.id}`} />
       </div>
     </div>
   );

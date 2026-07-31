@@ -1,12 +1,12 @@
-import { useState, useCallback, useMemo } from 'react';
-import { mapFormToPayload } from '../../../lib/x-lt-bind';
+import { useState, useCallback } from 'react';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
-import { validateResolverForm, type FieldError } from '../../../lib/field-validator';
+import { type FieldError } from '../../../lib/field-validator';
+import { buildResolverPayload } from '../../../lib/resolver-payload';
+import { type FooterLabels } from '../../../lib/x-lt-labels';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
-import { useSubmitGuard, type SubmitGuardDef } from '../../../hooks/useSubmitGuard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +60,12 @@ export interface EscalationActionBarProps {
   onValidationErrors?: (errors: FieldError[]) => void;
   /** Escalation context — used to skip required checks on fields hidden by x-lt-showIf. */
   escalationContext?: ShowIfContext;
+  /** Footer copy overrides from the form's `x-lt-labels`. Absent targets keep their defaults. */
+  labels?: FooterLabels;
+  /** The page-owned x-lt-submit-guard block state — submit stays disabled while true. */
+  submitBlocked?: boolean;
+  /** Message shown beside the disabled submit while the guard blocks. */
+  submitBlockedMessage?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +85,9 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     onSubmitAttempt,
     onValidationErrors,
     escalationContext,
+    labels = {},
+    submitBlocked,
+    submitBlockedMessage,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -90,19 +99,10 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
   const isCustom = duration === 'custom';
   const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
 
-  // x-lt-submit-guard rides the embedded form schema. The gate applies to the
-  // form resolve only — triage stays available as the escape hatch when the
-  // guarded work itself is the problem.
-  const guardDef = useMemo<SubmitGuardDef | undefined>(() => {
-    try {
-      const schema = JSON.parse(json)?._form_schema as Record<string, unknown> | undefined;
-      return schema?.['x-lt-submit-guard'] as SubmitGuardDef | undefined;
-    } catch {
-      return undefined;
-    }
-  }, [json]);
-  const guard = useSubmitGuard(guardDef, escalationContext);
-  const guardBlocksSubmit = guard.blocked && !requestTriage;
+  // x-lt-submit-guard is owned by the page (it drives auto-resolve too); the bar
+  // just reflects its block state. The gate applies to the form resolve only —
+  // triage stays the escape hatch when the guarded work itself is the problem.
+  const guardBlocksSubmit = !!submitBlocked && !requestTriage;
 
   if (mode === 'terminal') return null;
 
@@ -128,39 +128,25 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
       return;
     }
 
-    let payload: Record<string, unknown>;
-    try {
-      payload = JSON.parse(json);
-    } catch {
-      setParseError('Invalid JSON');
+    // Parse, validate against the embedded _form_schema, and map to the final
+    // nested shape — the same pass the API layer runs on enforced roles, so the
+    // panel and a server 422 report the identical list. Hidden fields (x-lt-showIf
+    // falsy against the live context) are excluded from the required checks.
+    const result = buildResolverPayload(json, escalationContext);
+    if (result.parseError) {
+      setParseError(result.parseError);
       return;
     }
-
-    // Validate all fields against the embedded _form_schema — the same shared
-    // pass the API layer runs on enforced roles, so the panel and a server 422
-    // report the identical list. Hidden fields (x-lt-showIf evaluates falsy
-    // against the live context) are excluded — a field the user cannot see
-    // must never block submission.
-    const schema = payload._form_schema as Record<string, unknown> | undefined;
-    if (schema) {
-      const fieldErrors: FieldError[] = validateResolverForm(schema, payload, escalationContext);
-
-      if (fieldErrors.length > 0) {
-        // Field errors live in ONE surface: the errors panel, which opens on
-        // the blocked submit and recomputes as the user fixes fields. A
-        // summary here would go stale the moment a field is corrected — the
-        // footer keeps only its own errors (bad JSON, server rejection).
-        onSubmitAttempt?.();
-        onValidationErrors?.(fieldErrors);
-        return;
-      }
+    if (result.errors.length > 0) {
+      // Field errors live in ONE surface: the errors panel, which opens on the
+      // blocked submit and recomputes as the user fixes fields. A summary here
+      // would go stale the moment a field is corrected — the footer keeps only
+      // its own errors (bad JSON, server rejection).
+      onSubmitAttempt?.();
+      onValidationErrors?.(result.errors);
+      return;
     }
-
-    // Submit the resolver payload in its final shape: drop the UI-only schema and
-    // map the flat form fields into the nested payload via x-lt-bind. The server
-    // stores this exactly as sent — the payload IS the payload.
-    const { _form_schema, ...formValues } = payload;
-    onResolve(mapFormToPayload(formValues, schema as Record<string, any> | undefined));
+    onResolve(result.payload!);
   };
 
   const tabClass = (active: boolean) =>
@@ -198,7 +184,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 onClick={onCancel}
                 className="text-xs text-text-tertiary hover:text-status-error transition-colors"
               >
-                Cancel escalation
+                {labels.cancel ?? 'Cancel escalation'}
               </button>
               <div className="flex-1" />
               {isCustom && (
@@ -213,7 +199,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 className={`btn-primary text-xs ${claimNudge ? 'animate-[field-shake_0.4s_ease-in-out]' : ''}`}
                 data-testid="claim-button"
               >
-                {claimPending ? 'Claiming...' : 'Claim'}
+                {claimPending ? 'Claiming...' : (labels.claim ?? 'Claim')}
               </button>
             </div>
           </div>
@@ -245,20 +231,20 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                   onClick={() => onActiveViewChange('escalate')}
                   className={tabClass(activeView === 'escalate')}
                 >
-                  Escalate
+                  {labels.escalate ?? 'Escalate'}
                 </button>
               )}
               <button
                 onClick={() => onActiveViewChange('release')}
                 className={`text-xs transition-colors ${activeView === 'release' ? 'text-status-error font-medium' : 'text-text-tertiary hover:text-status-error'}`}
               >
-                Release
+                {labels.release ?? 'Release'}
               </button>
               <button
                 onClick={onCancel}
                 className="text-xs transition-colors text-text-tertiary hover:text-status-error"
               >
-                Cancel
+                {labels.cancel ?? 'Cancel'}
               </button>
             </div>
 
@@ -268,9 +254,9 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 <div className="flex-1" />
                 {parseError && <span className="text-xs text-status-error">{parseError}</span>}
                 {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
-                {guardBlocksSubmit && (
+                {guardBlocksSubmit && submitBlockedMessage && (
                   <span className="text-xs text-status-pending" data-testid="submit-guard-message">
-                    {guard.message}
+                    {submitBlockedMessage}
                   </span>
                 )}
                 <button
@@ -281,7 +267,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                   {resolvePending
                     ? (workflowType ? 'Submitting...' : 'Acknowledging...')
                     : requestTriage ? 'Send to Triage'
-                    : workflowType ? 'Submit' : 'Acknowledge'}
+                    : (labels.submit ?? (workflowType ? 'Submit' : 'Acknowledge'))}
                 </button>
               </div>
             )}
@@ -310,7 +296,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                   disabled={!escalateTarget || escalatePending}
                   className="btn-primary text-xs"
                 >
-                  {escalatePending ? 'Escalating...' : 'Escalate'}
+                  {escalatePending ? 'Escalating...' : (labels.escalate ?? 'Escalate')}
                 </button>
               </div>
             )}

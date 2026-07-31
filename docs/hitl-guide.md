@@ -20,6 +20,8 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Sections, columns, ordering, side-panel help | Layout keywords | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Runtime-driven items, files, signatures, SOP blocks | Widgets | [x-lt-widget.md](hitl/x-lt-widget.md) |
 | A role-authored list page — document views, facet tables, entity card boards | List schema | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
+| Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
+| Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
 
 ---
@@ -84,6 +86,8 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Layout, ordering, sections, binding, help panel | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Custom widgets (checklist, file upload, code editor, signature, markdown) | [x-lt-widget.md](hitl/x-lt-widget.md) |
 | List schema (`active-history`, `active`, `facet-table`, `facet-board` cards) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
+| Embedded widgets (`link`, `escalation`, `escalation-list`) and the submit guard | [x-lt-embed.md](hitl/x-lt-embed.md) |
+| Footer labels, claim-and-submit, and the list-driven "start" action | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
@@ -118,7 +122,12 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-help` | schema | Markdown guidance for the side panel's Help view |
 | `x-lt-context` | schema | Plain-text fallback for the Help view when `x-lt-help` is absent |
 | `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |
+| `x-lt-submit-guard` | schema | Block the resolve while an embedded escalation query returns rows; `autoResolveWhenEmpty` auto-closes the claimed parent once it drains. Enforced isomorphically for `enforce_schema` roles |
+| `x-lt-submit-on-claim` | schema | Claiming also resolves the form's seeded defaults in one gesture |
+| `x-lt-labels` | schema | Per-target labels for the footer controls (`claim`, `cancel`, `submit`, `escalate`, `release`) |
+| `x-lt-transition` | schema | Pause on a wait screen after resolve and hand off to the born-assigned follow-on |
 | `x-lt-columns` | schema (list) | Column definitions for `facet-table` layout |
+| `x-lt-row-action` | schema (list) | Per-row list action: `claim` / `view`, or `submitOnClaim` to claim, submit, and transition straight from the list |
 | `x-lt-active` | schema (list) | Active-item card definition |
 | `x-lt-history` | schema (list) | History column definition |
 | `format` | field | Input specialization: `password`, `date`, `date-time`, `email`, `uri`, `textarea` |
