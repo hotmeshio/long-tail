@@ -6,15 +6,19 @@ import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
 
-import { PanelRightClose, PanelRightOpen, ChevronDown } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, ChevronDown, Info, Activity, List } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { CollapsibleSection } from '../../components/common/layout/CollapsibleSection';
+import { SegmentedTabs } from '../../components/common/layout/SegmentedTabs';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 
 import { ExecutionSidePanel } from './workflow-execution/ExecutionSidePanel';
 import { ExecutionInputResult } from './workflow-execution/ExecutionInputResult';
 import { SwimlaneTimeline } from './workflow-execution/SwimlaneTimeline';
 import { EventTable } from './workflow-execution/EventTable';
+
+type WfTab = 'details' | 'timeline' | 'events';
+const WF_TABS = ['details', 'timeline', 'events'] as const;
+const WF_TAB_KEY = 'lt:workflow-execution:tab';
 
 function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
   isRunning: boolean;
@@ -108,6 +112,21 @@ export function WorkflowExecutionPage() {
   const navigate = useNavigate();
   const terminateMutation = useTerminateWorkflow();
   const { isCollapsed, toggle } = useCollapsedSections('workflow-execution');
+
+  // The main content is a segmented switch, not an accordion: one section shows
+  // at a time and the tabs sit at the top. The choice persists across visits.
+  const [tab, setTab] = useState<WfTab>(() => {
+    try {
+      const saved = localStorage.getItem(WF_TAB_KEY) as WfTab | null;
+      return saved && WF_TABS.includes(saved) ? saved : 'details';
+    } catch {
+      return 'details';
+    }
+  });
+  const selectTab = (next: WfTab) => {
+    setTab(next);
+    try { localStorage.setItem(WF_TAB_KEY, next); } catch { /* private mode */ }
+  };
 
   const handleAction = (action: 'restart' | 'terminate') => {
     if (action === 'terminate') {
@@ -214,28 +233,42 @@ export function WorkflowExecutionPage() {
         )}
 
 
-        <div className="space-y-6">
-          <CollapsibleSection title="Details" sectionKey="details" isCollapsed={isCollapsed('details')} onToggle={toggle} contentClassName="mt-4 ml-9">
-            <ExecutionInputResult execution={execution} />
-          </CollapsibleSection>
-
-          <CollapsibleSection title="Execution Timeline" sectionKey="timeline" isCollapsed={isCollapsed('timeline')} onToggle={toggle} contentClassName="mt-4 ml-9">
-            <SwimlaneTimeline
-              events={execution.events}
-              childTasks={childTasksData?.tasks}
-              jid={workflowId}
-              appId="durable"
+        <div>
+          {/* The tab strip affixes to the top of the scroll as the section
+              scrolls under it — the bg band hides the content passing beneath. */}
+          <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
+            <SegmentedTabs<WfTab>
+              aria-label="Execution section"
+              active={tab}
+              onChange={selectTab}
+              tabs={[
+                { key: 'details', label: 'Details', icon: <Info className="w-3.5 h-3.5" /> },
+                { key: 'timeline', label: 'Execution Timeline', icon: <Activity className="w-3.5 h-3.5" /> },
+                { key: 'events', label: 'Events', icon: <List className="w-3.5 h-3.5" /> },
+              ]}
             />
-          </CollapsibleSection>
+          </div>
 
-          <CollapsibleSection title="Events" sectionKey="events" isCollapsed={isCollapsed('events')} onToggle={toggle} contentClassName="mt-4 ml-9">
-            <EventTable
-              events={execution.events}
-              childTasks={childTasksData?.tasks}
-              jid={workflowId}
-              appId="durable"
-            />
-          </CollapsibleSection>
+          {/* One section at a time; the key restarts the reveal on each switch. */}
+          <div key={tab} className="mt-4 animate-page-in">
+            {tab === 'details' && <ExecutionInputResult execution={execution} />}
+            {tab === 'timeline' && (
+              <SwimlaneTimeline
+                events={execution.events}
+                childTasks={childTasksData?.tasks}
+                jid={workflowId}
+                appId="durable"
+              />
+            )}
+            {tab === 'events' && (
+              <EventTable
+                events={execution.events}
+                childTasks={childTasksData?.tasks}
+                jid={workflowId}
+                appId="durable"
+              />
+            )}
+          </div>
         </div>
       </div>
 
