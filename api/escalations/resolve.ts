@@ -67,7 +67,7 @@ export async function resolveEscalation(
     // Costs nothing when the role does not enforce (cached role set); the
     // task-fallback envelope read only happens for enforcing roles.
     const violation = await checkResolverPayload(
-      escalation, resolverPayload, () => reconstructEnvelope(escalation),
+      escalation, resolverPayload, () => reconstructEnvelope(escalation), auth.userId,
     );
     if (violation) return validationFailure(violation);
 
@@ -162,7 +162,7 @@ export async function resolveBySignalKey(
 
     // Schema enforcement — the row (envelope included) is already loaded, so
     // this costs zero extra reads beyond the cached schema.
-    const violation = await checkResolverPayload(escalation, resolverPayload);
+    const violation = await checkResolverPayload(escalation, resolverPayload, undefined, auth.userId);
     if (violation) return validationFailure(violation);
 
     // The payload is delivered as the signal the parked workflow's condition()
@@ -233,7 +233,7 @@ export async function resolveByIds(
         const fullRows = await escalationService.getEscalationsByIds(involved);
         const failed: Array<{ id: string; report: ResolverSchemaViolationReport }> = [];
         for (const row of fullRows) {
-          const report = await checkResolverPayload(row, resolverPayload);
+          const report = await checkResolverPayload(row, resolverPayload, undefined, auth.userId);
           if (report) failed.push({ id: row.id, report });
         }
         if (failed.length > 0) return bulkValidationFailure(failed);
@@ -346,7 +346,7 @@ export async function resolveAllOrNone(
       for (const item of items) {
         const row = rowById.get(item.id);
         if (!row || !row.role || !enforcing.has(row.role)) continue;
-        const report = await checkResolverPayload(row, item.resolverPayload);
+        const report = await checkResolverPayload(row, item.resolverPayload, undefined, auth.userId);
         if (report) failed.push({ id: item.id, report });
       }
       if (failed.length > 0) return bulkValidationFailure(failed);

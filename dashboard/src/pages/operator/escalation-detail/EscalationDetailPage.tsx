@@ -37,6 +37,8 @@ import { readDraft, saveDraft, clearDraft } from '../../../lib/draft-store';
 import { readTransitionConfig, readTransitionDone } from '../../../lib/x-lt-transition';
 import { readSubmitOnClaim } from '../../../lib/x-lt-submit-on-claim';
 import { readFooterLabels } from '../../../lib/x-lt-labels';
+import { readSubmitGuard } from '../../../lib/x-lt-submit-guard';
+import { useSubmitGuard } from '../../../hooks/useSubmitGuard';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
@@ -135,6 +137,13 @@ function EscalationDetailView({ id }: { id: string }) {
   const autoStartFiredRef = useRef(false);
   const autoStartActionRef = useRef<(() => void) | null>(null);
 
+  // Auto-resolve-when-empty (x-lt-submit-guard.autoResolveWhenEmpty): the moment
+  // the guard query is confirmed empty, the claimed parent submits itself. Fires
+  // once; the effect re-checks on page-load and after each inline child-resolve
+  // (the guard query is socket-invalidated, so it refetches with no polling).
+  const autoResolveFiredRef = useRef(false);
+  const autoResolveActionRef = useRef<(() => void) | null>(null);
+
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
   // and the action bar returns to its available state). Dismissal is keyed by
@@ -170,6 +179,12 @@ function EscalationDetailView({ id }: { id: string }) {
   // controls (e.g. a "Claim and Submit" button when both are set).
   const submitOnClaim = readSubmitOnClaim(effectiveSchema as Record<string, unknown> | null);
   const footerLabels = readFooterLabels(effectiveSchema as Record<string, unknown> | null);
+
+  // x-lt-submit-guard — the query precondition. The page owns it (not the action
+  // bar) because it also drives auto-resolve-when-empty. Inert until the row
+  // loads; the hook self-disables when the schema declares no guard.
+  const submitGuardDef = readSubmitGuard(effectiveSchema as Record<string, unknown> | null);
+  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc) : undefined);
 
   // Initialize json from the form exactly once. Fields are seeded in priority order:
   // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
@@ -288,6 +303,19 @@ function EscalationDetailView({ id }: { id: string }) {
     autoStartFiredRef.current = true;
     autoStartActionRef.current?.();
   }, [esc, json, location.state]);
+
+  // Auto-resolve the claimed parent once the submit guard confirms its children
+  // are gone. Only the claimant closes it, and only when the parent's own form
+  // has seeded — the action ref (below) revalidates before submitting.
+  useEffect(() => {
+    if (autoResolveFiredRef.current) return;
+    if (!submitGuardDef?.autoResolveWhenEmpty || !submitGuard.confirmedEmpty) return;
+    if (!esc || esc.status !== 'pending' || !isEffectivelyClaimed(esc)) return;
+    if (esc.assigned_to !== user?.userId) return;
+    if (json === '{}') return;
+    autoResolveFiredRef.current = true;
+    autoResolveActionRef.current?.();
+  }, [submitGuard.confirmedEmpty, submitGuardDef, esc, json, user?.userId]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
@@ -415,6 +443,10 @@ function EscalationDetailView({ id }: { id: string }) {
     } catch {
       return; // claim.error surfaces through the action bar
     }
+    // A submit guard defers the auto-submit: land the person on the claimed
+    // parent with its children to work; the auto-resolve effect closes it once
+    // they clear (pair submitOnClaim with autoResolveWhenEmpty for full flow).
+    if (submitGuard.blocked) return;
     const result = buildResolverPayload(json, buildShowIfContext(esc));
     if (result.parseError) return; // seeded form is malformed — leave it claimed
     if (result.errors.length > 0) {
@@ -438,6 +470,15 @@ function EscalationDetailView({ id }: { id: string }) {
     setAutoStarting(true);
     await handleClaimAndSubmit(typeof dm === 'number' && dm > 0 ? dm : 30);
     setAutoStarting(false);
+  };
+
+  // Auto-resolve-when-empty: submit the parent's seeded payload once the guard
+  // clears. Revalidates first — if the parent's own form is incomplete, leave it
+  // for the person rather than auto-closing an invalid record.
+  autoResolveActionRef.current = () => {
+    const result = buildResolverPayload(json, buildShowIfContext(esc));
+    if (result.parseError || result.errors.length > 0) return;
+    handleResolve(result.payload!);
   };
 
   const handleEscalate = async (targetRole: string) => {
@@ -639,6 +680,8 @@ function EscalationDetailView({ id }: { id: string }) {
             setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
           }}
           labels={footerLabels}
+          submitBlocked={submitGuard.blocked}
+          submitBlockedMessage={submitGuard.message}
         />}
       </div>
 

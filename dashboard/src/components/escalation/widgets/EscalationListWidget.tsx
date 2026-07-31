@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { OpenDetailButton } from './OpenDetailButton';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { formatAgoCompact } from '../../../lib/format';
 import { rowContext } from '../EscalationListView';
@@ -204,7 +204,7 @@ function EmbedTable({
             </th>
           ))}
           {actions.length > 0 && <th className="w-px" />}
-          <th className="w-4" />
+          <th className="w-8" />
         </tr>
       </thead>
       <tbody>
@@ -246,15 +246,8 @@ function EmbedTable({
                   )}
                 </td>
               )}
-              <td className="py-1 align-top">
-                <Link
-                  to={`/escalations/detail/${esc.id}`}
-                  className="text-accent hover:text-accent-hover transition-colors"
-                  title="Open escalation detail"
-                  tabIndex={-1}
-                >
-                  →
-                </Link>
+              <td className="py-1 pl-2 align-top">
+                <OpenDetailButton to={`/escalations/detail/${esc.id}`} />
               </td>
             </tr>
           );

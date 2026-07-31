@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { type FieldError } from '../../../lib/field-validator';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
@@ -7,7 +7,6 @@ import { CountdownTimer } from '../../../components/common/display/CountdownTime
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
-import { useSubmitGuard, type SubmitGuardDef } from '../../../hooks/useSubmitGuard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,6 +62,10 @@ export interface EscalationActionBarProps {
   escalationContext?: ShowIfContext;
   /** Footer copy overrides from the form's `x-lt-labels`. Absent targets keep their defaults. */
   labels?: FooterLabels;
+  /** The page-owned x-lt-submit-guard block state — submit stays disabled while true. */
+  submitBlocked?: boolean;
+  /** Message shown beside the disabled submit while the guard blocks. */
+  submitBlockedMessage?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +86,8 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     onValidationErrors,
     escalationContext,
     labels = {},
+    submitBlocked,
+    submitBlockedMessage,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -94,19 +99,10 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
   const isCustom = duration === 'custom';
   const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
 
-  // x-lt-submit-guard rides the embedded form schema. The gate applies to the
-  // form resolve only — triage stays available as the escape hatch when the
-  // guarded work itself is the problem.
-  const guardDef = useMemo<SubmitGuardDef | undefined>(() => {
-    try {
-      const schema = JSON.parse(json)?._form_schema as Record<string, unknown> | undefined;
-      return schema?.['x-lt-submit-guard'] as SubmitGuardDef | undefined;
-    } catch {
-      return undefined;
-    }
-  }, [json]);
-  const guard = useSubmitGuard(guardDef, escalationContext);
-  const guardBlocksSubmit = guard.blocked && !requestTriage;
+  // x-lt-submit-guard is owned by the page (it drives auto-resolve too); the bar
+  // just reflects its block state. The gate applies to the form resolve only —
+  // triage stays the escape hatch when the guarded work itself is the problem.
+  const guardBlocksSubmit = !!submitBlocked && !requestTriage;
 
   if (mode === 'terminal') return null;
 
@@ -258,9 +254,9 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 <div className="flex-1" />
                 {parseError && <span className="text-xs text-status-error">{parseError}</span>}
                 {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
-                {guardBlocksSubmit && (
+                {guardBlocksSubmit && submitBlockedMessage && (
                   <span className="text-xs text-status-pending" data-testid="submit-guard-message">
-                    {guard.message}
+                    {submitBlockedMessage}
                   </span>
                 )}
                 <button

@@ -142,7 +142,7 @@ describe('EscalationListWidget — x-lt-actions', () => {
     const error = await screen.findByTestId('escalation-list-action-error-ORD-1');
     expect(error).toHaveTextContent('Validation failed: checks.labeled is required');
     // the full-form path stays available for the reject/complex case
-    expect(screen.getByTitle('Open escalation detail')).toHaveAttribute(
+    expect(screen.getByTitle('View details')).toHaveAttribute(
       'href',
       '/escalations/detail/ORD-1',
     );
