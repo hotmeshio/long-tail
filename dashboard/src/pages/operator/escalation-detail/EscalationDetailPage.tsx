@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAccess } from '../../../hooks/useAccess';
@@ -35,6 +35,9 @@ import { ClaimExpiryModal } from './ClaimExpiryModal';
 import { useClaimClock } from '../../../hooks/useClaimClock';
 import { readDraft, saveDraft, clearDraft } from '../../../lib/draft-store';
 import { readTransitionConfig, readTransitionDone } from '../../../lib/x-lt-transition';
+import { readSubmitOnClaim } from '../../../lib/x-lt-submit-on-claim';
+import { readFooterLabels } from '../../../lib/x-lt-labels';
+import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
 import { apiFetch } from '../../../api/client';
@@ -84,6 +87,7 @@ export function EscalationDetailPage() {
 function EscalationDetailView({ id }: { id: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: esc, isLoading, refetch, isFetching } = useEscalation(id);
   useEscalationDetailEvents(id);
@@ -121,6 +125,16 @@ function EscalationDetailView({ id }: { id: string }) {
   // is where to land if the follow-on never comes (an x-lt-transition-done URL).
   const [waiting, setWaiting] = useState<{ message: string; maxWaitSeconds: number; doneDest: string | null } | null>(null);
 
+  // Auto-start (list-driven claim-and-submit): a list row launched with the
+  // `autoStart` intent (x-lt-row-action submitOnClaim) claims and submits this
+  // escalation without a second gesture, then transitions on to the follow-on.
+  // `autoStarting` masks the brief form render with the wait screen; the ref
+  // holds the latest handler (assigned in the render body, where the handlers
+  // are defined) so the effect below can fire it exactly once.
+  const [autoStarting, setAutoStarting] = useState(false);
+  const autoStartFiredRef = useRef(false);
+  const autoStartActionRef = useRef<(() => void) | null>(null);
+
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
   // and the action bar returns to its available state). Dismissal is keyed by
@@ -150,6 +164,12 @@ function EscalationDetailView({ id }: { id: string }) {
   const resolverSchema =
     (esc?.form_schema ?? wfConfig?.resolver_schema ?? null) as Record<string, any> | null;
   const effectiveSchema = metadataFormSchema ?? resolverSchema;
+
+  // Footer configuration — root tokens on the form schema. `x-lt-submit-on-claim`
+  // folds claim and submit into one gesture; `x-lt-labels` renames the action
+  // controls (e.g. a "Claim and Submit" button when both are set).
+  const submitOnClaim = readSubmitOnClaim(effectiveSchema as Record<string, unknown> | null);
+  const footerLabels = readFooterLabels(effectiveSchema as Record<string, unknown> | null);
 
   // Initialize json from the form exactly once. Fields are seeded in priority order:
   // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
@@ -252,6 +272,22 @@ function EscalationDetailView({ id }: { id: string }) {
     }, waiting.maxWaitSeconds * 1000);
     return () => window.clearTimeout(timer);
   }, [waiting, id, user?.userId, navigate, queryClient]);
+
+  // Fire the list-driven auto-start once. The escalation must be loaded, still
+  // claimable (pending, no live claim), and — when it carries a form — seeded so
+  // its defaults are ready to submit. The one-shot ref survives refetches; the
+  // action ref holds the current handler closure (assigned in the render body,
+  // after the handlers are defined).
+  useEffect(() => {
+    if (autoStartFiredRef.current) return;
+    if (!(location.state as { autoStart?: boolean } | null)?.autoStart) return;
+    if (!esc || esc.status !== 'pending' || isEffectivelyClaimed(esc)) return;
+    // The seeded defaults land in `json` one render after the schema resolves;
+    // an unseeded '{}' would submit an empty payload, so wait for the real form.
+    if (json === '{}') return;
+    autoStartFiredRef.current = true;
+    autoStartActionRef.current?.();
+  }, [esc, json, location.state]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
@@ -366,6 +402,44 @@ function EscalationDetailView({ id }: { id: string }) {
     goBack();
   };
 
+  // x-lt-submit-on-claim: claim, then immediately resolve with whatever the form
+  // holds (its seeded defaults). The two are distinct operations — the row must
+  // be claimed by me before the server accepts the resolve — so they run in
+  // sequence. If the defaults fail validation the claim still stands; the page
+  // drops into the normal claimed state with the errors surfaced so the person
+  // finishes by hand. Wired to the Claim button only; extend and the locked-form
+  // nudge keep the plain claim.
+  const handleClaimAndSubmit = async (durationMinutes: number) => {
+    try {
+      await claim.mutateAsync({ id, durationMinutes });
+    } catch {
+      return; // claim.error surfaces through the action bar
+    }
+    const result = buildResolverPayload(json, buildShowIfContext(esc));
+    if (result.parseError) return; // seeded form is malformed — leave it claimed
+    if (result.errors.length > 0) {
+      setSubmitAttempted(true);
+      setFormErrors(result.errors);
+      setSidePanelOpen(true);
+      savePanelOpen(true);
+      setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
+      return;
+    }
+    await handleResolve(result.payload!);
+  };
+
+  // The list-driven auto-start: mask the form with the wait screen, then run the
+  // same claim-and-submit the manual button runs. On success the transition (or
+  // goBack) takes over; on a validation miss the mask drops to reveal the
+  // claimed form and its errors. Reassigned each render so the pre-return effect
+  // fires the latest closure.
+  autoStartActionRef.current = async () => {
+    const dm = (location.state as { durationMinutes?: number } | null)?.durationMinutes;
+    setAutoStarting(true);
+    await handleClaimAndSubmit(typeof dm === 'number' && dm > 0 ? dm : 30);
+    setAutoStarting(false);
+  };
+
   const handleEscalate = async (targetRole: string) => {
     if (!targetRole) return;
     await escalate.mutateAsync({ id, targetRole });
@@ -434,14 +508,14 @@ function EscalationDetailView({ id }: { id: string }) {
                 {
                   onClick: handleRelease,
                   disabled: claim.isPending,
-                  label: 'Release',
+                  label: footerLabels.release ?? 'Release',
                   hoverClass: 'hover:text-accent',
                   icon: <RotateCcw className="w-4 h-4" strokeWidth={1.5} />,
                 },
                 {
                   onClick: () => setCancelModalOpen(true),
                   disabled: false,
-                  label: 'Cancel',
+                  label: footerLabels.cancel ?? 'Cancel',
                   hoverClass: 'hover:text-status-error',
                   icon: <X className="w-4 h-4" strokeWidth={1.5} />,
                 },
@@ -537,8 +611,8 @@ function EscalationDetailView({ id }: { id: string }) {
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
-          onClaim={handleClaim}
-          claimPending={claim.isPending}
+          onClaim={submitOnClaim ? handleClaimAndSubmit : handleClaim}
+          claimPending={claim.isPending || (submitOnClaim && resolve.isPending)}
           claimNudge={claimNudge}
           workflowType={esc.workflow_type}
           json={json}
@@ -564,6 +638,7 @@ function EscalationDetailView({ id }: { id: string }) {
             savePanelOpen(true);
             setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
           }}
+          labels={footerLabels}
         />}
       </div>
 
@@ -601,7 +676,12 @@ function EscalationDetailView({ id }: { id: string }) {
 
       {/* Transition hand-off: shown after a resolve on an x-lt-transition form,
           bridging the brief gap until the born-assigned follow-on arrives. */}
-      <TransitionWaitModal open={!!waiting} message={waiting?.message ?? ''} />
+      <TransitionWaitModal
+        open={!!waiting || autoStarting}
+        message={waiting?.message
+          ?? readTransitionConfig(effectiveSchema as Record<string, unknown> | null)?.message
+          ?? 'Starting…'}
+      />
 
       {claimedByMe && !isTerminal && esc.assigned_until && (
         <ClaimExpiryModal

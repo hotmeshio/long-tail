@@ -93,6 +93,32 @@ export const TXN_STEP1_FORM_SCHEMA = {
   },
 } as const;
 
+// Step 1 list view — the pool of accounts awaiting onboarding. The row action
+// opts into the list-driven claim-and-submit: "Start Onboarding" claims the row,
+// submits the account form's seeded defaults, and — because the form declares
+// x-lt-transition — hands the person straight to their preferences step (step 2,
+// born assigned). The demo for x-lt-row-action `submitOnClaim` (see
+// docs/hitl/x-lt-list-schema.md); the behavior itself lives on the form.
+export const TXN_STEP1_LIST_SCHEMA = {
+  'x-lt-layout': 'facet-table',
+  'x-lt-help': [
+    '# Accounts awaiting onboarding',
+    '',
+    'Start one — it claims the account, submits it, and takes you straight to the',
+    'preferences step. No queue round-trip.',
+  ].join('\n'),
+  'x-lt-columns': [
+    { label: 'Account', value: '{{metadata.account}}', priority: 1 },
+    { label: 'Step', value: '{{escalation.description}}' },
+    { label: 'Waiting', value: '{{escalation.created_at}}', format: 'age' },
+  ],
+  'x-lt-row-action': {
+    submitOnClaim: true,
+    label: 'Start Onboarding',
+    durationMinutes: 30,
+  },
+} as const;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step 2 — Preferences (opts into the hand-off)
 // ─────────────────────────────────────────────────────────────────────────────

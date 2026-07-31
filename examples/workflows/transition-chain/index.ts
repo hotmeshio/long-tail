@@ -32,6 +32,13 @@ import {
 // owner (an assignee with no window is a soft hint others could claim).
 const HOLD_MINUTES = 30;
 
+/** A placeholder email derived from the account name, so step 1's seeded
+ *  defaults are valid and can be submitted straight from the list. */
+function emailForAccount(account: string): string {
+  const slug = account.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/(^\.|\.$)/g, '');
+  return `${slug || 'account'}@example.com`;
+}
+
 export interface TransitionChainEnvelopeData {
   account?: string;
 }
@@ -50,7 +57,10 @@ export async function transitionChain(envelope: LTEnvelope): Promise<any> {
       priority: 2,
       description: `Onboarding — ${account} · Step 1 of 3`,
       workflowType: 'transitionChain',
-      envelope: { source: 'transition-chain', formDefaults: { full_name: '', email: '' } },
+      // Seeded with valid defaults so the account can be started straight from
+      // the list (x-lt-row-action submitOnClaim); a person opening the detail
+      // still edits them before submitting.
+      envelope: { source: 'transition-chain', formDefaults: { full_name: account, email: emailForAccount(account) } },
       metadata: { account },
       schemaVersion: TXN_SCHEMA_VERSION,
     },

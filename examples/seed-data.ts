@@ -83,7 +83,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget' | 'transitionChain';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -269,6 +269,26 @@ export const SEED_ENVELOPES: Array<{
       },
     },
   },
+
+  // -- Process 9: Onboarding wizard (x-lt-transition + list-driven submit-on-claim)
+  // Each start puts one account into the txn-step-1 pool. The role owns a
+  // list_schema whose "Start Onboarding" row action claims and submits in one
+  // gesture, then transitions the person straight to the born-assigned step 2.
+  ...['Ada Lovelace', 'Grace Hopper', 'Katherine Johnson', 'Alan Turing', 'Edsger Dijkstra'].map(
+    (account): { workflowName: SeedWorkflowName; taskQueue: string; envelope: LTEnvelope; label: string } => ({
+      label: `Process 9 — Onboarding · ${account}`,
+      workflowName: 'transitionChain',
+      taskQueue: 'long-tail-examples',
+      envelope: {
+        data: { account },
+        metadata: {
+          source: 'seed',
+          process: 'onboarding',
+          description: 'Open the txn-step-1 list and click "Start Onboarding" — it claims, submits the account, and hands you to the preferences step.',
+        },
+      },
+    }),
+  ),
 ];
 
 // Escalation chains: reviewer -> admin -> engineer (and cross-links)
