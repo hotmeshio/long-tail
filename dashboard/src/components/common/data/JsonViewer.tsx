@@ -116,7 +116,7 @@ export function JsonViewer({
     : '';
   const contentClass = isPanel
     ? 'font-mono text-xs leading-relaxed bg-surface-raised rounded-md p-4 overflow-x-auto break-all'
-    : 'font-mono text-xs leading-relaxed bg-surface-sunken rounded-md p-4 overflow-x-auto break-all';
+    : 'font-mono text-xs leading-relaxed bg-surface-sunken border border-surface-border rounded-md p-4 overflow-x-auto break-all';
 
   return (
     <div className={wrapperClass}>

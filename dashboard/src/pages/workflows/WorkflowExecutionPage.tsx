@@ -201,42 +201,37 @@ export function WorkflowExecutionPage() {
   );
 
   return (
-    // Master flow beside a full-height panel: the left column page-scrolls
-    // like any detail page; the panel spans the middle row with its own
-    // sticky viewport. Negative margins let the panel bleed to the page edge;
-    // the left column re-adds those gutters.
-    <div className="flex items-stretch min-w-0 -mt-10 -mr-10 -mb-16">
-      <div className="flex-1 min-w-0 pt-10 pr-10 pb-16">
-        {/* The main header stays quiet: title + the panel toggle. Status, the
-            toolbar, and the Actions menu all live in the panel. */}
-        <PageHeader
-          title={executionTitle}
-          actions={
-            <button
-              onClick={() => toggle('side-panel')}
-              className="text-accent/60 hover:text-accent transition-colors"
-              title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
-            >
-              {sidePanelOpen
-                ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
-                : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
-            </button>
-          }
-        />
+    // Two fixed-height columns, like the escalation detail page: the header and
+    // tab strip stay put while only the active section scrolls, and the side
+    // panel is affixed with its own internal scroll. Negative margins let the
+    // panel bleed to the page edge; the left column re-adds the gutters.
+    <div className="flex-1 min-h-0 min-w-0 flex items-stretch -mt-8 -mr-page-x -mb-16">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* Fixed header: title + the panel toggle, then the tab strip. The
+            toolbar, status, and Actions menu all live in the panel. */}
+        <div className="shrink-0 pt-8 pr-page-x">
+          <PageHeader
+            title={executionTitle}
+            actions={
+              <button
+                onClick={() => toggle('side-panel')}
+                className="text-accent/60 hover:text-accent transition-colors"
+                title={sidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+              >
+                {sidePanelOpen
+                  ? <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
+                  : <PanelRightOpen className="w-5 h-5" strokeWidth={1.5} />}
+              </button>
+            }
+          />
 
-        {terminateMutation.error && (
-          <div className="py-3 mb-6">
-            <p className="text-xs text-status-error">
+          {terminateMutation.error && (
+            <p className="text-xs text-status-error py-2">
               Terminate failed: {terminateMutation.error.message}
             </p>
-          </div>
-        )}
+          )}
 
-
-        <div>
-          {/* The tab strip affixes to the top of the scroll as the section
-              scrolls under it — the bg band hides the content passing beneath. */}
-          <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
+          <div className="mt-2">
             <SegmentedTabs<WfTab>
               aria-label="Execution section"
               active={tab}
@@ -248,27 +243,28 @@ export function WorkflowExecutionPage() {
               ]}
             />
           </div>
+        </div>
 
-          {/* One section at a time; the key restarts the reveal on each switch. */}
-          <div key={tab} className="mt-4 animate-page-in">
-            {tab === 'details' && <ExecutionInputResult execution={execution} />}
-            {tab === 'timeline' && (
-              <SwimlaneTimeline
-                events={execution.events}
-                childTasks={childTasksData?.tasks}
-                jid={workflowId}
-                appId="durable"
-              />
-            )}
-            {tab === 'events' && (
-              <EventTable
-                events={execution.events}
-                childTasks={childTasksData?.tasks}
-                jid={workflowId}
-                appId="durable"
-              />
-            )}
-          </div>
+        {/* Only the active section scrolls; the key restarts the reveal and
+            resets the scroll position on each switch. */}
+        <div key={tab} className="flex-1 min-h-0 overflow-y-auto pr-page-x pt-6 pb-16 animate-page-in">
+          {tab === 'details' && <ExecutionInputResult execution={execution} />}
+          {tab === 'timeline' && (
+            <SwimlaneTimeline
+              events={execution.events}
+              childTasks={childTasksData?.tasks}
+              jid={workflowId}
+              appId="durable"
+            />
+          )}
+          {tab === 'events' && (
+            <EventTable
+              events={execution.events}
+              childTasks={childTasksData?.tasks}
+              jid={workflowId}
+              appId="durable"
+            />
+          )}
         </div>
       </div>
 

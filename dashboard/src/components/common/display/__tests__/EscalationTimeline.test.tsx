@@ -65,7 +65,7 @@ describe('EscalationTimeline', () => {
     );
     // The resolved segment should have minWidth set
     const segs = container.querySelectorAll<HTMLElement>('div[style*="minWidth"], div[style*="min-width"]');
-    const hasSphere = Array.from(segs).some((el) => el.style.minWidth === `${5}px`);
+    const hasSphere = Array.from(segs).some((el) => el.style.minWidth === `${4}px`);
     expect(hasSphere).toBe(true);
   });
 

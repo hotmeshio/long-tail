@@ -4,9 +4,7 @@
 
 Durable platforms are built around determinism — that is their strength and their blind spot. They give you rich, first-class queues for deterministic work (retry, timeout, `backoffCoefficient`, exactly-once) and an `await condition()` to park a workflow until a signal arrives. All of it assumes the thing you are waiting on will, eventually, behave.
 
-Most of the work that decides an outcome behaves on its own schedule: an approval, a person, a shipment, a machine that needs service. You cannot set a `backoffCoefficient` on a person — retrying someone who has not answered just asks twice. This is why "human-in-the-loop" keeps getting bolted on as a feature: the platform perfected the deterministic queue and left the non-deterministic one for you to improvise.
-
-Long Tail makes it a primitive. The same `condition()` wait — except the act of waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. Machines answer some rows, people answer others; the workflow resumes either way, exactly where it paused.
+Long Tail makes non-determinism a primitive. The same `condition()` wait — except the act of waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. Machines answer some rows, people answer others; the workflow resumes either way, exactly where it paused.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -14,7 +12,7 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-One workflow, both queues: `proxyActivities` for the deterministic one, `condition()` for the one reality answers.
+One workflow, both queues: `proxyActivities` for the deterministic one, `condition()` for non-determinism.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
