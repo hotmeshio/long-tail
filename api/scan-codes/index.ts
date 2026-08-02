@@ -1,4 +1,6 @@
 export { executeScanCode } from './execute';
+export { executeScanChoice } from './choice';
+export { executeIdentityScan, resolveActingAuth } from './identity';
 export {
   listScanSchemes,
   getScanScheme,

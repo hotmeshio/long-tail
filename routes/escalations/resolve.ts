@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import * as api from '../../api/escalations';
+import { effectiveWorkAuth } from './acting';
 
 export function registerResolveRoutes(router: Router): void {
   /**
@@ -71,9 +72,14 @@ export function registerResolveRoutes(router: Router): void {
    * Body: { resolverPayload: Record<string, any>, metadata?: Record<string, any> }
    */
   router.post('/:id/resolve', async (req, res) => {
+    // The actor is the token user — or the badged person when an
+    // X-LT-Acting-Token grant rides the request (station continuity: the
+    // person who claimed by badge submits by badge).
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
     const result = await api.resolveEscalation(
       { id: req.params.id, resolverPayload: req.body?.resolverPayload, metadata: req.body?.metadata },
-      req.auth!,
+      auth,
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });

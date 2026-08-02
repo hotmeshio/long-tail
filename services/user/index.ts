@@ -4,6 +4,7 @@ export {
   getUser,
   getUserByExternalId,
   getUserByEmail,
+  getUserByMetadataValue,
   updateUser,
   deleteUser,
   listUsers,

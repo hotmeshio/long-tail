@@ -51,6 +51,16 @@ export const GET_USER_BY_EMAIL =
 export const GET_USER_BY_ID =
   'SELECT * FROM lt_users WHERE id = $1';
 
+/**
+ * Lookup by a caller-named metadata key (e.g. a badge binding). LIMIT 2 so an
+ * ambiguous binding — two users carrying the same value — is detectable and
+ * can fail loudly rather than silently picking one. Seq scan by design: this
+ * is the people table (small); revisit with a GIN index on metadata if a
+ * deployment ever holds tens of thousands of users.
+ */
+export const GET_USERS_BY_METADATA_VALUE =
+  `SELECT * FROM lt_users WHERE metadata->>$1 = $2 AND status = 'active' LIMIT 2`;
+
 /** Check if a user exists by id. Lightweight — returns only the id column. */
 export const VERIFY_USER_BY_ID =
   'SELECT id FROM lt_users WHERE id = $1 LIMIT 1';
