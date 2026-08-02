@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScanBarcode, Plus } from 'lucide-react';
-import { useScanSchemes, useUpsertScanScheme } from '../../../api/scan-codes';
+import { useScanSchemes, useUpsertScanScheme, SCAN_SCHEME_KINDS, type ScanSchemeKind } from '../../../api/scan-codes';
 import { useRoleDetails } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 
@@ -55,6 +55,7 @@ export function ScanCodesPage() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-text-primary truncate">{scheme.name}</div>
                 <div className="text-2xs text-text-tertiary truncate">
+                  {scheme.kind === SCAN_SCHEME_KINDS.IDENTITY && 'identity badge · '}
                   target facet <span className="font-mono">{scheme.target_facet}</span>
                   {' · '}{scheme.encoding === 'fixed'
                     ? `fixed, ${scheme.target_length} digit target`
@@ -106,22 +107,32 @@ function NewSchemeForm({
   const upsert = useUpsertScanScheme();
   const { data: roles } = useRoleDetails();
   const [name, setName] = useState('');
+  const [kind, setKind] = useState<ScanSchemeKind>(SCAN_SCHEME_KINDS.ACTION);
   const [targetFacet, setTargetFacet] = useState('');
   const [encoding, setEncoding] = useState<'' | 'fixed' | 'delimited'>('');
   const [targetLength, setTargetLength] = useState(8);
+  const [grantTtlSeconds, setGrantTtlSeconds] = useState(3600);
+  const [grantMaxUses, setGrantMaxUses] = useState(0);
 
   const priorityFacets = Array.from(
     new Set((roles?.roles ?? []).map((r) => r.priority_facet).filter(Boolean) as string[]),
   );
 
+  const isIdentity = kind === SCAN_SCHEME_KINDS.IDENTITY;
+  const ttlValid = grantTtlSeconds >= 1 && grantTtlSeconds <= 86_400;
+
   const submit = async () => {
     if (!name || !targetFacet || !encoding) return;
+    if (isIdentity && !ttlValid) return;
     await upsert.mutateAsync({
       version,
       name,
+      kind,
       target_facet: targetFacet,
       encoding,
       target_length: encoding === 'fixed' ? targetLength : null,
+      grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
+      grant_max_uses: isIdentity ? grantMaxUses : 0,
     });
     onDone(version);
   };
@@ -132,19 +143,37 @@ function NewSchemeForm({
         Codes for this scheme start with <span className="font-mono text-text-secondary">{version}</span> — assigned for you.
       </p>
       <div className="flex flex-wrap gap-4">
+        <label className="block">
+          <span className="block text-xs text-text-secondary mb-1">Kind <span className="text-status-error">*</span></span>
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity
+              ? 'A badge — scanning it primes who acts next.'
+              : 'An item code — scanning it acts on the item.'}
+          </span>
+          <select value={kind} onChange={(e) => setKind(e.target.value as ScanSchemeKind)} className="select">
+            <option value={SCAN_SCHEME_KINDS.ACTION}>Action</option>
+            <option value={SCAN_SCHEME_KINDS.IDENTITY}>Identity</option>
+          </select>
+        </label>
         <label className="block flex-1 min-w-[16rem]">
           <span className="block text-xs text-text-secondary mb-1">Name <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">Say what the target identifies — "Printer serial".</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} className="input w-full" placeholder="Printer serial" autoFocus />
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity ? 'Say who the badge identifies — "Associate badge".' : 'Say what the target identifies — "Printer serial".'}
+          </span>
+          <input value={name} onChange={(e) => setName(e.target.value)} className="input w-full" placeholder={isIdentity ? 'Associate badge' : 'Printer serial'} autoFocus />
         </label>
         <label className="block flex-1 min-w-[16rem]">
           <span className="block text-xs text-text-secondary mb-1">Target facet <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">The escalation metadata key the scanned value matches.</span>
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity
+              ? 'The user-metadata key the badge matches (e.g. badge_id).'
+              : 'The escalation metadata key the scanned value matches.'}
+          </span>
           <input
             value={targetFacet}
             onChange={(e) => setTargetFacet(e.target.value)}
             className="input w-full font-mono"
-            placeholder="serialNumber"
+            placeholder={isIdentity ? 'badge_id' : 'serialNumber'}
             list="scan-facet-suggestions"
           />
           <datalist id="scan-facet-suggestions">
@@ -152,6 +181,31 @@ function NewSchemeForm({
           </datalist>
         </label>
       </div>
+      {isIdentity && (
+        <div className="flex flex-wrap gap-4">
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Grant TTL (seconds) <span className="text-status-error">*</span></span>
+            <span className="block text-2xs text-text-tertiary mb-1">How long a badge scan stays primed (1–86400).</span>
+            <input
+              type="number" min={1} max={86400}
+              value={grantTtlSeconds}
+              onChange={(e) => setGrantTtlSeconds(Number(e.target.value))}
+              className="input w-[12rem]"
+            />
+            {!ttlValid && <span className="block text-2xs text-status-error mt-1">Enter 1–86400 seconds.</span>}
+          </label>
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Grant max uses</span>
+            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n scans.</span>
+            <input
+              type="number" min={0}
+              value={grantMaxUses}
+              onChange={(e) => setGrantMaxUses(Number(e.target.value))}
+              className="input w-[12rem]"
+            />
+          </label>
+        </div>
+      )}
       <div className="flex flex-wrap gap-4">
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Code style <span className="text-status-error">*</span></span>
@@ -181,7 +235,7 @@ function NewSchemeForm({
         <button
           type="button"
           onClick={submit}
-          disabled={!name || !targetFacet || !encoding || upsert.isPending}
+          disabled={!name || !targetFacet || !encoding || (isIdentity && !ttlValid) || upsert.isPending}
           className="btn-primary text-xs"
         >
           Create scheme

@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react';
-import { History } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RoleDetail } from '../../api/roles';
 import {
   useAggregateByFacets,
   useAnalyticsWindow,
   isForbidden,
-  type AggregateRow,
 } from '../../api/escalation-analytics';
 import { useFacetKeys } from '../../api/escalations';
 import { EntityTimelinePanel } from '../../components/escalation/EntityTimelinePanel';
@@ -13,6 +11,12 @@ import { useShellPanelOptional } from '../../hooks/useShellPanel';
 import { assignLabelColors } from './mix-colors';
 import { displayRoleTitle } from '../../lib/role-display';
 import { formatDurationCompact } from '../../lib/format';
+import { StateBand, SliceBands } from './StateBands';
+import { EntityTable, ENTITY_PAGE_SIZE } from './EntityTable';
+import { entityValues, pivotEntities, totalDwell } from './entity-pivot';
+
+// Shared shell-panel slot key — the entity timeline claims/releases this slot.
+const TIMELINE_PANEL_KEY = 'entity-timeline';
 
 /**
  * The entity lens — the Operations page flipped from station-first to
@@ -22,7 +26,13 @@ import { formatDurationCompact } from '../../lib/format';
  *
  *   the system band   how the fleet's time splits across states
  *   the slice row     the same band per value of any metadata key (h2s vs pdac)
- *   the entity table  one row per entity: current state, its own band, timeline
+ *   the entity table  one dwell-ranked PAGE of entities: find (prefix match),
+ *                     current state, own band, timeline — built for a
+ *                     multi-thousand-entity fleet, never a full pull
+ *
+ * The find term and the open timeline are URL-backed (?find=, ?entity=) —
+ * owned by OperationsPage and passed down — so links reproduce the view and
+ * back/forward walks it.
  *
  * State labels arrive from the server (groupBy.state); role-sourced labels are
  * prettied through the role title, subtype-sourced labels render as authored.
@@ -31,14 +41,30 @@ export function EntityLensView({
   entityKey,
   periodHours,
   roles,
+  find,
+  onFindChange,
+  entityValue,
+  onEntityChange,
 }: {
   entityKey: string;
   periodHours: number;
   roles: RoleDetail[];
+  /** Debounced find term (?find=) — a case-insensitive prefix on the entity key. */
+  find: string | null;
+  onFindChange: (term: string | null) => void;
+  /** Deep-linked entity (?entity=) — the timeline panel follows this value. */
+  entityValue: string | null;
+  onEntityChange: (value: string | null) => void;
 }) {
   const window = useAnalyticsWindow(periodHours);
   const shell = useShellPanelOptional();
   const [sliceKey, setSliceKey] = useState('');
+  const [page, setPage] = useState(0);
+
+  // A page only means anything within one query shape — reset with it.
+  useEffect(() => {
+    setPage(0);
+  }, [find, window.from, window.to, entityKey]);
 
   const roleTitles = useMemo(() => {
     const map = new Map<string, string>();
@@ -78,18 +104,98 @@ export function EntityLensView({
         }
       : null,
   );
+
+  // The RANKING query: one row per entity (grouped by the entity facet alone),
+  // ordered by TOTAL tracked time — so a page is exactly ENTITY_PAGE_SIZE
+  // entities, none straddling a boundary, ranked by their whole dwell. The
+  // find term narrows via prefix; the pager offsets — filtering and paging
+  // are server-side, always.
   const perEntity = useAggregateByFacets({
-    query: { entity: entityKey },
-    groupBy: { state: true, facets: [entityKey] },
+    query: { entity: entityKey, ...(find ? { prefix: { [entityKey]: find } } : {}) },
+    groupBy: { facets: [entityKey] },
     measure: { kind: 'dwell', window },
-    limit: 800,
+    orderBy: [{ field: 'dwellSeconds', direction: 'desc' }],
+    limit: ENTITY_PAGE_SIZE,
+    offset: page * ENTITY_PAGE_SIZE,
   });
-  const perEntityNow = useAggregateByFacets({
-    query: { entity: entityKey },
-    groupBy: { state: true, facets: [entityKey] },
-    measure: { kind: 'membership' },
-    limit: 800,
-  });
+  const pageValues = useMemo(
+    () => entityValues(perEntity.data?.groups ?? [], entityKey),
+    [perEntity.data, entityKey],
+  );
+  // The page's state splits and current states — anyOf targets its entities.
+  const pageScope = pageValues.length
+    ? { entity: entityKey, anyOf: pageValues.map((v) => ({ [entityKey]: v })) }
+    : null;
+  const perEntityStates = useAggregateByFacets(
+    pageScope
+      ? {
+          query: pageScope,
+          groupBy: { state: true, facets: [entityKey] },
+          measure: { kind: 'dwell', window },
+          limit: ENTITY_PAGE_SIZE * 10,
+        }
+      : null,
+  );
+  const perEntityNow = useAggregateByFacets(
+    pageScope
+      ? {
+          query: pageScope,
+          groupBy: { state: true, facets: [entityKey] },
+          measure: { kind: 'membership' },
+        }
+      : null,
+  );
+  const entityRows = useMemo(
+    () =>
+      pivotEntities(
+        perEntity.data?.groups ?? [],
+        perEntityStates.data?.groups ?? [],
+        perEntityNow.data?.groups ?? [],
+        entityKey,
+      ),
+    [perEntity.data, perEntityStates.data, perEntityNow.data, entityKey],
+  );
+
+  // ── ?entity= ↔ timeline panel sync ──────────────────────────────────────────
+  // The param is the source of truth: a change (row click, link, back/forward)
+  // opens/closes the panel; an external close (the panel's X, slot takeover)
+  // clears the param. Refs guard both directions against loops.
+  const appliedEntity = useRef<string | null>(null);
+  const panelWasOpen = useRef(false);
+  useEffect(() => {
+    if (!shell) return;
+    if (entityValue === appliedEntity.current) return;
+    appliedEntity.current = entityValue;
+    if (entityValue) {
+      shell.setPanel(
+        <EntityTimelinePanel facetKey={entityKey} value={entityValue} entity={entityKey} />,
+        { key: TIMELINE_PANEL_KEY, width: 420 },
+      );
+    } else {
+      panelWasOpen.current = false;
+      shell.closePanel(TIMELINE_PANEL_KEY);
+    }
+  }, [entityValue, entityKey, shell]);
+  useEffect(() => {
+    if (!shell || !entityValue) return;
+    if (shell.open && shell.ownerKey === TIMELINE_PANEL_KEY) {
+      panelWasOpen.current = true;
+      return;
+    }
+    if (panelWasOpen.current) {
+      panelWasOpen.current = false;
+      onEntityChange(null);
+    }
+  }, [shell, entityValue, onEntityChange]);
+  // Leaving the lens with the panel open (lens switch) releases the slot.
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
+  useEffect(
+    () => () => {
+      if (appliedEntity.current) shellRef.current?.closePanel(TIMELINE_PANEL_KEY);
+    },
+    [],
+  );
 
   const { data: facetKeyData } = useFacetKeys();
   const sliceOptions = useMemo(
@@ -110,17 +216,6 @@ export function EntityLensView({
   );
   const nowByState = new Map((stateNow.data?.groups ?? []).map((g) => [g.state ?? '—', g.count ?? 0]));
   const tracked = entityCount.data?.groups[0]?.count ?? null;
-
-  const openTimeline = (value: string) =>
-    shell?.setPanel(
-      <EntityTimelinePanel facetKey={entityKey} value={value} entity={entityKey} />,
-      { key: 'entity-timeline', width: 420 },
-    );
-
-  const entityRows = useMemo(
-    () => pivotEntities(perEntity.data?.groups ?? [], perEntityNow.data?.groups ?? [], entityKey),
-    [perEntity.data, perEntityNow.data, entityKey],
-  );
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-8">
@@ -194,147 +289,21 @@ export function EntityLensView({
           <p className="text-2xs text-text-quaternary">
             The per-entity view requires full read access to the system's queues.
           </p>
-        ) : entityRows.length === 0 ? (
-          <p className="text-2xs text-text-quaternary">No entities tracked in this window.</p>
         ) : (
-          <div className="space-y-1 max-w-3xl">
-            {entityRows.map((row) => (
-              <div key={row.value} className="flex items-center gap-3 text-2xs">
-                <span className="font-mono text-text-secondary truncate w-44 shrink-0" title={row.value}>
-                  {row.value}
-                </span>
-                <span className="flex items-center gap-1.5 w-32 shrink-0">
-                  {row.nowState && (
-                    <>
-                      <span className="w-2 h-2 rounded-full dot-ring shrink-0" style={{ backgroundColor: colors.get(row.nowState) }} />
-                      <span className="font-mono text-text-tertiary truncate">{stateLabel(row.nowState)}</span>
-                    </>
-                  )}
-                </span>
-                <StateBand groups={row.groups} colors={colors} height="h-1.5" className="flex-1" />
-                <span className="font-mono tabular-nums text-text-secondary w-16 text-right shrink-0">
-                  {formatDurationCompact(row.total * 1000)}
-                </span>
-                <button className="icon-link shrink-0" title="Open timeline" onClick={() => openTimeline(row.value)}>
-                  <History className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-            {perEntity.data?.overflow && (
-              <p className="text-2xs text-text-quaternary pt-1">more entities exist — narrow the window</p>
-            )}
-          </div>
+          <EntityTable
+            entityKey={entityKey}
+            rows={entityRows}
+            colors={colors}
+            stateLabel={stateLabel}
+            find={find}
+            onFindChange={onFindChange}
+            page={page}
+            onPageChange={setPage}
+            overflow={perEntity.data?.overflow ?? false}
+            onEntityOpen={onEntityChange}
+          />
         )}
       </div>
     </div>
   );
-}
-
-function totalDwell(groups: AggregateRow[]): number {
-  return groups.reduce((sum, g) => sum + (g.dwellSeconds ?? 0), 0) || 1;
-}
-
-/** One stacked band of state dwell. */
-function StateBand({
-  groups,
-  colors,
-  height,
-  className = '',
-}: {
-  groups: AggregateRow[];
-  colors: Map<string, string>;
-  height: string;
-  className?: string;
-}) {
-  const total = totalDwell(groups);
-  return (
-    <div className={`${height} flex rounded-full overflow-hidden bg-surface-sunken ${className}`}>
-      {groups.map((g) => (
-        <div
-          key={g.state ?? '—'}
-          title={`${g.state ?? '—'} · ${formatDurationCompact((g.dwellSeconds ?? 0) * 1000)}`}
-          style={{ width: `${((g.dwellSeconds ?? 0) / total) * 100}%`, backgroundColor: colors.get(g.state ?? '—') }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/** Small-multiple bands, one per slice value, ranked by total dwell. */
-function SliceBands({
-  groups,
-  sliceKey,
-  colors,
-  overflow,
-}: {
-  groups: AggregateRow[];
-  sliceKey: string;
-  colors: Map<string, string>;
-  overflow?: boolean;
-}) {
-  const byValue = new Map<string, AggregateRow[]>();
-  for (const g of groups) {
-    if ((g.dwellSeconds ?? 0) <= 0) continue;
-    const value = g.facets[sliceKey] ?? 'no value';
-    const rows = byValue.get(value) ?? [];
-    rows.push(g);
-    byValue.set(value, rows);
-  }
-  const ranked = [...byValue.entries()]
-    .map(([value, rows]) => ({ value, rows, total: totalDwell(rows) }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 8);
-
-  if (ranked.length === 0) {
-    return <p className="text-2xs text-text-quaternary">No tracked time for this slice in the window.</p>;
-  }
-  return (
-    <div className="space-y-1.5 max-w-3xl">
-      {ranked.map(({ value, rows, total }) => (
-        <div key={value} className="flex items-center gap-3 text-2xs">
-          <span className="font-mono text-text-secondary truncate w-44 shrink-0" title={value}>{value}</span>
-          <StateBand groups={rows} colors={colors} height="h-2" className="flex-1" />
-          <span className="font-mono tabular-nums text-text-secondary w-16 text-right shrink-0">
-            {formatDurationCompact(total * 1000)}
-          </span>
-        </div>
-      ))}
-      {(overflow || byValue.size > 8) && (
-        <p className="text-2xs text-text-quaternary pt-1">top 8 values by tracked time</p>
-      )}
-    </div>
-  );
-}
-
-/** Pivot (entityValue × state) rows into per-entity bands + current state. */
-function pivotEntities(
-  dwellGroups: AggregateRow[],
-  nowGroups: AggregateRow[],
-  entityKey: string,
-): Array<{ value: string; groups: AggregateRow[]; total: number; nowState: string | null }> {
-  const byValue = new Map<string, AggregateRow[]>();
-  for (const g of dwellGroups) {
-    const value = g.facets[entityKey];
-    if (value == null || (g.dwellSeconds ?? 0) <= 0) continue;
-    const rows = byValue.get(value) ?? [];
-    rows.push(g);
-    byValue.set(value, rows);
-  }
-  const nowByValue = new Map<string, string>();
-  for (const g of nowGroups) {
-    const value = g.facets[entityKey];
-    if (value == null || (g.count ?? 0) <= 0 || g.state == null) continue;
-    // Multiple live states for one entity is a model smell; surface the largest.
-    const existing = nowByValue.get(value);
-    if (!existing) nowByValue.set(value, g.state);
-  }
-  return [...byValue.entries()]
-    .map(([value, rows]) => ({
-      value,
-      groups: [...rows].sort((a, b) => (b.dwellSeconds ?? 0) - (a.dwellSeconds ?? 0)),
-      total: rows.reduce((sum, g) => sum + (g.dwellSeconds ?? 0), 0),
-      nowState: nowByValue.get(value) ?? null,
-    }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 50);
 }

@@ -42,9 +42,29 @@ export const SEED_USERS = [
       // Also holds the rich-form escalation surface so the intake demo is
       // claimable by a normal (non-superadmin) user.
       { role: 'intake-reviewer', type: 'member' as const },
-      // Fleet membership: this user sees the fleet-sim's default pins and
-      // facet-board from first login — the persona-views demo, no setup.
-      { role: 'fleet-servicer', type: 'member' as const },
+      // Printer-floor membership: this user works all three printer queues,
+      // sees the fleet board's default pins from first login, and is the
+      // badge-scan demo associate (metadata.badge_id below).
+      { role: 'printer-fleet', type: 'member' as const },
+      { role: 'printer-harvest', type: 'member' as const },
+      { role: 'printer-service', type: 'member' as const },
+    ],
+    // The badge binding the identity scan resolves: scan 11:0:BADGE-REVIEWER-7431
+    // on a station device and mutations attribute to this user.
+    metadata: { badge_id: 'BADGE-REVIEWER-7431' },
+  },
+  {
+    // The shared station device: a real seat with a queue view and an audit
+    // identity for reads, while write_scope 'none' keeps every mutation
+    // behind the badge layer.
+    external_id: 'station',
+    display_name: 'Floor Station',
+    email: 'station@longtail.local',
+    password: 'l0ngt@1l',
+    roles: [
+      { role: 'printer-fleet', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
+      { role: 'printer-harvest', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
+      { role: 'printer-service', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
     ],
   },
   {
@@ -319,7 +339,7 @@ export const SEED_PERSONAS: LTPersonaSpec[] = [
       { role: 'design', relationship: 'write-all' },
       { role: 'review', relationship: 'write-all' },
       { role: 'print', relationship: 'read-all' },
-      { role: 'fleet-servicer', relationship: 'read-all' },
+      { role: 'printer-fleet', relationship: 'read-all' },
     ],
   },
   {
@@ -327,7 +347,9 @@ export const SEED_PERSONAS: LTPersonaSpec[] = [
     title: 'Fleet Operator',
     description: 'Services the machine fleet and watches the print queue feeding it.',
     roles: [
-      { role: 'fleet-servicer', relationship: 'write-all' },
+      { role: 'printer-fleet', relationship: 'write-all' },
+      { role: 'printer-harvest', relationship: 'write-all' },
+      { role: 'printer-service', relationship: 'write-all' },
       { role: 'print', relationship: 'read-all' },
     ],
   },

@@ -14,6 +14,7 @@ import { ensureSystemBot } from '../../../services/iam';
 import type { LTApiAuth } from '../../../types/sdk';
 import {
   executeScanCodeSchema,
+  executeScanChoiceSchema,
   listScanSchemesSchema,
   upsertScanSchemeSchema,
   upsertScanRuleSchema,
@@ -46,7 +47,29 @@ export function registerScanCodeTools(server: McpServer): void {
       inputSchema: executeScanCodeSchema,
     },
     async (args: z.infer<typeof executeScanCodeSchema>) => {
-      const result = await scanCodesApi.executeScanCode({ code: args.code }, await systemAuth());
+      const result = await scanCodesApi.executeScanCode({
+        code: args.code,
+        actingToken: args.actingToken,
+        previousActingToken: args.previousActingToken,
+      }, await systemAuth());
+      return asText(result.data ?? { error: result.error });
+    },
+  );
+
+  // mirrors POST /api/scan-codes/execute-choice
+  (server as any).registerTool(
+    'execute_scan_choice',
+    {
+      title: 'Execute Scan Choice',
+      description:
+        'Execute one choice presented by a PRESENT step (the info-choice screen). ' +
+        'The pointer (scheme/category/step/choice + escalationId) is re-validated ' +
+        'against live config, the row\'s current state, the acting-identity gate, ' +
+        'and RBAC before the verb runs.',
+      inputSchema: executeScanChoiceSchema,
+    },
+    async (args: z.infer<typeof executeScanChoiceSchema>) => {
+      const result = await scanCodesApi.executeScanChoice(args, await systemAuth());
       return asText(result.data ?? { error: result.error });
     },
   );

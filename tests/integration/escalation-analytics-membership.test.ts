@@ -131,6 +131,42 @@ describe('membership — brute-force interval containment', () => {
   });
 });
 
+describe('locate filters — prefix and anyOf', () => {
+  it('prefix narrows groups to values with the literal prefix (wildcards escaped)', async () => {
+    const { data } = await api.post('/api/escalations/aggregate-by-facets', {
+      query: { roles: [ROLE_A, ROLE_B], facets: { run_id: RUN }, prefix: { serialNumber: 'SER-0' } },
+      groupBy: { facets: ['serialNumber'] },
+      measure: { kind: 'membership' },
+    });
+    const values = data.groups.map((g: any) => g.facets.serialNumber).sort();
+    // SER-001..003 match; the SER-D1-* fixtures do not.
+    expect(values.every((v: string) => v.startsWith('SER-0'))).toBe(true);
+    expect(values.length).toBeGreaterThan(0);
+
+    // '_' is matched literally, never as a LIKE wildcard.
+    const { data: underscore } = await api.post('/api/escalations/aggregate-by-facets', {
+      query: { roles: [ROLE_A, ROLE_B], facets: { run_id: RUN }, prefix: { serialNumber: 'SER_' } },
+      groupBy: { facets: ['serialNumber'] },
+      measure: { kind: 'membership' },
+    });
+    expect(underscore.groups).toHaveLength(0);
+  });
+
+  it('anyOf targets exactly the named entity set — the page-membership pattern', async () => {
+    const { data } = await api.post('/api/escalations/aggregate-by-facets', {
+      query: {
+        roles: [ROLE_A, ROLE_B],
+        facets: { run_id: RUN },
+        anyOf: [{ serialNumber: 'SER-001' }, { serialNumber: 'SER-003' }],
+      },
+      groupBy: { facets: ['serialNumber'] },
+      measure: { kind: 'membership' },
+    });
+    const values = data.groups.map((g: any) => g.facets.serialNumber).sort();
+    expect(values).toEqual(['SER-001', 'SER-003']);
+  });
+});
+
 describe('fail-loud (P6/P3)', () => {
   it('an unknown entity key is a 400 naming the configuration gap', async () => {
     const { status, data } = await caught(api.post('/api/escalations/aggregate-by-facets', {

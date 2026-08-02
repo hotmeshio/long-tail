@@ -245,6 +245,12 @@ If a token is expired or exhausted, the opaque string passes through unchanged. 
 
 When an activity calls `getCredential('anthropic')` and no credential exists in the cascade (principal → initiator → env var), `MissingCredentialError` is thrown. The interceptor catches this and creates a credential-focused escalation with `category: 'missing_credential'`. The escalation form can include a password field so the human provides the credential ephemerally, without it being stored permanently.
 
+### Acting identity (badge grants)
+
+The same keystore carries **acting-identity grants** for shared station devices. A device signs in once as a station account — `read_scope: 'all'`, `write_scope: 'none'` on the queues it fronts — so reads are free and every mutation is structurally blocked for the account itself. A badge scan under an identity-kind scan scheme resolves the badge token against a server-side binding (`lt_users.metadata`, e.g. `badge_id`) and mints `eph:v1:acting_identity:<uuid>` under the scheme's TTL/max-uses policy.
+
+The grant rides scan requests as `actingToken` and is exchanged server-side before anything reads or writes: the verbs run **as the badged person under their own live RBAC**. The grant confers attribution, never privilege — a badged user without write scope on the queue is still denied. Mutations attribute to the person (`assigned_to`, `resolved_by`) with the device recorded beside them (`scanStation` provenance). A dead grant is a loud `not_primed` outcome, never a silent execution as the device. See [scan-codes.md](scan-codes.md#identity-schemes-and-acting-identity).
+
 ## Dashboard
 
 The dashboard surfaces IAM across four pages:

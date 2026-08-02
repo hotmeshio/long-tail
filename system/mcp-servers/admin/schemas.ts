@@ -740,6 +740,8 @@ const analyticsFilterSchema = z.object({
   roles: z.array(z.string()).optional().describe('Multiple pond roles; no role at all spans every pond (global principals only)'),
   entity: z.string().optional().describe("An entity facet key (e.g. serialNumber): resolves server-side to every role declaring it as entity_facet — the entity's SYSTEM. Mutually exclusive with role/roles."),
   facets: z.record(z.any()).optional().describe('Metadata facet equality filters (metadata @> containment)'),
+  anyOf: z.array(z.record(z.any())).optional().describe('Rows carrying ANY of these facet sets (OR, GIN-served; max 200 entries) — target an explicit entity set, e.g. one table page'),
+  prefix: z.record(z.string()).optional().describe("Case-insensitive prefix match on facet VALUES (metadata->>key ILIKE 'value%') — the locate affordance for entity keys"),
   block: z.array(z.record(z.any())).optional().describe('Exclude rows carrying ANY of these facet sets'),
   range: z.array(z.object({
     facet: z.string(),
@@ -803,31 +805,66 @@ export const timelineByFacetSchema = z.object({
     facets: z.array(z.string()).optional(),
   }).optional().describe('Columns/facets to surface per interval (default: all three columns)'),
   liveStatuses: z.array(z.string()).optional().describe("Statuses considered live (default ['pending'])"),
+  order: z.enum(['asc', 'desc']).optional().describe("Interval ordering by start instant (default asc); desc + before pages a long history recent-first"),
+  before: z.string().optional().describe('Strict upper bound on startedAt (ISO instant) — the "load earlier" cursor'),
   limit: z.number().int().min(1).optional(),
 });
 
 // ── Scan codes ──────────────────────────────────────────────────────────────
 
 export const executeScanCodeSchema = z.object({
-  code: z.string().min(1).describe('Raw scan string, e.g. "1:01:SN123" or "10175433211"'),
+  code: z.string().min(1).describe('Raw scan string, e.g. "10:1:SN123" or "10175433211"'),
+  actingToken: z.string().optional().describe('An acting-identity grant (eph:v1:acting_identity:*) — verbs run as the badged person'),
+  previousActingToken: z.string().optional().describe('The grant an identity scan replaces — best-effort revoked on mint'),
+});
+
+export const executeScanChoiceSchema = z.object({
+  schemeVersion: z.number().int().min(10).max(99),
+  category: z.string().regex(/^[0-9]$/),
+  stepIndex: z.number().int().min(0),
+  choiceIndex: z.number().int().min(0),
+  escalationId: z.string().describe('The escalation the CHOICES screen presented'),
+  actingToken: z.string().optional().describe('An acting-identity grant — the choice attributes to the badged person'),
 });
 
 export const listScanSchemesSchema = z.object({});
 
+const scanStepParamsSchema = z.object({
+  resolverPayload: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
+  targetRole: z.string().optional(),
+  escalationType: z.string().optional(),
+  description: z.string().optional(),
+  closeCurrent: z.enum(['resolve', 'cancel']).optional(),
+  durationMinutes: z.number().int().min(1).optional(),
+});
+
+const scanChoiceSchema = z.object({
+  label: z.string().describe('Button text the associate reads'),
+  verb: z.enum(['show-detail', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel']),
+  params: scanStepParamsSchema.optional(),
+  confirm: z.object({ prompt: z.string() }).optional(),
+  requireActingIdentity: z.boolean().optional().describe('The choice executes only under a real acting identity (badge or a write-capable login)'),
+  code: z.string().optional().describe('Short token enabling double-scan selection (scan object, then an action card)'),
+});
+
 export const upsertScanSchemeSchema = z.object({
-  version: z.number().int().min(1).max(9).describe('Scheme version digit (1-9)'),
+  version: z.number().int().min(10).max(99).describe('Two-digit scheme version (10-99)'),
   name: z.string().describe('Scheme display name'),
   description: z.string().optional(),
-  target_facet: z.string().describe('Escalation metadata key the scanned target resolves against'),
+  target_facet: z.string().describe("The metadata key the target resolves against: an escalation metadata key for action schemes, an lt_users.metadata key (e.g. badge_id) for identity schemes"),
   encoding: z.enum(['fixed', 'delimited']).optional().describe('fixed = digits only (UPC), delimited = text with separators'),
   delimiter: z.string().optional().describe('Separator character for delimited encoding (default ":")'),
   target_length: z.number().int().min(1).optional().describe('Target digit count for fixed encoding'),
+  kind: z.enum(['action', 'identity']).optional().describe("action = ECA steps over escalations (default); identity = a badge that mints a short-lived acting-identity grant"),
+  grant_ttl_seconds: z.number().int().min(1).max(86400).optional().describe('Identity kind: how long a minted acting grant lives'),
+  grant_max_uses: z.number().int().min(0).optional().describe('Identity kind: 0 = TTL-bound; n = the grant covers n scan requests'),
   enabled: z.boolean().optional(),
 });
 
 export const upsertScanRuleSchema = z.object({
-  scheme_version: z.number().int().min(1).max(9),
-  category: z.string().regex(/^[0-9]{2}$/).describe('Two-digit category (00-99)'),
+  scheme_version: z.number().int().min(10).max(99),
+  category: z.string().regex(/^[0-9]$/).describe('Single-digit category (0-9)'),
   name: z.string().describe('Friendly label — printed next to the physical code'),
   steps: z.array(z.object({
     query: z.object({
@@ -837,26 +874,25 @@ export const upsertScanRuleSchema = z.object({
       facets: z.record(z.any()).optional().describe('Extra metadata guards'),
     }),
     cardinality: z.enum(['first', 'many']).optional(),
-    verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel']),
+    verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel', 'present']),
     confirm: z.object({ prompt: z.string() }).optional(),
-    params: z.object({
-      resolverPayload: z.record(z.any()).optional(),
-      metadata: z.record(z.any()).optional(),
-      targetRole: z.string().optional(),
-      escalationType: z.string().optional(),
-      description: z.string().optional(),
-      closeCurrent: z.enum(['resolve', 'cancel']).optional(),
-      durationMinutes: z.number().int().min(1).optional(),
-    }).optional(),
+    params: scanStepParamsSchema.optional(),
+    requireActingIdentity: z.boolean().optional().describe('The step executes only under a real acting identity — a badge grant, or a login whose own write scope covers the step'),
+    choices: z.array(scanChoiceSchema).optional().describe("present verb only: the labeled choice set rendered under the located reality"),
+    autoSelectSingle: z.boolean().optional().describe('present verb with exactly one confirm-less choice: the scan executes it directly — one scan, one action; an unsatisfied identity requirement still presents the badge stop-over'),
   })).describe('Ordered condition/action steps — first match wins'),
   fallback: z.object({
     markdown: z.string().optional(),
     route: z.string().optional(),
-  }).optional().describe('Rendered when no step matches'),
+  }).optional().describe('Rendered when no step matches (identity schemes: the unknown-badge screen)'),
+  notPrimed: z.object({
+    markdown: z.string().optional(),
+    route: z.string().optional(),
+  }).optional().describe('The "scan your badge" screen — rendered when an acting identity is required and absent'),
   enabled: z.boolean().optional(),
 });
 
 export const deleteScanRuleSchema = z.object({
-  scheme_version: z.number().int().min(1).max(9),
-  category: z.string().regex(/^[0-9]{2}$/),
+  scheme_version: z.number().int().min(10).max(99),
+  category: z.string().regex(/^[0-9]$/),
 });

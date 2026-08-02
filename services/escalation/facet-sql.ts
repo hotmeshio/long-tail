@@ -21,6 +21,11 @@ function metaExpr(key: string, numeric = false): string {
   return numeric ? `(metadata->>'${key}')::numeric` : `(metadata->>'${key}')`;
 }
 
+/** Escape LIKE wildcards so a prefix VALUE is matched literally. */
+function escapeLikePrefix(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 /**
  * Build the WHERE clause for a faceted query, pushing bound params into `params`.
  * Every value is parameterized; only validated column names / metadata keys and
@@ -57,9 +62,23 @@ export function buildFacetWhere(
     clauses.push(`metadata @> $${params.length}::jsonb`); // GIN-served
   }
 
+  if (q.anyOf && q.anyOf.length) {
+    params.push(q.anyOf.map((a) => JSON.stringify(a)));
+    clauses.push(`metadata @> ANY($${params.length}::jsonb[])`); // GIN-served OR
+  }
+
   if (q.block && q.block.length) {
     params.push(q.block.map((b) => JSON.stringify(b)));
     clauses.push(`NOT (metadata @> ANY($${params.length}::jsonb[]))`);
+  }
+
+  // Case-insensitive prefix on facet VALUES — the locate affordance. No
+  // dedicated index by design: the predicate composes into scans the rest of
+  // the filter already bounds (the live set, or an analytics window).
+  for (const [key, value] of Object.entries(q.prefix ?? {})) {
+    if (!FACET_KEY.test(key) || typeof value !== 'string' || !value) continue;
+    params.push(`${escapeLikePrefix(value)}%`);
+    clauses.push(`${metaExpr(key)} ILIKE $${params.length}`);
   }
 
   for (const r of q.range ?? []) {

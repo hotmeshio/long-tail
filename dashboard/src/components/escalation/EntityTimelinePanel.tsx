@@ -1,20 +1,30 @@
-import { Fragment } from 'react';
-import { X } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { X, Link as LinkIcon } from 'lucide-react';
 import {
   useTimelineByFacet,
+  fetchTimelineByFacet,
   isForbidden,
+  type AnalyticsFilter,
   type TimelineInterval,
 } from '../../api/escalation-analytics';
 import { useEscalationAnalyticsEvents } from '../../hooks/useEventHooks';
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { formatDateTime, formatDurationCompact } from '../../lib/format';
 
+// Newest page size — the head query and every "load earlier" page.
+const TIMELINE_PAGE_SIZE = 100;
+
 /**
  * One entity's escalation-interval timeline — every station the facet value
- * has moved through, as [started, ended) spans in created_at order. Gaps
+ * has moved through, as [started, ended) spans rendered chronologically. Gaps
  * between consecutive intervals are untracked time and render as explicit
  * separators: their size is the digital/physical settle latency, a health
  * signal, never hidden.
+ *
+ * The head query fetches the NEWEST page (order desc) so push-driven
+ * invalidation keeps the recent end fresh; older pages accumulate locally via
+ * the "Load earlier" cursor (`before` = oldest loaded startedAt) and reset
+ * whenever the head page changes.
  *
  * Rendered in the global shell right panel (key 'entity-timeline'). Passing
  * `role` keeps the query inside the pond gate for read_all members; without
@@ -35,12 +45,62 @@ export function EntityTimelinePanel({
 }) {
   useEscalationAnalyticsEvents();
   const { closePanel } = useShellPanel();
+  const scope: { query?: AnalyticsFilter } = entity
+    ? { query: { entity } }
+    : role
+      ? { query: { roles: [role] } }
+      : {};
   const { data, error, isLoading } = useTimelineByFacet({
     facet: { key: facetKey, value },
-    ...(entity ? { query: { entity } } : role ? { query: { roles: [role] } } : {}),
+    ...scope,
+    order: 'desc',
+    limit: TIMELINE_PAGE_SIZE,
   });
 
-  const intervals = data?.intervals ?? [];
+  // Head page, chronological. Older pages prepend before it.
+  const headIntervals = [...(data?.intervals ?? [])].reverse();
+  const [older, setOlder] = useState<TimelineInterval[]>([]);
+  const [hasEarlier, setHasEarlier] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [earlierError, setEarlierError] = useState<string | null>(null);
+
+  // Reset accumulated pages when the newest interval set changes — a new facet
+  // value, or a push-driven head refetch that shifted the recent end.
+  const headSignature = data
+    ? `${value}|${data.intervals.length}|${data.intervals[0]?.startedAt ?? ''}|${data.intervals[data.intervals.length - 1]?.startedAt ?? ''}`
+    : null;
+  const appliedSignature = useRef<string | null>(null);
+  useEffect(() => {
+    if (headSignature === appliedSignature.current) return;
+    appliedSignature.current = headSignature;
+    setOlder([]);
+    setHasEarlier(data?.overflow ?? false);
+    setEarlierError(null);
+  }, [headSignature, data]);
+
+  const intervals = [...older, ...headIntervals];
+
+  const loadEarlier = async () => {
+    const oldest = intervals[0]?.startedAt;
+    if (!oldest || loadingEarlier) return;
+    setLoadingEarlier(true);
+    setEarlierError(null);
+    try {
+      const page = await fetchTimelineByFacet({
+        facet: { key: facetKey, value },
+        ...scope,
+        order: 'desc',
+        before: oldest,
+        limit: TIMELINE_PAGE_SIZE,
+      });
+      setOlder((prev) => [...[...page.intervals].reverse(), ...prev]);
+      setHasEarlier(page.overflow);
+    } catch (err) {
+      setEarlierError((err as Error).message);
+    } finally {
+      setLoadingEarlier(false);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -58,9 +118,12 @@ export function EntityTimelinePanel({
             </p>
           )}
         </div>
-        <button onClick={() => closePanel('entity-timeline')} className="icon-link mt-0.5 shrink-0 ml-2">
-          <X className="w-4 h-4" />
-        </button>
+        <span className="flex items-center gap-1 mt-0.5 shrink-0 ml-2">
+          {entity && <CopyLinkButton entity={entity} value={value} />}
+          <button onClick={() => closePanel('entity-timeline')} className="icon-link">
+            <X className="w-4 h-4" />
+          </button>
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -78,6 +141,20 @@ export function EntityTimelinePanel({
           </p>
         ) : (
           <div className="relative">
+            {(hasEarlier || earlierError) && (
+              <div className="pb-2 pl-5">
+                {hasEarlier && (
+                  <button
+                    onClick={loadEarlier}
+                    disabled={loadingEarlier}
+                    className="text-2xs text-text-tertiary hover:text-accent transition-colors disabled:opacity-40"
+                  >
+                    {loadingEarlier ? 'Loading earlier…' : 'Load earlier'}
+                  </button>
+                )}
+                {earlierError && <p className="text-2xs text-status-error mt-1">{earlierError}</p>}
+              </div>
+            )}
             {/* Left rail behind the dots */}
             <div className="absolute left-[4px] top-2 bottom-2 w-px bg-surface-border" />
             <div className="space-y-0">
@@ -88,15 +165,34 @@ export function EntityTimelinePanel({
                 </Fragment>
               ))}
             </div>
-            {data?.overflow && (
-              <p className="text-2xs text-text-quaternary mt-3 pl-5">
-                first {intervals.length} intervals shown
-              </p>
-            )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/** Copies the entity-lens deep link (?lens= + ?entity=) with a transient note. */
+function CopyLinkButton({ entity, value }: { entity: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    const url = `${window.location.origin}/operations?lens=${encodeURIComponent(entity)}&entity=${encodeURIComponent(value)}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <span className="flex items-center gap-1">
+      {copied && <span className="text-2xs text-text-quaternary">copied</span>}
+      <button onClick={copy} className="icon-link" title="Copy link to this timeline">
+        <LinkIcon className="w-3.5 h-3.5" />
+      </button>
+    </span>
   );
 }
 

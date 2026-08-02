@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { renderWithProviders } from '../../../../test/render';
+import { ActingIdentityProvider } from '../../../../hooks/useActingIdentity';
 import { EscalationDetailPage } from '../EscalationDetailPage';
 
 const state = vi.hoisted(() => {
@@ -80,7 +81,9 @@ function renderPage() {
     [{ path: '/escalations/detail/:id', element: <EscalationDetailPage /> }],
     { initialEntries: [`/escalations/detail/${ESC_ID}`] },
   );
-  return renderWithProviders(<RouterProvider router={router} />);
+  return renderWithProviders(
+    <ActingIdentityProvider><RouterProvider router={router} /></ActingIdentityProvider>,
+  );
 }
 
 describe('EscalationDetailPage — auto-resolve-when-empty', () => {

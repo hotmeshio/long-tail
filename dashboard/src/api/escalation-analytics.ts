@@ -33,7 +33,11 @@ export interface AnalyticsFilter {
   /** Entity facet key — resolves server-side to every role declaring it (the entity's system). */
   entity?: string;
   facets?: Record<string, unknown>;
+  /** Case-insensitive facet-value prefix match, keyed by facet. */
+  prefix?: Record<string, string>;
   block?: Record<string, unknown>[];
+  /** Row carries ANY of these facet sets (max 200) — the positive mirror of block. */
+  anyOf?: Record<string, unknown>[];
   range?: { facet: string; op: '<' | '<=' | '>' | '>=' | '='; value: number }[];
   exists?: string[];
 }
@@ -69,6 +73,10 @@ export interface TimelineByFacetInput {
   query?: AnalyticsFilter;
   window?: AnalyticsWindow;
   select?: { columns?: ('role' | 'subtype' | 'status')[]; facets?: string[] };
+  /** Interval order by startedAt (default asc). */
+  order?: 'asc' | 'desc';
+  /** Strict startedAt upper bound — the "load earlier" cursor. */
+  before?: string;
   limit?: number;
 }
 
@@ -155,17 +163,21 @@ export function useAggregateByFacets(
   });
 }
 
+/** One-shot timeline fetch — cursor pages ("load earlier") outside the query cache. */
+export function fetchTimelineByFacet(input: TimelineByFacetInput): Promise<TimelineByFacetResult> {
+  return apiFetch('/escalations/timeline-by-facet', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export function useTimelineByFacet(
   input: TimelineByFacetInput | null,
   opts?: { enabled?: boolean },
 ) {
   return useQuery<TimelineByFacetResult>({
     queryKey: ['escTimeline', input ? canonicalStringify(input) : 'off'],
-    queryFn: () =>
-      apiFetch('/escalations/timeline-by-facet', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      }),
+    queryFn: () => fetchTimelineByFacet(input!),
     staleTime: 15_000,
     enabled: (opts?.enabled ?? true) && !!input,
     retry: retryUnlessForbidden,

@@ -166,6 +166,51 @@ index write per row, at its terminal transition.
 `liveStatuses` (default `['pending']`) declares which statuses count as
 live; everything else is terminal.
 
+## Locating one entity among thousands
+
+Two filter fields make the individual findable at fleet scale, and both ride
+the scans the aggregate already bounds — no additional indexes:
+
+- **`prefix`** — case-insensitive prefix match on facet values
+  (`metadata->>key ILIKE 'value%'`, wildcards escaped). Type or scan the
+  leading characters of a serial and the entity table narrows:
+
+  ```bash
+  ltc esc aggregate-facets --entity serialNumber --group-facets serialNumber \
+    --prefix '{"serialNumber":"PRN-00"}' --window '{"from":"...","to":"..."}'
+  ```
+
+- **`anyOf`** — the row carries at least one of the given facet sets
+  (`metadata @> ANY(...)`, GIN-served; max 200 entries). Targets an explicit
+  entity set — the current table page — in one query:
+
+  ```json
+  { "anyOf": [{ "serialNumber": "PRN-001" }, { "serialNumber": "PRN-002" }] }
+  ```
+
+Result groups page with `orderBy` + `limit`/`offset`; `overflow: true` means
+another page exists. In the dashboard, every entity row is deep-linkable:
+`/operations?lens=serialNumber&entity=PRN-003` opens the fleet view focused
+on that printer with its timeline panel raised, and `&find=PRN-00` restores
+a narrowed table.
+
+## Paging a long timeline
+
+Timelines order by start instant. The default `asc` reads the journey
+top-down; a long history pages recent-first with `order: 'desc'` and the
+`before` cursor (a strict upper bound on `startedAt`):
+
+```bash
+ltc esc timeline serialNumber PRN-001 --entity serialNumber \
+  --order desc --limit 100
+# then, for the next-older page:
+ltc esc timeline serialNumber PRN-001 --entity serialNumber \
+  --order desc --limit 100 --before 2026-08-01T09:15:00Z
+```
+
+The dashboard's timeline panel loads the most recent 100 intervals and
+offers "Load earlier" until the history is exhausted.
+
 ## Fail-loud validation
 
 The filter takes the WHAT of a facet query only — `role`/`roles` (or

@@ -10,6 +10,7 @@ vi.mock('../../../api/escalation-analytics', async (importOriginal) => {
   return {
     ...actual,
     useTimelineByFacet: (...args: unknown[]) => mockUseTimelineByFacet(...args),
+    fetchTimelineByFacet: vi.fn(),
     isForbidden: (error: unknown) => (error as { status?: number } | null)?.status === 403,
   };
 });
@@ -43,9 +44,10 @@ function interval(overrides: Partial<TimelineInterval>): TimelineInterval {
   };
 }
 
-function setTimeline(intervals: TimelineInterval[], overflow = false) {
+/** The head page arrives newest-first (order desc), as the server returns it. */
+function setTimeline(intervalsDesc: TimelineInterval[], overflow = false) {
   mockUseTimelineByFacet.mockReturnValue({
-    data: { intervals, overflow },
+    data: { intervals: intervalsDesc, overflow },
     error: null,
     isLoading: false,
   });
@@ -62,11 +64,11 @@ describe('EntityTimelinePanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders intervals in order with the facet header', () => {
+  it('renders the newest-first page chronologically with the facet header', () => {
     setTimeline([
-      interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) }),
       // Contiguous handoff (500ms) — no untracked separator between them.
       interval({ role: 'assembly', startedAt: iso(600_500), endedAt: null, durationSeconds: 120 }),
+      interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) }),
     ]);
     renderPanel();
 
@@ -82,9 +84,9 @@ describe('EntityTimelinePanel', () => {
 
   it('renders an untracked separator for gaps over one second', () => {
     setTimeline([
-      interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) }),
       // 90s of untracked time before the next station picks it up.
       interval({ role: 'assembly', startedAt: iso(690_000), endedAt: null, durationSeconds: 60 }),
+      interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) }),
     ]);
     renderPanel();
     expect(screen.getByText(/untracked/)).toBeInTheDocument();
@@ -108,12 +110,14 @@ describe('EntityTimelinePanel', () => {
     expect(screen.getByText('No escalation has carried this value.')).toBeInTheDocument();
   });
 
-  it('scopes the query to the given role', () => {
+  it('requests the newest page desc, scoped to the given role', () => {
     setTimeline([]);
     renderPanel();
     expect(mockUseTimelineByFacet).toHaveBeenCalledWith({
       facet: { key: 'serialNumber', value: 'SN-100' },
       query: { roles: ['print-station'] },
+      order: 'desc',
+      limit: 100,
     });
   });
 
@@ -123,6 +127,8 @@ describe('EntityTimelinePanel', () => {
     expect(mockUseTimelineByFacet).toHaveBeenCalledWith({
       facet: { key: 'serialNumber', value: 'SN-100' },
       query: { entity: 'serialNumber' },
+      order: 'desc',
+      limit: 100,
     });
   });
 });

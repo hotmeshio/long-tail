@@ -25,15 +25,22 @@ const window7h = () => ({
 beforeAll(async () => {
   api = new ApiClient();
   await api.login('superadmin', 'l0ngt@1l');
-  // The seeder runs asynchronously after boot — wait for the fleet.
-  await poll('printer fleet seeded', async () => {
-    const { data } = await api.get('/api/escalations', {
-      role: FLEET, status: 'pending', limit: '1',
-    });
-    return data.escalations?.length ? true : null;
-  }, 120_000);
-  log('setup', 'flagship printer seed present');
-}, 180_000);
+  // The seeder runs asynchronously after boot and creates the fleet printer
+  // by printer — wait for ALL SIX live intervals, not just the first row, or
+  // the distinct-entity assertions race the tail of the seed.
+  await poll('printer fleet fully seeded', async () => {
+    const { data } = await api.post('/api/escalations/aggregate-by-facets', {
+      query: { entity: 'serialNumber' },
+      groupBy: {},
+      measure: { kind: 'membership' },
+      distinctBy: 'serialNumber',
+    }).catch(() => ({ data: { groups: [] } })); // dials not declared yet → 400 → keep polling
+    return (data.groups?.[0]?.count ?? 0) >= 6 ? true : null;
+    // The flagship seed is ~100 engine calls behind every other seeder — a
+    // cold multi-container boot can take a few minutes to finish it.
+  }, 240_000);
+  log('setup', 'flagship printer seed present (6 live printers)');
+}, 300_000);
 
 describe('the seeded roles (S1/S2)', () => {
   it('declares both dials on all three roles', async () => {

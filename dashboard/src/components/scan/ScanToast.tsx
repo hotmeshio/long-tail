@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScanBarcode, X } from 'lucide-react';
 import { useScanInput } from '../../hooks/useScanInput';
 import { useShellPanel } from '../../hooks/useShellPanel';
-import { SCAN_OUTCOMES } from '../../api/scan-codes';
-import { OUTCOME_LABELS, OUTCOME_TONE } from './outcome-display';
+import { OUTCOME_TONE, outcomeHeadline, outcomeMarkdown } from './outcome-display';
 import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
 
 const DISMISS_MS = 6_000;
@@ -47,15 +46,14 @@ export function ScanToast() {
           {response ? (
             <>
               <div className={`text-sm font-medium ${OUTCOME_TONE[response.outcome]}`}>
-                {OUTCOME_LABELS[response.outcome]}
-                {response.rule ? ` — ${response.rule.name}` : ''}
+                {outcomeHeadline(response)}
               </div>
               {response.error && (
                 <div className="text-xs text-text-tertiary mt-0.5">{response.error}</div>
               )}
-              {response.outcome === SCAN_OUTCOMES.NO_MATCH_FALLBACK && response.fallback?.markdown && (
+              {outcomeMarkdown(response) && (
                 <div className="text-xs text-text-secondary mt-1.5">
-                  <SimpleMarkdown content={response.fallback.markdown} compact />
+                  <SimpleMarkdown content={outcomeMarkdown(response)!} compact />
                 </div>
               )}
             </>

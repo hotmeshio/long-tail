@@ -1167,7 +1167,7 @@ Grouped analytics over the escalation intervals. Every escalation is one open in
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `query` | `object` | yes | The filter — `role`/`roles` (or `entity`), `facets`, `block`, `range`, `exists`. `entity` names an entity facet key and resolves server-side to every role declaring it as its `entity_facet` — the entity's **system**; mutually exclusive with `role`/`roles`, and it implies `exists: [entity]` so stray rows without the key stay out |
+| `query` | `object` | yes | The filter — `role`/`roles` (or `entity`), `facets`, `anyOf` (rows carrying ANY of the given facet sets, max 200 — target an explicit entity set such as one table page), `block`, `range`, `exists`, and `prefix` (case-insensitive prefix match on facet values — the locate affordance, e.g. `{"serialNumber":"PRN-00"}`). `entity` names an entity facet key and resolves server-side to every role declaring it as its `entity_facet` — the entity's **system**; mutually exclusive with `role`/`roles`, and it implies `exists: [entity]` so stray rows without the key stay out |
 | `groupBy` | `object` | yes | Group keys — `columns` (whitelisted: `role`, `subtype`, `status`), `facets` (metadata keys, projected as text; `NULL` group key when absent), and `state` (group by the derived state label: each role contributes per its `entity_state_source` — its subtypes or itself; mutually exclusive with `states[]`). An empty object yields one total row |
 | `measure` | `object` | yes | Exactly one kind: `{ "kind": "membership", "asOf"? }` (default anchor: now) or `{ "kind": "dwell", "window": { "from", "to" } }` |
 | `distinctBy` | `string` | no | Membership only — count DISTINCT of this metadata facet per group (entities, not rows). Omit to count rows |
@@ -1241,6 +1241,8 @@ One entity's ordered interval sequence — every escalation the entity facet app
 | `window` | `{ from, to }` | no | Only intervals overlapping the window (overlap-filtered, not clipped) |
 | `select` | `object` | no | `columns` / `facets` to surface per interval (default: all three columns) |
 | `liveStatuses` | `string[]` | no | Statuses considered live (default `["pending"]`) |
+| `order` | `string` | no | Interval ordering by start instant — `asc` (default) or `desc`; `desc` + `before` pages a long history recent-first |
+| `before` | `string` | no | Strict upper bound on `startedAt` (ISO instant) — the "load earlier" cursor |
 | `limit` | `integer` | no | Max intervals |
 
 **Example** — one printer's movement across the fleet's queues:

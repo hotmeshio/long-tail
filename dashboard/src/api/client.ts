@@ -30,6 +30,31 @@ export function getToken(): string | null {
   return authToken;
 }
 
+// ── Acting identity (badge grant) ────────────────────────────────────────────
+// The ActingIdentityProvider registers these. While a grant is held, every
+// request carries the token; the server honors it only on the escalation work
+// verbs (claim/release/resolve) and ignores it everywhere else, so whoever
+// badged in owns the actions with no per-hook wiring.
+
+export const ACTING_TOKEN_HEADER = 'X-LT-Acting-Token';
+
+let actingTokenProvider: (() => string | null) | null = null;
+let actingIdentityClear: (() => void) | null = null;
+
+export function setActingTokenProvider(fn: (() => string | null) | null) {
+  actingTokenProvider = fn;
+}
+
+export function setActingIdentityClear(fn: (() => void) | null) {
+  actingIdentityClear = fn;
+}
+
+/** True when a 401 body names the acting identity (dead/expired grant). */
+function isActingIdentityError(body: unknown): boolean {
+  const msg = (body as { error?: unknown } | null)?.error;
+  return typeof msg === 'string' && /acting[- ]identity/i.test(msg);
+}
+
 /**
  * Try to silently refresh the JWT using stored credentials.
  * Returns the new token on success, null on failure.
@@ -90,10 +115,27 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
+  const actingToken = actingTokenProvider?.() ?? null;
+  if (actingToken) {
+    headers[ACTING_TOKEN_HEADER] = actingToken;
+  }
+
   let res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
   });
+
+  // A dead badge grant answers 401 with an acting-identity error — the session
+  // itself is fine, so this never enters the refresh/logout path. Clear the
+  // client-side grant so state matches the server, then rethrow for the caller
+  // to surface (a fresh badge scan re-primes and the person retries).
+  if (res.status === 401 && actingToken) {
+    const body = await res.clone().json().catch(() => null);
+    if (isActingIdentityError(body)) {
+      actingIdentityClear?.();
+      throw new ApiError((body as { error: string }).error, 401, body);
+    }
+  }
 
   // On 401 (expired/invalid token), try a silent refresh and retry once.
   // 403 (permission denied) is a business-logic error, not a session issue.

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import * as api from '../../api/escalations';
+import { effectiveWorkAuth } from './acting';
 
 export function registerSingleRoutes(router: Router): void {
   /**
@@ -44,13 +45,16 @@ export function registerSingleRoutes(router: Router): void {
 
   /**
    * POST /api/escalations/:id/claim
-   * Claim an escalation. userId comes from auth token.
+   * Claim an escalation. The actor is the auth token's user — or the badged
+   * person when an X-LT-Acting-Token grant rides the request.
    * Body: { durationMinutes?: number }
    */
   router.post('/:id/claim', async (req, res) => {
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
     const result = await api.claimEscalation(
       { id: req.params.id, durationMinutes: req.body?.durationMinutes, provisionIfAbsent: req.body?.provisionIfAbsent },
-      req.auth!,
+      auth,
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });
@@ -58,12 +62,15 @@ export function registerSingleRoutes(router: Router): void {
   /**
    * POST /api/escalations/:id/release
    * Release a claimed escalation back to the available pool.
-   * Only the assigned user may release their own claim.
+   * Only the assigned actor (token user, or the badged person when an
+   * X-LT-Acting-Token grant rides the request) may release their own claim.
    */
   router.post('/:id/release', async (req, res) => {
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
     const result = await api.releaseEscalation(
       { id: req.params.id },
-      req.auth!,
+      auth,
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });

@@ -19,6 +19,7 @@ import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 import { ScanInputProvider } from '../../hooks/useScanInput';
+import { ActingIdentityProvider } from '../../hooks/useActingIdentity';
 import { ScanToast } from '../scan/ScanToast';
 
 /**
@@ -178,9 +179,11 @@ export function Shell() {
     <SidebarProvider>
       <ShellPanelProvider>
         <HelpAssistantProvider>
-          <ScanInputProvider>
-            <ShellLayout />
-          </ScanInputProvider>
+          <ActingIdentityProvider>
+            <ScanInputProvider>
+              <ShellLayout />
+            </ScanInputProvider>
+          </ActingIdentityProvider>
         </HelpAssistantProvider>
       </ShellPanelProvider>
     </SidebarProvider>

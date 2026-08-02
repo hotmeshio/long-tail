@@ -185,6 +185,7 @@ export type {
 
 export type {
   ScanEncoding,
+  ScanSchemeKind,
   ScanVerb,
   ScanOutcome,
   ScanAvailability,
@@ -201,8 +202,15 @@ export type {
   ScanExecuteResponse,
 } from './scan-code';
 
+export type {
+  ScanChoice,
+  ScanChoiceExecuteRequest,
+  ScanPresentedChoice,
+} from './scan-choice';
+
 export {
   SCAN_ENCODINGS,
+  SCAN_SCHEME_KINDS,
   SCAN_VERBS,
   SCAN_MUTATING_VERBS,
   SCAN_OUTCOMES,
@@ -210,6 +218,7 @@ export {
   SCAN_CARDINALITY,
   SCAN_PROVENANCE_KEYS,
   SCAN_TEMPLATE_TOKENS,
+  ACTING_IDENTITY_LABEL,
 } from './scan-code';
 
 export type {

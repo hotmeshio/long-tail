@@ -11,6 +11,7 @@ import {
   GET_USER_BY_EMAIL,
   GET_USER_BY_EXTERNAL_ID,
   GET_USER_BY_ID,
+  GET_USERS_BY_METADATA_VALUE,
 } from './sql';
 import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
 import type { CreateUserInput, UpdateUserInput } from './types';
@@ -104,6 +105,24 @@ export async function getUserByEmail(email: string): Promise<LTUserRecord | null
   const pool = getPool();
   const { rows } = await pool.query(GET_USER_BY_EMAIL, [email]);
   if (!rows[0]) return null;
+  return attachRoles(rows[0]);
+}
+
+/**
+ * Resolve an ACTIVE user by a metadata binding (e.g. metadata.badge_id).
+ * Two users carrying the same value is a configuration fault, not a pick —
+ * it throws so the binding gets fixed instead of misattributing work.
+ */
+export async function getUserByMetadataValue(
+  key: string,
+  value: string,
+): Promise<LTUserRecord | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_USERS_BY_METADATA_VALUE, [key, value]);
+  if (rows.length === 0) return null;
+  if (rows.length > 1) {
+    throw new Error(`metadata binding "${key}" is ambiguous — multiple users carry the same value`);
+  }
   return attachRoles(rows[0]);
 }
 

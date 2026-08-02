@@ -938,7 +938,7 @@ await lt.escalations.aggregateByFacets({
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `query` | `AnalyticsQuery` | Yes | The filter — `role`/`roles` or `entity`, plus `facets`, `block`, `range`, `exists`. `status`/`available`/`jeopardy` and query-level paging are rejected with 400: liveness derives from the interval, `liveStatuses`, and the measure anchor |
+| `query` | `AnalyticsQuery` | Yes | The filter — `role`/`roles` or `entity`, plus `facets`, `anyOf` (rows carrying ANY of the given facet sets, max 200), `block`, `range`, `exists`, and `prefix` (case-insensitive prefix match on facet values — the locate affordance). `status`/`available`/`jeopardy` and query-level paging are rejected with 400: liveness derives from the interval, `liveStatuses`, and the measure anchor |
 | `groupBy` | `FacetGroupBy` | Yes | `columns` (`role`, `subtype`, `status`), `facets` (metadata keys), `state` (derived state label; mutually exclusive with `states[]`). Empty object → one total row |
 | `measure` | `AggregateMeasure` | Yes | `{ kind: 'membership', asOf? }` or `{ kind: 'dwell', window }` |
 | `distinctBy` | `string` | No | Membership only — count DISTINCT of this facet (entities, not rows) |
@@ -967,6 +967,8 @@ const result = await lt.escalations.timelineByFacet({
 | `window` | `{ from, to }` | No | Only intervals overlapping the window (overlap-filtered, not clipped) |
 | `select` | `{ columns?, facets? }` | No | Columns/facets to surface per interval (default: all three columns) |
 | `liveStatuses` | `string[]` | No | Statuses considered live (default `['pending']`) |
+| `order` | `'asc' \| 'desc'` | No | Interval ordering by start instant (default `asc`); `desc` + `before` pages a long history recent-first |
+| `before` | `Date \| string` | No | Strict upper bound on `startedAt` — the "load earlier" cursor |
 | `limit` | `integer` | No | Max intervals |
 
 **Returns:** `LTApiResult<{ intervals: TimelineInterval[]; overflow: boolean }>`. Mirrors `POST /api/escalations/timeline-by-facet`.

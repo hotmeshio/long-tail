@@ -150,6 +150,13 @@ export interface TimelineByFacetInput {
   };
   /** Statuses considered live. Default ['pending']. */
   liveStatuses?: string[];
+  /**
+   * Interval ordering by start instant. Default 'asc' (the journey read
+   * top-down); 'desc' + `before` pages a long history recent-first.
+   */
+  order?: 'asc' | 'desc';
+  /** Strict upper bound on startedAt — the "load earlier" cursor. */
+  before?: Date | string;
   limit?: number;
 }
 
