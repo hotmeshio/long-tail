@@ -7,3 +7,4 @@ export { resolveEscalation, resolveBySignalKey, resolveByIds, resolveAllOrNone }
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';
 export { searchByFacets, claimGroups, claimByFacets } from './facets';
+export { aggregateByFacets, timelineByFacet } from './analytics';

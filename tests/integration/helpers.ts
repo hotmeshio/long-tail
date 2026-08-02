@@ -406,3 +406,32 @@ export async function poll<T>(
   }
   throw new Error(`Timed out waiting for: ${label} (${timeoutMs / 1000}s)`);
 }
+
+// ── Direct Postgres probe ─────────────────────────────────────────────────────
+
+/**
+ * Read-only SQL against the compose Postgres (host port LT_PG_PORT, default
+ * 5415) — for assertions the HTTP surface deliberately does not expose:
+ * view-level derived columns, EXPLAIN plans, exact stored timestamps.
+ */
+export async function pgQuery(sql: string, params: unknown[] = []): Promise<any[]> {
+  const { Client } = await import('pg');
+  const client = new Client({
+    host: 'localhost',
+    port: parseInt(process.env.LT_PG_PORT || '5415', 10),
+    user: 'postgres',
+    password: 'password',
+    database: 'longtail',
+  });
+  await client.connect();
+  try {
+    // Multi-statement strings (e.g. a SET before an EXPLAIN) return one
+    // result per statement — surface the last one's rows. Parameters are
+    // only valid with a single statement (a pg protocol rule).
+    const result: any = await client.query(sql, params.length ? (params as any[]) : undefined);
+    const last = Array.isArray(result) ? result[result.length - 1] : result;
+    return last.rows;
+  } finally {
+    await client.end();
+  }
+}

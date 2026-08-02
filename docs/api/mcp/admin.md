@@ -377,6 +377,59 @@ Update the priority of multiple escalations.
 | ids | string[] | Yes | Escalation IDs |
 | priority | integer | Yes | New priority value |
 
+### aggregate_by_facets
+
+Grouped analytics over the escalation intervals. Every escalation is one open
+interval `[created_at, ended_at)`; this tool reads it two ways: **membership**
+(rows or, with `distinctBy`, distinct entities open at an instant — a past
+`asOf` reconstructs the live set then) and **dwell** (open-seconds per group
+within a half-open `[from, to)` window). Group by role/subtype/status columns
+plus metadata facet keys; optional `states[]` label each group. One call
+replaces N per-filter count round-trips. Mirrors
+`POST /api/escalations/aggregate-by-facets`.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| query | object | Yes | The filter (WHAT only — no status/available/jeopardy): `role`/`roles` or `entity` (the entity facet key, resolved to every role declaring it — the entity's system), plus `facets`, `block`, `range`, `exists` |
+| groupBy | object | Yes | Group keys: `columns` (`role`, `subtype`, `status`), `facets` (metadata keys), `state` (derived state label per each role's `entity_state_source`; mutually exclusive with `states`). Empty object → one total row |
+| measure | object | Yes | `{ kind: "membership", asOf? }` or `{ kind: "dwell", window: { from, to } }` |
+| distinctBy | string | No | Membership only: count DISTINCT of this metadata facet (entities, not rows) |
+| states | array | No | Pure labeling: tag each group with the FIRST matching state name |
+| liveStatuses | string[] | No | Statuses considered live (default `["pending"]`) |
+| orderBy | array | No | Order the RESULT groups: `{ field, direction? }` |
+| limit | integer | No | Max result groups (server-capped; `overflow` flag when more exist) |
+| offset | integer | No | Result-group offset |
+
+### timeline_by_facet
+
+One entity's ordered interval sequence — every escalation the entity facet
+(e.g. a machine id) appeared in, as `[startedAt, endedAt)` spans with durations,
+in `created_at` order. Open intervals report `endedAt: null`. Gaps between
+consecutive intervals are untracked time and are preserved, not filled. The
+entity facet value must be stored as a JSON string (GIN containment match).
+Mirrors `POST /api/escalations/timeline-by-facet`.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| facet | object | Yes | `{ key, value }` — the entity facet to trace |
+| query | object | No | Optional extra filter / role scope (or `entity` — the derived system) |
+| window | object | No | `{ from, to }` — only intervals overlapping this window (overlap-filtered, not clipped) |
+| select | object | No | `columns` / `facets` to surface per interval (default: all three columns) |
+| liveStatuses | string[] | No | Statuses considered live (default `["pending"]`) |
+| limit | integer | No | Max intervals |
+
 ## Workflow Configuration
 
 ### list_workflow_configs

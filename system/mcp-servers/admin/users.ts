@@ -224,7 +224,7 @@ export function registerUserTools(server: McpServer): void {
         '(server-side resolver validation), parent role, default_pins ' +
         '(member pinned-view seeds), and the typed operational targets ' +
         '(sla_minutes, target_per_hour, worker_count, ' +
-        'priority_threshold_minutes, priority_facet).',
+        'priority_threshold_minutes, priority_facet, entity_facet).',
       inputSchema: updateRoleSchema,
     },
     async (args: z.infer<typeof updateRoleSchema>) => {
@@ -242,6 +242,8 @@ export function registerUserTools(server: McpServer): void {
         worker_count: args.worker_count,
         priority_threshold_minutes: args.priority_threshold_minutes,
         priority_facet: args.priority_facet,
+        entity_facet: args.entity_facet,
+        entity_state_source: args.entity_state_source,
         enforce_schema: args.enforce_schema,
         upstream_roles: args.upstream_roles,
         list_schema: args.list_schema as Record<string, any> | null | undefined,

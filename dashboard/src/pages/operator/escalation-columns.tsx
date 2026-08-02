@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Circle, Bell, Clock, ListFilter, Search } from 'lucide-react';
+import { Circle, Bell, Clock, ListFilter, Search, History } from 'lucide-react';
+import { EntityTimelinePanel } from '../../components/escalation/EntityTimelinePanel';
+import { useShellPanelOptional } from '../../hooks/useShellPanel';
 import type { Column } from '../../components/common/data/DataTable';
 import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../components/common/data/FilterBar';
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
@@ -51,6 +53,9 @@ export function MetadataCell({
   highlightKeys?: string[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Null outside the shell (tests, standalone renders) — the timeline
+  // affordance simply doesn't render there.
+  const shell = useShellPanelOptional();
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return <span className="text-2xs text-text-tertiary">—</span>;
@@ -106,6 +111,24 @@ export function MetadataCell({
                 >
                   <Search className="w-3 h-3" />
                 </Link>
+                {/* filter-present / search-present / history-past — the third
+                    verb of the triad. String values only: the timeline's GIN
+                    containment match only serves JSON-string facets. */}
+                {shell && typeof metadata[k] === 'string' && (
+                  <button
+                    className="p-0.5 rounded text-text-quaternary hover:text-accent transition-colors"
+                    title={`Timeline: every station ${sv} has moved through`}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      shell.setPanel(
+                        <EntityTimelinePanel facetKey={k} value={metadata[k] as string} role={role} />,
+                        { key: 'entity-timeline', width: 420 },
+                      );
+                    }}
+                  >
+                    <History className="w-3 h-3" />
+                  </button>
+                )}
               </span>
               {/* +N inline at end of single visible row when collapsed */}
               {!expanded && hiddenCount > 0 && (

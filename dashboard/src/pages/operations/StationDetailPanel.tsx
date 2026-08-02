@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { X, ExternalLink } from 'lucide-react';
 import { useStationMetrics } from '../../api/escalations';
@@ -7,12 +7,21 @@ import type { RoleDetail } from '../../api/roles';
 import { PRIORITY_TEXT_COLOR } from './PaceChart';
 import { jeopardyQueueLink } from './priority-link';
 import { displayRoleTitle } from '../../lib/role-display';
+import { StationAnalyticsSections } from './StationAnalyticsSections';
+import { EntityTimelinePanel } from '../../components/escalation/EntityTimelinePanel';
+import { useShellPanelOptional } from '../../hooks/useShellPanel';
+import { assignLabelColors, subtypeLabel } from './mix-colors';
+import type { AggregateRow } from '../../api/escalation-analytics';
+import { formatDurationCompact } from '../../lib/format';
 
 interface StationDetailPanelProps {
   role: RoleDetail | null;
   allMetrics: StationMetric[];
   orderedRoles: RoleDetail[];
   globalPeriod: string;
+  /** The page's shared role+subtype dwell groups — the sequence bands derive
+   *  from them with zero extra requests. */
+  mixGroups?: AggregateRow[];
   onClose: () => void;
 }
 
@@ -22,6 +31,16 @@ const PERIODS = ['15m', '1h', '24h', '7d', '30d'] as const;
 type Period = (typeof PERIODS)[number];
 
 const isPeriod = (p: string): p is Period => (PERIODS as readonly string[]).includes(p);
+
+// Mirrors OperationsPage's window lengths — the analytics sections express the
+// panel's selected period as a trailing dwell window.
+const PERIOD_HOURS: Record<Period, number> = {
+  '15m': 0.25,
+  '1h': 1,
+  '24h': 24,
+  '7d': 168,
+  '30d': 720,
+};
 
 function fmt(min: number | null): string {
   if (min == null) return '—';
@@ -71,6 +90,22 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
   const slaMinutes = role.sla_minutes ?? undefined;
   const targetPerHour = role.target_per_hour ?? undefined;
   const workerCount = role.worker_count ?? undefined;
+
+  // Entity timelines open in the global shell right slot, beside this panel.
+  // When the role declares an entity, the timeline scopes to the entity's
+  // whole SYSTEM — an order's journey walks every station, not just this one.
+  const shell = useShellPanelOptional();
+  const openEntityTimeline = useCallback(
+    (facetKey: string, value: string) => {
+      shell?.setPanel(
+        role.entity_facet
+          ? <EntityTimelinePanel facetKey={facetKey} value={value} entity={role.entity_facet} />
+          : <EntityTimelinePanel facetKey={facetKey} value={value} role={role.role} />,
+        { key: 'entity-timeline', width: 420 },
+      );
+    },
+    [shell, role.role, role.entity_facet],
+  );
 
   return (
     <>
@@ -157,6 +192,13 @@ function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPer
           </div>
         </div>
       )}
+
+      {/* Time-in-state + live queue composition (the MIX bar's drill-down) */}
+      <StationAnalyticsSections
+        role={role}
+        periodHours={PERIOD_HOURS[period]}
+        onOpenEntity={openEntityTimeline}
+      />
 
     </>
   );
@@ -295,6 +337,7 @@ export function StationDetailPanel({
   allMetrics,
   orderedRoles,
   globalPeriod,
+  mixGroups,
   onClose,
 }: StationDetailPanelProps) {
   return (
@@ -302,8 +345,92 @@ export function StationDetailPanel({
       {role ? (
         <RoleView role={role} globalPeriod={globalPeriod} onClose={onClose} />
       ) : (
-        <OverviewPanel allMetrics={allMetrics} orderedRoles={orderedRoles} period={globalPeriod} />
+        <>
+          <OverviewPanel allMetrics={allMetrics} orderedRoles={orderedRoles} period={globalPeriod} />
+          <SequenceBands mixGroups={mixGroups} orderedRoles={orderedRoles} />
+        </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The set-on-screen bands — where the SEQUENCE'S time went over the window,
+ * cut both ways: by station (the sequential story) and by subtype (the
+ * product/state story). Derived from the page's shared mix query.
+ */
+function SequenceBands({
+  mixGroups,
+  orderedRoles,
+}: {
+  mixGroups?: AggregateRow[];
+  orderedRoles: RoleDetail[];
+}) {
+  const visible = new Set(orderedRoles.map((r) => r.role));
+  const rows = (mixGroups ?? []).filter((g) => g.role && visible.has(g.role) && (g.dwellSeconds ?? 0) > 0);
+  if (rows.length === 0) return null;
+
+  const titleFor = new Map(orderedRoles.map((r) => [r.role, r.title || r.role]));
+  const byRole = sumBy(rows, (g) => g.role!);
+  const bySubtype = sumBy(rows, (g) => subtypeLabel(g.subtype));
+
+  return (
+    <>
+      <BandSection
+        label="Time by station"
+        entries={byRole}
+        display={(key) => titleFor.get(key) ?? key}
+      />
+      <BandSection label="Time by subtype" entries={bySubtype} display={(key) => key} />
+    </>
+  );
+}
+
+function sumBy(rows: AggregateRow[], keyOf: (g: AggregateRow) => string): Array<[string, number]> {
+  const totals = new Map<string, number>();
+  for (const g of rows) {
+    const key = keyOf(g);
+    totals.set(key, (totals.get(key) ?? 0) + (g.dwellSeconds ?? 0));
+  }
+  return [...totals.entries()].sort(([, a], [, b]) => b - a);
+}
+
+function BandSection({
+  label,
+  entries,
+  display,
+}: {
+  label: string;
+  entries: Array<[string, number]>;
+  display: (key: string) => string;
+}) {
+  const colors = assignLabelColors(entries.map(([key, weight]) => ({ label: key, weight })));
+  const total = entries.reduce((sum, [, v]) => sum + v, 0) || 1;
+  return (
+    <div className="border-t border-surface-border/40 pt-4 mt-5">
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2.5">{label}</p>
+      <div className="h-2 flex rounded-full overflow-hidden bg-surface-sunken mb-2">
+        {entries.map(([key, value]) => (
+          <div key={key} style={{ width: `${(value / total) * 100}%`, backgroundColor: colors.get(key) }} />
+        ))}
+      </div>
+      <div className="space-y-0.5">
+        {entries.slice(0, 6).map(([key, value]) => (
+          <div key={key} className="flex items-center gap-2 text-2xs">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors.get(key) }} />
+            <span className="font-mono text-text-secondary truncate flex-1">{display(key)}</span>
+            <span className="font-mono tabular-nums text-text-tertiary shrink-0">
+              {formatDurationCompact(value * 1000)}
+            </span>
+            <span className="font-mono tabular-nums text-text-quaternary w-8 text-right shrink-0">
+              {Math.round((value / total) * 100)}%
+            </span>
+          </div>
+        ))}
+        {entries.length > 6 && (
+          <p className="text-2xs text-text-quaternary">+{entries.length - 6} more</p>
+        )}
+      </div>
     </div>
   );
 }

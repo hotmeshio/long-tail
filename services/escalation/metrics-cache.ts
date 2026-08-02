@@ -53,3 +53,50 @@ export class TtlCache<T> {
     this.store.clear();
   }
 }
+
+/**
+ * TtlCache with an LRU bound — for key spaces the caller doesn't control.
+ *
+ * The analytics caches key by a canonical stringify of the whole query input,
+ * so distinct keys are unbounded; the expired-entry sweep alone can't bound
+ * memory the way it does for TtlCache's small role-set × period key space.
+ * Same single-flight and reject-evict semantics; a hit refreshes recency
+ * (Map delete+set, the enforcement-cache pattern), and inserting past
+ * `maxEntries` evicts the least-recently-used entry.
+ */
+export class BoundedTtlCache<T> {
+  private readonly store = new Map<string, CacheEntry<T>>();
+
+  constructor(
+    private readonly ttlMs: number,
+    private readonly maxEntries: number,
+  ) {}
+
+  async resolve(key: string, compute: () => Promise<T>): Promise<T> {
+    const hit = this.store.get(key);
+    if (hit && Date.now() - hit.at < this.ttlMs) {
+      this.store.delete(key); // refresh recency
+      this.store.set(key, hit);
+      return hit.value;
+    }
+    for (const [k, entry] of this.store) {
+      if (Date.now() - entry.at >= this.ttlMs) this.store.delete(k);
+    }
+    while (this.store.size >= this.maxEntries) {
+      const oldest = this.store.keys().next().value as string;
+      this.store.delete(oldest);
+    }
+    const value = compute();
+    this.store.set(key, { at: Date.now(), value });
+    try {
+      return await value;
+    } catch (err) {
+      this.store.delete(key);
+      throw err;
+    }
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+}

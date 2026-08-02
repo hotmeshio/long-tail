@@ -114,12 +114,17 @@ async function login(): Promise<void> {
  *
  * Topology: print-jobs ─▶ printer-fleet  (production line), with print-servicer
  * a side-quest root merging into the fleet.
+ *
+ * The three printer roles share entity_facet 'serialNumber' (every twin row
+ * carries it) — together with the flagship printer roles they form the
+ * printer's SYSTEM, so onboarding and servicing intervals join the machine's
+ * timeline and state band.
  */
 const TWIN_ROLE_CONFIG = [
   { role: 'print-jobs',      title: 'Print Jobs',      parent_role: null,          sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Order demand — one print-job escalation per unit, claimed as a set.' },
-  { role: 'printer-fleet',   title: 'Printer Fleet',   parent_role: 'print-jobs',  sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Twin availability adverts and in-flight print rows — the machines at work.', upstream_roles: ['print-onboarder', 'print-servicer'] },
-  { role: 'print-onboarder', title: 'Print Onboarder', parent_role: null,          sla_minutes: 15, target_per_hour: 5,  priority_threshold_minutes: 15, description: 'Register + bind a newly unboxed machine.' },
-  { role: 'print-servicer',  title: 'Print Servicer',  parent_role: null,          sla_minutes: 10, target_per_hour: 10, priority_threshold_minutes: 10, description: 'Reload filament, inspect failures, restore offline machines.' },
+  { role: 'printer-fleet',   title: 'Printer Fleet',   parent_role: 'print-jobs',  sla_minutes: 5,  target_per_hour: 30, priority_threshold_minutes: 5,  description: 'Twin availability adverts and in-flight print rows — the machines at work.', upstream_roles: ['print-onboarder', 'print-servicer'], entity_facet: 'serialNumber', entity_state_source: 'subtype' },
+  { role: 'print-onboarder', title: 'Print Onboarder', parent_role: null,          sla_minutes: 15, target_per_hour: 5,  priority_threshold_minutes: 15, description: 'Register + bind a newly unboxed machine.', entity_facet: 'serialNumber', entity_state_source: 'role' },
+  { role: 'print-servicer',  title: 'Print Servicer',  parent_role: null,          sla_minutes: 10, target_per_hour: 10, priority_threshold_minutes: 10, description: 'Reload filament, inspect failures, restore offline machines.', entity_facet: 'serialNumber', entity_state_source: 'role' },
 ] as const;
 
 async function ensureTwinRoles(): Promise<void> {
@@ -132,7 +137,17 @@ async function ensureTwinRoles(): Promise<void> {
   let applied = 0;
   for (const cfg of TWIN_ROLE_CONFIG) {
     const row = configured.get(cfg.role);
-    if (row?.title) continue; // already configured — respect admin tuning
+    if (row?.title) {
+      // Already configured — respect admin tuning, but self-heal the entity
+      // dials where the role predates them (set only when unset).
+      if ('entity_facet' in cfg && row.entity_facet == null) {
+        await api('PATCH', `/api/roles/${cfg.role}`, {
+          entity_facet: cfg.entity_facet,
+          entity_state_source: cfg.entity_state_source,
+        }).catch(() => { /* concurrent heal */ });
+      }
+      continue;
+    }
     const { role, ...body } = cfg;
     await api('PATCH', `/api/roles/${role}`, { ...body, ops_visible: true }).then(() => { applied++; }).catch((err: any) => {
       console.warn(`[${ts()}]   ⚠ role ${role}: ${String(err.message).slice(0, 80)}`);

@@ -56,7 +56,7 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Accounts** | `/admin/users` | User accounts and service accounts (bots). Create, edit, assign roles, manage API keys. |
-| **Roles** | `/admin/roles` | Define roles — the queues, forms, and membership that connect workflows to people. Escalation chains, capacity settings, and versioned schemas live here. |
+| **Roles** | `/admin/roles` | Define roles — the queues, forms, and membership that connect workflows to people. Pace Board dials, capacity settings, versioned schemas, members, and default pins live here. |
 | **Personas** | `/admin/personas` | Bundle roles into named, one-step assignments. Each linked role carries a relationship scope (write-all, write-self, read-all); assigning a persona composes the member's whole surface from its roles' pins and schemas. |
 
 ### Infrastructure
@@ -223,41 +223,43 @@ Because roles carry the queue, the form schema, the membership, and the capacity
 
 **Master list** (`/admin/roles`) — one row per role:
 
-- **Ops dot** — a green dot marks roles that appear as stations on the [Pace Board](#pace-board).
-- **Role / Label / Description** — the role key and its human-facing identity.
+- **Role** — an ops status dot (green marks roles that appear as stations on the [Pace Board](#pace-board)) beside the display name: the user-set title, else Title Case derived from the key.
+- **Key** — the exact technical role id.
+- **Description** — the role's human-facing summary.
 - **Preceded By** — the role's prior step (`parent_role`), linked. Prior steps compose the Pace Board's sequences.
-- **Escalates To** — the chain targets this role can forward work to.
-- **Member Count** — how many accounts hold the role.
+- **Members** — how many accounts hold the role.
 - **Capacity** — SLA (minutes), Target (per hour), and Staff side by side. These drive the Pace Board's computed metrics.
 
 Search filters by key, label, or description. **+ Add Role** creates a role here; roles referenced in workflow configs are also auto-created at startup. Click any row to open [Role Detail](#role-detail).
 
-**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `GET /api/roles/details` returns full `RoleDetail` shapes. `GET /api/roles/escalation-chains` lists chains.
+**API:** `GET /api/roles` lists roles. `POST /api/roles` creates. `GET /api/roles/details` returns full `RoleDetail` shapes.
 
 ### Role Detail
 
-Accessible at `/admin/roles/:role`. One page per role — a header plus three columns covering identity, routing and people, and schemas.
+Accessible at `/admin/roles/:role`. One page per role — a quiet header carrying the role's identity, with the configuration organized into a five-section left sub-nav: **Identity · Pace Board · Schemas · Members · Pins**. The active section rides the URL (`?section=pace-board`), so deep links land on the right concern. One draft spans every section — switching sections never loses edits — and the **Save** button sits in the sub-nav footer, visible from every section. (Members, Pins, and Upstream Inputs save live.)
 
-**Header** — the role key with its prior step, the capacity set, and the **Ops** toggle that shows the role as a station on the [Pace Board](#pace-board). The capacity set holds `sla_minutes`, `target_per_hour`, and `worker_count`; enter any two and the header hints the derived third (`throughput = workers / (sla / 60)`). Beside it, the priority set holds `priority_threshold_minutes` and `priority_facet` — the age threshold and metadata timestamp key driving the Pace Board priority count (blank = `sla_minutes` and `created_at`). Save applies header and identity edits via `PATCH /api/roles/:role`.
+**Identity** — display name and description, shown on role rows and station labels. The danger zone lives here too: a role nothing references can be deleted.
 
-**Identity** — display name and description, shown on role rows and station labels.
+**Pace Board** — everything the board consumes about this role, in one column:
 
-**Sequence placement** — appears when the Ops toggle is on:
+- **Station** — the toggle that shows the role as a station on the [Pace Board](#pace-board).
+- **Capacity** — `sla_minutes`, `target_per_hour`, and `worker_count`; enter any two and the section hints the derived third (`throughput = workers / (sla / 60)`).
+- **Priority** — `priority_threshold_minutes` and the age facet (`priority_facet`) driving the Pace Board priority count and the jeopardy filter (blank = `sla_minutes` and `created_at`). The dials stay editable while the station is hidden — they also drive jeopardy in the queues.
+- **Entity** — the metadata key naming what moves through this station (`entity_facet`, e.g. `serialNumber`, `orderId`). Roles sharing a key form that entity's system: the [entity lens](operations.md#entity-lens), per-entity dwell, and timelines all derive from it. Once a key is set, the **States from** picker (`entity_state_source`) chooses how the station names the entity's state — **Station** (being here is one state, e.g. a servicing queue) or **Subtypes** (this one role holds several states named by each escalation's subtype, e.g. a fleet role parking `idle` / `printing`).
+- **Sequence** — board geometry, shown while the station is visible: **Prior Step** (places the role in one Pace Board sequence; a role with no prior step starts its own), **Upstream Inputs** (the roles this station also draws from in other sequences — mixin-like, many allowed, saved live, rendered as a merge glyph on the station, never a bend in the line), and **Home Segment** (lead the home Pace Board with this role's sequence; one role holds this).
 
-- **Prior Step** — places the role in one Pace Board sequence; a role with no prior step starts its own.
-- **Upstream Inputs** — the roles this station also draws from in other sequences. Mixin-like, many allowed, saved live. Rendered on the Pace Board as a merge glyph on the station, never a bend in the line: an upstream is an input, not a descendant.
+**Schemas** — the role's contracts:
 
-**Escalation Targets** — the chain out of this role, saved live. When a member escalates an item, these targets receive it. Chains are directional and support multiple targets per source.
+- **Enforcement** — the `enforce_schema` toggle: validate every resolve payload server-side against the role's form schema.
+- **Escalation Schema** — shows the schema version currently in use and links to the [Escalation Schema](#escalation-schema) editor page.
+- **Escalations List Schema** — shows the list-schema version in use and links to the [Escalations List Schema](#escalations-list-schema) editor page.
+- **Metadata Schema** — JSON Schema that validates each escalation's `metadata` at creation time. Its keys appear in faceted search autocomplete.
 
 **Members** — who holds the role: admins manage it; members work its queue according to their read/write work-surface scope (read = which items appear; write = which they can claim and resolve). A `member` grant carries a scope chosen from five named profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). The picker enforces **write ⊆ read**. `admin` and `superadmin` grants always work the whole queue.
 
-**Escalation Schema** — shows the schema version currently in use and links to the [Escalation Schema](#escalation-schema) editor page.
+**Pins** — the pinned-view seeds this role hands its members (`default_pins`): label, dashboard-relative URL, optional badge. Members see them in their Pinned nav section from first login (marked role-provided) and may promote, hide, or reorder them via preferences. Live-save.
 
-**Metadata Schema** — JSON Schema that validates each escalation's `metadata` at creation time. Its keys appear in faceted search autocomplete.
-
-**Properties** — a free JSON bag for custom per-role values.
-
-**API:** `PATCH /api/roles/:role` updates identity, capacity, placement, and schemas. `POST /api/roles/escalation-chains` adds a chain target; `DELETE /api/roles/escalation-chains` removes one.
+**API:** `PATCH /api/roles/:role` updates identity, Pace Board dials, placement, schemas, and pins.
 
 ### Escalation Schema
 
@@ -334,10 +336,10 @@ The central queue for all escalation activity across every workflow.
 - **Title = queue selector** — the page title reads as the selected role's friendly title, or "All Escalations" when unfiltered; clicking it switches queues over the same `?role=` param the filter bar mirrors. The **My Escalations** personal inbox (`/escalations/queue`) carries the identical control, titling itself "My Escalations" or the filtered role's title.
 - **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
 - **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
+- **Metadata value affordances** — each metadata key/value row in the list carries a three-icon triad on hover: **filter** (filter the current role's queue to rows where the key equals this value), **search** (the same facet match across all roles), and **history** (open the entity's cross-queue interval timeline in the right panel — every station this value has moved through, with durations and gaps). Filter-present, search-present, history-past. The history affordance renders for string values, since the timeline's GIN containment match serves JSON-string facets.
 - **Rich list view** — when the list is scoped to exactly one role (`?role=<role>`) and that role owns a [list schema](#escalations-list-schema), a role-authored view renders in place of the table (the live item as a card, plus a load-on-demand history), with a **Table view** toggle back to the columns.
 - **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
 - **Resolve** — after claiming, submit a resolver payload. The form is pre-filled from the role's versioned `form_schema` field defaults and from the workflow's seeded `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind`). The dashboard maps the flat form to the nested payload via `x-lt-bind` and the submitted payload is stored as-is. Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
-- **Escalate** — forward a claimed escalation to a higher-tier role via the escalation chain.
 - **Side panel** — a slide-in beside the resolve form with switchable views, selected by the icon set at its top: **Help** (the form's `x-lt-help` markdown, `{{domain.path}}`-interpolated against the live record, or a state-aware hint such as "Claim this escalation to enable the form"), **Details** (status, role, priority, claim provenance, timestamps, and — for builders — identifier links), **AI Analysis** (what triage diagnosed and corrected — shown when AI is enabled and triage data is present), **Metadata** (the row's metadata values), **Context** (input envelope, escalation context, resolver payload), and **Record** (the raw escalation JSON, builders only). The panel and form share the width as a flex set — the form column narrows as the panel expands. It opens expanded on Help when the form carries `x-lt-help`, stays hidden otherwise, and the page-header panel button toggles it either way.
 
 **API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.

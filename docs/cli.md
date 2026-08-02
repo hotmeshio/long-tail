@@ -78,7 +78,18 @@ ltc esc claim-by-meta orderId order-123             # Claim by metadata key
 ltc esc claim-by-meta orderId order-123 --assignee ext-user-42  # On behalf of user
 ltc esc resolve-by-meta orderId order-123 --data '{"approved": true}'
 ltc esc resolve-by-meta orderId order-123 --data '{"approved": true}' --assignee ext-user-42
+
+# Analytics: grouped membership/dwell aggregates and per-entity timelines
+# The fleet: how the entities spent the window, one row per state
+ltc esc aggregate-facets --entity serialNumber --group-state \
+  --window '{"from":"2026-08-01T00:00:00Z","to":"2026-08-02T00:00:00Z"}'
+# The individual: one printer's ordered interval timeline
+ltc esc timeline serialNumber PRN-001 --entity serialNumber
 ```
+
+`aggregate-facets` runs grouped analytics over the escalation intervals — membership at an instant (`--as-of`, default now), or dwell over a window (`--window` switches the measure). Scope with `--role`, `--roles`, or `--entity <key>` (the entity facet key — scopes to every role declaring it, the entity's system; no role at all spans every pond, global principals only). Group with `--group-columns role,subtype,status`, `--group-facets <list>`, or `--group-state` (the derived state label — each role's subtypes or itself). Refine with `--facets`/`--exists`, `--distinct-by <key>` (count entities, not rows; membership only), `--live-statuses`, and page the result groups with `--order-by`/`--limit`/`--offset`.
+
+`timeline <key> <value>` prints one entity's ordered escalation-interval timeline (gaps = untracked time). `--entity` scopes to the entity's system (every role declaring that entity facet); `--roles` restricts to specific roles; a call with neither spans every pond and requires a global principal. `--from`/`--to` keep only overlapping intervals; `--select-facets` surfaces metadata keys per interval.
 
 ### Workflows
 

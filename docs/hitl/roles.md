@@ -57,7 +57,7 @@ const decision = await conditionLT<{ confirmed: boolean; address: string }>(sign
 
 ## Escalation Chains
 
-Users can escalate to other roles via the "Escalate" tab on the detail page. Configure chain targets in Admin > Roles. Each role lists which other roles it can escalate to. Common shape:
+Chains are role-to-role routing edges, configured via the roles API (`POST /api/roles/escalation-chains`). Each role lists which other roles it can route work to, and the edges scope the programmatic re-routing surfaces — the `escalate_and_wait` MCP tool and the escalate APIs (HTTP, SDK, MCP, CLI). Common shape:
 
 ```
 Analyst → Senior Analyst → Manager → VP

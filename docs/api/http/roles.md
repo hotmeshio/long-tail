@@ -252,6 +252,8 @@ Returns all roles with metadata and usage counts.
       "worker_count": 4,
       "priority_threshold_minutes": null,
       "priority_facet": null,
+      "entity_facet": null,
+      "entity_state_source": "role",
       "user_count": 5,
       "chain_count": 2,
       "workflow_count": 3
@@ -275,6 +277,8 @@ Returns all roles with metadata and usage counts.
 | `worker_count` | `number \| null` | Capacity at this station — staff or machine count (capacity setting) |
 | `priority_threshold_minutes` | `number \| null` | Max age (minutes) before a pending unclaimed item counts toward `priority_count` in station metrics; falls back to `sla_minutes` |
 | `priority_facet` | `string \| null` | Escalation metadata key holding the age origin as an ISO 8601 UTC timestamp (e.g. `authorized_at`); falls back to `created_at` |
+| `entity_facet` | `string \| null` | Escalation metadata key naming the **entity** that moves through this role (e.g. `serialNumber`, `orderId`). Roles sharing the key form that entity's system; the analytics surfaces (distinct-entity counts, per-entity dwell, entity timelines) derive from it. `null` = the role has no entity notion |
+| `entity_state_source` | `'role' \| 'subtype'` | How the role names its contribution to the entity's state space: `'role'` (the station itself is the state) or `'subtype'` (the role's subtypes are its states). Default `'role'`; only meaningful while `entity_facet` is set |
 | `user_count` | `number` | Number of users assigned this role |
 | `chain_count` | `number` | Number of escalation chain entries referencing this role |
 | `workflow_count` | `number` | Number of workflow configs that reference this role |
@@ -374,6 +378,8 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 | `worker_count` | `number \| null` | Station capacity |
 | `priority_threshold_minutes` | `number \| null` | Priority age threshold in minutes; falls back to `sla_minutes` |
 | `priority_facet` | `string \| null` | Metadata key for the priority age origin (letters, numbers, underscores); falls back to `created_at` |
+| `entity_facet` | `string \| null` | Metadata key naming the entity that moves through this role (letters, numbers, underscores). Roles sharing the key form the entity's system for the analytics surfaces. `null` clears |
+| `entity_state_source` | `'role' \| 'subtype' \| null` | How the role names the entity's states — the station itself (`'role'`) or its subtypes (`'subtype'`). `null` resets to the `'role'` default |
 | `upstream_roles` | `string[] \| null` | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Every entry must name an existing role other than this one. Distinct from `parent_role`, which places the role in its own sequence. |
 | `list_schema` | `object \| null` | Rich formatting (x-lt-* markup) for this role's escalation LIST page. Versions independently of `form_schema`; the list always renders the latest |
 | `default_pins` | `array \| null` | Pinned-view seeds for members: `[{ label, url, badge? }]` with dashboard-relative `url`s. Members promote, hide, or reorder them via their own preferences (`/api/me/preferences`). `null` clears |

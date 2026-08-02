@@ -14,7 +14,6 @@ import {
   useSetEscalationPriority,
   useBulkClaimEscalations,
   useBulkAssignEscalations,
-  useBulkEscalateToRole,
   useBulkTriageEscalations,
   useBulkCancelEscalations,
   type FacetFilters,
@@ -182,7 +181,6 @@ export function AvailableEscalationsPage() {
   const setPriority = useSetEscalationPriority();
   const bulkClaim = useBulkClaimEscalations();
   const bulkAssign = useBulkAssignEscalations();
-  const bulkEscalate = useBulkEscalateToRole();
   const bulkTriage = useBulkTriageEscalations();
   const bulkCancel = useBulkCancelEscalations();
   const { data: rolesData } = useRoles();
@@ -332,7 +330,6 @@ export function AvailableEscalationsPage() {
   const {
     handleSetPriority,
     handleBulkClaim,
-    handleBulkEscalate,
     handleBulkTriage,
     handleBulkAssign,
     handleBulkCancel,
@@ -341,7 +338,6 @@ export function AvailableEscalationsPage() {
     clearSelection,
     setPriority,
     bulkClaim,
-    bulkEscalate,
     bulkTriage,
     bulkAssign,
     bulkCancel,
@@ -511,16 +507,13 @@ export function AvailableEscalationsPage() {
           onSetPriority={handleSetPriority}
           onClaim={handleBulkClaim}
           onAssign={() => setAssignModalOpen(true)}
-          onEscalate={handleBulkEscalate}
           onTriage={() => setTriageModalOpen(true)}
           onCancel={() => setCancelModalOpen(true)}
           isPriorityPending={setPriority.isPending}
           isClaimPending={bulkClaim.isPending}
           isAssignPending={bulkAssign.isPending}
-          isEscalatePending={bulkEscalate.isPending}
           isTriagePending={bulkTriage.isPending}
           isCancelPending={bulkCancel.isPending}
-          availableRoles={rolesData?.roles ?? []}
         />
 
       {/* Active facet pills — sticky below the shell header, opaque so timeline scrolls beneath */}

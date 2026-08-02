@@ -103,17 +103,26 @@ async function installEscalationCompatView(): Promise<void> {
     client.release();
   }
 
-  // The one index long-tail still owns builds OUTSIDE the advisory lock:
+  // The indexes long-tail owns build OUTSIDE the advisory lock:
   // CREATE INDEX CONCURRENTLY waits on every transaction holding a snapshot,
   // and sibling containers parked inside `SELECT pg_advisory_lock(...)` hold
   // exactly that — building inside the critical section would stall the build
   // against its own waiters. Out here the build blocks nothing (writes proceed
   // during CONCURRENTLY) and nothing blocks it.
-  await ensureResolvedCoverIndex();
+  await ensureAppIndex('idx_hmsh_esc_resolved_cover', ENSURE_RESOLVED_COVER_INDEX);
+  await ensureAppIndex('idx_hmsh_esc_ended_at', ENSURE_ENDED_AT_INDEX);
 }
 
+/** Reports existence + validity so a crash-orphaned INVALID build is rebuilt. */
+const APP_INDEX_STATE = `
+SELECT i.indisvalid AS valid
+FROM pg_class c
+JOIN pg_index i ON i.indexrelid = c.oid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relname = $1 AND n.nspname = 'public'`;
+
 /**
- * Idempotent, concurrent-boot-safe build of idx_hmsh_esc_resolved_cover.
+ * Idempotent, concurrent-boot-safe build of one app-layer index.
  *
  * A crashed CONCURRENTLY build leaves an INVALID index behind, and
  * `CREATE INDEX CONCURRENTLY IF NOT EXISTS` would then skip it forever — so
@@ -121,19 +130,19 @@ async function installEscalationCompatView(): Promise<void> {
  * A create that loses a cross-container race logs and defers to the next
  * boot, which observes the winner's valid index and no-ops.
  */
-async function ensureResolvedCoverIndex(): Promise<void> {
+async function ensureAppIndex(name: string, ddl: string): Promise<void> {
   const pool = getPool();
   try {
-    const { rows } = await pool.query(RESOLVED_COVER_INDEX_STATE);
+    const { rows } = await pool.query(APP_INDEX_STATE, [name]);
     if (rows[0]?.valid === true) return;
     if (rows.length > 0) {
-      await pool.query('DROP INDEX IF EXISTS idx_hmsh_esc_resolved_cover');
+      await pool.query(`DROP INDEX IF EXISTS ${name}`);
     }
-    await pool.query(ENSURE_RESOLVED_COVER_INDEX);
-    loggerRegistry.info('[escalation] idx_hmsh_esc_resolved_cover ensured');
+    await pool.query(ddl);
+    loggerRegistry.info(`[escalation] ${name} ensured`);
   } catch (err: any) {
     loggerRegistry.warn(
-      `[escalation] resolved-cover index build deferred to next boot: ${err.message}`,
+      `[escalation] ${name} index build deferred to next boot: ${err.message}`,
     );
   }
 }
@@ -197,17 +206,39 @@ BEGIN
 END $$;`;
 
 // `available` mirrors the legacy isEffectivelyClaimed/isAvailable heuristic so
-// existing `SELECT *` consumers are unaffected; the column is additive.
+// existing `SELECT *` consumers are unaffected; the columns are additive.
+//
+// `ended_at` is the instant the row left the live set: resolve stamps
+// resolved_at in its guarded transition; cancel and expire stamp only
+// updated_at in theirs, and no long-tail write path touches a terminal row
+// afterward, so COALESCE(resolved_at, updated_at) is the transition instant
+// for all three terminal statuses. (The SDK's updateEscalation /
+// appendEscalationMilestones carry no status guard, so a post-terminal touch
+// WOULD skew a cancelled/expired end — documented contract, not enforced.)
+// Analytics SQL inlines the equivalent expression rather than reading this
+// column (so non-default liveStatuses compose and the partial index predicate
+// stays provable); the view column serves external and debugging consumers.
+// If the SDK ever ships a physical ended_at column, the SELECT * expansion
+// collides with this alias — remediation is dropping the view-level column
+// and reading the (strictly better) real one.
+//
+// DROP+CREATE (not CREATE OR REPLACE) because the base table's column set
+// moves with SDK migrations: REPLACE re-expands SELECT * and errors the
+// moment a new base column lands before the computed aliases. The swap runs
+// inside the install transaction, so readers see the old view or the new
+// one, never a gap.
 const CREATE_COMPAT_VIEW = `
-CREATE OR REPLACE VIEW public.lt_escalations AS
+DROP VIEW IF EXISTS public.lt_escalations;
+CREATE VIEW public.lt_escalations AS
   SELECT *,
-    (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()) AS available
+    (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()) AS available,
+    (CASE WHEN status <> 'pending' THEN COALESCE(resolved_at, updated_at) END) AS ended_at
   FROM public.hmsh_escalations;`;
 
 // Index ownership — hmsh 0.25.0 ships the general aggregate indexes on
 // hmsh_escalations (idx_hmsh_esc_stats_pending covers the pending backlog
 // incl. assigned_to/assigned_until; _stats_created and _stats_resolved bound
-// the created/resolved windows). Long-tail keeps exactly ONE app-layer index:
+// the created/resolved windows). Long-tail keeps exactly TWO app-layer indexes:
 //
 //   idx_hmsh_esc_resolved_cover (role, resolved_at DESC, claimed_at, created_at)
 //     WHERE status = 'resolved'
@@ -215,6 +246,15 @@ CREATE OR REPLACE VIEW public.lt_escalations AS
 //     prefix bounds each station's percentile scan to its own window, and the
 //     trailing claimed_at/created_at feed PERCENTILE_CONT(resolved_at -
 //     claimed_at) and (claimed_at - created_at) from the index.
+//
+//   idx_hmsh_esc_ended_at ((COALESCE(resolved_at, updated_at)))
+//     WHERE status <> 'pending'
+//     Serves the analytics interval scans (aggregate-sql.ts): dwell and
+//     past-membership need "terminal rows whose end instant is after the
+//     window/asOf" — without this, every such query scans all terminal
+//     history, growing without bound. Write cost is the cheapest possible:
+//     inserts are 'pending' (excluded by the predicate), so exactly one
+//     index write occurs per row, at its terminal transition.
 //
 // Everything else this branch once created is dropped below: the pending
 // index duplicated _stats_pending, and the claimed cover had no consuming
@@ -234,17 +274,14 @@ DROP INDEX IF EXISTS idx_hmsh_esc_pending_role_created`;
 const DROP_UNCONSUMED_CLAIMED_COVER_INDEX = `
 DROP INDEX IF EXISTS idx_hmsh_esc_claimed_cover`;
 
-// ── The station-percentile cover ─────────────────────────────────────────────
-
-/** Reports existence + validity so a crash-orphaned INVALID build is rebuilt. */
-const RESOLVED_COVER_INDEX_STATE = `
-SELECT i.indisvalid AS valid
-FROM pg_class c
-JOIN pg_index i ON i.indexrelid = c.oid
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE c.relname = 'idx_hmsh_esc_resolved_cover' AND n.nspname = 'public'`;
+// ── The app-layer indexes (built via ensureAppIndex) ────────────────────────
 
 const ENSURE_RESOLVED_COVER_INDEX = `\
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hmsh_esc_resolved_cover
   ON public.hmsh_escalations (role, resolved_at DESC, claimed_at, created_at)
   WHERE status = 'resolved'`;
+
+const ENSURE_ENDED_AT_INDEX = `\
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_hmsh_esc_ended_at
+  ON public.hmsh_escalations ((COALESCE(resolved_at, updated_at)))
+  WHERE status <> 'pending'`;

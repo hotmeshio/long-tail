@@ -4,8 +4,13 @@ import { GitMerge, RefreshCw, Eye, Settings, TriangleAlert, ChevronDown } from '
 import { useRoleDetails, useUpdateRole, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
-import { useStationMetricsEvents } from '../../hooks/useEventHooks';
+import { useStationMetricsEvents, useEscalationAnalyticsEvents } from '../../hooks/useEventHooks';
+import { useAggregateByFacets, useAnalyticsWindow, type AggregateRow } from '../../api/escalation-analytics';
+import { assignMixColors } from './mix-colors';
+import { StationMixBar } from './StationMixBar';
+import { EntityLensView } from './EntityLensView';
 import { PageHeader } from '../../components/common/layout/PageHeader';
+import { SegmentedTabs } from '../../components/common/layout/SegmentedTabs';
 import {
   PaceChart,
   ACTIVE_COLOR,
@@ -159,12 +164,16 @@ function EditableNumber({ value, onSave }: { value: number | null; onSave: (n: n
 function StationRow({
   role,
   metric,
+  mixGroups,
+  mixColors,
   selected,
   periodHours,
   onClick,
 }: {
   role: RoleDetail;
   metric: StationMetric | undefined;
+  mixGroups: AggregateRow[] | undefined;
+  mixColors: Map<string, string>;
   selected: boolean;
   periodHours: number;
   onClick: () => void;
@@ -289,6 +298,11 @@ function StationRow({
         </span>
       </td>
 
+      {/* Time-in-state mix over the window */}
+      <td className="hidden lg:table-cell px-2 py-1.5">
+        <StationMixBar groups={mixGroups} colors={mixColors} />
+      </td>
+
       {/* Load mini-bar */}
       <td className="hidden lg:table-cell px-2 py-1.5">
         <div className="flex items-center gap-2">
@@ -324,9 +338,9 @@ function StationRow({
           <span className="w-3.5 flex items-center justify-center">
             {(isBuilder || isOps) && (
               <Link
-                to={`/admin/roles/${encodeURIComponent(role.role)}`}
+                to={`/admin/roles/${encodeURIComponent(role.role)}?section=pace-board`}
                 className="icon-link"
-                title="Configure this role"
+                title="Configure this station"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -531,6 +545,7 @@ function TableHead() {
         ))}
         <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WAIT</th>
         <th className={`${TH_BASE} hidden xl:table-cell w-[8%] px-2 text-right text-text-quaternary`}>P99 WORK</th>
+        <th className={`${TH_BASE} hidden lg:table-cell w-[10%] px-2 text-left text-text-quaternary`}>MIX</th>
         <th className={`${TH_BASE} hidden lg:table-cell w-[11%] px-2 text-left text-text-quaternary`}>TREND</th>
         <th className={`${TH_BASE} w-20 px-1 text-center text-text-quaternary`}>ACTIONS</th>
       </tr>
@@ -552,9 +567,11 @@ export function OperationsPage() {
   const [logScale, setLogScale] = useState(true);
 
   // Push-driven refresh: every escalation event invalidates ['stationMetrics']
-  // through the central event system (debounced, transport-agnostic). The
-  // header's refresh button covers user-initiated reloads.
+  // (and the analytics aggregates behind the MIX bars) through the central
+  // event system (debounced, transport-agnostic). The header's refresh button
+  // covers user-initiated reloads.
   useStationMetricsEvents();
+  useEscalationAnalyticsEvents();
 
   const { data: roleData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleDetails();
   const {
@@ -608,6 +625,37 @@ export function OperationsPage() {
     () => new Set(ordered.map(({ role }) => role.role)),
     [ordered],
   );
+
+  // Time-in-state mix: ONE dwell aggregate serves every visible station's MIX
+  // bar. The window rolls with the minute (stable keys, server-cache-aligned);
+  // an analytics 403 (flag off, unprivileged) simply leaves every cell at `—`.
+  const analyticsWindow = useAnalyticsWindow(PERIOD_HOURS[period]);
+  const visibleRoles = useMemo(() => ordered.map(({ role }) => role.role), [ordered]);
+  const { data: mixData } = useAggregateByFacets(
+    visibleRoles.length
+      ? {
+          query: { roles: visibleRoles },
+          groupBy: { columns: ['role', 'subtype'] },
+          measure: { kind: 'dwell', window: analyticsWindow },
+        }
+      : null,
+  );
+  const mixByRole = useMemo(() => {
+    const out = new Map<string, AggregateRow[]>();
+    for (const g of mixData?.groups ?? []) {
+      if (!g.role) continue;
+      const rows = out.get(g.role) ?? [];
+      rows.push(g);
+      out.set(g.role, rows);
+    }
+    return out;
+  }, [mixData]);
+  const mixColorsByRole = useMemo(() => {
+    const out = new Map<string, Map<string, string>>();
+    for (const [role, rows] of mixByRole) out.set(role, assignMixColors(rows));
+    return out;
+  }, [mixByRole]);
+  const EMPTY_COLORS = useMemo(() => new Map<string, string>(), []);
   const fragmentMetrics = useMemo(
     () => metrics.filter((m) => fragmentRoleSet.has(m.role)),
     [metrics, fragmentRoleSet],
@@ -641,6 +689,31 @@ export function OperationsPage() {
 
   const selectedRoleDetail =
     ordered.find(({ role }) => role.role === selectedRole)?.role ?? null;
+
+  // ── Lenses: station-first (default) or entity-first, one lens per entity
+  // facet the visible ops roles declare. Roles sharing a key form the
+  // entity's SYSTEM; the lens shows its state mix, slices, and entities.
+  const entityLenses = useMemo(() => {
+    const keys = new Set<string>();
+    for (const r of roles) {
+      if (r.ops_visible && r.entity_facet) keys.add(r.entity_facet);
+    }
+    return [...keys].sort();
+  }, [roles]);
+  const lensParam = searchParams.get('lens');
+  const activeLens = lensParam && entityLenses.includes(lensParam) ? lensParam : null;
+  const selectLens = useCallback(
+    (lens: string | null) => {
+      setSelectedRole(null);
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        if (lens) p.set('lens', lens);
+        else p.delete('lens');
+        return p;
+      });
+    },
+    [setSearchParams],
+  );
 
   const isLoading = rolesLoading || metricsLoading;
 
@@ -714,10 +787,10 @@ export function OperationsPage() {
         /* Console layout: fixed header (above) → chart row (min 40vh) → table row (max 30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
-          {/* Top strip: segment selector (left) + scale toggle (right) */}
+          {/* Top strip: segment selector (left) + lens selector + scale toggle (right) */}
           <div className="flex items-end justify-between">
             <div className="flex-1">
-              {fragments.length > 1 && (
+              {!activeLens && fragments.length > 1 && (
                 <SequenceMenu
                   fragments={fragments}
                   aggregates={fragmentAggregates}
@@ -726,6 +799,23 @@ export function OperationsPage() {
                 />
               )}
             </div>
+            {entityLenses.length > 0 && (
+              <div
+                className="px-4 pt-1 pb-0.5"
+                title="Lens: the board station-first, or an entity system (roles sharing an entity facet) entity-first"
+              >
+                <SegmentedTabs
+                  aria-label="Board lens"
+                  tabs={[
+                    { key: 'stations', label: 'Stations' },
+                    ...entityLenses.map((lens) => ({ key: lens, label: `by ${lens}` })),
+                  ]}
+                  active={activeLens ?? 'stations'}
+                  onChange={(key) => selectLens(key === 'stations' ? null : key)}
+                />
+              </div>
+            )}
+            {!activeLens && (
             <div className="flex items-center gap-0.5 px-4 pt-2 pb-0.5">
               {(['lin', 'log'] as const).map((mode) => (
                 <button
@@ -742,55 +832,71 @@ export function OperationsPage() {
                 </button>
               ))}
             </div>
+            )}
           </div>
 
-          {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
-          <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
-            {/* SVG chart — scales to fill available space */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden px-2 py-4">
-              <PaceChart
-                stations={chartStations}
-                selectedRole={selectedRole}
-                onSelect={handleSelect}
-                onUpstreamSelect={handleUpstreamSelect}
-                onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
-                periodHours={PERIOD_HOURS[period]}
-                logScale={logScale}
-              />
-            </div>
-            {/* Vertical divider */}
-            <div className="w-px bg-surface-border shrink-0 self-stretch" />
-            {/* Right sidebar — fixed width, scrolls its own content */}
-            <StationDetailPanel
-              role={selectedRoleDetail}
-              allMetrics={fragmentMetrics}
-              orderedRoles={ordered.map((o) => o.role)}
-              globalPeriod={period}
-              onClose={() => setSelectedRole(null)}
+          {activeLens ? (
+            /* ── Entity lens: the board flipped entity-first — the system's
+                state band, categorical slices, and per-entity rows. ── */
+            <EntityLensView
+              entityKey={activeLens}
+              periodHours={PERIOD_HOURS[period]}
+              roles={roles}
             />
-          </div>
-
-          {/* Bottom row: one real table in one scroll container — the platform
-              idiom (see DataTable). `table-fixed w-full` locks columns to the
-              container width (no horizontal scroll at any breakpoint); header
-              cells stick inside the scrolling region. */}
-          <div className="max-h-[30vh] flex-none overflow-y-auto border-t border-surface-border">
-            <table className="w-full table-fixed">
-              <TableHead />
-              <tbody>
-                {ordered.map(({ role }) => (
-                  <StationRow
-                    key={role.role}
-                    role={role}
-                    metric={metrics.find((m) => m.role === role.role)}
-                    selected={selectedRole === role.role}
+          ) : (
+            <>
+              {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
+              <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
+                {/* SVG chart — scales to fill available space */}
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden px-2 py-4">
+                  <PaceChart
+                    stations={chartStations}
+                    selectedRole={selectedRole}
+                    onSelect={handleSelect}
+                    onUpstreamSelect={handleUpstreamSelect}
+                    onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
                     periodHours={PERIOD_HOURS[period]}
-                    onClick={() => handleSelect(role.role)}
+                    logScale={logScale}
                   />
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </div>
+                {/* Vertical divider */}
+                <div className="w-px bg-surface-border shrink-0 self-stretch" />
+                {/* Right sidebar — fixed width, scrolls its own content */}
+                <StationDetailPanel
+                  role={selectedRoleDetail}
+                  allMetrics={fragmentMetrics}
+                  orderedRoles={ordered.map((o) => o.role)}
+                  globalPeriod={period}
+                  mixGroups={mixData?.groups}
+                  onClose={() => setSelectedRole(null)}
+                />
+              </div>
+
+              {/* Bottom row: one real table in one scroll container — the platform
+                  idiom (see DataTable). `table-fixed w-full` locks columns to the
+                  container width (no horizontal scroll at any breakpoint); header
+                  cells stick inside the scrolling region. */}
+              <div className="max-h-[30vh] flex-none overflow-y-auto border-t border-surface-border">
+                <table className="w-full table-fixed">
+                  <TableHead />
+                  <tbody>
+                    {ordered.map(({ role }) => (
+                      <StationRow
+                        key={role.role}
+                        role={role}
+                        metric={metrics.find((m) => m.role === role.role)}
+                        mixGroups={mixByRole.get(role.role)}
+                        mixColors={mixColorsByRole.get(role.role) ?? EMPTY_COLORS}
+                        selected={selectedRole === role.role}
+                        periodHours={PERIOD_HOURS[period]}
+                        onClick={() => handleSelect(role.role)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
         </div>
       )}

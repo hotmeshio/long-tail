@@ -26,6 +26,10 @@ export interface RoleDetail {
   priority_threshold_minutes: number | null;
   /** Escalation metadata key holding the age origin (ISO 8601 UTC timestamp). Falls back to created_at. */
   priority_facet: string | null;
+  /** Metadata key identifying the entity that moves through this role (e.g. serialNumber). Powers entity counts, dwell, timelines. */
+  entity_facet: string | null;
+  /** How the role names its states for entities: 'role' (the station is the state) or 'subtype' (its subtypes are). */
+  entity_state_source: 'role' | 'subtype';
   /** Version of the live schema pair; each schema edit advances it. Null until the role first carries a schema. */
   current_schema_version: number | null;
   /** Rich formatting for this role's escalation list page (x-lt-* markup). Opt-in; versioned independently. */
@@ -105,6 +109,8 @@ export interface UpdateRoleInput {
   worker_count?: number | null;
   priority_threshold_minutes?: number | null;
   priority_facet?: string | null;
+  entity_facet?: string | null;
+  entity_state_source?: 'role' | 'subtype' | null;
   /** Replace the upstream-input set (omitted = preserve; [] = clear). */
   upstream_roles?: string[];
   /** Recorded on the schema version snapshot when the update changes a schema field. */

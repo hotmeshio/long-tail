@@ -194,6 +194,20 @@ export function useStationMetricsEvents(): void {
 }
 
 /**
+ * Invalidate the analytics aggregates/timelines (mix bars, dwell sections,
+ * entity timelines) on escalation events. Same summary-surface rationale and
+ * generous debounce as the station metrics: lifecycle moments are the only
+ * things that move an interval, so the event is the complete refresh signal.
+ */
+export function useEscalationAnalyticsEvents(): void {
+  const invalidate = useDebouncedInvalidation(1500);
+
+  useEventSubscription(escalationPattern({}), () => {
+    invalidate([['escAggregate'], ['escTimeline']]);
+  });
+}
+
+/**
  * Invalidate escalation list queries on escalation events.
  *
  * List pages pass the slice they render: `role` narrows to one queue's

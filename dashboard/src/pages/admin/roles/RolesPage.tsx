@@ -1,19 +1,19 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { useRoleDetails, useEscalationChains, type RoleDetail } from '../../../api/roles';
+import { useRoleDetails, type RoleDetail } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { displayRoleTitle } from '../../../lib/role-display';
 import { CreateRoleModal } from './CreateRoleModal';
 
 // ── Grid columns ──────────────────────────────────────────────────────────────
-// ROLE(dot+display name, 200px) | KEY(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | ESCALATES TO(160px) | MEMBERS(88px) | CAPACITY(204px)
+// ROLE(dot+display name, 200px) | KEY(160px) | DESCRIPTION(1fr) | PRECEDED BY(130px) | MEMBERS(88px) | CAPACITY(204px)
 // The display name leads (user-set title, else Title Case derived from the
 // key — same formatter the Pace Board uses); the exact key is the secondary
 // field. The capacity block is a single combined cell that internally renders
 // SLA/m · Target/h · Staff flush to row edges.
-const GRID = '200px 160px 1fr 130px 160px 88px 204px';
+const GRID = '200px 160px 1fr 130px 88px 204px';
 
 const CELL_TEXT = 'text-text-secondary transition-colors group-hover/row:text-text-primary';
 // Header/cell sizes match the app's list standard (DataTable): text-2xs
@@ -38,7 +38,6 @@ function TableHead() {
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Key</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Description</span>
       <span className={`${HDR} ${CELL_PY} flex items-center`}>Preceded By</span>
-      <span className={`${HDR} ${CELL_PY} flex items-center`}>Escalates To</span>
       <span className={`${HDR} ${CELL_PY} flex items-center justify-end`}>Members</span>
       {/* Capacity block — no py, stretches to full row height by default (grid stretch alignment) */}
       <div className="flex gap-3 items-center bg-surface-sunken px-3">
@@ -56,11 +55,9 @@ const CAPACITY_COL_VAL = 'text-xs tabular-nums text-right flex-1 min-w-0 transit
 
 function RoleRow({
   role,
-  targets,
   onClick,
 }: {
   role: RoleDetail;
-  targets: string[];
   onClick: () => void;
 }) {
 
@@ -108,19 +105,6 @@ function RoleRow({
         )}
       </div>
 
-      {/* ESCALATES TO — same universal role pill, one link per target */}
-      <div className={`flex items-center flex-wrap gap-x-2.5 gap-y-0.5 min-w-0 ${ROW_PY}`} onClick={(e) => e.stopPropagation()}>
-        {targets.map((t) => (
-          <Link
-            key={t}
-            to={`/admin/roles/${encodeURIComponent(t)}`}
-            className="min-w-0 truncate text-text-secondary transition-colors hover:text-accent"
-          >
-            <RolePill role={t} tone="inherit" />
-          </Link>
-        ))}
-      </div>
-
       {/* MEMBER COUNT — unset renders empty, not invisible text (screen
           readers and copy/paste see exactly what the eye sees) */}
       <span className={`flex items-center justify-end text-sm tabular-nums ${ROW_PY} transition-colors ${CELL_TEXT}`}>
@@ -148,22 +132,10 @@ function RoleRow({
 export function RolesPage() {
   const navigate = useNavigate();
   const { data, isLoading } = useRoleDetails();
-  const { data: chainData } = useEscalationChains();
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState('');
 
   const roles = data?.roles ?? [];
-  const chains = chainData?.chains ?? [];
-
-  // Build a map: role → list of target roles it escalates to
-  const escalationTargets = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const { source_role, target_role } of chains) {
-      const existing = map.get(source_role) ?? [];
-      map.set(source_role, [...existing, target_role]);
-    }
-    return map;
-  }, [chains]);
 
   // Rows lead with the display name, so they sort by it — and the search
   // matches it too (a derived "Cad Designer" is findable even when no title
@@ -235,7 +207,6 @@ export function RolesPage() {
               <RoleRow
                 key={role.role}
                 role={role}
-                targets={escalationTargets.get(role.role) ?? []}
                 onClick={() => navigate(`/admin/roles/${encodeURIComponent(role.role)}`)}
               />
             ))}

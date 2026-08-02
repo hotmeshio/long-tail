@@ -12,3 +12,10 @@ export {
   claimGroups,
   claimByFacets,
 } from './facets';
+export {
+  aggregateByFacets,
+  timelineByFacet,
+  resolveEntitySystem,
+  resetAnalyticsCaches,
+} from './aggregates';
+export { AnalyticsInputError } from './aggregate-validate';

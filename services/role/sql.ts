@@ -93,6 +93,14 @@ export const DELETE_ROLE = `
  * ops_home_default ($35 = provided sentinel, $36 = value) is single-holder:
  * setting it true clears the flag on every other role in the same statement
  * (the home_clear CTE touches only OTHER rows, so the two UPDATEs never meet).
+ *
+ * entity_facet ($37 = provided sentinel, $38 = value) is unversioned config:
+ * the metadata key naming the entity that moves through this role (powers the
+ * analytics surfaces — entity counts, per-entity dwell, timelines).
+ *
+ * entity_state_source ($39 = provided sentinel, $40 = value) is unversioned
+ * config: 'role' | 'subtype' — how this role names its contribution to the
+ * entity's state space (the station itself, or its subtypes).
  */
 export const UPDATE_ROLE_METADATA = `
   WITH home_clear AS (
@@ -113,6 +121,9 @@ export const UPDATE_ROLE_METADATA = `
       priority_threshold_minutes
                       = CASE WHEN $22::boolean THEN $23::numeric                      ELSE priority_threshold_minutes END,
       priority_facet  = CASE WHEN $24::boolean THEN $25                               ELSE priority_facet  END,
+      entity_facet    = CASE WHEN $37::boolean THEN $38                               ELSE entity_facet    END,
+      entity_state_source
+                      = CASE WHEN $39::boolean THEN COALESCE($40, 'role')             ELSE entity_state_source END,
       list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
       default_pins    = CASE WHEN $31::boolean THEN $32::jsonb                        ELSE default_pins    END,
       enforce_schema  = CASE WHEN $33::boolean THEN COALESCE($34::boolean, false)     ELSE enforce_schema  END,
@@ -130,7 +141,7 @@ export const UPDATE_ROLE_METADATA = `
     RETURNING
       role, title, description, form_schema, metadata_schema, properties,
       ops_visible, ops_home_default, parent_role, sla_minutes, target_per_hour, worker_count,
-      priority_threshold_minutes, priority_facet,
+      priority_threshold_minutes, priority_facet, entity_facet, entity_state_source,
       current_schema_version, list_schema, current_list_schema_version,
       default_pins, enforce_schema
   ), snapshot AS (
@@ -285,6 +296,8 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.worker_count,
     r.priority_threshold_minutes,
     r.priority_facet,
+    r.entity_facet,
+    r.entity_state_source,
     r.current_schema_version,
     r.list_schema,
     r.current_list_schema_version,

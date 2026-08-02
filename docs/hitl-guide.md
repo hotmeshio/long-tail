@@ -61,12 +61,12 @@ When you author a HITL-backed workflow, the platform handles:
 - **Accessible forms** — generated controls carry label association, error announcements, and keyboard-correct locking (see [form.md](hitl/form.md#accessibility))
 - **Side panel** — help, AI analysis, metadata, context, and raw-record views beside the form
 - **Section state persistence** — collapsed sections remembered across navigation
-- **Escalation chains** — users can re-route work to other roles
+- **Escalation chains** — role-to-role routing edges that scope programmatic re-routing (API, MCP, CLI)
 - **AI triage** — optional auto-resolution for common patterns
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Schema enforcement** — roles with `enforce_schema` validate every resolver payload server-side (dashboard, API, MCP, CLI alike) with the same pass the form runs, rejecting violations as a structured 422 (see [schema-enforcement.md](schema-enforcement.md))
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
-- **Bulk operations** — bulk claim, assign, escalate, triage, and cancel for queue management
+- **Bulk operations** — bulk claim, assign, triage, and cancel for queue management
 - **Cancellation** — cancel pending escalations from the API or dashboard
 
 You write the workflow and the schema. Everything else is provided.
@@ -124,7 +124,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |
 | `x-lt-submit-guard` | schema | Block the resolve while an embedded escalation query returns rows; `autoResolveWhenEmpty` auto-closes the claimed parent once it drains. Enforced isomorphically for `enforce_schema` roles |
 | `x-lt-submit-on-claim` | schema | Claiming also resolves the form's seeded defaults in one gesture |
-| `x-lt-labels` | schema | Per-target labels for the footer controls (`claim`, `cancel`, `submit`, `escalate`, `release`) |
+| `x-lt-labels` | schema | Per-target labels for the footer controls (`claim`, `cancel`, `submit`, `release`) |
 | `x-lt-transition` | schema | Pause on a wait screen after resolve and hand off to the born-assigned follow-on |
 | `x-lt-columns` | schema (list) | Column definitions for `facet-table` layout |
 | `x-lt-row-action` | schema (list) | Per-row list action: `claim` / `view`, or `submitOnClaim` to claim, submit, and transition straight from the list |
