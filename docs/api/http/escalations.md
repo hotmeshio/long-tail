@@ -1154,3 +1154,134 @@ Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), a
 | `allOrNone` | `boolean` | no | Commit only if the full set was acquired |
 
 **Response 200:** `{ "claimed": [...] }`.
+
+## Aggregate by facets
+
+```
+POST /api/escalations/aggregate-by-facets
+```
+
+Grouped analytics over the escalation intervals. Every escalation is one open interval `[created_at, ended_at)` — `ended_at` is the instant the row left the live set (resolved / cancelled / expired), `NULL` while live. The aggregate reads that time-series two ways: **membership** (rows — or, with `distinctBy`, distinct entities — whose interval is open at an instant; a past `asOf` reconstructs the live set at that moment) and **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it on both ends). One call replaces N per-filter count round-trips. See [escalation-analytics.md](../../escalation-analytics.md) for the full guide.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | `object` | yes | The filter — `role`/`roles` (or `entity`), `facets`, `block`, `range`, `exists`. `entity` names an entity facet key and resolves server-side to every role declaring it as its `entity_facet` — the entity's **system**; mutually exclusive with `role`/`roles`, and it implies `exists: [entity]` so stray rows without the key stay out |
+| `groupBy` | `object` | yes | Group keys — `columns` (whitelisted: `role`, `subtype`, `status`), `facets` (metadata keys, projected as text; `NULL` group key when absent), and `state` (group by the derived state label: each role contributes per its `entity_state_source` — its subtypes or itself; mutually exclusive with `states[]`). An empty object yields one total row |
+| `measure` | `object` | yes | Exactly one kind: `{ "kind": "membership", "asOf"? }` (default anchor: now) or `{ "kind": "dwell", "window": { "from", "to" } }` |
+| `distinctBy` | `string` | no | Membership only — count DISTINCT of this metadata facet per group (entities, not rows). Omit to count rows |
+| `states` | `array` | no | Pure labeling: tag each group with the FIRST matching `{ name, match }` entry, evaluated top-to-bottom; `match` compares grouped columns/facets. Grouping is unchanged |
+| `liveStatuses` | `string[]` | no | Statuses considered live (default `["pending"]`) |
+| `orderBy` | `array` | no | Order the RESULT groups: `{ field, direction? }` — `count`, `dwellSeconds`, `sampleCount`, a grouped column, or a grouped facet key |
+| `limit` / `offset` | `integer` | no | Result-group paging, capped at `LT_ANALYTICS_MAX_GROUPS` |
+
+The filter takes the WHAT fields only. `status`, `available`, and `jeopardy` are rejected — liveness derives from the interval, `liveStatuses`, and the measure anchor. Query-level `orderBy`/`limit`/`offset` are rejected too — order and paginate the result groups with the top-level fields.
+
+**Example** — how the printer fleet spent a day, one row per state. The three seeded roles declare `entity_facet: "serialNumber"`: `printer-fleet` uses `entity_state_source: "subtype"` (its `idle` / `printing` subtypes are states), while `printer-harvest` and `printer-service` use `"role"` (each role is a state):
+
+```json
+{
+  "query": { "entity": "serialNumber" },
+  "groupBy": { "state": true },
+  "measure": {
+    "kind": "dwell",
+    "window": { "from": "2026-08-01T00:00:00Z", "to": "2026-08-02T00:00:00Z" }
+  }
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "groups": [
+    { "facets": {}, "state": "printing", "dwellSeconds": 214380, "sampleCount": 41 },
+    { "facets": {}, "state": "idle", "dwellSeconds": 132600, "sampleCount": 38 },
+    { "facets": {}, "state": "printer-harvest", "dwellSeconds": 21540, "sampleCount": 17 },
+    { "facets": {}, "state": "printer-service", "dwellSeconds": 9060, "sampleCount": 3 }
+  ],
+  "overflow": false
+}
+```
+
+Adding `"facets": ["model"]` to `groupBy` slices the same bands per model value (`p1s` vs `h2s`).
+
+**Response fields (per group):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` / `subtype` / `status` | `string` | Present iff requested in `groupBy.columns`. `status` is the row's status NOW — status history is not stored, so a past `asOf` still groups by current status |
+| `facets` | `object` | One entry per `groupBy.facets` key; `null` when the facet is absent on the underlying rows |
+| `state` | `string` | Present when `groupBy.state` derived it or a `states[]` entry matched |
+| `count` | `number` | Membership: entities (with `distinctBy`) or rows (without) |
+| `dwellSeconds` | `number` | Dwell: summed open-seconds within the window |
+| `sampleCount` | `number` | Underlying escalation rows contributing to the group (pre-distinct) |
+
+`overflow: true` means the group cap was hit — more groups exist beyond this page.
+
+**Response 400** — a caller-input problem: a liveness field (`status`/`available`/`jeopardy`) or `orderBy`/`limit`/`offset` on the filter; `entity` together with `role`/`roles`; `groupBy.state` together with `states[]`; an unknown status in `liveStatuses`; an empty window or one wider than `LT_ANALYTICS_MAX_WINDOW_DAYS`; a future `asOf`; a malformed facet key; a `states[]` match referencing a key the query never groups by.
+
+**Response 403** — the caller must hold `read_all` on every role in scope (for `entity`, every role in the derived system); a filter with no role scope spans every pond and requires a global principal (superadmin/admin). While `features.publicPaceBoard` stands (default on), counts-only groupings — no `groupBy.facets` keys — are readable by any login, the same data class the Pace Board exposes; a facet-keyed grouping emits facet values (entity ids) as group keys and always takes the full gate.
+
+## Timeline by facet
+
+```
+POST /api/escalations/timeline-by-facet
+```
+
+One entity's ordered interval sequence — every escalation the entity facet appeared in, as `[startedAt, endedAt)` spans with durations, in `created_at` order. Open intervals report `endedAt: null`. Gaps between consecutive intervals are untracked time and are preserved, not filled. The facet is matched GIN-served (`metadata @> {key: value}`), so the stored value must be a JSON string.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `facet` | `{ key, value }` | yes | The entity facet to trace |
+| `query` | `object` | no | Optional extra filter / role scope (or `entity` — the derived system). Same field rules as the aggregate filter |
+| `window` | `{ from, to }` | no | Only intervals overlapping the window (overlap-filtered, not clipped) |
+| `select` | `object` | no | `columns` / `facets` to surface per interval (default: all three columns) |
+| `liveStatuses` | `string[]` | no | Statuses considered live (default `["pending"]`) |
+| `limit` | `integer` | no | Max intervals |
+
+**Example** — one printer's movement across the fleet's queues:
+
+```json
+{
+  "facet": { "key": "serialNumber", "value": "PRN-001" },
+  "query": { "entity": "serialNumber" }
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "intervals": [
+    {
+      "role": "printer-fleet",
+      "subtype": "printing",
+      "status": "resolved",
+      "facets": {},
+      "startedAt": "2026-08-01T08:00:00.000Z",
+      "endedAt": "2026-08-01T09:30:00.000Z",
+      "durationSeconds": 5400
+    },
+    {
+      "role": "printer-harvest",
+      "subtype": "harvest",
+      "status": "pending",
+      "facets": {},
+      "startedAt": "2026-08-01T09:30:00.000Z",
+      "endedAt": null,
+      "durationSeconds": 1800
+    }
+  ],
+  "overflow": false
+}
+```
+
+`durationSeconds` runs to `endedAt`, else to `window.to` clamped at now. `overflow: true` means the interval cap was hit.
+
+**Response 400** — same validation class as the aggregate: a rejected filter field, an invalid window, a malformed facet key.
+
+**Response 403** — timelines always take the full gate: an entity's movement history is item-level disclosure. The caller must hold `read_all` on every role in scope (for `entity`, every role in the derived system); a roleless query requires a global principal.

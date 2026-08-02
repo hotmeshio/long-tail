@@ -92,6 +92,12 @@ HTTP surface: `GET/POST /api/personas`, `GET/PATCH/DELETE /api/personas/:key`, `
 
 Scope folds into the SQL, so it is atomic with no TOCTOU window. Read scope becomes part of the escalation search query — a member sees a row when `role ∈ allRoles OR (role ∈ selfRoles AND assigned_to = me)`. Write scope folds into the atomic resolve-by-metadata query and gates the by-id claim/resolve/cancel paths. `assigned_to` is indexed, so `self` scope scales to large queues.
 
+### Analytics gate
+
+The escalation analytics surfaces (`aggregate-by-facets`, `timeline-by-facet`) are reads that aggregate other operators' items, and they may span roles — so the gate is `read_all` on **every** role in the query's scope. When the filter uses `entity`, the scope is the derived system: every role declaring that entity facet. A query with no role scope at all is inherently cross-role and requires a global principal (superadmin/admin).
+
+While the `features.publicPaceBoard` flag stands (default on), counts-only aggregates — groupings with no `groupBy.facets` keys — are readable by any login: they emit counts and seconds, the same data class station metrics already expose to everyone. Facet-keyed groupings emit facet values (entity ids) as group keys, and a timeline is one entity's movement history — item-level disclosure — so both always take the full `read_all`-per-role gate.
+
 ## Workflow Types and IAM
 
 Long Tail has three workflow types (see the [Workflows Guide](workflows.md#three-workflow-types) for full details). IAM applies to all three:

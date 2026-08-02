@@ -915,6 +915,62 @@ const result = await lt.escalations.claimByFacets({
 
 **Returns:** `LTApiResult<{ claimed }>`.
 
+## aggregateByFacets
+
+Grouped analytics over the escalation intervals — every escalation is one open interval `[created_at, ended_at)`, `ended_at` `NULL` while live. Two measures: **membership** (rows or, with `distinctBy`, distinct entities open at an instant; a past `asOf` reconstructs the live set then) and **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it). `query.entity` names an entity facet key and scopes to every role declaring it as its `entity_facet` — the entity's system (mutually exclusive with `role`/`roles`); `groupBy.state` groups by the derived state label, each role contributing per its `entity_state_source`.
+
+```typescript
+// The printer fleet: how the entities spent the window, one row per state
+// (idle, printing, printer-harvest, printer-service)
+const result = await lt.escalations.aggregateByFacets({
+  query: { entity: 'serialNumber' },
+  groupBy: { state: true },
+  measure: { kind: 'dwell', window: { from: '2026-08-01T00:00:00Z', to: '2026-08-02T00:00:00Z' } },
+});
+
+// The slice: the same bands per model value (p1s vs h2s)
+await lt.escalations.aggregateByFacets({
+  query: { entity: 'serialNumber' },
+  groupBy: { state: true, facets: ['model'] },
+  measure: { kind: 'dwell', window: { from: '2026-08-01T00:00:00Z', to: '2026-08-02T00:00:00Z' } },
+});
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | `AnalyticsQuery` | Yes | The filter — `role`/`roles` or `entity`, plus `facets`, `block`, `range`, `exists`. `status`/`available`/`jeopardy` and query-level paging are rejected with 400: liveness derives from the interval, `liveStatuses`, and the measure anchor |
+| `groupBy` | `FacetGroupBy` | Yes | `columns` (`role`, `subtype`, `status`), `facets` (metadata keys), `state` (derived state label; mutually exclusive with `states[]`). Empty object → one total row |
+| `measure` | `AggregateMeasure` | Yes | `{ kind: 'membership', asOf? }` or `{ kind: 'dwell', window }` |
+| `distinctBy` | `string` | No | Membership only — count DISTINCT of this facet (entities, not rows) |
+| `states` | `Array<{ name, match }>` | No | Pure labeling: tag each group with the first matching state name |
+| `liveStatuses` | `string[]` | No | Statuses considered live (default `['pending']`) |
+| `orderBy` / `limit` / `offset` | — | No | Order and page the RESULT groups (capped at `LT_ANALYTICS_MAX_GROUPS`) |
+
+**Returns:** `LTApiResult<{ groups: AggregateRow[]; overflow: boolean }>` — each group carries the grouped keys, `count` or `dwellSeconds`, and `sampleCount`. Gate: `read_all` on every role in scope (entity-derived roles included); a roleless filter requires a global principal; counts-only groupings (no `groupBy.facets`) are open to any login while `features.publicPaceBoard` stands. Mirrors `POST /api/escalations/aggregate-by-facets`.
+
+## timelineByFacet
+
+One entity's ordered interval sequence — every escalation the facet appeared in, as `[startedAt, endedAt)` spans with durations, in `created_at` order. Open intervals report `endedAt: null`; gaps are untracked time, preserved. GIN-served containment match — the stored facet value must be a JSON string. Always takes the full read gate (an entity's movement history is item-level disclosure).
+
+```typescript
+// One printer's movement across the fleet's queues
+const result = await lt.escalations.timelineByFacet({
+  facet: { key: 'serialNumber', value: 'PRN-001' },
+  query: { entity: 'serialNumber' },
+});
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `facet` | `{ key, value }` | Yes | The entity facet to trace |
+| `query` | `AnalyticsQuery` | No | Optional extra filter / role scope (or `entity` — the derived system) |
+| `window` | `{ from, to }` | No | Only intervals overlapping the window (overlap-filtered, not clipped) |
+| `select` | `{ columns?, facets? }` | No | Columns/facets to surface per interval (default: all three columns) |
+| `liveStatuses` | `string[]` | No | Statuses considered live (default `['pending']`) |
+| `limit` | `integer` | No | Max intervals |
+
+**Returns:** `LTApiResult<{ intervals: TimelineInterval[]; overflow: boolean }>`. Mirrors `POST /api/escalations/timeline-by-facet`.
+
 ---
 
 ## getStationMetrics

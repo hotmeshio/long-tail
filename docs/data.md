@@ -106,9 +106,9 @@ Updated when claimed or resolved.
 
 The storage is the **shared HotMesh table `public.hmsh_escalations`**
 (written by both long-tail and the HotMesh SDK). `lt_escalations` remains as a
-backward-compatible **view** over it — `SELECT *` plus a computed `available`
-column — so existing read queries and the public API are unchanged. Indexes are
-managed by the SDK on `hmsh_escalations` (see below).
+backward-compatible **view** over it — `SELECT *` plus computed `available` and
+`ended_at` columns — so existing read queries and the public API are unchanged.
+Indexes are managed by the SDK on `hmsh_escalations` (see below).
 
 Role read/write scope does **not** add columns here. An escalation carries a `role`
 and an optional `assigned_to`; work-surface scope lives on the membership table
@@ -159,11 +159,12 @@ contract is stable.
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
-The `lt_escalations` view adds one computed column on top of the above:
+The `lt_escalations` view adds two computed columns on top of the above:
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `available` | `BOOLEAN` | `true` when claimable — `assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()` |
+| `ended_at` | `TIMESTAMPTZ` | The instant the row left the live set — `NULL` while `pending`, `COALESCE(resolved_at, updated_at)` once terminal. Resolve stamps `resolved_at` in its guarded transition; cancel and expire stamp only `updated_at` in theirs, and no long-tail write path touches a terminal row afterward, so the coalesce is the transition instant for all three terminal statuses. Every escalation is thereby one open interval `[created_at, ended_at)` — the time-series the analytics surfaces read |
 
 **Claiming is implicit.** There is no separate status for "claimed". An escalation is considered claimed when `assigned_to IS NOT NULL` and `assigned_until > NOW()`. When the claim expires, the escalation is available again without any status change. The `/available` endpoint uses this logic:
 
@@ -186,6 +187,13 @@ WHERE status = 'pending'
 | `idx_hmsh_esc_origin` | `(origin_id) WHERE origin_id IS NOT NULL` | Find escalations sharing an origin |
 | `idx_hmsh_esc_task` | `(task_id) WHERE task_id IS NOT NULL` | Join escalations to their parent task |
 | `idx_hmsh_esc_workflow` | `(workflow_id) WHERE workflow_id IS NOT NULL` | Look up escalation by workflow ID |
+
+**Indexes** (app-managed, built at startup with `CREATE INDEX CONCURRENTLY`):
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_hmsh_esc_resolved_cover` | `(role, resolved_at DESC, claimed_at, created_at) WHERE status = 'resolved'` | Station-metrics percentile pass — bounds each station's scan to its resolved window and feeds the wait/work percentiles from the index |
+| `idx_hmsh_esc_ended_at` | `((COALESCE(resolved_at, updated_at))) WHERE status <> 'pending'` | The analytics interval scans — dwell and past-membership need terminal rows whose end instant falls after the window/`asOf`. The predicate excludes `pending` inserts, so each row costs exactly one index write, at its terminal transition |
 
 ### lt_users
 

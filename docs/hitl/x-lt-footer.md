@@ -23,7 +23,6 @@ to render in their place:
 | `claim` | Claim | The claim button (unclaimed). |
 | `cancel` | Cancel / Cancel escalation | The cancel control, both states. |
 | `submit` | Submit / Acknowledge | The resolve button (claimed). |
-| `escalate` | Escalate | The escalate tab and button. |
 | `release` | Release | The release tab. |
 
 ```jsonc
@@ -34,7 +33,7 @@ to render in their place:
 }
 ```
 
-Only the five known targets are read; unknown keys and non-string values are
+Only the known targets are read; unknown keys and non-string values are
 ignored. Any target the schema omits keeps its default, so a schema overrides
 just the controls it cares about. The pending, triage, and confirmation states
 ("Claiming…", "Send to Triage", "Yes, Release") keep their own copy.

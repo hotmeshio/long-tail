@@ -90,6 +90,23 @@ A 340 px right rail that slides open when a row or chart circle is clicked. Thre
 
 Close the panel with × or by clicking another row.
 
+## Entity lens
+
+The board carries one view selector. When any station declares an entity facet, a lens strip appears above the chart: **Stations** (the default station-first board) plus one lens per entity facet the visible roles declare, labeled `by <key>` (e.g. `by serialNumber`). The active lens is deep-linked (`?lens=<key>`). Selecting a lens flips the page from station-first to entity-first: roles sharing the facet form the entity's **system**, and each role contributes states per its `entity_state_source`. Three tiers, aggregate → individual:
+
+- **The system band** — how the fleet's time splits across states over the selected period: one stacked dwell band with a per-state legend (duration, percentage, and a `· N now` membership count where entities currently sit), headlined by the distinct-entity count in queue now (e.g. `6 serialNumber in queue now`).
+- **Slice by** — the same band per value of any metadata key, chosen from a select of the known facet keys (e.g. `model` splits the band into `p1s` vs `h2s`). Small-multiple bands, ranked by total dwell, top 8 values.
+- **The entity table** — one row per entity, ranked by tracked time: the entity value, its current state, its own dwell band, its total tracked time, and a timeline action that opens the entity's cross-queue interval timeline in the right panel.
+
+The lens is driven by two dials on the role's Pace Board section ([Role Detail](dashboard.md#role-detail)):
+
+| Dial | Description |
+|------|-------------|
+| `entity_facet` | The `lt_escalations.metadata` key naming the entity that moves through the role (e.g. `serialNumber`, `orderId`). Roles sharing a key form that entity's system. Blank = the role has no entity notion. |
+| `entity_state_source` | How the role names the entity's state: **Station** (`'role'` — being in this role is one state, e.g. a servicing queue) or **Subtypes** (`'subtype'` — the one role holds several states named by each escalation's subtype, e.g. a fleet role parking `idle` / `printing`). Default `'role'`. |
+
+The band tiers are counts-only aggregates, readable by any login while the public board flag stands; the slice and per-entity tiers group by facet values and require full (`read_all`) access to the system's queues. Data comes from `POST /api/escalations/aggregate-by-facets` and `POST /api/escalations/timeline-by-facet` — see [escalation-analytics.md](escalation-analytics.md) for the query contract.
+
 ## Data source
 
 All station metrics come from `GET /api/escalations/station-metrics?period=<period>`. The endpoint runs two queries against `public.hmsh_escalations` joined to `lt_roles` (for the priority dials and `target_per_hour`): a live-counts pass over the pending backlog, and a window-bounded percentile pass over resolved rows (`PERCENTILE_CONT` in Postgres, served by the `idx_hmsh_esc_resolved_cover` index). Updates reach the page as push events — every escalation write invalidates the metrics through the Socket.IO event system.
