@@ -709,8 +709,45 @@ export function OperationsPage() {
         const p = new URLSearchParams(prev);
         if (lens) p.set('lens', lens);
         else p.delete('lens');
+        // Entity-scoped params belong to one lens — a switch resets them.
+        p.delete('entity');
+        p.delete('find');
         return p;
       });
+    },
+    [setSearchParams],
+  );
+
+  // Lens deep-link companions: ?entity= (the open timeline panel) and ?find=
+  // (the entity-table prefix term). Both are plain URL-encoded strings; the
+  // lens view treats the params as source of truth, so back/forward replays
+  // panel opens and find terms.
+  const entityParam = searchParams.get('entity');
+  const findParam = searchParams.get('find');
+  const setEntityParam = useCallback(
+    (value: string | null) => {
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        if (value) p.set('entity', value);
+        else p.delete('entity');
+        return p;
+      });
+    },
+    [setSearchParams],
+  );
+  // Replace, not push — each debounced keystroke would otherwise pile up
+  // history entries; the final term still restores on back/forward.
+  const setFindParam = useCallback(
+    (term: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (term) p.set('find', term);
+          else p.delete('find');
+          return p;
+        },
+        { replace: true },
+      );
     },
     [setSearchParams],
   );
@@ -839,9 +876,14 @@ export function OperationsPage() {
             /* ── Entity lens: the board flipped entity-first — the system's
                 state band, categorical slices, and per-entity rows. ── */
             <EntityLensView
+              key={activeLens}
               entityKey={activeLens}
               periodHours={PERIOD_HOURS[period]}
               roles={roles}
+              find={findParam}
+              onFindChange={setFindParam}
+              entityValue={entityParam}
+              onEntityChange={setEntityParam}
             />
           ) : (
             <>
