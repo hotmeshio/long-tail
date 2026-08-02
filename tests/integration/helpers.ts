@@ -262,8 +262,19 @@ export class ApiClient {
 
   // ── Internal ──────────────────────────────────────────────────────────────
 
+  private extraHeaders: Record<string, string> = {};
+
+  /** Attach a sticky header to every request (e.g. an acting-identity grant). */
+  setHeader(name: string, value: string): void {
+    this.extraHeaders[name] = value;
+  }
+
+  clearHeader(name: string): void {
+    delete this.extraHeaders[name];
+  }
+
   private headers(): Record<string, string> {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = { 'Content-Type': 'application/json', ...this.extraHeaders };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
     return h;
   }

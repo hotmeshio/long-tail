@@ -22,6 +22,9 @@ canonical action surface. A scan is an **ECA rule** over that surface:
 - [Schemes](#schemes)
 - [Rules and steps](#rules-and-steps)
 - [Confirmation](#confirmation)
+- [Info-choice screens](#info-choice-screens)
+- [Identity schemes and acting identity](#identity-schemes-and-acting-identity)
+- [Station deployments](#station-deployments)
 - [The fallback screen](#the-fallback-screen)
 - [Executing a scan](#executing-a-scan)
 - [Capture on the dashboard](#capture-on-the-dashboard)
@@ -121,6 +124,115 @@ descriptor; the dashboard opens the item's detail page and raises the
 rule's prompt ("Cancel this printer's current state and send it home to
 servicing?"). Confirming fires the standard per-id endpoint — the same
 guarded call every other surface uses.
+
+## Info-choice screens
+
+Some objects carry one code for their whole life — an item tag, an order
+label. One code, many possible intents, and the right one depends on where
+the object is in its journey. The `present` verb closes that gap: the step
+locates the row, states its reality, and returns a configured, labeled
+choice set for the human to pick from. Upper half — what is true; lower
+half — what you may do about it.
+
+```jsonc
+{
+  "query": { "roles": ["printer-fleet", "printer-harvest", "printer-service"] },
+  "verb": "present",
+  "choices": [
+    { "label": "Claim & Start", "verb": "claim", "requireActingIdentity": true, "code": "CLAIM" },
+    { "label": "Complete", "verb": "resolve", "requireActingIdentity": true,
+      "confirm": { "prompt": "Mark this item complete?" },
+      "params": { "resolverPayload": { "outcome": "complete" } } },
+    { "label": "View Details", "verb": "show-detail" }
+  ]
+}
+```
+
+The scan answers `choices` with the located escalation and the choice list;
+each choice carries `withheld: true` when its identity requirement is
+unsatisfied. Picking one calls `POST /api/scan-codes/execute-choice` with a
+pointer (scheme, category, step index, choice index, escalation id) — and a
+pointer is never authority: the server re-reads live config, re-locates the
+row under the step's query, re-applies the identity gate, and runs the verb
+through the same atomic executors a direct scan uses. A row that moved on
+between render and tap answers `conflict`, exactly as a lost double-scan.
+
+A choice's `code` is a short printable token (letters, digits, underscore,
+dash) enabling double-scan selection: scan the object, then scan an action
+card. The station screen matches the second scan against the presented
+choices before treating it as a new code.
+
+A claim choice lands on the work: after `claim` or `claim-show-detail`
+executes, the station navigates to the escalation's detail page — the same
+form every operator uses to resolve, reject, or conclude the item.
+
+**One scan, one action.** A step with exactly one confirm-less choice can
+set `autoSelectSingle: true`: the scan executes the choice directly instead
+of presenting a one-button screen. The worker scans the item that just
+arrived at their bench and it is theirs, claimed for the configured
+duration, form on screen. An unsatisfied identity requirement never
+auto-fires as the wrong actor — the scan stops over at the badge screen and
+completes on its own once a badge primes.
+
+## Identity schemes and acting identity
+
+A scheme with `kind: "identity"` is the badge layer. Its `target_facet`
+names the `lt_users.metadata` key the scanned badge token matches (the demo
+binds `badge_id`) — resolution is only ever that metadata equality, so a
+printed username can never impersonate. Identity rules carry no steps;
+their `fallback` is the unknown-badge screen.
+
+A matching badge scan answers `identity_primed` with the person's display
+name, an expiry, and an **acting grant** — an ephemeral token
+(`eph:v1:acting_identity:…`) minted through the internal keystore under the
+scheme's policy:
+
+| Scheme field | Meaning |
+|---|---|
+| `grant_ttl_seconds` | How long the grant lives (1–86400). |
+| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n scan requests (a strict one-scan policy is `1`). |
+
+The grant rides subsequent scans as `actingToken`. Verbs then run **as the
+badged person under their own live RBAC** — the grant confers attribution,
+never privilege. A dead grant (expired, exhausted, revoked) is a loud
+`not_primed`, never a silent execution as the device. Scanning the next
+badge replaces the session's grant; passing `previousActingToken` revokes
+the outgoing one immediately.
+
+Steps and choices opt in with `requireActingIdentity: true`: the effective
+actor must be a real acting identity — a badge grant, or an authenticated
+user whose own write scope covers the step. When unsatisfied, the outcome
+is `not_primed` with the rule's `notPrimed` screen (a sibling of
+`fallback`): the "scan your badge" message, never a silent or misattributed
+action.
+
+## Station deployments
+
+A shared floor device (tablet + tethered scanner) signs in once as a
+station account — an ordinary user with `read_scope: 'all'` and
+`write_scope: 'none'` on the queues it fronts. Reads are free: the station
+holds a real seat with a queue view and an audit identity. Every mutation
+takes the badge layer, and `write_scope: 'none'` is the structural
+backstop — even a misconfigured rule cannot mutate as the station, because
+the RBAC write gate denies the account itself.
+
+Mutations attribute to the badged person (`assigned_to`, `resolved_by`)
+with the device recorded beside them (`scanStation` in the scan
+provenance) — every action individually owned and geographically placed.
+The dashboard's `/scan/station` route is the full-screen experience: idle
+("scan your badge / scan an item"), the primed chrome with the grant
+countdown, the info-choice screen, and the **badge stop-over** — the one
+identity moment the flow ever surfaces. When an action needs a person and
+none is primed (a withheld choice tapped, an auto-select scan, a grant that
+lapsed mid-flow), the screen becomes a single clear prompt: scan your badge
+to continue. The badge scan primes the session and the pending action
+completes on its own. With a live grant the stop-over never appears — the
+identity layer is invisible when all is well.
+
+Badge tokens are printed credentials: seed them as long random strings,
+bind them server-side (`lt_users.metadata`), and treat badge possession
+with the same physical policy as any badge system. Unknown badges answer
+`identity_unknown` and are auditable.
 
 ## The fallback screen
 
