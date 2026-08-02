@@ -168,6 +168,19 @@ async function ensureSideQuestRoles(): Promise<void> {
     await api('PATCH', '/api/roles/ship', { upstream_roles: [...upstreams, 'inserting'] });
   }
   console.log(`[${ts()}] Side-quest roles ready (ordering → inserting ⇒ ship)`);
+
+  // Declare each station's entity: the order is what moves through every one
+  // of these roles, so entity_facet = 'order_id' unlocks distinct-order
+  // counts, per-order dwell, and order timelines on the Pace Board. Set only
+  // where unset — an operator-configured entity is never overwritten.
+  let declared = 0;
+  for (const role of ALL_ROLES) {
+    const detail = (details?.roles ?? []).find((r: any) => r.role === role);
+    if (!detail || detail.entity_facet) continue;
+    await api('PATCH', `/api/roles/${role}`, { entity_facet: 'order_id' }).catch(() => { /* concurrent heal */ });
+    declared++;
+  }
+  if (declared > 0) console.log(`[${ts()}] Entity declared on ${declared} role(s): order_id`);
 }
 
 // ── Side-quest escalations (standalone rows — no workflow behind them) ────────
