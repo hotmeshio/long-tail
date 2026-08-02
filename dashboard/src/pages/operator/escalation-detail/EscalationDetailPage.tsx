@@ -14,7 +14,6 @@ import { ApiError } from '../../../api/client';
 import { isValidationErrorBody } from '../../../lib/validation';
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
 import { ScanConfirmModal } from '../../../components/scan/ScanConfirmModal';
-import { useEscalationTargets } from '../../../api/roles';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
@@ -98,7 +97,6 @@ function EscalationDetailView({ id }: { id: string }) {
   const escalate = useEscalateToRole();
   const cancel = useCancelEscalation();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const { data: escalationTargets } = useEscalationTargets(esc?.role ?? '');
   const { data: workflowConfigs } = useWorkflowConfigs();
   const { data: settings } = useSettings();
 
@@ -662,11 +660,6 @@ function EscalationDetailView({ id }: { id: string }) {
           resolveError={resolve.error as Error | null}
           requestTriage={requestTriage}
           triageNotes={triageNotes}
-          currentRole={esc.role}
-          escalationTargets={(escalationTargets?.targets ?? []).filter((r) => r !== esc.role)}
-          onEscalate={handleEscalate}
-          escalatePending={escalate.isPending}
-          escalateError={escalate.error as Error | null}
           onRelease={handleRelease}
           releasePending={claim.isPending}
           onCancel={() => setCancelModalOpen(true)}

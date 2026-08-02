@@ -23,7 +23,6 @@ export function createBulkHandlers(deps: {
   clearSelection: () => void;
   setPriority: UseMutationResult<{ updated: number }, Error, { ids: string[]; priority: 1 | 2 | 3 | 4 }>;
   bulkClaim: UseMutationResult<{ claimed: number; skipped: number }, Error, { ids: string[]; durationMinutes: number }>;
-  bulkEscalate: UseMutationResult<{ updated: number }, Error, { ids: string[]; targetRole: string }>;
   bulkTriage: UseMutationResult<{ triaged: number }, Error, { ids: string[]; hint?: string }>;
   bulkAssign: UseMutationResult<{ assigned: number; skipped: number }, Error, { ids: string[]; targetUserId: string; durationMinutes: number }>;
   bulkCancel: UseMutationResult<{ cancelled: number; skipped: number }, Error, { ids: string[] }>;
@@ -45,13 +44,6 @@ export function createBulkHandlers(deps: {
       deps.bulkClaim,
       deps.clearSelection,
     )({ ids: ids(), durationMinutes });
-  };
-
-  const handleBulkEscalate = (targetRole: string) => {
-    bulkHandler(
-      deps.bulkEscalate,
-      deps.clearSelection,
-    )({ ids: ids(), targetRole });
   };
 
   const handleBulkTriage = (hint?: string) => {
@@ -78,5 +70,5 @@ export function createBulkHandlers(deps: {
     )({ ids: ids() });
   };
 
-  return { handleSetPriority, handleBulkClaim, handleBulkEscalate, handleBulkTriage, handleBulkAssign, handleBulkCancel };
+  return { handleSetPriority, handleBulkClaim, handleBulkTriage, handleBulkAssign, handleBulkCancel };
 }

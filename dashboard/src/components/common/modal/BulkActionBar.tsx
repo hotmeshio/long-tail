@@ -9,20 +9,17 @@ interface BulkActionBarProps {
   onSetPriority: (priority: 1 | 2 | 3 | 4) => void;
   onClaim: (durationMinutes: number) => void;
   onAssign: () => void;
-  onEscalate: (targetRole: string) => void;
   onTriage: () => void;
   onCancel: () => void;
   isPriorityPending: boolean;
   isClaimPending: boolean;
   isAssignPending: boolean;
-  isEscalatePending: boolean;
   isTriagePending: boolean;
   isCancelPending: boolean;
-  availableRoles: string[];
 }
 
 const anyPending = (props: BulkActionBarProps) =>
-  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isEscalatePending || props.isTriagePending || props.isCancelPending;
+  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isTriagePending || props.isCancelPending;
 
 // One control chrome for the whole bar — white pill-free buttons on the band,
 // hairline border, a barely-there 3px radius (square reads timeless, not dated),
@@ -100,25 +97,6 @@ export function BulkActionBar(props: BulkActionBarProps) {
       <button onClick={props.onAssign} disabled={disabled} className={CTRL}>
         {props.isAssignPending ? 'Assigning…' : 'Assign to…'}
       </button>
-
-      {/* Escalate */}
-      {props.availableRoles.length > 0 && (
-        <select
-          onChange={(e) => {
-            if (!e.target.value) return;
-            props.onEscalate(e.target.value);
-            e.target.value = '';
-          }}
-          disabled={disabled}
-          className={SELECT}
-          defaultValue=""
-        >
-          <option value="" disabled>Escalate to…</option>
-          {props.availableRoles.map((role) => (
-            <option key={role} value={role}>{role}</option>
-          ))}
-        </select>
-      )}
 
       {/* Triage — LLM-powered, shown only when AI is enabled */}
       {aiEnabled && (

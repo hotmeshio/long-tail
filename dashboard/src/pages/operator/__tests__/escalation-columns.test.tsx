@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar, STATUS_OPTIONS, MetadataCell } from '../escalation-columns';
+import { ShellPanelProvider, useShellPanel } from '../../../hooks/useShellPanel';
 import type { LTEscalationRecord } from '../../../api/types';
 
 function makeEscalation(overrides: Partial<LTEscalationRecord> = {}): LTEscalationRecord {
@@ -250,5 +251,54 @@ describe('MetadataCell — native-type facet URLs', () => {
     expect(href).not.toContain('role=');
     const facets = JSON.parse(decodeURIComponent(new URLSearchParams(href.split('?')[1]).get('facets')!));
     expect(facets.crew_pill).toBe(true);
+  });
+});
+
+describe('MetadataCell — filter / search / history triad', () => {
+  /** Shows which claimant holds the shell right slot after a click. */
+  function PanelProbe() {
+    const shell = useShellPanel();
+    return <div data-testid="panel-owner">{shell.open ? shell.ownerKey : 'closed'}</div>;
+  }
+
+  function renderWithShell(metadata: Record<string, unknown>) {
+    render(
+      <MemoryRouter>
+        <ShellPanelProvider>
+          <MetadataCell metadata={metadata} role="print-station" />
+          <PanelProbe />
+        </ShellPanelProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('string values expose filter, search, and history affordances', () => {
+    renderWithShell({ serialNumber: 'SN-100' });
+    expect(screen.getByTitle(/Filter print-station: serialNumber = SN-100/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Search all: serialNumber = SN-100/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Timeline: every station SN-100 has moved through/)).toBeInTheDocument();
+  });
+
+  it('history opens the entity timeline panel in the shell slot', () => {
+    renderWithShell({ serialNumber: 'SN-100' });
+    expect(screen.getByTestId('panel-owner').textContent).toBe('closed');
+    fireEvent.click(screen.getByTitle(/Timeline: every station SN-100 has moved through/));
+    expect(screen.getByTestId('panel-owner').textContent).toBe('entity-timeline');
+  });
+
+  it('keeps filter and search but withholds history for non-string values', () => {
+    renderWithShell({ confidence: 0.95 });
+    expect(screen.getByTitle(/Filter print-station: confidence = 0.95/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Search all: confidence = 0.95/)).toBeInTheDocument();
+    expect(screen.queryByTitle(/Timeline:/)).not.toBeInTheDocument();
+  });
+
+  it('withholds the history affordance outside the shell', () => {
+    render(
+      <MemoryRouter>
+        <MetadataCell metadata={{ serialNumber: 'SN-100' }} role="print-station" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTitle(/Timeline:/)).not.toBeInTheDocument();
   });
 });

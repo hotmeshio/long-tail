@@ -13,16 +13,13 @@ function defaultProps(): React.ComponentProps<typeof BulkActionBar> {
     onSetPriority: vi.fn(),
     onClaim: vi.fn(),
     onAssign: vi.fn(),
-    onEscalate: vi.fn(),
     onTriage: vi.fn(),
     isPriorityPending: false,
     isClaimPending: false,
     isAssignPending: false,
-    isEscalatePending: false,
     isTriagePending: false,
     onCancel: vi.fn(),
     isCancelPending: false,
-    availableRoles: ['reviewer', 'engineer'],
   };
 }
 

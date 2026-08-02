@@ -14,11 +14,11 @@ import { useClaimDurations } from '../../../hooks/useClaimDurations';
 
 export type ActionBarMode =
   | 'available'       // unclaimed — show claim controls
-  | 'claimed_by_me'   // I own it — show resolve/escalate/release
+  | 'claimed_by_me'   // I own it — show resolve/release
   | 'claimed_by_other'// someone else has it
   | 'terminal';       // resolved or cancelled — nothing to do
 
-export type ActiveView = 'resolve' | 'escalate' | 'release';
+export type ActiveView = 'resolve' | 'release';
 
 export interface EscalationActionBarProps {
   mode: ActionBarMode;
@@ -40,12 +40,6 @@ export interface EscalationActionBarProps {
   // Triage (controlled by parent — callout + overlay render in page body)
   requestTriage: boolean;
   triageNotes: string;
-  // Escalate
-  currentRole: string;
-  escalationTargets: string[];
-  onEscalate: (role: string) => void;
-  escalatePending: boolean;
-  escalateError: Error | null;
   // Release
   onRelease: () => void;
   releasePending: boolean;
@@ -78,7 +72,6 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     onClaim, claimPending, claimNudge,
     workflowType, json, onResolve, resolvePending, resolveError,
     requestTriage, triageNotes,
-    currentRole, escalationTargets, onEscalate, escalatePending, escalateError,
     onRelease, releasePending,
     onCancel,
     assignedTo, assignedUntil,
@@ -94,7 +87,6 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
   const [duration, setDuration] = useState('30');
   const [customMinutes, setCustomMinutes] = useState(0);
   const [parseError, setParseError] = useState('');
-  const [escalateTarget, setEscalateTarget] = useState('');
 
   const isCustom = duration === 'custom';
   const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
@@ -226,14 +218,6 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               >
                 {workflowType ? 'Resolve' : 'Acknowledge'}
               </button>
-              {escalationTargets.length > 0 && (
-                <button
-                  onClick={() => onActiveViewChange('escalate')}
-                  className={tabClass(activeView === 'escalate')}
-                >
-                  {labels.escalate ?? 'Escalate'}
-                </button>
-              )}
               <button
                 onClick={() => onActiveViewChange('release')}
                 className={`text-xs transition-colors ${activeView === 'release' ? 'text-status-error font-medium' : 'text-text-tertiary hover:text-status-error'}`}
@@ -268,35 +252,6 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                     ? (workflowType ? 'Submitting...' : 'Acknowledging...')
                     : requestTriage ? 'Send to Triage'
                     : (labels.submit ?? (workflowType ? 'Submit' : 'Acknowledge'))}
-                </button>
-              </div>
-            )}
-
-            {/* ── Escalate controls ── */}
-            {activeView === 'escalate' && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-text-secondary">
-                  From <span className="font-medium text-text-primary">{currentRole}</span> to
-                </span>
-                <select
-                  value={escalateTarget}
-                  onChange={(e) => setEscalateTarget(e.target.value)}
-                  className="select text-xs"
-                  data-testid="escalate-select"
-                >
-                  <option value="">Select role...</option>
-                  {escalationTargets.map((role) => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-                <div className="flex-1" />
-                {escalateError && <span className="text-xs text-status-error">{escalateError.message}</span>}
-                <button
-                  onClick={() => onEscalate(escalateTarget)}
-                  disabled={!escalateTarget || escalatePending}
-                  className="btn-primary text-xs"
-                >
-                  {escalatePending ? 'Escalating...' : (labels.escalate ?? 'Escalate')}
                 </button>
               </div>
             )}

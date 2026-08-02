@@ -24,11 +24,6 @@ function renderBar(overrides: Partial<EscalationActionBarProps> = {}) {
     resolveError: null,
     requestTriage: false,
     triageNotes: '',
-    currentRole: 'reviewer',
-    escalationTargets: ['supervisor'],
-    onEscalate: vi.fn(),
-    escalatePending: false,
-    escalateError: null,
     onRelease: vi.fn(),
     releasePending: false,
     onCancel: vi.fn(),
@@ -57,13 +52,12 @@ describe('EscalationActionBar — x-lt-labels overrides', () => {
     expect(screen.queryByText('Claim')).not.toBeInTheDocument();
   });
 
-  it('overrides submit, escalate, release, and cancel in the claimed bar', () => {
+  it('overrides submit, release, and cancel in the claimed bar', () => {
     renderBar({
       mode: 'claimed_by_me',
-      labels: { submit: 'Approve', escalate: 'Send up', release: 'Hand back', cancel: 'Discard' },
+      labels: { submit: 'Approve', release: 'Hand back', cancel: 'Discard' },
     });
     expect(screen.getByText('Approve')).toBeInTheDocument();
-    expect(screen.getByText('Send up')).toBeInTheDocument();
     expect(screen.getByText('Hand back')).toBeInTheDocument();
     expect(screen.getByText('Discard')).toBeInTheDocument();
     expect(screen.queryByText('Submit')).not.toBeInTheDocument();

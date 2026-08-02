@@ -28,11 +28,6 @@ function renderBar(overrides: Partial<EscalationActionBarProps> = {}) {
     resolveError: null,
     requestTriage: false,
     triageNotes: '',
-    currentRole: 'reviewer',
-    escalationTargets: ['supervisor'],
-    onEscalate: vi.fn(),
-    escalatePending: false,
-    escalateError: null,
     onRelease: vi.fn(),
     releasePending: false,
     onCancel: vi.fn(),
@@ -225,27 +220,20 @@ describe('EscalationActionBar', () => {
     expect(onValidationErrors.mock.calls[0][0].some((e: { field: string }) => e.field === 'notes')).toBe(true);
   });
 
-  // ── Claimed by me: escalate ──
-  it('switches to escalate view', () => {
+  // ── Claimed by me: view tabs ──
+  it('offers only resolve, release, and cancel views when claimed', () => {
+    renderBar({ mode: 'claimed_by_me' });
+    expect(screen.getByText('Resolve')).toBeInTheDocument();
+    expect(screen.getByText('Release')).toBeInTheDocument();
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
+    expect(screen.queryByText('Escalate')).not.toBeInTheDocument();
+  });
+
+  it('switches to release view via the tab', () => {
     const onActiveViewChange = vi.fn();
     renderBar({ mode: 'claimed_by_me', onActiveViewChange });
-    fireEvent.click(screen.getByText('Escalate'));
-    expect(onActiveViewChange).toHaveBeenCalledWith('escalate');
-  });
-
-  it('calls onEscalate with selected role', () => {
-    const onEscalate = vi.fn();
-    renderBar({ mode: 'claimed_by_me', activeView: 'escalate', onEscalate });
-
-    fireEvent.change(screen.getByTestId('escalate-select'), { target: { value: 'supervisor' } });
-    const buttons = screen.getAllByText('Escalate');
-    fireEvent.click(buttons[buttons.length - 1]);
-    expect(onEscalate).toHaveBeenCalledWith('supervisor');
-  });
-
-  it('hides escalate tab when no targets', () => {
-    renderBar({ mode: 'claimed_by_me', escalationTargets: [] });
-    expect(screen.queryByText('Escalate')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Release'));
+    expect(onActiveViewChange).toHaveBeenCalledWith('release');
   });
 
   // ── Claimed by me: release ──
