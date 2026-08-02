@@ -128,4 +128,30 @@ describe('buildTimelineQuery', () => {
     expect(built.sql).toMatch(/created_at < \$\d+::timestamptz/);
     expect(built.sql).toMatch(/LEAST\(NOW\(\), \$\d+::timestamptz\)/);
   });
+
+  it('order desc + before pages a long history recent-first', () => {
+    const before = new Date(Date.now() - 60_000);
+    const built = buildTimelineQuery({
+      facet: { key: 'serialNumber', value: 'SN-1' },
+      order: 'desc',
+      before,
+      limit: 100,
+    });
+    expect(built.sql).toContain('ORDER BY created_at DESC');
+    expect(built.sql).toMatch(/created_at < \$\d+::timestamptz/);
+    expect(built.params).toContain(before.toISOString());
+    expect(built.pageLimit).toBe(100);
+    expect(built.params).toContain(101); // overflow probe
+  });
+
+  it('order defaults to asc (wire-compatible) and rejects unknown directions', () => {
+    const built = buildTimelineQuery({ facet: { key: 'serialNumber', value: 'SN-1' } });
+    expect(built.sql).toContain('ORDER BY created_at ASC');
+    expect(() =>
+      buildTimelineQuery({ facet: { key: 'serialNumber', value: 'SN-1' }, order: 'newest' as any }),
+    ).toThrow(AnalyticsInputError);
+    expect(() =>
+      buildTimelineQuery({ facet: { key: 'serialNumber', value: 'SN-1' }, before: 'not-a-time' }),
+    ).toThrow(/parseable/);
+  });
 });

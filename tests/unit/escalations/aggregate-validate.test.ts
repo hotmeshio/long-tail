@@ -51,6 +51,21 @@ describe('requireCleanFilter', () => {
     const q = { roles: ['a'], facets: { model: 'h2s' }, exists: ['serialNumber'] };
     expect(requireCleanFilter(q)).toBe(q);
   });
+
+  it('validates prefix keys and values loudly', () => {
+    expect(() => requireCleanFilter({ prefix: { 'bad key': 'x' } })).toThrow(AnalyticsInputError);
+    expect(() => requireCleanFilter({ prefix: { serialNumber: '' } })).toThrow(/non-empty string/);
+    expect(requireCleanFilter({ prefix: { serialNumber: 'PRN' } })).toBeTruthy();
+  });
+
+  it('validates anyOf shape, keys, and the page-size cap', () => {
+    expect(() => requireCleanFilter({ anyOf: [] })).toThrow(/non-empty array/);
+    expect(() => requireCleanFilter({ anyOf: [{}] })).toThrow(/non-empty facet objects/);
+    expect(() => requireCleanFilter({ anyOf: [{ 'bad key': 1 }] })).toThrow(AnalyticsInputError);
+    const oversized = Array.from({ length: 201 }, (_, i) => ({ serialNumber: `S${i}` }));
+    expect(() => requireCleanFilter({ anyOf: oversized })).toThrow(/maximum is 200/);
+    expect(requireCleanFilter({ anyOf: [{ serialNumber: 'PRN-001' }] })).toBeTruthy();
+  });
 });
 
 describe('requireFacetKey / resolveLiveStatuses', () => {

@@ -25,6 +25,7 @@ import {
   resolveGroupBy,
   resolveLiveStatuses,
   resolvePage,
+  resolveTimelinePage,
   resolveWindow,
   validateStates,
 } from './aggregate-validate';
@@ -278,6 +279,7 @@ export function buildTimelineQuery(input: TimelineByFacetInput): BuiltTimelineQu
   const live = resolveLiveStatuses(input.liveStatuses);
   const liveList = statusLiterals(live);
   const win = resolveWindow(input.window);
+  const { order, before } = resolveTimelinePage(input.order, input.before);
   const { pageLimit } = resolvePage(input.limit, undefined);
 
   // GIN-served entity match; buildFacetWhere composes any extra filter after it.
@@ -292,6 +294,12 @@ export function buildTimelineQuery(input: TimelineByFacetInput): BuiltTimelineQu
     clauses.push(`created_at < ${toP}`, overlapsAfter(liveList, fromP));
     clampEnd = `LEAST(NOW(), ${toP})`;
   }
+  // The "load earlier" cursor: strictly-older intervals than the oldest the
+  // client already holds. One entity's rows are few; the sort is trivial.
+  if (before) {
+    params.push(before.toISOString());
+    clauses.push(`created_at < $${params.length}::timestamptz`);
+  }
   const ended = endedAtExpr(liveList);
   const facetSelect = facets.map((key) => `(metadata->>'${key}') AS ${facetAlias(key)}`);
   params.push(pageLimit + 1);
@@ -301,7 +309,7 @@ export function buildTimelineQuery(input: TimelineByFacetInput): BuiltTimelineQu
        EXTRACT(EPOCH FROM (COALESCE(${ended}, ${clampEnd}) - created_at))::float8 AS duration_seconds
 FROM public.lt_escalations
 WHERE ${clauses.join('\n  AND ')}
-ORDER BY created_at ASC
+ORDER BY created_at ${order === 'desc' ? 'DESC' : 'ASC'}
 LIMIT $${params.length}`;
   return { sql, params, pageLimit, columns, facets, nowAnchored: !win || win.nowAnchored };
 }

@@ -95,6 +95,30 @@ describe('timelineByFacet', () => {
     expect(data.intervals.map((i: any) => i.subtype)).toEqual(['working', 'finish']);
   });
 
+  it('desc + before pages walk the whole history and equal the asc journey reversed', async () => {
+    const { data: asc } = await api.post('/api/escalations/timeline-by-facet', {
+      facet: { key: 'unitSerial', value: SERIAL },
+    });
+    const expected = asc.intervals.map((i: any) => i.startedAt).reverse();
+
+    // Page recent-first, one interval at a time, cursoring on the oldest loaded.
+    const walked: string[] = [];
+    let before: string | undefined;
+    for (let hop = 0; hop < 10; hop++) {
+      const { data: page } = await api.post('/api/escalations/timeline-by-facet', {
+        facet: { key: 'unitSerial', value: SERIAL },
+        order: 'desc',
+        limit: 1,
+        ...(before ? { before } : {}),
+      });
+      if (page.intervals.length === 0) break;
+      walked.push(...page.intervals.map((i: any) => i.startedAt));
+      before = page.intervals[page.intervals.length - 1].startedAt;
+      if (!page.overflow) break;
+    }
+    expect(walked).toEqual(expected);
+  });
+
   it('select.facets projects extra metadata per interval', async () => {
     const { data } = await api.post('/api/escalations/timeline-by-facet', {
       facet: { key: 'unitSerial', value: SERIAL },

@@ -192,6 +192,7 @@ const TIMELINE_COLUMNS = [
 
 export async function aggregateByFacets(opts: {
   role?: string; roles?: string; entity?: string; facets?: string; exists?: string;
+  prefix?: string; anyOf?: string;
   groupColumns?: string; groupFacets?: string; groupState?: boolean;
   asOf?: string; window?: string; distinctBy?: string; liveStatuses?: string;
   orderBy?: string; limit?: string; offset?: string; json?: boolean;
@@ -202,6 +203,8 @@ export async function aggregateByFacets(opts: {
   if (opts.entity) query.entity = opts.entity;
   if (opts.facets) query.facets = parseJsonOption('--facets', opts.facets);
   if (opts.exists) query.exists = parseJsonOption('--exists', opts.exists);
+  if (opts.prefix) query.prefix = parseJsonOption('--prefix', opts.prefix);
+  if (opts.anyOf) query.anyOf = parseJsonOption('--any-of', opts.anyOf);
   const groupBy: any = {};
   if (opts.groupColumns) groupBy.columns = opts.groupColumns.split(',').map((s) => s.trim());
   if (opts.groupFacets) groupBy.facets = opts.groupFacets.split(',').map((s) => s.trim());
@@ -226,13 +229,15 @@ export async function aggregateByFacets(opts: {
 
 export async function timelineByFacet(key: string, value: string, opts: {
   roles?: string; entity?: string; from?: string; to?: string;
-  selectFacets?: string; limit?: string; json?: boolean;
+  selectFacets?: string; order?: string; before?: string; limit?: string; json?: boolean;
 }): Promise<void> {
   const body: any = { facet: { key, value } };
   if (opts.entity) body.query = { entity: opts.entity };
   else if (opts.roles) body.query = { roles: parseJsonOption('--roles', opts.roles) };
   if (opts.from && opts.to) body.window = { from: opts.from, to: opts.to };
   if (opts.selectFacets) body.select = { facets: opts.selectFacets.split(',').map((s) => s.trim()) };
+  if (opts.order) body.order = opts.order;
+  if (opts.before) body.before = opts.before;
   if (opts.limit) body.limit = parseInt(opts.limit, 10);
   const data = await apiFetch<any>('/escalations/timeline-by-facet', {
     method: 'POST',

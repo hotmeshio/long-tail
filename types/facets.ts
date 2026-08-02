@@ -36,12 +36,25 @@ export interface FacetQuery {
   roles?: string[];
   /** metadata @> facets — required facets (AND), GIN-served. */
   facets?: Record<string, any>;
+  /**
+   * metadata @> ANY(anyOf) — the row carries at least one of these facet sets
+   * (OR), GIN-served; the positive mirror of `block`. Targets an explicit set
+   * of entities (e.g. the current page of an entity table) in one query.
+   */
+  anyOf?: Record<string, any>[];
   /** NOT (metadata @> ANY(block)) — exclude units carrying any of these facet sets. */
   block?: Record<string, any>[];
   /** Numeric range predicates over metadata facets. */
   range?: FacetRange[];
   /** metadata ? key — facet must be present. */
   exists?: string[];
+  /**
+   * Case-insensitive prefix match on facet VALUES: metadata->>key ILIKE
+   * '<value>%' (LIKE wildcards in the value are escaped). Rides the same
+   * bounded scans as the rest of the filter — the locate affordance for
+   * entity keys (type or scan the leading characters of a serial).
+   */
+  prefix?: Record<string, string>;
   status?: string;
   /** true = only available (unclaimed/expired); false = only held now. */
   available?: boolean;

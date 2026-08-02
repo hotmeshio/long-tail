@@ -740,6 +740,8 @@ const analyticsFilterSchema = z.object({
   roles: z.array(z.string()).optional().describe('Multiple pond roles; no role at all spans every pond (global principals only)'),
   entity: z.string().optional().describe("An entity facet key (e.g. serialNumber): resolves server-side to every role declaring it as entity_facet — the entity's SYSTEM. Mutually exclusive with role/roles."),
   facets: z.record(z.any()).optional().describe('Metadata facet equality filters (metadata @> containment)'),
+  anyOf: z.array(z.record(z.any())).optional().describe('Rows carrying ANY of these facet sets (OR, GIN-served; max 200 entries) — target an explicit entity set, e.g. one table page'),
+  prefix: z.record(z.string()).optional().describe("Case-insensitive prefix match on facet VALUES (metadata->>key ILIKE 'value%') — the locate affordance for entity keys"),
   block: z.array(z.record(z.any())).optional().describe('Exclude rows carrying ANY of these facet sets'),
   range: z.array(z.object({
     facet: z.string(),
@@ -803,6 +805,8 @@ export const timelineByFacetSchema = z.object({
     facets: z.array(z.string()).optional(),
   }).optional().describe('Columns/facets to surface per interval (default: all three columns)'),
   liveStatuses: z.array(z.string()).optional().describe("Statuses considered live (default ['pending'])"),
+  order: z.enum(['asc', 'desc']).optional().describe("Interval ordering by start instant (default asc); desc + before pages a long history recent-first"),
+  before: z.string().optional().describe('Strict upper bound on startedAt (ISO instant) — the "load earlier" cursor'),
   limit: z.number().int().min(1).optional(),
 });
 

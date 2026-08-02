@@ -74,6 +74,19 @@ describe('ltc esc aggregate-facets — flag → body mapping', () => {
     await expect(aggregateByFacets({ roles: 'not-json' })).rejects.toThrow(/--roles/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('maps --prefix and --any-of onto the filter', async () => {
+    await aggregateByFacets({
+      entity: 'serialNumber',
+      prefix: '{"serialNumber":"PRN-00"}',
+      anyOf: '[{"serialNumber":"PRN-001"}]',
+    });
+    expect(sentBody().query).toEqual({
+      entity: 'serialNumber',
+      prefix: { serialNumber: 'PRN-00' },
+      anyOf: [{ serialNumber: 'PRN-001' }],
+    });
+  });
 });
 
 describe('ltc esc timeline — flag → body mapping', () => {
@@ -98,6 +111,20 @@ describe('ltc esc timeline — flag → body mapping', () => {
       window: { from: '2026-08-01T00:00:00Z', to: '2026-08-01T12:00:00Z' },
       select: { facets: ['model', 'pdac'] },
       limit: 50,
+    });
+  });
+
+  it('maps --order and --before for recent-first paging', async () => {
+    await timelineByFacet('serialNumber', 'SN-1', {
+      order: 'desc',
+      before: '2026-08-01T09:15:00Z',
+      limit: '100',
+    });
+    expect(sentBody()).toEqual({
+      facet: { key: 'serialNumber', value: 'SN-1' },
+      order: 'desc',
+      before: '2026-08-01T09:15:00Z',
+      limit: 100,
     });
   });
 });

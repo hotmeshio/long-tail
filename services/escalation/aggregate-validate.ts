@@ -30,6 +30,8 @@ const VALID_STATUSES = new Set(['pending', 'resolved', 'cancelled', 'expired']);
 const RANGE_OPS = new Set(['<', '<=', '>', '>=', '=']);
 /** Clock-skew tolerance when rejecting a future asOf. */
 const FUTURE_SKEW_MS = 5_000;
+/** anyOf targets an explicit entity set (a table page) — never an unbounded list. */
+const MAX_ANY_OF = 200;
 
 export function requireFacetKey(key: string, label: string): string {
   if (typeof key !== 'string' || !FACET_KEY.test(key)) {
@@ -105,7 +107,41 @@ export function requireCleanFilter(
   for (const key of q.exists ?? []) {
     requireFacetKey(key, `${label}.exists key`);
   }
+  for (const [key, value] of Object.entries(q.prefix ?? {})) {
+    requireFacetKey(key, `${label}.prefix key`);
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new AnalyticsInputError(`${label}.prefix["${key}"] must be a non-empty string`);
+    }
+  }
+  if (q.anyOf !== undefined) {
+    if (!Array.isArray(q.anyOf) || q.anyOf.length === 0) {
+      throw new AnalyticsInputError(`${label}.anyOf must be a non-empty array of facet sets`);
+    }
+    if (q.anyOf.length > MAX_ANY_OF) {
+      throw new AnalyticsInputError(`${label}.anyOf holds ${q.anyOf.length} entries; the maximum is ${MAX_ANY_OF} — page the target set`);
+    }
+    for (const entry of q.anyOf) {
+      if (!entry || typeof entry !== 'object' || Object.keys(entry).length === 0) {
+        throw new AnalyticsInputError(`${label}.anyOf entries must be non-empty facet objects`);
+      }
+      for (const key of Object.keys(entry)) requireFacetKey(key, `${label}.anyOf key`);
+    }
+  }
   return q;
+}
+
+/** Timeline paging direction; `before` is a strict created_at upper bound. */
+export function resolveTimelinePage(
+  order: 'asc' | 'desc' | undefined,
+  before: Date | string | undefined,
+): { order: 'asc' | 'desc'; before: Date | null } {
+  if (order !== undefined && order !== 'asc' && order !== 'desc') {
+    throw new AnalyticsInputError('order must be "asc" or "desc"');
+  }
+  return {
+    order: order ?? 'asc',
+    before: before === undefined ? null : toInstant(before, 'before'),
+  };
 }
 
 export function toInstant(value: Date | string, label: string): Date {

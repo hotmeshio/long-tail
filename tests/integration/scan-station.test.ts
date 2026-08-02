@@ -39,9 +39,11 @@ beforeAll(async () => {
       distinctBy: 'serialNumber',
     }).catch(() => ({ data: { groups: [] } })); // dials not declared yet → 400 → keep polling
     return (data.groups?.[0]?.count ?? 0) >= 6 ? true : null;
-  }, 120_000);
+    // The flagship seed is ~100 engine calls behind every other seeder — a
+    // cold multi-container boot can take a few minutes to finish it.
+  }, 240_000);
   log('setup', 'station + associate ready');
-}, 180_000);
+}, 300_000);
 
 describe('the read-only station', () => {
   it('an object scan presents reality with mutating choices withheld', async () => {
