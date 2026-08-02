@@ -10,7 +10,7 @@ import { assignMixColors } from './mix-colors';
 import { StationMixBar } from './StationMixBar';
 import { EntityLensView } from './EntityLensView';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { SegmentedTabs } from '../../components/common/layout/SegmentedTabs';
+import { ViewMenu } from './ViewMenu';
 import {
   PaceChart,
   ACTIVE_COLOR,
@@ -837,18 +837,12 @@ export function OperationsPage() {
               )}
             </div>
             {entityLenses.length > 0 && (
-              <div
-                className="px-4 pt-1 pb-0.5"
-                title="Lens: the board station-first, or an entity system (roles sharing an entity facet) entity-first"
-              >
-                <SegmentedTabs
-                  aria-label="Board lens"
-                  tabs={[
-                    { key: 'stations', label: 'Stations' },
-                    ...entityLenses.map((lens) => ({ key: lens, label: `by ${lens}` })),
-                  ]}
-                  active={activeLens ?? 'stations'}
-                  onChange={(key) => selectLens(key === 'stations' ? null : key)}
+              <div className="px-4 pt-2 pb-0.5">
+                <ViewMenu
+                  lenses={entityLenses}
+                  activeLens={activeLens}
+                  stationCount={ordered.length}
+                  onSelect={selectLens}
                 />
               </div>
             )}
