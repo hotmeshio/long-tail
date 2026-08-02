@@ -3,6 +3,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAccess } from '../../../hooks/useAccess';
+import { useActingIdentity } from '../../../hooks/useActingIdentity';
+import { useScanEnabled } from '../../../hooks/useScanInput';
 import {
   useEscalation,
   useClaimEscalation,
@@ -87,6 +89,12 @@ export function EscalationDetailPage() {
 
 function EscalationDetailView({ id }: { id: string }) {
   const { user } = useAuth();
+  const { identity: acting } = useActingIdentity();
+  const scanEnabled = useScanEnabled();
+  // The badge grant outranks the session: whoever badged in owns the claim
+  // comparisons here, and the mutations they fire ride the acting header so
+  // the server attributes them to the same person.
+  const effectiveActorId = acting?.actorId ?? user?.userId;
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -256,7 +264,7 @@ function EscalationDetailView({ id }: { id: string }) {
       try {
         const params = new URLSearchParams({
           parent_id: id,
-          assigned_to: user?.userId ?? '',
+          assigned_to: effectiveActorId ?? '',
           status: 'pending',
           limit: '1',
         });
@@ -284,7 +292,7 @@ function EscalationDetailView({ id }: { id: string }) {
       }
     }, waiting.maxWaitSeconds * 1000);
     return () => window.clearTimeout(timer);
-  }, [waiting, id, user?.userId, navigate, queryClient]);
+  }, [waiting, id, effectiveActorId, navigate, queryClient]);
 
   // Fire the list-driven auto-start once. The escalation must be loaded, still
   // claimable (pending, no live claim), and — when it carries a form — seeded so
@@ -309,11 +317,11 @@ function EscalationDetailView({ id }: { id: string }) {
     if (autoResolveFiredRef.current) return;
     if (!submitGuardDef?.autoResolveWhenEmpty || !submitGuard.confirmedEmpty) return;
     if (!esc || esc.status !== 'pending' || !isEffectivelyClaimed(esc)) return;
-    if (esc.assigned_to !== user?.userId) return;
+    if (esc.assigned_to !== effectiveActorId) return;
     if (json === '{}') return;
     autoResolveFiredRef.current = true;
     autoResolveActionRef.current?.();
-  }, [submitGuard.confirmedEmpty, submitGuardDef, esc, json, user?.userId]);
+  }, [submitGuard.confirmedEmpty, submitGuardDef, esc, json, effectiveActorId]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
@@ -331,7 +339,7 @@ function EscalationDetailView({ id }: { id: string }) {
   }
 
   const claimed = isEffectivelyClaimed(esc);
-  const claimedByMe = claimed && esc.assigned_to === user?.userId;
+  const claimedByMe = claimed && esc.assigned_to === effectiveActorId;
   const claimedByOther = claimed && !claimedByMe;
   const isTerminal = esc.status === 'resolved' || esc.status === 'cancelled';
 
@@ -665,6 +673,8 @@ function EscalationDetailView({ id }: { id: string }) {
           onCancel={() => setCancelModalOpen(true)}
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
+          actingName={acting && claimedByMe ? acting.displayName : null}
+          badgePrompt={scanEnabled && !acting && claimedByOther}
           onSubmitAttempt={() => setSubmitAttempted(true)}
           onValidationErrors={(errors) => {
             setFormErrors(errors);

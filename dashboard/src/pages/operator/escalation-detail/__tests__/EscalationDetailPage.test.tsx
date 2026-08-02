@@ -2,6 +2,7 @@ import { screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { renderWithProviders } from '../../../../test/render';
+import { ActingIdentityProvider } from '../../../../hooks/useActingIdentity';
 import { EscalationDetailPage } from '../EscalationDetailPage';
 
 const state = vi.hoisted(() => {
@@ -125,7 +126,12 @@ function renderAt(entries: string[], initialIndex = entries.length - 1) {
     [{ path: '/escalations/detail/:id', element: <EscalationDetailPage /> }],
     { initialEntries: entries, initialIndex },
   );
-  return { router, ...renderWithProviders(<RouterProvider router={router} />) };
+  return {
+    router,
+    ...renderWithProviders(
+      <ActingIdentityProvider><RouterProvider router={router} /></ActingIdentityProvider>,
+    ),
+  };
 }
 
 describe('EscalationDetailPage — per-id state isolation', () => {

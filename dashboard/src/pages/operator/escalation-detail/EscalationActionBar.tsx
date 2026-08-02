@@ -1,66 +1,12 @@
 import { useState, useCallback } from 'react';
-import { type ShowIfContext } from '../../../lib/x-lt-show-if';
-import { type FieldError } from '../../../lib/field-validator';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
-import { type FooterLabels } from '../../../lib/x-lt-labels';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
 import { CustomDurationPicker } from '../../../components/common/form/CustomDurationPicker';
 import { useClaimDurations } from '../../../hooks/useClaimDurations';
+import type { EscalationActionBarProps } from './action-bar-types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type ActionBarMode =
-  | 'available'       // unclaimed — show claim controls
-  | 'claimed_by_me'   // I own it — show resolve/release
-  | 'claimed_by_other'// someone else has it
-  | 'terminal';       // resolved or cancelled — nothing to do
-
-export type ActiveView = 'resolve' | 'release';
-
-export interface EscalationActionBarProps {
-  mode: ActionBarMode;
-  // Active view (controlled by parent)
-  activeView: ActiveView;
-  onActiveViewChange: (view: ActiveView) => void;
-  // Claim
-  onClaim: (minutes: number) => void;
-  claimPending: boolean;
-  /** Bumped when the user clicks the locked form — each bump replays the
-   *  claim button's wiggle to point at the gesture that unlocks it. */
-  claimNudge?: number;
-  // Resolve — JSON lives in viewport, bar reads it for submit
-  workflowType: string | null;
-  json: string;
-  onResolve: (payload: Record<string, unknown>) => void;
-  resolvePending: boolean;
-  resolveError: Error | null;
-  // Triage (controlled by parent — callout + overlay render in page body)
-  requestTriage: boolean;
-  triageNotes: string;
-  // Release
-  onRelease: () => void;
-  releasePending: boolean;
-  // Cancel (opens confirm modal in parent)
-  onCancel: () => void;
-  // Other user
-  assignedTo?: string | null;
-  assignedUntil?: string | null;
-  // Validation
-  onSubmitAttempt?: () => void;
-  /** Called with structured errors when submit is blocked by validation. */
-  onValidationErrors?: (errors: FieldError[]) => void;
-  /** Escalation context — used to skip required checks on fields hidden by x-lt-showIf. */
-  escalationContext?: ShowIfContext;
-  /** Footer copy overrides from the form's `x-lt-labels`. Absent targets keep their defaults. */
-  labels?: FooterLabels;
-  /** The page-owned x-lt-submit-guard block state — submit stays disabled while true. */
-  submitBlocked?: boolean;
-  /** Message shown beside the disabled submit while the guard blocks. */
-  submitBlockedMessage?: string;
-}
+export type { ActionBarMode, ActiveView, EscalationActionBarProps } from './action-bar-types';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -81,6 +27,8 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     labels = {},
     submitBlocked,
     submitBlockedMessage,
+    actingName,
+    badgePrompt,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -204,6 +152,14 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               Claimed by <span className="font-medium text-text-primary">{assignedTo ? <UserName userId={assignedTo} /> : 'unknown'}</span>
             </p>
             {assignedUntil && <CountdownTimer until={assignedUntil} />}
+            {/* An expired badge grant on submit lands here: the acting state
+                cleared, the server's answer surfaces, and a fresh scan retries. */}
+            {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
+            {badgePrompt && (
+              <p className="text-xs text-text-tertiary" data-testid="badge-prompt">
+                If this is your claim, scan your badge.
+              </p>
+            )}
           </div>
         )}
 
@@ -235,6 +191,13 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
             {/* ── Resolve controls ── */}
             {activeView === 'resolve' && (
               <div className="flex items-center gap-4">
+                {/* The badged person's claim: name the identity the submit acts as. */}
+                {actingName && (
+                  <p className="text-sm text-text-secondary" data-testid="acting-claim-note">
+                    Claimed by you <span className="font-medium text-text-primary">({actingName})</span>
+                  </p>
+                )}
+                {actingName && assignedUntil && <CountdownTimer until={assignedUntil} />}
                 <div className="flex-1" />
                 {parseError && <span className="text-xs text-status-error">{parseError}</span>}
                 {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}

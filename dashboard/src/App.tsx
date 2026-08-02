@@ -137,6 +137,9 @@ const ScanCodesPage = lazy(() =>
 const ScanSchemeDetailPage = lazy(() =>
   import('./pages/admin/scan-codes/ScanSchemeDetailPage').then((m) => ({ default: m.ScanSchemeDetailPage })),
 );
+const ScanStationPage = lazy(() =>
+  import('./pages/scan/ScanStationPage').then((m) => ({ default: m.ScanStationPage })),
+);
 const MaintenancePage = lazy(() =>
   import('./pages/admin/maintenance').then((m) => ({ default: m.MaintenancePage })),
 );
@@ -274,6 +277,9 @@ const router = createBrowserRouter([
       { path: 'escalations/available', element: <Lazy><AvailableEscalationsPage /></Lazy> },
       { path: 'escalations/queue', element: <Lazy><OperatorDashboard /></Lazy> },
       { path: 'escalations/detail/:id', element: <Lazy><EscalationDetailPage /></Lazy> },
+
+      // Scan station (all authenticated users) — badge + item surface
+      { path: 'scan/station', element: <Lazy><ScanStationPage /></Lazy> },
 
       // Capabilities (all authenticated users)
       { path: 'capabilities', element: <Lazy><CapabilitiesPage /></Lazy> },

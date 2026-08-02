@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X, ScanBarcode } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { useScanInput } from '../../hooks/useScanInput';
-import { SCAN_OUTCOMES } from '../../api/scan-codes';
-import { OUTCOME_LABELS, OUTCOME_TONE } from './outcome-display';
+import { OUTCOME_TONE, outcomeHeadline, outcomeMarkdown } from './outcome-display';
 import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
 
 /**
@@ -159,13 +158,12 @@ export function ScanPanel({ onClose }: { onClose: () => void }) {
             {response ? (
               <>
                 <div className={`text-sm font-medium ${OUTCOME_TONE[response.outcome]}`}>
-                  {OUTCOME_LABELS[response.outcome]}
-                  {response.rule ? ` — ${response.rule.name}` : ''}
+                  {outcomeHeadline(response)}
                 </div>
                 {response.error && <div className="text-xs text-text-tertiary">{response.error}</div>}
-                {response.outcome === SCAN_OUTCOMES.NO_MATCH_FALLBACK && response.fallback?.markdown && (
+                {outcomeMarkdown(response) && (
                   <div className="text-sm border-t border-surface-border pt-2">
-                    <SimpleMarkdown content={response.fallback.markdown} compact />
+                    <SimpleMarkdown content={outcomeMarkdown(response)!} compact />
                   </div>
                 )}
               </>

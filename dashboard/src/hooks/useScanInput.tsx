@@ -2,7 +2,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -10,6 +9,8 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useActingIdentity } from './useActingIdentity';
+import { useWedgeCapture, type ScanKeyDiag } from './useWedgeCapture';
 import {
   executeScanCode,
   SCAN_OUTCOMES,
@@ -17,16 +18,16 @@ import {
   type ScanExecuteResponse,
 } from '../api/scan-codes';
 import {
-  createWedgeMachine,
   loadWedgeConfig,
   saveWedgeConfig,
   type WedgeConfig,
 } from '../lib/scan-sources/keyboard-wedge';
 import { SCAN_SOURCE_IDS, type ScanSourceId } from '../lib/scan-sources/types';
-import { removeFromActiveEditable } from '../lib/scan-sources/editable-repair';
 import { metadataFacetsUrl } from '../lib/facet-url';
 import { getScanOverride } from '../lib/view-as';
 import { useSettings } from '../api/settings';
+
+export type { ScanKeyDiag } from './useWedgeCapture';
 
 /**
  * Effective scan-input state: the deployment's `features.scanCodes` flag
@@ -50,22 +51,15 @@ export interface ScanResult {
   navigated: boolean;
 }
 
-/** One observed keydown, as the capture machine saw it. */
-export interface ScanKeyDiag {
-  seq: number;
-  key: string;
-  /** KeyboardEvent.code when it names a different physical key. */
-  code: string;
-  /** ms since the previous observed keydown. */
-  deltaMs: number;
-  /** Accumulator contents after this key. */
-  buffer: string;
-  note: string;
-}
-
 interface ScanInputContextValue {
   /** Submit a code from any source (manual entry, tests). */
   submitCode(code: string, source?: string): Promise<void>;
+  /**
+   * Client-side first look at every raw code, ahead of the POST. Return true
+   * to consume it (the station screen claims short choice codes this way);
+   * false lets the code execute normally. Pass null to unregister.
+   */
+  setCodeInterceptor(fn: ((raw: string) => boolean) | null): void;
   lastResult: ScanResult | null;
   busy: boolean;
   wedgeConfig: WedgeConfig;
@@ -87,6 +81,12 @@ export function useScanInput(): ScanInputContextValue {
 /** Route state key the escalation detail page reads for the confirm modal. */
 export const SCAN_PENDING_ACTION_STATE = 'scanPendingAction';
 
+/** Route state key the scan station reads for a CHOICES response. */
+export const SCAN_CHOICES_STATE = 'scanChoices';
+
+/** The station route a CHOICES outcome lands on. */
+export const SCAN_STATION_ROUTE = '/scan/station';
+
 /**
  * The scan dispatch pipeline: captures codes from input sources (the HID
  * keyboard-wedge listener here; manual entry via the panel) and executes
@@ -99,21 +99,21 @@ export const SCAN_PENDING_ACTION_STATE = 'scanPendingAction';
  *                             state; the page raises the confirm modal
  * - no_match_fallback       → the rule's route, or stays put (panel shows
  *                             the fallback markdown)
+ * - choices                 → station route with the response in route state;
+ *                             the station renders reality + choices
+ * - identity_primed         → primes the acting-identity context, stays put
  * - everything else         → reported in the scan panel / result state
  */
 export function ScanInputProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const enabled = useScanEnabled();
   const navigate = useNavigate();
+  const { identity, prime } = useActingIdentity();
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [wedgeConfig, setWedgeConfig] = useState<WedgeConfig>(() => loadWedgeConfig());
   const [diagnostics, setDiagnostics] = useState<ScanKeyDiag[]>([]);
   const [diagnosticsOn, setDiagnosticsOn] = useState(false);
-  const diagnosticsOnRef = useRef(diagnosticsOn);
-  diagnosticsOnRef.current = diagnosticsOn;
-  const diagSeqRef = useRef(0);
-  const lastKeyAtRef = useRef(0);
 
   /** Navigate per the outcome; true when navigation was the answer. */
   const navigateForResponse = useCallback((response: ScanExecuteResponse): boolean => {
@@ -148,6 +148,11 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
       return true;
     }
 
+    if (outcome === SCAN_OUTCOMES.CHOICES && response.choices) {
+      navigate(SCAN_STATION_ROUTE, { state: { [SCAN_CHOICES_STATE]: response } });
+      return true;
+    }
+
     if (outcome === SCAN_OUTCOMES.NO_MATCH_FALLBACK && response.fallback?.route) {
       navigate(response.fallback.route);
       return true;
@@ -155,11 +160,32 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     return false;
   }, [navigate]);
 
+  // Live refs so submitCode stays stable while the grant changes underneath.
+  const actingTokenRef = useRef<string | null>(null);
+  actingTokenRef.current = identity?.actingToken ?? null;
+  // The grant a re-prime replaced — sent on the next scan so an identity
+  // scan's mint can best-effort revoke it.
+  const previousTokenRef = useRef<string | null>(null);
+  // The station's client-side first look at raw codes (choice-code double scan).
+  const interceptorRef = useRef<((raw: string) => boolean) | null>(null);
+
+  const setCodeInterceptor = useCallback((fn: ((raw: string) => boolean) | null) => {
+    interceptorRef.current = fn;
+  }, []);
+
   const submitCode = useCallback(async (code: string, source: ScanSourceId = SCAN_SOURCE_IDS.MANUAL) => {
+    // The interceptor runs before the POST — a consumed code never executes.
+    if (interceptorRef.current?.(code)) return;
     setBusy(true);
     const at = Date.now();
     try {
-      const response = await executeScanCode(code);
+      const response = await executeScanCode(code, {
+        actingToken: actingTokenRef.current ?? undefined,
+        previousActingToken: previousTokenRef.current ?? undefined,
+      });
+      if (response.outcome === SCAN_OUTCOMES.IDENTITY_PRIMED) {
+        previousTokenRef.current = prime(response);
+      }
       const navigated = navigateForResponse(response);
       setLastResult({ code, source, at, response, error: null, navigated });
     } catch (err: any) {
@@ -167,120 +193,29 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [navigateForResponse]);
+  }, [navigateForResponse, prime]);
 
   // Live refs so the capture listener stays installed across renders.
   const submitRef = useRef(submitCode);
   submitRef.current = submitCode;
 
-  // The HID keyboard-wedge source: one capture-phase window listener sees
-  // every key before focused inputs do; the burst machine decides which
-  // keys belong to a scan and directs their suppression.
-  useEffect(() => {
-    if (!user || !enabled) return;
-    const machine = createWedgeMachine(wedgeConfig);
-    let autoFireTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const clearAutoFire = () => {
-      if (autoFireTimer) { clearTimeout(autoFireTimer); autoFireTimer = null; }
-    };
-
-    const fire = (code: string, consumedLength: number, note: string) => {
-      if (consumedLength) removeFromActiveEditable(consumedLength);
-      if (diagnosticsOnRef.current) {
-        const entry: ScanKeyDiag = {
-          seq: ++diagSeqRef.current, key: '(quiet)', code: '', deltaMs: 0, buffer: '', note,
-        };
-        // eslint-disable-next-line no-console
-        console.debug('[scan]', note);
-        setDiagnostics((prev) => [...prev.slice(-29), entry]);
-      }
-      void submitRef.current(code, SCAN_SOURCE_IDS.KEYBOARD_WEDGE);
-    };
-
-    // Scanners with no suffix programmed never send a terminator — when the
-    // buffer ends in a full code typed at scanner speed, a quiet period
-    // stands in for the Enter.
-    const scheduleAutoFire = () => {
-      clearAutoFire();
-      if (!machine.pendingAutoFire()) return;
-      autoFireTimer = setTimeout(() => {
-        autoFireTimer = null;
-        const pending = machine.pendingAutoFire();
-        if (!pending) return;
-        machine.reset();
-        fire(pending.code, pending.consumedLength, `capture → ${pending.code} (quiet period — no suffix)`);
-      }, wedgeConfig.autoFireQuietMs);
-    };
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      const bufferBefore = machine.snapshot().buffer;
-      const { suppress, emit, consumedLength } = machine.step({
-        key: e.key,
-        timeMs: e.timeStamp,
-        hasModifier: e.ctrlKey || e.metaKey || e.altKey,
-        isRepeat: e.repeat,
-      });
-      if (suppress) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-
-      // Diagnostics: what the machine saw and what it decided, key by key —
-      // the panel view for chasing scanner-specific stream shapes.
-      if (diagnosticsOnRef.current) {
-        const bufferAfter = machine.snapshot().buffer;
-        const isTerminator = wedgeConfig.terminators.includes(e.key);
-        const note = emit
-          ? `capture → ${emit}`
-          : isTerminator
-            ? `terminator — no code tail in "${bufferBefore.slice(-24)}"`
-            : bufferAfter === bufferBefore
-              ? bufferBefore ? 'neutral (chord key)' : 'ignored'
-              : bufferAfter === ''
-                ? 'reset (edit/chord/non-printable)'
-                : bufferAfter.length <= 1 && bufferBefore.length > 1
-                  ? 'gap — new episode'
-                  : 'accumulate';
-        const deltaMs = lastKeyAtRef.current ? Math.round(e.timeStamp - lastKeyAtRef.current) : 0;
-        const entry: ScanKeyDiag = {
-          seq: ++diagSeqRef.current,
-          key: e.key,
-          code: e.code !== e.key ? e.code : '',
-          deltaMs,
-          buffer: bufferAfter.slice(-24),
-          note,
-        };
-        // eslint-disable-next-line no-console
-        console.debug('[scan]', entry.key, entry.code, `${entry.deltaMs}ms`, entry.note);
-        setDiagnostics((prev) => [...prev.slice(-29), entry]);
-      }
-      lastKeyAtRef.current = e.timeStamp;
-
-      // The code's characters typed into whatever holds focus; strip exactly
-      // them back out before executing. Cursor focus never diverts a scan.
-      if (emit) {
-        clearAutoFire();
-        if (consumedLength) removeFromActiveEditable(consumedLength);
-        void submitRef.current(emit, SCAN_SOURCE_IDS.KEYBOARD_WEDGE);
-      } else {
-        scheduleAutoFire();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => {
-      clearAutoFire();
-      window.removeEventListener('keydown', onKeyDown, { capture: true });
-    };
-  }, [user, enabled, wedgeConfig]);
+  // The HID keyboard-wedge source — captured codes flow into submitCode like
+  // any other source; observed keydowns feed the panel's diagnostics view.
+  useWedgeCapture({
+    active: !!user && enabled,
+    wedgeConfig,
+    diagnosticsOn,
+    onScan: (code) => void submitRef.current(code, SCAN_SOURCE_IDS.KEYBOARD_WEDGE),
+    onDiag: (entry) => setDiagnostics((prev) => [...prev.slice(-29), entry]),
+  });
 
   const updateWedgeConfig = useCallback((patch: Partial<WedgeConfig>) => {
     setWedgeConfig(saveWedgeConfig(patch));
   }, []);
 
   const value = useMemo(
-    () => ({ submitCode, lastResult, busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn, setDiagnosticsOn }),
-    [submitCode, lastResult, busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn],
+    () => ({ submitCode, setCodeInterceptor, lastResult, busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn, setDiagnosticsOn }),
+    [submitCode, setCodeInterceptor, lastResult, busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn],
   );
 
   return <ScanInputContext.Provider value={value}>{children}</ScanInputContext.Provider>;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ScanBarcode, SlidersHorizontal, ListChecks, Plus, Trash2 } from 'lucide-react';
-import { useScanScheme, useUpsertScanScheme, useDeleteScanScheme, type ScanRule } from '../../../api/scan-codes';
+import { useScanScheme, useUpsertScanScheme, useDeleteScanScheme, SCAN_SCHEME_KINDS, type ScanRule, type ScanScheme, type ScanSchemeKind } from '../../../api/scan-codes';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ScanRuleEditor } from './ScanRuleEditor';
@@ -80,8 +80,9 @@ export function ScanSchemeDetailPage() {
 
       <p className="text-sm text-text-secondary max-w-form -mt-4">
         Codes for this scheme start with <span className="font-mono text-text-primary">{scheme.version}</span>.
-        Add an action, name it, and configure what a scan does — each action gets its own
-        slot automatically.
+        {scheme.kind === SCAN_SCHEME_KINDS.IDENTITY
+          ? ' Scanning a badge primes who acts next; each slot names the badge and its unknown-badge message.'
+          : ' Add an action, name it, and configure what a scan does — each action gets its own slot automatically.'}
       </p>
 
       <SchemeSettings key={scheme.version} scheme={scheme} ruleCount={rules.length} />
@@ -89,7 +90,9 @@ export function ScanSchemeDetailPage() {
       <SectionGroup
         icon={ListChecks}
         label="Actions"
-        annotation="what a scan of this scheme does — named, in the order you add them"
+        annotation={scheme.kind === SCAN_SCHEME_KINDS.IDENTITY
+          ? 'named badge slots — each carries its unknown-badge message'
+          : 'what a scan of this scheme does — named, in the order you add them'}
       >
         <div className="divide-y divide-surface-border border-y border-surface-border max-w-form">
           {rules.map((rule) => {
@@ -141,6 +144,7 @@ export function ScanSchemeDetailPage() {
           <ScanRuleEditor
             key={`${scheme.version}:${selected}`}
             schemeVersion={scheme.version}
+            schemeKind={scheme.kind}
             category={selected}
             rule={selectedRule}
             codePreview={codeFor(selected)}
@@ -152,16 +156,25 @@ export function ScanSchemeDetailPage() {
   );
 }
 
-function SchemeSettings({ scheme, ruleCount }: { scheme: { version: number; name: string; description: string | null; target_facet: string; encoding: 'fixed' | 'delimited'; delimiter: string; target_length: number | null; enabled: boolean }; ruleCount: number }) {
+function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: number }) {
   const navigate = useNavigate();
   const upsert = useUpsertScanScheme();
   const remove = useDeleteScanScheme();
   const [name, setName] = useState(scheme.name);
+  const [kind, setKind] = useState<ScanSchemeKind>(scheme.kind);
   const [targetFacet, setTargetFacet] = useState(scheme.target_facet);
+  const [grantTtlSeconds, setGrantTtlSeconds] = useState(scheme.grant_ttl_seconds ?? 3600);
+  const [grantMaxUses, setGrantMaxUses] = useState(scheme.grant_max_uses ?? 0);
   const [enabled, setEnabled] = useState(scheme.enabled);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const dirty = name !== scheme.name || targetFacet !== scheme.target_facet || enabled !== scheme.enabled;
+  const isIdentity = kind === SCAN_SCHEME_KINDS.IDENTITY;
+  const ttlValid = !isIdentity || (grantTtlSeconds >= 1 && grantTtlSeconds <= 86_400);
+  const dirty = name !== scheme.name
+    || targetFacet !== scheme.target_facet
+    || enabled !== scheme.enabled
+    || kind !== scheme.kind
+    || (isIdentity && (grantTtlSeconds !== scheme.grant_ttl_seconds || grantMaxUses !== scheme.grant_max_uses));
 
   return (
     <SectionGroup
@@ -179,16 +192,57 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: { version: number; name
       )}
     >
       <div className="flex flex-wrap items-end gap-4 max-w-form">
+        <label className="block">
+          <span className="block text-xs text-text-secondary mb-1">Kind <span className="text-status-error">*</span></span>
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity ? 'A badge — scanning it primes who acts next.' : 'An item code — scanning it acts on the item.'}
+          </span>
+          <select value={kind} onChange={(e) => setKind(e.target.value as ScanSchemeKind)} className="select">
+            <option value={SCAN_SCHEME_KINDS.ACTION}>Action</option>
+            <option value={SCAN_SCHEME_KINDS.IDENTITY}>Identity</option>
+          </select>
+        </label>
         <label className="block flex-1 min-w-[16rem]">
           <span className="block text-xs text-text-secondary mb-1">Name <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">Say what the target identifies.</span>
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity ? 'Say who the badge identifies.' : 'Say what the target identifies.'}
+          </span>
           <input value={name} onChange={(e) => setName(e.target.value)} className="input w-full" />
         </label>
         <label className="block flex-1 min-w-[16rem]">
           <span className="block text-xs text-text-secondary mb-1">Target facet <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">The metadata key the scanned value matches.</span>
+          <span className="block text-2xs text-text-tertiary mb-1">
+            {isIdentity
+              ? 'The user-metadata key the badge matches (e.g. badge_id).'
+              : 'The metadata key the scanned value matches.'}
+          </span>
           <input value={targetFacet} onChange={(e) => setTargetFacet(e.target.value)} className="input w-full font-mono" />
         </label>
+        {isIdentity && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Grant TTL (seconds) <span className="text-status-error">*</span></span>
+            <span className="block text-2xs text-text-tertiary mb-1">How long a badge scan stays primed (1–86400).</span>
+            <input
+              type="number" min={1} max={86400}
+              value={grantTtlSeconds}
+              onChange={(e) => setGrantTtlSeconds(Number(e.target.value))}
+              className="input w-[12rem]"
+            />
+            {!ttlValid && <span className="block text-2xs text-status-error mt-1">Enter 1–86400 seconds.</span>}
+          </label>
+        )}
+        {isIdentity && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Grant max uses</span>
+            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n scans.</span>
+            <input
+              type="number" min={0}
+              value={grantMaxUses}
+              onChange={(e) => setGrantMaxUses(Number(e.target.value))}
+              className="input w-[12rem]"
+            />
+          </label>
+        )}
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Status</span>
           <span className="block text-2xs text-text-tertiary mb-1">Disable to reject every scan of this version.</span>
@@ -200,7 +254,7 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: { version: number; name
         {dirty && (
           <button
             type="button"
-            disabled={upsert.isPending || !name || !targetFacet}
+            disabled={upsert.isPending || !name || !targetFacet || !ttlValid}
             onClick={() => upsert.mutate({
               version: scheme.version,
               name,
@@ -209,8 +263,11 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: { version: number; name
               encoding: scheme.encoding,
               delimiter: scheme.delimiter,
               target_length: scheme.target_length,
+              kind,
+              grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
+              grant_max_uses: isIdentity ? grantMaxUses : 0,
               enabled,
-            } as any)}
+            })}
             className="btn-primary text-xs"
           >
             Save
