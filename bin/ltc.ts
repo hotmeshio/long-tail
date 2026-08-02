@@ -195,6 +195,37 @@ escCmd.command('claim-by-facets')
   .option('--json', 'JSON output')
   .action(wrap(esc.claimByFacets));
 
+escCmd.command('aggregate-facets')
+  .description('Grouped analytics over escalation intervals: membership at an instant, or dwell over a window')
+  .option('--role <role>', 'Single pond role')
+  .option('--roles <json>', 'Multiple roles, JSON array (no role at all = every pond; global principals only)')
+  .option('--entity <key>', "Entity facet key (e.g. serialNumber) — scopes to every role declaring it (the entity's system)")
+  .option('--group-state', "Group by the derived STATE label (each role's subtypes or itself) — 'how do the entities spend their time'")
+  .option('--facets <json>', 'Required facets (JSON object, metadata @>)')
+  .option('--exists <json>', 'Metadata keys that must be present (JSON array)')
+  .option('--group-columns <list>', 'Comma-separated group columns: role,subtype,status')
+  .option('--group-facets <list>', 'Comma-separated metadata keys to group by')
+  .option('--as-of <iso>', 'Membership at this ISO instant (default: now; past reconstructs the live set then)')
+  .option('--window <json>', 'Dwell window {"from":"...","to":"..."} — switches the measure to dwell')
+  .option('--distinct-by <key>', 'Count DISTINCT of this facet (entities, not rows; membership only)')
+  .option('--live-statuses <list>', 'Comma-separated statuses considered live (default: pending)')
+  .option('--order-by <json>', 'Result-group order, JSON array e.g. \'[{"field":"count","direction":"desc"}]\'')
+  .option('--limit <n>', 'Max result groups')
+  .option('--offset <n>', 'Result-group offset')
+  .option('--json', 'JSON output')
+  .action(wrap(esc.aggregateByFacets));
+
+escCmd.command('timeline <key> <value>')
+  .description("One entity's ordered escalation-interval timeline (gaps = untracked time)")
+  .option('--roles <json>', 'Restrict to these roles, JSON array')
+  .option('--entity <key>', "Scope to the entity's system (every role declaring this entity facet); omitted with no --roles, the query spans every queue (global principals only)")
+  .option('--from <iso>', 'Window start (with --to; only overlapping intervals)')
+  .option('--to <iso>', 'Window end')
+  .option('--select-facets <list>', 'Comma-separated metadata keys to surface per interval')
+  .option('--limit <n>', 'Max intervals')
+  .option('--json', 'JSON output')
+  .action(wrap(esc.timelineByFacet));
+
 // ── Workflows ────────────────────────────────────────────────────────────
 
 const wfCmd = program.command('workflows').alias('wf').description('Manage durable workflows');

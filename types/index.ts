@@ -31,6 +31,26 @@ export type {
 } from './facets';
 
 export type {
+  GroupableColumn,
+  AnalyticsQuery,
+  FacetGroupBy,
+  AnalyticsWindow,
+  AggregateMeasure,
+  StateMatch,
+  AggregateOrder,
+  AggregateByFacetsInput,
+  AggregateRow,
+  AggregateByFacetsResult,
+  TimelineByFacetInput,
+  TimelineInterval,
+  TimelineByFacetResult,
+} from './analytics';
+
+export {
+  GROUPABLE_COLUMNS,
+} from './analytics';
+
+export type {
   LTReturn,
   LTEscalation,
   LTActivity,

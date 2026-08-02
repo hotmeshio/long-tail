@@ -168,3 +168,75 @@ export async function claimByFacets(opts: { role: string; facets?: string; limit
   if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
   console.log(`\n  ${pc.green('✓')} Claimed ${data.claimed?.length || 0} escalation(s)\n`);
 }
+
+// --- Analytics commands -------------------------------------------------------
+
+const AGG_COLUMNS = [
+  { key: 'state', label: 'State', width: 16 },
+  { key: 'role', label: 'Role', width: 16 },
+  { key: 'subtype', label: 'Subtype', width: 16 },
+  { key: 'facets', label: 'Facets', width: 28, format: (v: any) => (v && Object.keys(v).length ? JSON.stringify(v) : '') },
+  { key: 'count', label: 'Count', width: 7, align: 'right' as const },
+  { key: 'dwellSeconds', label: 'Dwell(s)', width: 10, align: 'right' as const, format: (v: any) => (v == null ? '' : String(Math.round(v))) },
+  { key: 'sampleCount', label: 'Rows', width: 6, align: 'right' as const },
+];
+
+const TIMELINE_COLUMNS = [
+  { key: 'role', label: 'Role', width: 16 },
+  { key: 'subtype', label: 'Subtype', width: 16 },
+  { key: 'status', label: 'Status', width: 10, format: formatStatus },
+  { key: 'startedAt', label: 'Started', width: 12, format: formatTime },
+  { key: 'endedAt', label: 'Ended', width: 12, format: (v: any) => (v ? formatTime(v) : 'open') },
+  { key: 'durationSeconds', label: 'Secs', width: 8, align: 'right' as const, format: (v: any) => String(Math.round(v)) },
+];
+
+export async function aggregateByFacets(opts: {
+  role?: string; roles?: string; entity?: string; facets?: string; exists?: string;
+  groupColumns?: string; groupFacets?: string; groupState?: boolean;
+  asOf?: string; window?: string; distinctBy?: string; liveStatuses?: string;
+  orderBy?: string; limit?: string; offset?: string; json?: boolean;
+}): Promise<void> {
+  const query: any = {};
+  if (opts.role) query.role = opts.role;
+  if (opts.roles) query.roles = parseJsonOption('--roles', opts.roles);
+  if (opts.entity) query.entity = opts.entity;
+  if (opts.facets) query.facets = parseJsonOption('--facets', opts.facets);
+  if (opts.exists) query.exists = parseJsonOption('--exists', opts.exists);
+  const groupBy: any = {};
+  if (opts.groupColumns) groupBy.columns = opts.groupColumns.split(',').map((s) => s.trim());
+  if (opts.groupFacets) groupBy.facets = opts.groupFacets.split(',').map((s) => s.trim());
+  if (opts.groupState) groupBy.state = true;
+  // --window switches the measure to dwell; otherwise membership (at --as-of, default now).
+  const measure: any = opts.window
+    ? { kind: 'dwell', window: parseJsonOption('--window', opts.window) }
+    : { kind: 'membership', ...(opts.asOf ? { asOf: opts.asOf } : {}) };
+  const body: any = { query, groupBy, measure };
+  if (opts.distinctBy) body.distinctBy = opts.distinctBy;
+  if (opts.liveStatuses) body.liveStatuses = opts.liveStatuses.split(',').map((s) => s.trim());
+  if (opts.orderBy) body.orderBy = parseJsonOption('--order-by', opts.orderBy);
+  if (opts.limit) body.limit = parseInt(opts.limit, 10);
+  if (opts.offset) body.offset = parseInt(opts.offset, 10);
+  const data = await apiFetch<any>('/escalations/aggregate-by-facets', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  output(data, data.groups || [], AGG_COLUMNS, opts);
+  if (data.overflow && !opts.json) console.log(`  ${pc.yellow('!')} more groups exist — raise --limit or --offset\n`);
+}
+
+export async function timelineByFacet(key: string, value: string, opts: {
+  roles?: string; entity?: string; from?: string; to?: string;
+  selectFacets?: string; limit?: string; json?: boolean;
+}): Promise<void> {
+  const body: any = { facet: { key, value } };
+  if (opts.entity) body.query = { entity: opts.entity };
+  else if (opts.roles) body.query = { roles: parseJsonOption('--roles', opts.roles) };
+  if (opts.from && opts.to) body.window = { from: opts.from, to: opts.to };
+  if (opts.selectFacets) body.select = { facets: opts.selectFacets.split(',').map((s) => s.trim()) };
+  if (opts.limit) body.limit = parseInt(opts.limit, 10);
+  const data = await apiFetch<any>('/escalations/timeline-by-facet', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  output(data, data.intervals || [], TIMELINE_COLUMNS, opts);
+}

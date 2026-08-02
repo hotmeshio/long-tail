@@ -6,6 +6,7 @@ import { registerMetadataRoutes } from './metadata';
 import { registerSingleRoutes } from './single';
 import { registerResolveRoutes } from './resolve';
 import { registerFacetRoutes } from './facets';
+import { registerAnalyticsRoutes } from './analytics';
 
 const router = Router();
 
@@ -23,6 +24,9 @@ registerMetadataRoutes(router);
 
 // POST /search-by-facets, /claim-groups, /claim-by-facets
 registerFacetRoutes(router);
+
+// POST /aggregate-by-facets, /timeline-by-facet
+registerAnalyticsRoutes(router);
 
 // PATCH /:id/escalate, GET /by-workflow/:workflowId,
 // GET /:id, POST /:id/claim, POST /:id/release

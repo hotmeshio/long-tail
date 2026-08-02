@@ -294,6 +294,8 @@ export const updateRoleSchema = z.object({
   worker_count: z.number().nullable().optional().describe('Capacity at this station (staff or machine count). One of the capacity settings.'),
   priority_threshold_minutes: z.number().min(0).nullable().optional().describe('Max age in minutes before a pending unclaimed escalation counts toward the Pace Board priority count. Falls back to sla_minutes when null.'),
   priority_facet: z.string().regex(FACET_KEY).nullable().optional().describe('lt_escalations.metadata key holding the age origin for the priority count as an ISO 8601 UTC timestamp (e.g. authorized_at). Falls back to created_at when null. When set, items missing the key or holding an unparseable value are not counted.'),
+  entity_facet: z.string().regex(FACET_KEY).nullable().optional().describe('lt_escalations.metadata key identifying the ENTITY that moves through this role (e.g. serialNumber, orderId). Powers the analytics surfaces: distinct-entity counts, per-entity dwell, entity timelines. Roles sharing an entity_facet form that entity\'s system. Null = no entity notion.'),
+  entity_state_source: z.enum(['role', 'subtype']).nullable().optional().describe("How this role names its states for the entity: 'role' (the station itself is the state, default) or 'subtype' (the role's subtypes are its states, e.g. a fleet role parking ready/printing). Null resets to 'role'."),
   enforce_schema: z.boolean().optional().describe('When true, every resolve surface validates the submitted resolverPayload against the escalation\'s form schema (the same pass the dashboard runs) and rejects violations with a structured schema_validation error before any state changes.'),
   upstream_roles: z.array(z.string()).nullable().optional().describe('Replace the set of roles this station draws input from across other sequences (parent_role stays the single prior step in its own sequence). Omitted = preserve; null or [] = clear.'),
   list_schema: z.record(z.any()).nullable().optional().describe('JSON contract (x-lt-* markup) that richly formats this role\'s escalation LIST page. Versioned independently of form_schema; the list always renders the latest version.'),
@@ -724,6 +726,84 @@ export const claimByFacetsSchema = z.object({
   limit: z.number().int().min(1).optional().describe('Max rows to claim'),
   durationMinutes: z.number().int().min(1).optional().describe('Claim TTL in minutes'),
   allOrNone: z.boolean().optional().describe('Commit only if the full limit was acquired'),
+});
+
+// ── Escalation analytics ─────────────────────────────────────────────────────
+
+/**
+ * The analytics filter — the WHAT of a facet query only. status/available/
+ * jeopardy (and row paging) are REJECTED by the API: liveness derives from
+ * the interval + measure, paging applies to result groups.
+ */
+const analyticsFilterSchema = z.object({
+  role: z.string().optional().describe('Single pond role to target'),
+  roles: z.array(z.string()).optional().describe('Multiple pond roles; no role at all spans every pond (global principals only)'),
+  entity: z.string().optional().describe("An entity facet key (e.g. serialNumber): resolves server-side to every role declaring it as entity_facet — the entity's SYSTEM. Mutually exclusive with role/roles."),
+  facets: z.record(z.any()).optional().describe('Metadata facet equality filters (metadata @> containment)'),
+  block: z.array(z.record(z.any())).optional().describe('Exclude rows carrying ANY of these facet sets'),
+  range: z.array(z.object({
+    facet: z.string(),
+    op: z.enum(['<', '<=', '>', '>=', '=']),
+    value: z.number(),
+  })).optional().describe('Numeric range predicates over metadata facets'),
+  exists: z.array(z.string()).optional().describe('Metadata keys that must be present'),
+});
+
+const analyticsWindowSchema = z.object({
+  from: z.string().describe('ISO instant, inclusive'),
+  to: z.string().describe('ISO instant, exclusive (half-open [from, to))'),
+});
+
+export const aggregateByFacetsSchema = z.object({
+  query: analyticsFilterSchema.describe('The filter (WHAT only — no status/available/jeopardy)'),
+  groupBy: z.object({
+    columns: z.array(z.enum(['role', 'subtype', 'status'])).optional().describe('Top-level group columns'),
+    facets: z.array(z.string()).optional().describe('Metadata keys to group by (a NULL group key = facet absent on those rows)'),
+    state: z.boolean().optional().describe("Group by the derived STATE label: each role contributes per its entity_state_source — its subtypes or itself. Answers 'how do the entities spend their time'. Requires role scope (entity or role/roles); mutually exclusive with states[]."),
+  }).describe('Group keys; empty object → one total row'),
+  measure: z.union([
+    z.object({
+      kind: z.literal('membership'),
+      asOf: z.string().optional().describe('ISO instant; omit for now. A past instant reconstructs the live set at that moment.'),
+    }),
+    z.object({
+      kind: z.literal('dwell'),
+      window: analyticsWindowSchema,
+    }),
+  ]).describe('membership = rows/entities open at an instant; dwell = open-seconds per group within the window, clipped to it'),
+  distinctBy: z.string().optional().describe('membership only: count DISTINCT of this metadata facet (entities, not rows)'),
+  states: z.array(z.object({
+    name: z.string(),
+    match: z.object({
+      role: z.string().optional(),
+      roles: z.array(z.string()).optional(),
+      subtype: z.string().optional(),
+      facets: z.record(z.any()).optional(),
+      exists: z.array(z.string()).optional(),
+    }),
+  })).optional().describe('Pure labeling: tag each group with the FIRST matching state name'),
+  liveStatuses: z.array(z.string()).optional().describe("Statuses considered live (default ['pending'])"),
+  orderBy: z.array(z.object({
+    field: z.string().describe('count | dwellSeconds | sampleCount | a grouped column or facet key'),
+    direction: z.enum(['asc', 'desc']).optional(),
+  })).optional().describe('Order the RESULT groups'),
+  limit: z.number().int().min(1).optional().describe('Max result groups (server-capped; overflow flag when more exist)'),
+  offset: z.number().int().min(0).optional(),
+});
+
+export const timelineByFacetSchema = z.object({
+  facet: z.object({
+    key: z.string(),
+    value: z.string(),
+  }).describe('The entity facet, matched via GIN containment — the stored value must be a JSON string'),
+  query: analyticsFilterSchema.optional().describe('Optional extra filter / role scope'),
+  window: analyticsWindowSchema.optional().describe('Only intervals overlapping this window (overlap-filtered, not clipped)'),
+  select: z.object({
+    columns: z.array(z.enum(['role', 'subtype', 'status'])).optional(),
+    facets: z.array(z.string()).optional(),
+  }).optional().describe('Columns/facets to surface per interval (default: all three columns)'),
+  liveStatuses: z.array(z.string()).optional().describe("Statuses considered live (default ['pending'])"),
+  limit: z.number().int().min(1).optional(),
 });
 
 // ── Scan codes ──────────────────────────────────────────────────────────────

@@ -41,6 +41,8 @@ import {
   searchByFacetsSchema,
   claimGroupsSchema,
   claimByFacetsSchema,
+  aggregateByFacetsSchema,
+  timelineByFacetSchema,
 } from './schemas';
 
 let systemPrincipalId: string | null = null;
@@ -341,6 +343,52 @@ export function registerEscalationTools(server: McpServer): void {
     },
     async (args: z.infer<typeof searchByFacetsSchema>) => {
       const result = await escalationApi.searchByFacets(args as any, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/aggregate-by-facets
+  (server as any).registerTool(
+    'aggregate_by_facets',
+    {
+      title: 'Aggregate by Facets',
+      description:
+        'Grouped analytics over the escalation intervals. Every escalation is one open ' +
+        'interval [created_at, ended_at); this tool reads it two ways: membership (rows or, ' +
+        'with distinctBy, distinct entities open at an instant — a past asOf reconstructs the ' +
+        'live set then) and dwell (open-seconds per group within a half-open [from,to) window). ' +
+        'Group by role/subtype/status columns plus metadata facet keys; optional states[] label ' +
+        'each group. One call replaces N per-filter count round-trips. The filter takes the WHAT ' +
+        'fields only — status/available/jeopardy are rejected (liveness derives from the measure).',
+      inputSchema: aggregateByFacetsSchema,
+    },
+    async (args: z.infer<typeof aggregateByFacetsSchema>) => {
+      const result = await escalationApi.aggregateByFacets(args as any, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/timeline-by-facet
+  (server as any).registerTool(
+    'timeline_by_facet',
+    {
+      title: 'Timeline by Facet',
+      description:
+        'One entity\'s ordered interval sequence — every escalation the entity facet ' +
+        '(e.g. a machine id) appeared in, as [startedAt, endedAt) spans with durations, in ' +
+        'created_at order. Open intervals report endedAt: null. Gaps between consecutive ' +
+        'intervals are untracked time and are preserved, not filled. The entity facet value ' +
+        'must be stored as a JSON string (GIN containment match).',
+      inputSchema: timelineByFacetSchema,
+    },
+    async (args: z.infer<typeof timelineByFacetSchema>) => {
+      const result = await escalationApi.timelineByFacet(args as any, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

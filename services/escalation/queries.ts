@@ -10,6 +10,7 @@ import type { EscalationStats, StationMetric } from './types';
 import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
 import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_LIVE_COUNTS_SQL, STATION_PERIOD_METRICS_SQL } from './sql';
 import { TtlCache } from './metrics-cache';
+import { clearNowAnchoredAnalyticsCache } from './aggregates';
 import type { FacetQuery } from '../../types';
 
 type SdkListParams = Types.ListEscalationsParams;
@@ -493,6 +494,7 @@ const stationPeriodCache = new TtlCache<Record<string, unknown>[]>(STATION_PERIO
 export function invalidateEscalationAggregates(): void {
   stationPeriodCache.clear();
   escalationStatsCache.clear();
+  clearNowAnchoredAnalyticsCache();
 }
 
 /** Test hook: drop cached period metrics AND escalation stats so tests observe fresh rows. */

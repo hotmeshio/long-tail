@@ -26,6 +26,19 @@ export const config = {
   // admin flips enforce_schema or edits a schema; pinned snapshots are
   // immutable and cache indefinitely.
   ROLE_ENFORCEMENT_CACHE_TTL_MS: parseInt(process.env.ROLE_ENFORCEMENT_CACHE_TTL_MS || '30000', 10),
+
+  // Escalation analytics (aggregateByFacets / timelineByFacet) bounds.
+  // MAX_GROUPS caps the result-group page (the API signals `overflow` instead
+  // of silently truncating); MAX_WINDOW_DAYS caps a dwell/timeline window so
+  // one query can never sweep unbounded history. The two cache TTLs split by
+  // anchor: now-anchored results tolerate pace-board-grade staleness, while a
+  // fully-past window is immutable under every long-tail write path and may
+  // live longer; MAX_ENTRIES LRU-bounds the past cache.
+  LT_ANALYTICS_MAX_GROUPS: parseInt(process.env.LT_ANALYTICS_MAX_GROUPS || '5000', 10),
+  LT_ANALYTICS_MAX_WINDOW_DAYS: parseInt(process.env.LT_ANALYTICS_MAX_WINDOW_DAYS || '35', 10),
+  LT_ANALYTICS_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_CACHE_TTL_MS || '30000', 10),
+  LT_ANALYTICS_PAST_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_PAST_CACHE_TTL_MS || '600000', 10),
+  LT_ANALYTICS_CACHE_MAX_ENTRIES: parseInt(process.env.LT_ANALYTICS_CACHE_MAX_ENTRIES || '512', 10),
 };
 
 export const postgres_options: Record<string, unknown> = {
