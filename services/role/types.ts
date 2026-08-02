@@ -49,6 +49,19 @@ export interface RoleDetail {
    */
   priority_facet: string | null;
   /**
+   * lt_escalations.metadata key identifying the ENTITY that moves through
+   * this role (e.g. serialNumber, orderId). Powers the analytics surfaces —
+   * distinct-entity counts, per-entity dwell, entity timelines. Null = the
+   * role has no entity notion.
+   */
+  entity_facet: string | null;
+  /**
+   * How this role names its contribution to the entity's state space:
+   * 'role' (the station itself is the state) or 'subtype' (the role's
+   * subtypes are its states). Only meaningful while entity_facet is set.
+   */
+  entity_state_source: 'role' | 'subtype';
+  /**
    * Version of the live form_schema. Advances whenever the form (or
    * metadata_schema) changes; each version is snapshotted in lt_role_schemas so
    * an escalation can pin the exact form it was created against. Null until the
@@ -148,6 +161,9 @@ export interface UpdateRoleInput {
   worker_count?: number | null;
   priority_threshold_minutes?: number | null;
   priority_facet?: string | null;
+  entity_facet?: string | null;
+  /** 'role' | 'subtype' — null resets to the 'role' default. */
+  entity_state_source?: 'role' | 'subtype' | null;
   /** Turn server-side resolver schema validation on/off for this role. */
   enforce_schema?: boolean;
   /**

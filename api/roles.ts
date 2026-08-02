@@ -197,6 +197,10 @@ export async function updateRole(input: {
   priority_threshold_minutes?: number | null;
   /** Escalation metadata key holding the age origin (ISO 8601 UTC timestamp). Falls back to created_at. */
   priority_facet?: string | null;
+  /** Escalation metadata key identifying the entity that moves through this role (e.g. serialNumber). */
+  entity_facet?: string | null;
+  /** How this role names the entity's states: 'role' (the station is the state) or 'subtype'. Null resets to 'role'. */
+  entity_state_source?: 'role' | 'subtype' | null;
   /** Turn server-side resolver schema validation on/off for this role. */
   enforce_schema?: boolean;
   /** Replace the upstream-input set (omitted = preserve; null or [] = clear). */
@@ -219,6 +223,12 @@ export async function updateRole(input: {
     }
     if (input.priority_facet != null && (typeof input.priority_facet !== 'string' || !FACET_KEY.test(input.priority_facet))) {
       return { status: 400, error: 'priority_facet must be a metadata key (letters, numbers, underscores) or null' };
+    }
+    if (input.entity_facet != null && (typeof input.entity_facet !== 'string' || !FACET_KEY.test(input.entity_facet))) {
+      return { status: 400, error: 'entity_facet must be a metadata key (letters, numbers, underscores) or null' };
+    }
+    if (input.entity_state_source != null && input.entity_state_source !== 'role' && input.entity_state_source !== 'subtype') {
+      return { status: 400, error: "entity_state_source must be 'role', 'subtype', or null" };
     }
     if (input.ops_visible !== undefined && typeof input.ops_visible !== 'boolean') {
       return { status: 400, error: 'ops_visible must be a boolean' };
@@ -272,6 +282,8 @@ export async function updateRole(input: {
       worker_count: input.worker_count,
       priority_threshold_minutes: input.priority_threshold_minutes,
       priority_facet: input.priority_facet,
+      entity_facet: input.entity_facet,
+      entity_state_source: input.entity_state_source,
       enforce_schema: input.enforce_schema,
       upstream_roles: input.upstream_roles,
       change_summary: input.change_summary,
