@@ -2,14 +2,14 @@ import { Durable } from '@hotmeshio/hotmesh';
 
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { loggerRegistry } from '../lib/logger';
-import { getUserByExternalId, createUser } from '../services/user';
+import { getUserByExternalId, createUser, updateUser } from '../services/user';
 import { addUserRole, getUserRoles } from '../services/user/roles';
 import { addEscalationChain, createRole } from '../services/role';
 import { seedPersonas as seedPersonaSpecs } from '../services/persona';
 import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS, SEED_PERSONAS } from './seed-data';
 import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
-import { seedScanCodes } from './seed-scan-codes';
+import { seedScanCodes, seedBadgeScheme } from './seed-scan-codes';
 import { seedRichFormRole } from './seed-rich-form';
 import { seedAcmeRoles } from './seed-acme';
 import { seedRelatedEscalationsRoles } from './seed-related-escalations';
@@ -40,13 +40,23 @@ async function seedUsers(): Promise<void> {
         // Ensure existing user has the expected roles
         if (userDef.roles?.length) {
           const currentRoles = await getUserRoles(existing.id);
-          for (const expected of userDef.roles) {
+          for (const expected of userDef.roles as Array<{ role: string; type: any; read_scope?: any; write_scope?: any }>) {
             const has = currentRoles.some(r => r.role === expected.role && r.type === expected.type);
             if (!has) {
-              await addUserRole(existing.id, expected.role, expected.type);
+              await addUserRole(existing.id, expected.role, expected.type, {
+                read_scope: expected.read_scope,
+                write_scope: expected.write_scope,
+              });
               loggerRegistry.info(`[examples] added role ${expected.role} (${expected.type}) to ${userDef.external_id}`);
             }
           }
+        }
+        // Self-heal demo bindings (e.g. the badge id): set only where the
+        // user carries no metadata at all — operator values are never touched.
+        const meta = (userDef as any).metadata;
+        if (meta && (existing.metadata == null || Object.keys(existing.metadata).length === 0)) {
+          await updateUser(existing.id, { metadata: meta });
+          loggerRegistry.info(`[examples] seeded metadata bindings for ${userDef.external_id}`);
         }
         loggerRegistry.info(`[examples] ${userDef.external_id} already exists, skipping`);
         continue;
@@ -105,6 +115,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedPrinterFleetEscalations();
   await seedTwinRoles();
   await seedScanCodes();
+  await seedBadgeScheme();
   await seedRichFormRole();
   await seedAcmeRoles();
   await seedRelatedEscalationsRoles();
