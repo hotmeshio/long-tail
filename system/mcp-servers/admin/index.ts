@@ -55,10 +55,9 @@ import { registerSettingsTools } from './settings';
 import { registerExportTools } from './exports';
 import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
-import { registerOrthoTools } from './ortho';
 import { registerScanCodeTools } from './scan-codes';
 
-const TOOL_COUNT = 105;
+const TOOL_COUNT = 101;
 
 let server: McpServer | null = null;
 
@@ -94,9 +93,8 @@ export async function createAdminServer(options?: {
   registerExportTools(instance);            //  4 tools
   registerOverviewTools(instance);          //  1 tool
   registerDiagnosticsTools(instance);       //  3 tools
-  registerOrthoTools(instance);             //  4 tools
   registerScanCodeTools(instance);          //  5 tools (scan schemes + rules + execute)
-  // Total: 105
+  // Total: 101
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

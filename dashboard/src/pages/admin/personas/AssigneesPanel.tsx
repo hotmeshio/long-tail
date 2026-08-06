@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { usePersona, useAssignPersona, useUnassignPersona } from '../../../api/personas';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { UserCombobox, type UserComboboxSelection } from '../../../components/common/form/UserCombobox';
@@ -8,8 +9,15 @@ const SECTION_HDR = 'text-2xs font-semibold uppercase tracking-widest text-text-
 /**
  * The 90% surface: pick a persona in the list, assign a user, and they get
  * every linked role — pins, list schemas, and forms compose from the roles.
+ * Rendered in the global shell right panel (key 'persona-assignees').
  */
-export function AssigneesPanel({ personaKey }: { personaKey: string | null }) {
+export function AssigneesPanel({
+  personaKey,
+  onClose,
+}: {
+  personaKey: string | null;
+  onClose?: () => void;
+}) {
   const { data: persona } = usePersona(personaKey ?? '');
   const assign = useAssignPersona();
   const unassign = useUnassignPersona();
@@ -26,8 +34,15 @@ export function AssigneesPanel({ personaKey }: { personaKey: string | null }) {
   };
 
   return (
-    <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
-      <p className={`${SECTION_HDR} mb-4`}>Assignees</p>
+    <div className="h-full overflow-y-auto px-5 pt-4 pb-6">
+      <div className="flex items-center justify-between mb-4">
+        <p className={SECTION_HDR}>Assignees</p>
+        {onClose && (
+          <button onClick={onClose} className="icon-link" title="Close" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {!persona ? (
         <p className="text-xs text-text-tertiary">

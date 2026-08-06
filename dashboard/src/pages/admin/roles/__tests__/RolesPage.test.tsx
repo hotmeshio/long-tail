@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -133,22 +133,23 @@ describe('RolesPage', () => {
 
   it('shows search bar', () => {
     renderPage();
-    expect(screen.getByPlaceholderText(/Search \d+ roles/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/\d+ roles/)).toBeInTheDocument();
   });
 
   it('filters roles when searching', async () => {
     renderPage();
-    const search = screen.getByPlaceholderText(/Search \d+ roles/);
+    const search = screen.getByPlaceholderText(/\d+ roles/);
     await userEvent.type(search, 'admin');
+    // FilterInput debounces 300ms before the filter applies.
+    await waitFor(() => expect(screen.queryByText('reviewer')).not.toBeInTheDocument());
     expect(screen.getByText('admin')).toBeInTheDocument();
-    expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
   });
 
   it('shows a clear-search directive when search finds nothing', async () => {
     renderPage();
-    const search = screen.getByPlaceholderText(/Search \d+ roles/);
+    const search = screen.getByPlaceholderText(/\d+ roles/);
     await userEvent.type(search, 'zzznomatch');
-    expect(screen.getByText('Clear the search to see all roles.')).toBeInTheDocument();
+    expect(await screen.findByText('Clear the search to see all roles.')).toBeInTheDocument();
   });
 
   it('renders table column headers', () => {

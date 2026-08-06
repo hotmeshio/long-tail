@@ -26,6 +26,8 @@ let GMAIL_TOOLS: any[] = [];
 try { GMAIL_TOOLS = require('../examples/seed/tool-manifests-gmail').GMAIL_TOOLS; } catch { /* not available */ }
 let IMAGE_TOOLS: any[] = [];
 try { IMAGE_TOOLS = require('../examples/mcp-servers/tool-manifests-image').IMAGE_TOOLS; } catch { /* not available */ }
+let ORTHO_TOOLS: any[] = [];
+try { ORTHO_TOOLS = require('../examples/seed/tool-manifests-ortho').ORTHO_TOOLS; } catch { /* not available */ }
 
 // ── Role constants ──────────────────────────────────────────────────────────
 
@@ -349,6 +351,19 @@ if (IMAGE_TOOLS.length > 0) {
       category: 'Media',
       compileHints: 'Image tools accept file paths from storage. Use file_storage tools to upload images first.',
       toolManifest: IMAGE_TOOLS,
+    },
+  };
+}
+
+// Ortho pipeline — example connector for the ortho-pipeline example workflow
+if (ORTHO_TOOLS.length > 0) {
+  builtinMcpServerFactories['long-tail-ortho'] = {
+    factory: () => import('../examples/mcp-servers/ortho').then((m) => m.createOrthoServer()),
+    config: {
+      description: 'AI-operable interface for the 8-stage ortho manufacturing pipeline example — submit orders, list and complete pending stage escalations, and track workflow status.',
+      tags: ['ortho', 'pipeline', 'manufacturing', 'example'],
+      category: 'Automation',
+      toolManifest: ORTHO_TOOLS,
     },
   };
 }

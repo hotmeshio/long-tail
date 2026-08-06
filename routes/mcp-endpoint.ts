@@ -43,7 +43,10 @@ router.post('/', requireAuth, async (req, res) => {
     await server.connect(transport);
     await transport.handleRequest(req as any, res as any, req.body);
   } catch (err: any) {
-    loggerRegistry.error(`[lt-mcp:endpoint] error: ${err.message}`);
+    // Log the full stack, not just the message — otherwise a 500 here is
+    // undiagnosable from the deployment logs (the caller only sees a generic
+    // "Internal server error").
+    loggerRegistry.error(`[lt-mcp:endpoint] error: ${err?.stack || err?.message || err}`);
     if (!res.headersSent) {
       res.status(500).json({
         jsonrpc: '2.0',

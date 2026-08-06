@@ -108,39 +108,48 @@ export async function createUnifiedMcpServer(
   const unified = new McpServer({ name: 'long-tail', version: '1.0.0' });
   const registered = new Set<string>();
 
-  for (const [name, entry] of Object.entries(builtinMcpServerFactories)) {
+  for (const [name] of Object.entries(builtinMcpServerFactories)) {
     if (!isServerAllowed(name, exposure)) continue;
 
-    const server = await getOrCreateServer(name);
-    if (!server) continue;
+    // Isolate each shipped server: a factory or registration that throws
+    // (e.g. a backend/credential missing in one environment) must not deny
+    // every other server's tools by taking down the whole /mcp endpoint.
+    try {
+      const server = await getOrCreateServer(name);
+      if (!server) continue;
 
-    const tools = (server as any)._registeredTools as Record<string, any> | undefined;
-    if (!tools) continue;
+      const tools = (server as any)._registeredTools as Record<string, any> | undefined;
+      if (!tools) continue;
 
-    for (const [toolName, tool] of Object.entries(tools)) {
-      if (!tool?.handler || !tool.enabled) continue;
-      if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
+      for (const [toolName, tool] of Object.entries(tools)) {
+        if (!tool?.handler || !tool.enabled) continue;
+        if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
 
-      // Deduplicate: prefix with server short name on collision
-      let finalName = toolName;
-      if (registered.has(toolName)) {
-        const prefix = name.replace('long-tail-', '').replace(/-/g, '_');
-        finalName = `${prefix}_${toolName}`;
-        if (registered.has(finalName)) continue; // still a collision — skip
+        // Deduplicate: prefix with server short name on collision
+        let finalName = toolName;
+        if (registered.has(toolName)) {
+          const prefix = name.replace('long-tail-', '').replace(/-/g, '_');
+          finalName = `${prefix}_${toolName}`;
+          if (registered.has(finalName)) continue; // still a collision — skip
+        }
+        registered.add(finalName);
+
+        // Re-register the tool handler on the unified server.
+        // Use the low-level `tool()` API since we already have the parsed handler.
+        (unified as any).registerTool(
+          finalName,
+          {
+            title: tool.title,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+            annotations: tool.annotations,
+          },
+          tool.handler,
+        );
       }
-      registered.add(finalName);
-
-      // Re-register the tool handler on the unified server.
-      // Use the low-level `tool()` API since we already have the parsed handler.
-      (unified as any).registerTool(
-        finalName,
-        {
-          title: tool.title,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          annotations: tool.annotations,
-        },
-        tool.handler,
+    } catch (err: any) {
+      loggerRegistry.error(
+        `[lt-mcp:endpoint] server "${name}" failed to load, skipping its tools: ${err?.stack || err?.message || err}`,
       );
     }
   }

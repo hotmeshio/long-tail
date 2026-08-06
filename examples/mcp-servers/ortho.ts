@@ -1,6 +1,10 @@
 /**
  * Ortho pipeline MCP tools — AI-operable interface for the 8-stage manufacturing workflow.
  *
+ * This is an example connector: it accompanies the ortho-pipeline example
+ * workflow and is registered conditionally (see system/index.ts). It is NOT
+ * part of the shipped framework and is excluded from the npm package.
+ *
  * ortho_submit          — start a new order through the orthoPipeline workflow
  * ortho_pending         — list open stage escalations waiting for completion
  * ortho_complete_stage  — claim and resolve one stage escalation (advances the pipeline)
@@ -9,12 +13,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { invokeWorkflow } from '../../../services/workflow-invocation';
-import * as escalationApi from '../../../api/escalations';
-import * as workflowApi from '../../../api/workflows';
-import { ensureSystemBot } from '../../../services/iam';
-import type { LTApiAuth } from '../../../types/sdk';
-import { ORTHO_STAGES, ORTHO_STAGE_TYPE, ORTHO_PIPELINE_WORKFLOW } from '../../../examples/workflows/ortho-pipeline/types';
+import { invokeWorkflow } from '../../services/workflow-invocation';
+import * as escalationApi from '../../api/escalations';
+import * as workflowApi from '../../api/workflows';
+import { ensureSystemBot } from '../../services/iam';
+import type { LTApiAuth } from '../../types/sdk';
+import { ORTHO_STAGES, ORTHO_STAGE_TYPE, ORTHO_PIPELINE_WORKFLOW } from '../workflows/ortho-pipeline/types';
 
 let systemPrincipalId: string | null = null;
 
@@ -268,4 +272,14 @@ export function registerOrthoTools(server: McpServer): void {
       };
     },
   );
+}
+
+/**
+ * Create the ortho example MCP server. Mirrors the other example connectors
+ * (gmail, playwright): news up an McpServer, registers the tools, returns it.
+ */
+export async function createOrthoServer(): Promise<McpServer> {
+  const server = new McpServer({ name: 'long-tail-ortho', version: '1.0.0' });
+  registerOrthoTools(server);
+  return server;
 }
