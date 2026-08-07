@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../common/modal/Modal';
-import { SimpleMarkdown } from '../../common/display/SimpleMarkdown';
 import { useScanInput } from '../../../hooks/useScanInput';
 import { formatTimeAgo } from '../../../lib/format';
 import { isChoiceEnabled, matchChoiceByCode } from './choice-code';
 import type { ScanExecuteResponse, ScanPresentedChoice } from '../../../api/scan-codes';
 
-function RealityRow({ label, value }: { label: string; value: string }) {
+/** Format a metadata leaf for display: booleans read as Yes/No, objects compact
+ *  to JSON, empty values show an em dash. */
+function formatFactValue(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function FactRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-4 py-2">
-      <span className="w-32 shrink-0 text-xs uppercase tracking-wide text-text-tertiary">{label}</span>
-      <span className="text-sm text-text-primary break-all">{value}</span>
+      <span className="w-32 shrink-0 text-2xs uppercase tracking-wide text-text-quaternary">{label}</span>
+      <span className="text-sm text-text-primary break-words">{value}</span>
     </div>
   );
+}
+
+/** Inline dot separator for the dense summary line. */
+function Dot() {
+  return <span className="text-text-quaternary select-none">·</span>;
 }
 
 /**
@@ -70,44 +83,55 @@ export function InfoChoiceScreen({
 
   const assignedTo = (escalation.assigned_to as string | null) ?? null;
   const claimState = !assignedTo ? 'Unclaimed' : assignedTo === selfId ? 'Claimed by you' : 'Claimed';
+  const claimClass = assignedTo === selfId ? 'text-accent' : 'text-text-secondary';
   const typeLine = [escalation.type, escalation.subtype].filter(Boolean).join(' · ');
+  const metaEntries = Object.entries(metadata);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col max-w-form">
-      {/* Reality — stated plainly */}
+      {/* Reality — the located item's identity up top, dense summary beneath,
+          then its metadata as a clean definition list. */}
       <div>
         {response.rule?.name && (
-          <div className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">
+          <div className="text-2xs font-semibold uppercase tracking-widest text-accent mb-2">
             {response.rule.name}
           </div>
         )}
-        <h2 className="text-xl text-text-primary mb-4">
+        <h2 className="text-2xl font-medium leading-tight text-text-primary mb-2">
           {(escalation.description as string) || typeLine || 'Located item'}
         </h2>
-        <div className="divide-y divide-surface-border border-y border-surface-border">
-          <RealityRow label="Queue" value={String(escalation.role ?? '—')} />
-          {typeLine && <RealityRow label="Type" value={typeLine} />}
-          <RealityRow label="Claim" value={claimState} />
+        {/* Dense one-line summary of the system facts. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-secondary mb-5">
+          <span>{String(escalation.role ?? '—')}</span>
+          {typeLine && (<><Dot /><span>{typeLine}</span></>)}
+          <Dot /><span className={claimClass}>{claimState}</span>
           {typeof escalation.created_at === 'string' && (
-            <RealityRow label="Age" value={formatTimeAgo(escalation.created_at)} />
+            <><Dot /><span>{formatTimeAgo(escalation.created_at)}</span></>
           )}
-          {Object.entries(metadata).map(([key, value]) => (
-            <RealityRow key={key} label={key} value={String(value)} />
-          ))}
         </div>
+        {metaEntries.length > 0 && (
+          <div className="divide-y divide-surface-border border-t border-surface-border">
+            {metaEntries.map(([key, value]) => (
+              <FactRow key={key} label={key} value={formatFactValue(value)} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Choices — the human's tap (or a second scan) disambiguates */}
       <div className="mt-8 space-y-3">
         {choices.map((choice) => {
           const enabled = isChoiceEnabled(choice, hasActingIdentity);
+          // Withheld choices stay fully presented and tappable — the identity
+          // requirement is collected on the ensuing badge screen, not announced
+          // here (one instruction at a time keeps this screen clear).
           return (
             <div key={choice.index}>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => (enabled ? select(choice) : onWithheldSelect(choice))}
-                className={`w-full text-left px-5 py-4 text-lg border border-surface-border rounded hover:bg-surface-sunken transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${enabled ? 'text-text-primary' : 'text-text-secondary'}`}
+                className="w-full text-left px-5 py-4 text-lg text-text-primary border border-surface-border rounded hover:bg-surface-sunken transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span className="flex items-baseline gap-3">
                   {choice.label}
@@ -116,15 +140,6 @@ export function InfoChoiceScreen({
                   )}
                 </span>
               </button>
-              {!enabled && (
-                <div className="text-xs text-status-warning mt-1.5 px-1">
-                  {response.notPrimed?.markdown ? (
-                    <SimpleMarkdown content={response.notPrimed.markdown} compact />
-                  ) : (
-                    <>Scan your badge to {choice.label.toLowerCase()}</>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

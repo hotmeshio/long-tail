@@ -35,6 +35,12 @@ export interface AnalyticsFilter {
   facets?: Record<string, unknown>;
   /** Case-insensitive facet-value prefix match, keyed by facet. */
   prefix?: Record<string, string>;
+  /**
+   * Exact facet-value match via the text projection (metadata->>key = value),
+   * keyed by facet. Compares as text, so a categorical value the aggregate
+   * returned (bool/enum/number, all surfaced as text) round-trips as a filter.
+   */
+  equals?: Record<string, string>;
   block?: Record<string, unknown>[];
   /** Row carries ANY of these facet sets (max 200) — the positive mirror of block. */
   anyOf?: Record<string, unknown>[];

@@ -113,6 +113,12 @@ export function requireCleanFilter(
       throw new AnalyticsInputError(`${label}.prefix["${key}"] must be a non-empty string`);
     }
   }
+  for (const [key, value] of Object.entries(q.equals ?? {})) {
+    requireFacetKey(key, `${label}.equals key`);
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new AnalyticsInputError(`${label}.equals["${key}"] must be a non-empty string`);
+    }
+  }
   if (q.anyOf !== undefined) {
     if (!Array.isArray(q.anyOf) || q.anyOf.length === 0) {
       throw new AnalyticsInputError(`${label}.anyOf must be a non-empty array of facet sets`);

@@ -6,7 +6,7 @@
 // as services/escalation/sql.ts. Metadata facets use the GIN index (`@>`).
 // ---------------------------------------------------------------------------
 
-import type { FacetOrder, FacetQuery, FacetRange } from '../../types';
+import type { FacetOrder, FacetQuery } from '../../types';
 
 // Top-level columns a caller may sort/range on directly. Anything else must be a
 // `metadata.<key>` facet. Keeps interpolation to a fixed, audited set.
@@ -79,6 +79,16 @@ export function buildFacetWhere(
     if (!FACET_KEY.test(key) || typeof value !== 'string' || !value) continue;
     params.push(`${escapeLikePrefix(value)}%`);
     clauses.push(`${metaExpr(key)} ILIKE $${params.length}`);
+  }
+
+  // Exact match on facet VALUES via the text projection — the same projection
+  // groupBy uses, so a categorical value the aggregate returned (bool/enum/
+  // number, all surfaced as text) round-trips as a filter. Rides the same
+  // bounded scans as `prefix`.
+  for (const [key, value] of Object.entries(q.equals ?? {})) {
+    if (!FACET_KEY.test(key) || typeof value !== 'string' || !value) continue;
+    params.push(value);
+    clauses.push(`${metaExpr(key)} = $${params.length}`);
   }
 
   for (const r of q.range ?? []) {

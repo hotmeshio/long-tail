@@ -49,6 +49,15 @@ const STATE_PAGE = {
 
 let dwellOverflow = false;
 
+// The slice aggregate: state dwell grouped by the categorical facet (no anyOf).
+const SLICE_PAGE = {
+  groups: [
+    { state: 'print', facets: { facility: 'solo' }, dwellSeconds: 600, sampleCount: 3 },
+    { state: 'print', facets: { facility: 'solitude' }, dwellSeconds: 300, sampleCount: 2 },
+  ],
+  overflow: false,
+};
+
 function isEntityRank(input: AggregateByFacetsInput | null): boolean {
   return !!input && input.measure.kind === 'dwell'
     && input.groupBy.facets?.[0] === 'serialNumber' && !input.groupBy.state;
@@ -59,9 +68,17 @@ function isEntityStates(input: AggregateByFacetsInput | null): boolean {
     && input.groupBy.state === true && !!input.query.anyOf;
 }
 
+function isSlice(input: AggregateByFacetsInput | null): boolean {
+  return !!input && input.measure.kind === 'dwell'
+    && input.groupBy.state === true && input.groupBy.facets?.[0] === 'facility' && !input.query.anyOf;
+}
+
 function installAggregates() {
   mockUseAggregateByFacets.mockImplementation((input: AggregateByFacetsInput | null) => {
     if (!input) return { data: undefined, error: null, isLoading: false };
+    if (isSlice(input)) {
+      return { data: SLICE_PAGE, error: null, isLoading: false };
+    }
     if (isEntityRank(input)) {
       return { data: { ...RANK_PAGE, overflow: dwellOverflow }, error: null, isLoading: false };
     }
@@ -74,6 +91,8 @@ function installAggregates() {
 
 const onFindChange = vi.fn();
 const onEntityChange = vi.fn();
+const onSliceKeyChange = vi.fn();
+const onSliceValueChange = vi.fn();
 
 function renderLens(overrides?: Partial<Parameters<typeof EntityLensView>[0]>) {
   return render(
@@ -85,6 +104,8 @@ function renderLens(overrides?: Partial<Parameters<typeof EntityLensView>[0]>) {
       onFindChange={onFindChange}
       entityValue={null}
       onEntityChange={onEntityChange}
+      onSliceKeyChange={onSliceKeyChange}
+      onSliceValueChange={onSliceValueChange}
       {...overrides}
     />,
   );
@@ -189,7 +210,56 @@ describe('EntityLensView entity table', () => {
 
   it('keeps the History affordance as the same deep-link action', () => {
     renderLens();
-    fireEvent.click(screen.getAllByTitle('Open timeline')[1]);
+    fireEvent.click(screen.getAllByTitle(/open timeline/i)[1]);
     expect(onEntityChange).toHaveBeenCalledWith('SN-2');
+  });
+});
+
+describe('EntityLensView slice modes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dwellOverflow = false;
+    installAggregates();
+  });
+
+  const scopedRanks = (): AggregateByFacetsInput[] =>
+    mockUseAggregateByFacets.mock.calls
+      .map((c) => c[0] as AggregateByFacetsInput | null)
+      .filter((i): i is AggregateByFacetsInput => isEntityRank(i) && !!i!.query.equals);
+
+  it('compare mode renders one column per slice value, each ranked by a per-value equality scope', () => {
+    renderLens({ sliceKey: 'facility' });
+    // Column headers center-ellipsize long values, so match on the full-value title.
+    expect(screen.getByTitle('solo')).toBeInTheDocument();
+    expect(screen.getByTitle('solitude')).toBeInTheDocument();
+    // Scope is an exact text match (round-trips the aggregate's text value),
+    // never a jsonb-containment anyOf that would miss booleans/numbers.
+    const facilities = scopedRanks().map((i) => (i.query.equals as Record<string, string>).facility);
+    expect(facilities).toContain('solo');
+    expect(facilities).toContain('solitude');
+    expect(scopedRanks().every((i) => i.query.anyOf === undefined)).toBe(true);
+    // The compare grid is a bounded snapshot — never paginated.
+    expect(screen.queryByText('Prev')).not.toBeInTheDocument();
+  });
+
+  it('compare columns pull a bounded top-K, not an offset page', () => {
+    renderLens({ sliceKey: 'facility' });
+    expect(scopedRanks()[0].limit).toBe(15);
+    expect(scopedRanks()[0].offset).toBeUndefined();
+  });
+
+  it('focus mode scopes the paginated ranking to the targeted value and restores the pager', () => {
+    renderLens({ sliceKey: 'facility', sliceValue: 'solo' });
+    const rank = lastRank();
+    expect(rank.query.equals).toEqual({ facility: 'solo' });
+    expect(rank).toMatchObject({ groupBy: { facets: ['serialNumber'] }, limit: 50, offset: 0 });
+    expect(screen.getByText('Prev')).toBeInTheDocument();
+    expect(screen.getByText(/all facility/)).toBeInTheDocument();
+  });
+
+  it('the page-size selector drives the ranking limit', () => {
+    renderLens({ sliceKey: 'facility', sliceValue: 'solo' });
+    fireEvent.change(screen.getByLabelText('Results per page'), { target: { value: '100' } });
+    expect(lastRank().limit).toBe(100);
   });
 });

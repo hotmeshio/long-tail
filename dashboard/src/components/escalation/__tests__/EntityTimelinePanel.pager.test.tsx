@@ -25,6 +25,12 @@ vi.mock('../../../hooks/useShellPanel', () => ({
   useShellPanel: () => ({ closePanel: vi.fn() }),
 }));
 
+// The self-serve color hook runs its own analytics queries — out of scope here;
+// the injected-resolver path is what these tests exercise.
+vi.mock('../../../pages/operations/useEntityStateColors', () => ({
+  useEntityStateColors: () => () => undefined,
+}));
+
 import { EntityTimelinePanel } from '../EntityTimelinePanel';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -68,6 +74,23 @@ describe('EntityTimelinePanel pager + copy link', () => {
     setHead(HEAD_DESC, false);
     render(<EntityTimelinePanel facetKey="serialNumber" value="SN-100" entity="serialNumber" />);
     expect(screen.queryByText('Load earlier')).not.toBeInTheDocument();
+  });
+
+  it('colors interval dots from the injected resolver (the graphic\'s exact map)', () => {
+    setHead(HEAD_DESC, false);
+    // The opener maps a category to the graphic's color; the panel must use it
+    // verbatim, not recompute one from its own intervals.
+    const injected = (iv: TimelineInterval) => (iv.role === 'stationC' ? 'rgb(1, 2, 3)' : undefined);
+    render(
+      <EntityTimelinePanel
+        facetKey="serialNumber"
+        value="SN-100"
+        entity="serialNumber"
+        intervalColor={injected}
+      />,
+    );
+    // Dot carries its category as title; stationC's dot uses the injected color.
+    expect(screen.getByTitle('stationC')).toHaveStyle({ backgroundColor: 'rgb(1, 2, 3)' });
   });
 
   it('loads earlier intervals with before = oldest loaded and prepends them', async () => {

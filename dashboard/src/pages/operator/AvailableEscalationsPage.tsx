@@ -158,9 +158,11 @@ export function AvailableEscalationsPage() {
   const facetHighlightKeys = facetFilters.facets ? Object.keys(facetFilters.facets) : [];
 
   // View mode is DEEP-LINKED (?view=table|timeline|rich) and tied to the filter-bar
-  // toggles — a shared link reproduces the exact presentation. Explicit param wins;
-  // absent, the page auto-picks: timeline when a filter narrows the set, else the
-  // role's rich list view when one exists, else the table.
+  // toggles — a shared link reproduces the exact presentation. The table is the
+  // default: it is the dense, scannable, countable presentation, and a metadata
+  // facet search should show the most recent matching events at a glance. The
+  // timeline is opt-in (?view=timeline) via the filter-bar toggle; absent an
+  // explicit view the role's rich list view shows when one exists, else the table.
   const viewParam = searchParams.get('view');
   const setViewParam = useCallback((v: 'table' | 'timeline' | 'rich' | null) => {
     setSearchParams((prev) => {
@@ -169,7 +171,7 @@ export function AvailableEscalationsPage() {
       return p;
     }, { replace: true });
   }, [setSearchParams]);
-  const showTimeline = viewParam ? viewParam === 'timeline' : activeFacetCount > 0;
+  const showTimeline = viewParam === 'timeline';
 
   // Remove a single facet key from the active query.
   const removeFacet = useCallback((key: string) => {

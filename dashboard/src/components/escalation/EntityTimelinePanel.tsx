@@ -10,6 +10,14 @@ import {
 import { useEscalationAnalyticsEvents } from '../../hooks/useEventHooks';
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { formatDateTime, formatDurationCompact } from '../../lib/format';
+import { assignLabelColors } from '../../pages/operations/mix-colors';
+import { useEntityStateColors } from '../../pages/operations/useEntityStateColors';
+
+/** The category a row belongs to — its state within the process (subtype),
+ *  falling back to the role. This is the axis the timeline graphic colors by,
+ *  NOT the escalation lifecycle (resolved/expired) which would be near-uniform
+ *  across a mostly-completed history. */
+const categoryOf = (iv: TimelineInterval): string => iv.subtype ?? iv.role;
 
 // Newest page size — the head query and every "load earlier" page.
 const TIMELINE_PAGE_SIZE = 100;
@@ -36,12 +44,20 @@ export function EntityTimelinePanel({
   value,
   role,
   entity,
+  intervalColor,
 }: {
   facetKey: string;
   value: string;
   role?: string;
   /** Scope to the derived entity system (every role declaring this entity facet). */
   entity?: string;
+  /**
+   * Optional color resolver from the opener (the entity lens): maps an interval
+   * to the EXACT color the timeline graphic uses for its category, so the list
+   * and the band agree. Absent (standalone opens), the panel colors from its
+   * own intervals — consistent, but not cross-component identical.
+   */
+  intervalColor?: (interval: TimelineInterval) => string | undefined;
 }) {
   useEscalationAnalyticsEvents();
   const { closePanel } = useShellPanel();
@@ -56,6 +72,13 @@ export function EntityTimelinePanel({
     order: 'desc',
     limit: TIMELINE_PAGE_SIZE,
   });
+
+  // Color resolution: the opener's resolver (the lens, period-matched to its
+  // band) wins; otherwise derive the entity system's colors here so station
+  // detail and cell popovers color by the same scheme. When a resolver is
+  // supplied, the fallback does no fetching.
+  const systemColor = useEntityStateColors({ entity, role }, { enabled: !intervalColor });
+  const resolveColor = intervalColor ?? systemColor;
 
   // Head page, chronological. Older pages prepend before it.
   const headIntervals = [...(data?.intervals ?? [])].reverse();
@@ -79,6 +102,14 @@ export function EntityTimelinePanel({
   }, [headSignature, data]);
 
   const intervals = [...older, ...headIntervals];
+
+  // Category colors — the same palette generator the timeline graphic uses,
+  // keyed by each row's category and weighted by dwell so the dominant states
+  // take the lead palette slots. The dot reads as "what this was," matching the
+  // band segments on the left.
+  const categoryColors = assignLabelColors(
+    intervals.map((iv) => ({ label: categoryOf(iv), weight: iv.durationSeconds })),
+  );
 
   const loadEarlier = async () => {
     const oldest = intervals[0]?.startedAt;
@@ -161,7 +192,10 @@ export function EntityTimelinePanel({
               {intervals.map((interval, i) => (
                 <Fragment key={`${interval.startedAt}-${i}`}>
                   {i > 0 && <GapRow prev={intervals[i - 1]} next={interval} />}
-                  <IntervalRow interval={interval} />
+                  <IntervalRow
+                    interval={interval}
+                    color={resolveColor(interval) ?? categoryColors.get(categoryOf(interval))}
+                  />
                 </Fragment>
               ))}
             </div>
@@ -196,17 +230,15 @@ function CopyLinkButton({ entity, value }: { entity: string; value: string }) {
   );
 }
 
-function statusDotClass(interval: TimelineInterval): string {
-  if (interval.endedAt === null) return 'bg-accent';
-  if (interval.status === 'resolved') return 'bg-status-success-graphic';
-  return 'bg-status-error';
-}
-
-function IntervalRow({ interval }: { interval: TimelineInterval }) {
+function IntervalRow({ interval, color }: { interval: TimelineInterval; color?: string }) {
   return (
     <div className="relative flex gap-3 py-2">
+      {/* Filled dot in the row's CATEGORY color — matches the graphic's segments,
+          so the list reads by state the same way the band does. */}
       <span
-        className={`dot-ring w-[9px] h-[9px] rounded-full shrink-0 mt-1 relative z-10 ${statusDotClass(interval)}`}
+        className="w-[9px] h-[9px] rounded-full shrink-0 mt-1 relative z-10"
+        style={{ backgroundColor: color ?? 'rgb(var(--lt-surface-border))' }}
+        title={categoryOf(interval)}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">

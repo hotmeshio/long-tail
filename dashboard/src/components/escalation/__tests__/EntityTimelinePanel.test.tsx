@@ -24,6 +24,12 @@ vi.mock('../../../hooks/useShellPanel', () => ({
   useShellPanel: () => ({ closePanel: mockClosePanel }),
 }));
 
+// The self-serve color hook runs its own analytics queries — out of scope for
+// these render tests (no QueryClient); stub it to a no-op resolver.
+vi.mock('../../../pages/operations/useEntityStateColors', () => ({
+  useEntityStateColors: () => () => undefined,
+}));
+
 import { EntityTimelinePanel } from '../EntityTimelinePanel';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────

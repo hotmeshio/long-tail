@@ -712,6 +712,8 @@ export function OperationsPage() {
         // Entity-scoped params belong to one lens — a switch resets them.
         p.delete('entity');
         p.delete('find');
+        p.delete('slice');
+        p.delete('sliceValue');
         return p;
       });
     },
@@ -748,6 +750,35 @@ export function OperationsPage() {
         },
         { replace: true },
       );
+    },
+    [setSearchParams],
+  );
+
+  // Slice params: ?slice= (the categorical facet) and ?sliceValue= (the focused
+  // value). Both push history — they define the view, so back/forward and the
+  // upper-right bookmark reproduce it. Changing the facet drops any focus.
+  const sliceParam = searchParams.get('slice');
+  const sliceValueParam = searchParams.get('sliceValue');
+  const setSliceParam = useCallback(
+    (key: string | null) => {
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        if (key) p.set('slice', key);
+        else p.delete('slice');
+        p.delete('sliceValue');
+        return p;
+      });
+    },
+    [setSearchParams],
+  );
+  const setSliceValueParam = useCallback(
+    (value: string | null) => {
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev);
+        if (value) p.set('sliceValue', value);
+        else p.delete('sliceValue');
+        return p;
+      });
     },
     [setSearchParams],
   );
@@ -846,24 +877,6 @@ export function OperationsPage() {
                 />
               </div>
             )}
-            {!activeLens && (
-            <div className="flex items-center gap-0.5 px-4 pt-2 pb-0.5">
-              {(['lin', 'log'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setLogScale(mode === 'log')}
-                  className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
-                    (logScale ? 'log' : 'lin') === mode
-                      ? 'text-accent font-semibold'
-                      : 'icon-link'
-                  }`}
-                  title={mode === 'lin' ? 'Linear Y axis' : 'Logarithmic Y axis — reveals shape across wide value ranges'}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-            )}
           </div>
 
           {activeLens ? (
@@ -878,22 +891,45 @@ export function OperationsPage() {
               onFindChange={setFindParam}
               entityValue={entityParam}
               onEntityChange={setEntityParam}
+              sliceKey={sliceParam}
+              onSliceKeyChange={setSliceParam}
+              sliceValue={sliceValueParam}
+              onSliceValueChange={setSliceValueParam}
             />
           ) : (
             <>
               {/* Middle row: flexible, never below 40vh — SVG fills left, sidebar fixed-width right */}
               <div className="flex-1 min-h-[40vh] flex items-stretch overflow-hidden">
                 {/* SVG chart — scales to fill available space */}
-                <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-center overflow-hidden px-2 py-4">
-                  <PaceChart
-                    stations={chartStations}
-                    selectedRole={selectedRole}
-                    onSelect={handleSelect}
-                    onUpstreamSelect={handleUpstreamSelect}
-                    onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
-                    periodHours={PERIOD_HOURS[period]}
-                    logScale={logScale}
-                  />
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden px-2 py-4">
+                  {/* Scale toggle — centered over the timeline it controls, not stranded on the far edge */}
+                  <div className="flex items-center justify-center gap-0.5 pb-2 shrink-0">
+                    {(['lin', 'log'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setLogScale(mode === 'log')}
+                        className={`px-2 py-0.5 text-2xs font-mono rounded transition-colors ${
+                          (logScale ? 'log' : 'lin') === mode
+                            ? 'text-accent font-semibold'
+                            : 'icon-link'
+                        }`}
+                        title={mode === 'lin' ? 'Linear Y axis' : 'Logarithmic Y axis — reveals shape across wide value ranges'}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                    <PaceChart
+                      stations={chartStations}
+                      selectedRole={selectedRole}
+                      onSelect={handleSelect}
+                      onUpstreamSelect={handleUpstreamSelect}
+                      onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
+                      periodHours={PERIOD_HOURS[period]}
+                      logScale={logScale}
+                    />
+                  </div>
                 </div>
                 {/* Vertical divider */}
                 <div className="w-px bg-surface-border shrink-0 self-stretch" />

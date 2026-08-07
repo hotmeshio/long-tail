@@ -68,11 +68,13 @@ describe('InfoChoiceScreen', () => {
     expect(screen.getByText('SN-88')).toBeInTheDocument();
   });
 
-  it('renders every choice as a button; withheld ones carry the badge affordance', () => {
+  it('renders every choice as a plain, tappable button with no badge hint on this screen', () => {
     renderScreen();
     expect(screen.getByRole('button', { name: /Collected/ })).toBeEnabled();
+    // Withheld choices stay fully presented and tappable — no dimming, no hint.
     expect(screen.getByRole('button', { name: /Ship it/ })).toBeEnabled();
-    expect(screen.getByText('Scan your badge to ship it')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Scrap/ })).toBeEnabled();
+    expect(screen.queryByText(/scan your badge/i)).not.toBeInTheDocument();
   });
 
   it('tapping a withheld choice hands it off as pending instead of executing', () => {
@@ -82,17 +84,17 @@ describe('InfoChoiceScreen', () => {
     expect(onWithheldSelect).toHaveBeenCalledWith(expect.objectContaining({ index: 1, label: 'Ship it' }));
   });
 
-  it('prefers the rule notPrimed markdown as the withheld affordance', () => {
+  it('never renders the notPrimed badge copy on this screen (deferred to the badge step)', () => {
     const response = { ...choicesResponse(), notPrimed: { markdown: '**Badge up** at the kiosk first.' } };
     renderScreen({ response });
-    expect(screen.getByText(/at the kiosk first/)).toBeInTheDocument();
-    expect(screen.queryByText('Scan your badge to ship it')).not.toBeInTheDocument();
+    expect(screen.queryByText(/at the kiosk first/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ship it/ })).toBeEnabled();
   });
 
-  it('enables withheld choices once an acting identity primes', () => {
+  it('withheld choices are tappable with or without an acting identity', () => {
     renderScreen({ hasActingIdentity: true });
     expect(screen.getByRole('button', { name: /Ship it/ })).toBeEnabled();
-    expect(screen.queryByText('Scan your badge to ship it')).not.toBeInTheDocument();
+    expect(screen.queryByText(/scan your badge/i)).not.toBeInTheDocument();
   });
 
   it('executes an unguarded choice on tap', () => {
