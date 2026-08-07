@@ -1,19 +1,54 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Play } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
+import { useShellPanelOptional } from '../../../hooks/useShellPanel';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
-import { WorkflowSelector } from './WorkflowSelector';
+import { WorkflowSelector, workflowQueues } from './WorkflowSelector';
 import { StartNowPanel } from './StartNowPanel';
+
+// Shell-panel ownership key — the invoke form claims/releases this slot.
+const INVOKE_PANEL_KEY = 'invoke-run';
+
+/** The invoke form framed for the shell panel: small header with a close X. */
+function InvokeRunPanel({
+  config,
+  executionsPath,
+  onClose,
+}: {
+  config: LTWorkflowConfig;
+  executionsPath: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
+        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Invoke</p>
+        <button onClick={onClose} className="icon-link" title="Close" aria-label="Close">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 pb-6 pt-1">
+        <StartNowPanel selected={config} executionsPath={executionsPath} />
+      </div>
+    </div>
+  );
+}
 
 export function StartWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: configsData, isLoading } = useWorkflowConfigs();
   const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
   const { data: cronEntries } = useCronStatus();
+  const shell = useShellPanelOptional();
 
   const selectedType = searchParams.get('type') ?? '';
+  // The list filters live at page level so the FilterBar spans the page —
+  // the standard master-list geometry.
+  const [search, setSearch] = useState('');
+  const [activeQueue, setActiveQueue] = useState<string | null>(null);
 
   const configs: LTWorkflowConfig[] = configsData ?? [];
 
@@ -57,20 +92,21 @@ export function StartWorkflowPage() {
 
   const executionsPath = '/workflows/executions';
 
-  // Fade transition when selection changes
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [panelVisible, setPanelVisible] = useState(true);
-  const prevKeyRef = useRef(selectedType);
-  useEffect(() => {
-    if (prevKeyRef.current !== selectedType) {
-      setPanelVisible(false);
-      const timer = setTimeout(() => {
-        prevKeyRef.current = selectedType;
-        setPanelVisible(true);
-      }, 120);
-      return () => clearTimeout(timer);
-    }
-  }, [selectedType]);
+  const setType = useCallback(
+    (value: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set('type', value);
+          else next.delete('type');
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+  const clearSelection = useCallback(() => setType(null), [setType]);
 
   useEffect(() => {
     if (invocableConfigs.length === 1 && !searchParams.get('type')) {
@@ -78,8 +114,52 @@ export function StartWorkflowPage() {
     }
   }, [invocableConfigs.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── ?type= ↔ shell panel sync ──────────────────────────────────────────────
+  // The param is the source of truth: a change (row click, deep link,
+  // back/forward) opens/closes the run panel in the shell's right slot; an
+  // external close (the panel's X, slot takeover) clears the param. Refs
+  // guard both directions against loops — the same pattern as EntityLensView.
+  const appliedType = useRef<string | null>(null);
+  const panelWasOpen = useRef(false);
+  useEffect(() => {
+    if (!shell) return;
+    const type = selectedConfig ? selectedType : null;
+    if (type === appliedType.current) return;
+    appliedType.current = type;
+    if (type && selectedConfig) {
+      shell.setPanel(
+        <InvokeRunPanel config={selectedConfig} executionsPath={executionsPath} onClose={clearSelection} />,
+        { key: INVOKE_PANEL_KEY, width: 420 },
+      );
+    } else {
+      panelWasOpen.current = false;
+      shell.closePanel(INVOKE_PANEL_KEY);
+    }
+  }, [selectedType, selectedConfig, shell, clearSelection, executionsPath]);
+  useEffect(() => {
+    if (!shell || !selectedType) return;
+    if (shell.open && shell.ownerKey === INVOKE_PANEL_KEY) {
+      panelWasOpen.current = true;
+      return;
+    }
+    if (panelWasOpen.current) {
+      panelWasOpen.current = false;
+      clearSelection();
+    }
+  }, [shell, selectedType, clearSelection]);
+  // Unmount with the panel open releases the slot (keyed — never yanks
+  // another claimant's panel).
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
+  useEffect(
+    () => () => {
+      if (appliedType.current) shellRef.current?.closePanel(INVOKE_PANEL_KEY);
+    },
+    [],
+  );
+
   const handleSelect = (config: LTWorkflowConfig) => {
-    setSearchParams({ type: config.workflow_type }, { replace: true });
+    setType(config.workflow_type);
   };
 
   if (isLoading || discoveredLoading) {
@@ -101,40 +181,37 @@ export function StartWorkflowPage() {
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-8 items-start">
-
-          {/* ── Left: workflow list (2 cols) ── */}
-          <div className="col-span-2">
-            <WorkflowSelector
-              configs={invocableConfigs}
-              selectedType={selectedType}
-              onSelect={handleSelect}
-              tierMap={tierMap}
-              activeTypes={activeTypes}
-            />
-          </div>
-
-          {/* ── Right: invoke form (1 col, sticky) ── */}
-          <div
-            ref={panelRef}
-            className={`sticky top-4 transition-all duration-200 ease-out ${
-              panelVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
-            }`}
-          >
-            {selectedType && selectedConfig ? (
-              <div className="border-l border-surface-border pl-6">
-                <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <Play className="w-6 h-6 text-text-quaternary mb-3" strokeWidth={1} />
-                <p className="text-sm text-text-tertiary">Select a workflow</p>
-                <p className="text-xs text-text-quaternary mt-1">Choose one from the list to configure and invoke it.</p>
-              </div>
+        <>
+          {/* The standard full-width sticky filter band — above the list. */}
+          <FilterBar>
+            {workflowQueues(invocableConfigs).length > 1 && (
+              <FilterSelect
+                label="Queue"
+                value={activeQueue ?? ''}
+                onChange={(v) => setActiveQueue(v || null)}
+                options={workflowQueues(invocableConfigs).map((q) => ({ value: q, label: q }))}
+              />
             )}
-          </div>
+            <FilterInput
+              label="Search"
+              value={search}
+              onChange={setSearch}
+              placeholder={`${invocableConfigs.length} workflows…`}
+            />
+          </FilterBar>
 
-        </div>
+          {/* The list IS the page — selecting a row opens the invoke form in
+              the shell's right panel. */}
+          <WorkflowSelector
+            configs={invocableConfigs}
+            selectedType={selectedType}
+            onSelect={handleSelect}
+            tierMap={tierMap}
+            activeTypes={activeTypes}
+            search={search}
+            activeQueue={activeQueue}
+          />
+        </>
       )}
     </div>
   );

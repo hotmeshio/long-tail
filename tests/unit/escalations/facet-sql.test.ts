@@ -51,6 +51,21 @@ describe('buildFacetWhere', () => {
     expect((params[0] as string[]).length).toBe(2);
   });
 
+  it('equals matches a facet VALUE via the text projection (round-trips bool/enum/number)', () => {
+    const { clause, params } = where({ equals: { pdac: 'true', model: 'p1s' } });
+    // Text equality on the same projection groupBy uses — not jsonb containment.
+    expect(clause).toContain(`(metadata->>'pdac') = $`);
+    expect(clause).toContain(`(metadata->>'model') = $`);
+    expect(clause).not.toContain('@>');
+    expect(params).toContain('true');
+    expect(params).toContain('p1s');
+  });
+
+  it('equals with an invalid facet key is dropped — injection safety', () => {
+    const { clause } = where({ equals: { 'bad key!': 'x' } });
+    expect(clause).toBe('TRUE');
+  });
+
   it('range with valid op adds a numeric metadata predicate', () => {
     const { clause, params } = where({ range: [{ facet: 'score', op: '>=', value: 80 }] });
     expect(clause).toContain("(metadata->>'score')::numeric >= $1");

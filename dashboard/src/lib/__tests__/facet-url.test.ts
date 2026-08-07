@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFacetParams, writeFacetParams, facetCount } from '../facet-url';
+import { parseFacetParams, writeFacetParams, facetCount, metadataFacetsUrl, metadataFacetUrl } from '../facet-url';
 
 describe('facet-url — deep-link round-trip', () => {
   it('round-trips a full faceted query through URL params', () => {
@@ -56,5 +56,37 @@ describe('facet-url — deep-link round-trip', () => {
     expect(facetCount({ jeopardy: true })).toBe(1);
     expect(facetCount({ orderBy: [{ field: 'created_at', direction: 'asc' }] })).toBe(0);
     expect(facetCount({ jeopardy: true, orderBy: [{ field: 'metadata.authorized_at', direction: 'asc' }] })).toBe(1);
+  });
+});
+
+describe('metadataFacetsUrl — a facet search lands in the dense table, newest-first', () => {
+  const orderByParam = encodeURIComponent(JSON.stringify([{ field: 'created_at', direction: 'desc' }]));
+
+  it('spans every status and defaults to the table sorted created_at desc', () => {
+    const url = metadataFacetsUrl({ po: 'X9cb7e' });
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(url.startsWith('/escalations/available?')).toBe(true);
+    expect(params.get('facets')).toBe(JSON.stringify({ po: 'X9cb7e' }));
+    expect(params.get('status')).toBe('all');
+    expect(params.get('view')).toBe('table');
+    expect(params.get('orderBy')).toBe(JSON.stringify([{ field: 'created_at', direction: 'desc' }]));
+    // Raw form is deep-linkable and matches the encoded orderBy tail.
+    expect(url).toContain(`&orderBy=${orderByParam}`);
+  });
+
+  it('preserves the role scope when provided', () => {
+    const url = metadataFacetsUrl({ po: 'X9cb7e' }, 'reviewer');
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('role')).toBe('reviewer');
+    expect(params.get('view')).toBe('table');
+    expect(params.get('status')).toBe('all');
+  });
+
+  it('single-pair convenience carries the same table + sort defaults', () => {
+    const url = metadataFacetUrl('orderId', 'ORD-001');
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('facets')).toBe(JSON.stringify({ orderId: 'ORD-001' }));
+    expect(params.get('view')).toBe('table');
+    expect(params.get('orderBy')).toBe(JSON.stringify([{ field: 'created_at', direction: 'desc' }]));
   });
 });

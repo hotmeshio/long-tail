@@ -1,9 +1,13 @@
-import { useState, useMemo } from 'react';
-import { Bot, Clock, Server, Wrench } from 'lucide-react';
-import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
+import { useMemo } from 'react';
+import { Bot, Clock, Play, Server, Wrench } from 'lucide-react';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
+
+/** The queue set a page-level filter bar offers — shared with the grouping below. */
+export function workflowQueues(configs: LTWorkflowConfig[]): string[] {
+  return [...new Set(configs.map((c) => c.task_queue).filter(Boolean))].sort() as string[];
+}
 
 export function WorkflowSelector({
   configs,
@@ -11,20 +15,19 @@ export function WorkflowSelector({
   onSelect,
   tierMap,
   activeTypes,
+  search,
+  activeQueue,
 }: {
   configs: LTWorkflowConfig[];
   selectedType: string;
   onSelect: (config: LTWorkflowConfig) => void;
   tierMap: Map<string, WorkflowTier>;
   activeTypes?: Set<string>;
+  /** Owned by the page — the standard full-width FilterBar renders there. */
+  search: string;
+  activeQueue: string | null;
 }) {
-  const [search, setSearch] = useState('');
-  const [activeQueue, setActiveQueue] = useState<string | null>(null);
-
-  const queues = useMemo(
-    () => [...new Set(configs.map((c) => c.task_queue).filter(Boolean))].sort(),
-    [configs],
-  );
+  const queues = useMemo(() => workflowQueues(configs), [configs]);
 
   // Group by task queue; workflows without a queue collect under a trailing section
   const grouped = useMemo(() => {
@@ -51,23 +54,6 @@ export function WorkflowSelector({
 
   return (
     <div>
-      <FilterBar>
-        {queues.length > 1 && (
-          <FilterSelect
-            label="Queue"
-            value={activeQueue ?? ''}
-            onChange={(v) => setActiveQueue(v || null)}
-            options={queues.map((q) => ({ value: q, label: q }))}
-          />
-        )}
-        <FilterInput
-          label="Search"
-          value={search}
-          onChange={setSearch}
-          placeholder={`${configs.length} workflows…`}
-        />
-      </FilterBar>
-
       {grouped.length === 0 ? (
         <p className="text-sm text-text-tertiary py-8 text-center">No workflows match your filter.</p>
       ) : (
@@ -121,7 +107,7 @@ function WorkflowRow({
   return (
     <button
       onClick={() => onSelect(config)}
-      className="group relative w-full text-left py-2 px-3 -mx-3 rounded-md transition-colors duration-150"
+      className="group relative w-full text-left py-2 px-3 -mx-3 rounded-md hover:bg-surface-hover/30 transition-colors duration-150"
     >
       {isSelected && (
         <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full" />
@@ -146,6 +132,16 @@ function WorkflowRow({
             </span>
           )}
           <NamespacePill namespace="durable" />
+          {/* Trailing action icon — quiet until row hover, visible on the
+              selected row. Selecting opens the invoke form in the shell panel. */}
+          <span title="Configure & invoke">
+            <Play
+              className={`w-3 h-3 transition-opacity ${
+                isSelected ? 'text-accent opacity-100' : 'text-accent opacity-0 group-hover:opacity-100'
+              }`}
+              strokeWidth={1.5}
+            />
+          </span>
         </span>
       </div>
     </button>

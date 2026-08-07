@@ -70,6 +70,18 @@ vi.mock('../../../../api/bots', () => ({
   useBots: () => ({ data: { bots: [] } }),
 }));
 
+// Shell panel mock — selection opens the run panel in the shell's right slot.
+const mockSetPanel = vi.fn();
+const mockClosePanel = vi.fn();
+vi.mock('../../../../hooks/useShellPanel', () => ({
+  useShellPanelOptional: () => ({
+    open: false,
+    ownerKey: null,
+    setPanel: mockSetPanel,
+    closePanel: mockClosePanel,
+  }),
+}));
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderPage(initialEntries = ['/workflows/start']) {
@@ -85,7 +97,7 @@ function renderPage(initialEntries = ['/workflows/start']) {
 
 import { StartWorkflowPage } from '../StartWorkflowPage';
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// ── Tests — the full-width master list ───────────────────────────────────────
 
 describe('StartWorkflowPage', () => {
   beforeEach(() => {
@@ -105,14 +117,14 @@ describe('StartWorkflowPage', () => {
     expect(screen.queryByText('Schedule')).not.toBeInTheDocument();
   });
 
-  it('renders workflow selector with all invocable workflows', () => {
-    renderPage();
-    // Workflows are grouped by task queue with a section header per queue
+  it('renders workflow selector full-width with all invocable workflows', () => {
+    const { container } = renderPage();
     expect(screen.getByRole('heading', { name: 'long-tail-examples-reviewContent' })).toBeInTheDocument();
     expect(screen.getByText('reviewContent')).toBeInTheDocument();
     expect(screen.getByText('processClaim')).toBeInTheDocument();
-    // every procedural workflow carries the 'durable' namespace pill
     expect(screen.getAllByText('durable').length).toBeGreaterThanOrEqual(1);
+    // The old reserved right column is gone — the list is the page.
+    expect(container.querySelector('.grid-cols-3')).not.toBeInTheDocument();
   });
 
   it('includes discovered durable workflows in the selector', () => {
@@ -120,9 +132,31 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByText('durableOnly')).toBeInTheDocument();
   });
 
-  it('shows prompt to select a workflow when none is selected', () => {
+  it('opens no run panel when nothing is selected', () => {
     renderPage();
-    expect(screen.getByText('Select a workflow')).toBeInTheDocument();
+    expect(mockSetPanel).not.toHaveBeenCalled();
+    expect(screen.queryByText('Select a workflow')).not.toBeInTheDocument();
+  });
+
+  it('shows a trailing invoke icon per row, quiet until row hover', () => {
+    renderPage();
+    const icons = screen.getAllByTitle('Configure & invoke');
+    expect(icons.length).toBe(3); // reviewContent, processClaim, durableOnly
+    for (const wrapper of icons) {
+      const svg = wrapper.querySelector('svg');
+      expect(svg?.getAttribute('class')).toContain('opacity-0');
+      expect(svg?.getAttribute('class')).toContain('group-hover:opacity-100');
+    }
+  });
+
+  it('keeps the trailing icon visible on the selected row', () => {
+    renderPage(['/workflows/start?type=reviewContent']);
+    const icons = screen.getAllByTitle('Configure & invoke');
+    // Exact token match — the quiet rows carry group-hover:opacity-100 instead.
+    const visible = icons.filter((w) =>
+      w.querySelector('svg')?.getAttribute('class')?.split(' ').includes('opacity-100'),
+    );
+    expect(visible.length).toBe(1);
   });
 
   it('shows loading skeleton when configs are loading', () => {
@@ -145,12 +179,6 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByText(/Mark workflows as invocable/)).toBeInTheDocument();
   });
 
-  it('shows the StartNowPanel when a workflow is selected with mode=now', () => {
-    renderPage(['/workflows/start?type=reviewContent&mode=now']);
-    // StartNowPanel renders the workflow_type as a SectionLabel and the Start Workflow button
-    expect(screen.getByText('Start Workflow')).toBeInTheDocument();
-  });
-
   it('displays workflow description when available', () => {
     renderPage();
     expect(screen.getByText('Review user-generated content')).toBeInTheDocument();
@@ -162,30 +190,11 @@ describe('StartWorkflowPage', () => {
     expect(screen.getByText('lt-system')).toBeInTheDocument();
   });
 
-  it('shows workflow heading in StartNowPanel', () => {
-    renderPage(['/workflows/start?type=reviewContent&mode=now']);
-    // Heading appears as h2 in the panel (also in sidebar as pill text)
-    const headings = screen.getAllByText('reviewContent');
-    expect(headings.length).toBeGreaterThanOrEqual(2); // sidebar + panel heading
-  });
-
-  it('shows identity summary in StartNowPanel', () => {
-    renderPage(['/workflows/start?type=reviewContent&mode=now']);
-    expect(screen.getByText('Running as')).toBeInTheDocument();
-    // No execute_as, so shows user
-    expect(screen.getByText('Test User')).toBeInTheDocument();
-  });
-
-  it('auto-selects workflow when only one is available', () => {
-    workflowConfigsOverride = {
-      data: [mockConfigs[0]],
-      isLoading: false,
-    };
+  it('auto-selects workflow when only one is available and opens its panel', () => {
+    workflowConfigsOverride = { data: [mockConfigs[0]], isLoading: false };
     discoveredOverride = { data: [], isLoading: false };
     renderPage();
-    // With a single invocable workflow, it should auto-select it
-    // and show the StartNowPanel instead of "Select a workflow"
-    expect(screen.queryByText('Choose a workflow to get started')).not.toBeInTheDocument();
-    expect(screen.getByText('Start Workflow')).toBeInTheDocument();
+    expect(mockSetPanel).toHaveBeenCalled();
+    expect(mockSetPanel.mock.calls[0][1]).toEqual({ key: 'invoke-run', width: 420 });
   });
 });

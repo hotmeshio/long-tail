@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
 import { useRoleDetails, type RoleDetail } from '../../../api/roles';
+import { FilterBar, FilterInput } from '../../../components/common/data/FilterBar';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
 import { displayRoleTitle } from '../../../lib/role-display';
@@ -167,26 +167,29 @@ export function RolesPage() {
         }
       />
 
-      {/* Filter bar + table header — one sticky block, no seam for rows to bleed through */}
+      {/* The standard full-width sticky filter band; the table header pins
+          just beneath it on the shared 60px offset. */}
       {!isLoading && roles.length > 0 && (
-        <div className="sticky top-0 z-20 bg-surface pt-3">
-          <div className="bg-surface-sunken rounded-lg px-5 py-3 mb-3 flex items-center gap-3">
-            <Search className="w-3 h-3 text-text-quaternary shrink-0" />
-            <input
-              type="text"
+        <>
+          <FilterBar>
+            <FilterInput
+              label="Search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${roles.length} roles…`}
-              className="input w-56"
+              onChange={setSearch}
+              placeholder={`${roles.length} roles…`}
             />
             {search && filtered.length !== roles.length && (
               <span className="text-2xs text-text-quaternary tabular-nums shrink-0">
                 {filtered.length} of {roles.length}
               </span>
             )}
-          </div>
-          {filtered.length > 0 && <TableHead />}
-        </div>
+          </FilterBar>
+          {filtered.length > 0 && (
+            <div className="sticky top-[60px] z-10 bg-surface">
+              <TableHead />
+            </div>
+          )}
+        </>
       )}
 
       {/* Table */}

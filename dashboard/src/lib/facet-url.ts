@@ -51,7 +51,18 @@ export function writeFacetParams(p: URLSearchParams, f: FacetFilters): void {
  * Single source of truth — use this everywhere a refine gesture should
  * navigate to a filtered queue (timeline cards, refine dialogs, detail
  * panel). Never pass values through String() first.
+ *
+ * A metadata facet search spans every status and lands in the dense table
+ * sorted newest-first — the most recent matching event sits at the top and the
+ * whole match set is scannable at a glance. status/view/orderBy are explicit in
+ * the URL so the link is shareable and reproduces the exact presentation; the
+ * user can still switch to the timeline from the filter bar.
  */
+const FACET_SEARCH_TAIL =
+  `&status=all&view=table&orderBy=${encodeURIComponent(
+    JSON.stringify([{ field: 'created_at', direction: 'desc' }]),
+  )}`;
+
 export function metadataFacetsUrl(pairs: Record<string, unknown>, role?: string | null): string {
   const facetPairs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(pairs)) {
@@ -59,9 +70,9 @@ export function metadataFacetsUrl(pairs: Record<string, unknown>, role?: string 
   }
   const facets = encodeURIComponent(JSON.stringify(facetPairs));
   if (role) {
-    return `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}&status=all`;
+    return `/escalations/available?role=${encodeURIComponent(role)}&facets=${facets}${FACET_SEARCH_TAIL}`;
   }
-  return `/escalations/available?facets=${facets}&status=all`;
+  return `/escalations/available?facets=${facets}${FACET_SEARCH_TAIL}`;
 }
 
 /** Single-pair convenience over metadataFacetsUrl. */

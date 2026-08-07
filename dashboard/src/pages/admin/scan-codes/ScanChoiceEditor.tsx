@@ -90,9 +90,11 @@ function ChoiceRow({
   };
 
   return (
-    <div className="py-3 space-y-3">
+    // Generous space above each header so every choice reads as its own section,
+    // clearly set off from the divider above it.
+    <div className="pt-8 pb-5 space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-widest text-text-quaternary">Choice {index + 1}</span>
+        <span className="text-xs font-semibold uppercase tracking-widest text-text-tertiary">Choice {index + 1}</span>
         <button type="button" onClick={onRemove} className="icon-link ml-auto" title="Remove choice">
           <Trash2 className="w-3.5 h-3.5" />
         </button>

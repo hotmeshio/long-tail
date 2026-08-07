@@ -13,6 +13,13 @@ export interface EntityRow {
   nowState: string | null;
 }
 
+/** One ranked slice value: the column's header timeline and its dwell total. */
+export interface SliceValue {
+  value: string;
+  groups: AggregateRow[];
+  total: number;
+}
+
 export function totalDwell(groups: AggregateRow[]): number {
   return groups.reduce((sum, g) => sum + (g.dwellSeconds ?? 0), 0) || 1;
 }
@@ -68,4 +75,32 @@ export function pivotEntities(
     });
   }
   return rows;
+}
+
+/**
+ * Rank a slice query's rows (grouped by state + the slice key) into per-value
+ * state-split bundles — top N by total dwell. These become the lens columns,
+ * each bundle the column's header timeline.
+ */
+export function rankSliceValues(
+  sliceGroups: AggregateRow[],
+  sliceKey: string,
+  limit = 12,
+): SliceValue[] {
+  const byValue = new Map<string, AggregateRow[]>();
+  for (const g of sliceGroups) {
+    if ((g.dwellSeconds ?? 0) <= 0) continue;
+    const value = g.facets[sliceKey] ?? 'no value';
+    const rows = byValue.get(value) ?? [];
+    rows.push(g);
+    byValue.set(value, rows);
+  }
+  return [...byValue.entries()]
+    .map(([value, groups]) => ({
+      value,
+      groups: [...groups].sort((a, b) => (b.dwellSeconds ?? 0) - (a.dwellSeconds ?? 0)),
+      total: totalDwell(groups),
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit);
 }

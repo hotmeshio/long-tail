@@ -1,12 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { usePersonas } from '../../../api/personas';
+import { FilterBar, FilterInput } from '../../../components/common/data/FilterBar';
 import type { LTPersonaRecord } from '../../../api/types';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { RolePill } from '../../../components/common/display/RolePill';
+import { useShellPanelOptional } from '../../../hooks/useShellPanel';
 import { CreatePersonaModal } from './CreatePersonaModal';
 import { AssigneesPanel } from './AssigneesPanel';
+
+// Shell-panel ownership key — the Assignees panel claims/releases this slot.
+const ASSIGNEES_PANEL_KEY = 'persona-assignees';
 
 // ── Grid columns ──────────────────────────────────────────────────────────────
 // PERSONA(title, 180px) | KEY(140px) | DESCRIPTION(1fr) | ROLES(220px) | USERS(56px) | CONFIGURE(40px)
@@ -109,11 +114,54 @@ function PersonaRow({ persona, active, onClick, onConfigure }: {
 export function PersonasPage() {
   const navigate = useNavigate();
   const { data, isLoading } = usePersonas();
+  const shell = useShellPanelOptional();
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const personas = data?.personas ?? [];
+
+  // ── Selection ↔ shell panel sync ────────────────────────────────────────────
+  // Clicking a row opens the Assignees panel in the shell's right slot; an
+  // external close (the panel's X, slot takeover) clears the selection. The
+  // applied-key ref guards against re-setting the panel on unrelated renders.
+  const appliedKey = useRef<string | null>(null);
+  const panelWasOpen = useRef(false);
+  useEffect(() => {
+    if (!shell) return;
+    if (selectedKey === appliedKey.current) return;
+    appliedKey.current = selectedKey;
+    if (selectedKey) {
+      shell.setPanel(
+        <AssigneesPanel personaKey={selectedKey} onClose={() => setSelectedKey(null)} />,
+        { key: ASSIGNEES_PANEL_KEY, width: 360 },
+      );
+    } else {
+      panelWasOpen.current = false;
+      shell.closePanel(ASSIGNEES_PANEL_KEY);
+    }
+  }, [selectedKey, shell]);
+  useEffect(() => {
+    if (!shell || !selectedKey) return;
+    if (shell.open && shell.ownerKey === ASSIGNEES_PANEL_KEY) {
+      panelWasOpen.current = true;
+      return;
+    }
+    if (panelWasOpen.current) {
+      panelWasOpen.current = false;
+      setSelectedKey(null);
+    }
+  }, [shell, selectedKey]);
+  // Unmount with the panel open releases the slot (keyed — never yanks
+  // another claimant's panel).
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
+  useEffect(
+    () => () => {
+      if (appliedKey.current) shellRef.current?.closePanel(ASSIGNEES_PANEL_KEY);
+    },
+    [],
+  );
 
   const filtered = useMemo(() => {
     const sorted = [...personas].sort((a, b) =>
@@ -145,61 +193,57 @@ export function PersonasPage() {
         }
       />
 
-      {/* Table left, Assignees right — the same split as Accounts. Selecting a
-          row targets the panel; the row pencil opens the persona's config. */}
-      <div className="grid grid-cols-1 @split:grid-cols-[1fr_360px] gap-6 items-start">
-        <div className="overflow-x-clip">
-          {!isLoading && personas.length > 0 && (
-            <div className="sticky top-0 z-20 bg-surface pt-3">
-              <div className="bg-surface-sunken rounded-lg px-5 py-3 mb-3 flex items-center gap-3">
-                <Search className="w-3 h-3 text-text-quaternary shrink-0" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={`Search ${personas.length} personas…`}
-                  className="input w-56"
-                />
-                {search && filtered.length !== personas.length && (
-                  <span className="text-2xs text-text-quaternary tabular-nums shrink-0">
-                    {filtered.length} of {personas.length}
-                  </span>
-                )}
-              </div>
-              {filtered.length > 0 && <TableHead />}
-            </div>
+      {/* The standard full-width sticky filter band — above the split. */}
+      {!isLoading && personas.length > 0 && (
+        <FilterBar>
+          <FilterInput
+            label="Search"
+            value={search}
+            onChange={setSearch}
+            placeholder={`${personas.length} personas…`}
+          />
+          {search && filtered.length !== personas.length && (
+            <span className="text-2xs text-text-quaternary tabular-nums shrink-0">
+              {filtered.length} of {personas.length}
+            </span>
           )}
+        </FilterBar>
+      )}
 
-          {isLoading ? (
-            <div className="animate-pulse space-y-3 mt-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-10 bg-surface-sunken rounded w-full" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-sm text-text-tertiary mt-8">
-              {search
-                ? 'Clear the search to see all personas.'
-                : 'Create a persona to bundle roles into a one-step assignment.'}
-            </p>
-          ) : (
-            <div className="divide-y divide-surface-border/30">
-              {filtered.map((persona) => (
-                <PersonaRow
-                  key={persona.key}
-                  persona={persona}
-                  active={persona.key === selectedKey}
-                  onClick={() => setSelectedKey(persona.key)}
-                  onConfigure={() => navigate(`/admin/personas/${encodeURIComponent(persona.key)}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+      {/* The table IS the page — selecting a row opens the Assignees panel in
+          the shell's right panel; the row pencil opens the persona's config. */}
+      <div className="overflow-x-clip">
+        {!isLoading && personas.length > 0 && filtered.length > 0 && (
+          <div className="sticky top-[60px] z-10 bg-surface">
+            <TableHead />
+          </div>
+        )}
 
-        <div className="sticky top-4">
-          <AssigneesPanel personaKey={selectedKey} />
-        </div>
+        {isLoading ? (
+          <div className="animate-pulse space-y-3 mt-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 bg-surface-sunken rounded w-full" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-text-tertiary mt-8">
+            {search
+              ? 'Clear the search to see all personas.'
+              : 'Create a persona to bundle roles into a one-step assignment.'}
+          </p>
+        ) : (
+          <div className="divide-y divide-surface-border/30">
+            {filtered.map((persona) => (
+              <PersonaRow
+                key={persona.key}
+                persona={persona}
+                active={persona.key === selectedKey}
+                onClick={() => setSelectedKey(persona.key)}
+                onConfigure={() => navigate(`/admin/personas/${encodeURIComponent(persona.key)}`)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <CreatePersonaModal open={showCreate} onClose={() => setShowCreate(false)} />

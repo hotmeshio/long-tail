@@ -55,6 +55,14 @@ export interface FacetQuery {
    * entity keys (type or scan the leading characters of a serial).
    */
   prefix?: Record<string, string>;
+  /**
+   * Exact match on facet VALUES via the text projection: metadata->>key =
+   * '<value>'. Compares as text, so it round-trips whatever `groupBy` emits —
+   * booleans, enums, and numbers all surface as text — the correct way to scope
+   * to a categorical slice value the aggregate handed back (a jsonb-containment
+   * filter would need the native type the text projection has already lost).
+   */
+  equals?: Record<string, string>;
   status?: string;
   /** true = only available (unclaimed/expired); false = only held now. */
   available?: boolean;
