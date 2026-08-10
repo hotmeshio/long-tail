@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { History, ArrowRight, Clock } from 'lucide-react';
 import { StateBand } from './StateBands';
 import { CenterEllipsis } from '../../components/common/display/CenterEllipsis';
+import { metadataFacetUrl } from '../../lib/facet-url';
 import { useAggregateByFacets, type AnalyticsWindow } from '../../api/escalation-analytics';
 import type { AggregateRow } from '../../api/escalation-analytics';
 import type { EntityRow } from './entity-pivot';
@@ -26,25 +28,37 @@ export const DEFAULT_PAGE_SIZE = 50;
  * One entity row: a filled dot in the current-state color (its label is the
  * hover title, not repeated as text), the id center-ellipsized so the trailing
  * digits stay readable, the dwell timeline that fills the cell, the tracked
- * total. The whole row deep-links the entity's timeline.
+ * total. Click deep-links the entity's timeline panel; ⌘/ctrl-click jumps to
+ * the all-queues escalation search for this facet value.
  */
 export function EntityRowItem({
+  facetKey,
   row,
   colors,
   stateLabel,
   onOpen,
 }: {
+  /** The entity's metadata facet (e.g. serialNumber) — the ⌘-click search key. */
+  facetKey: string;
   row: EntityRow;
   colors: Map<string, string>;
   stateLabel: (state: string | undefined) => string;
   onOpen: (value: string) => void;
 }) {
+  const navigate = useNavigate();
+  const activate = (e: { metaKey: boolean; ctrlKey: boolean }) => {
+    if (e.metaKey || e.ctrlKey) {
+      navigate(metadataFacetUrl(facetKey, row.value));
+      return;
+    }
+    onOpen(row.value);
+  };
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(row.value)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(row.value); }}
+      onClick={activate}
+      onKeyDown={(e) => { if (e.key === 'Enter') activate(e); }}
       className={`${ROW_GRID} text-2xs cursor-pointer group py-0.5`}
     >
       <span
@@ -59,7 +73,7 @@ export function EntityRowItem({
       <StateBand groups={row.groups} colors={colors} height="h-1.5" className="min-w-[2rem]" />
       <button
         className="icon-link justify-self-center"
-        title={`${formatDurationCompact(row.total * 1000)} tracked · open timeline`}
+        title={`${formatDurationCompact(row.total * 1000)} tracked · open timeline · ⌘-click row searches every queue`}
         onClick={(e) => { e.stopPropagation(); onOpen(row.value); }}
       >
         <History className="w-3 h-3" />
@@ -74,6 +88,7 @@ export function EntityRowItem({
  * affordance that drills into the value's full, paginated list.
  */
 function EntityColumnView({
+  facetKey,
   sliced,
   header,
   rows,
@@ -84,6 +99,7 @@ function EntityColumnView({
   hasMore,
   emptyText,
 }: {
+  facetKey: string;
   sliced: boolean;
   header?: { value: string; groups: AggregateRow[]; total: number };
   rows: EntityRow[];
@@ -123,7 +139,7 @@ function EntityColumnView({
       ) : (
         <div className="space-y-0.5">
           {rows.map((row) => (
-            <EntityRowItem key={row.value} row={row} colors={colors} stateLabel={stateLabel} onOpen={onOpen} />
+            <EntityRowItem key={row.value} facetKey={facetKey} row={row} colors={colors} stateLabel={stateLabel} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -204,6 +220,7 @@ export function SliceColumnLoader({
 
   return (
     <EntityColumnView
+      facetKey={entityKey}
       sliced
       header={{ value, groups: headerGroups, total: headerTotal }}
       rows={rows}
@@ -218,12 +235,15 @@ export function SliceColumnLoader({
 
 /** A single wide column — the unsliced ranking or a focused value's paged list. */
 export function SingleColumn({
+  facetKey,
   rows,
   colors,
   stateLabel,
   onOpen,
   emptyText,
 }: {
+  /** The entity's metadata facet — the ⌘-click search key on each row. */
+  facetKey: string;
   rows: EntityRow[];
   colors: Map<string, string>;
   stateLabel: (state: string | undefined) => string;
@@ -232,6 +252,7 @@ export function SingleColumn({
 }) {
   return (
     <EntityColumnView
+      facetKey={facetKey}
       sliced={false}
       rows={rows}
       colors={colors}

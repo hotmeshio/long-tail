@@ -423,6 +423,7 @@ export function EntityLensView({
           </p>
         ) : (
           <SingleColumn
+            facetKey={entityKey}
             rows={entityRows}
             colors={colors}
             stateLabel={stateLabel}
