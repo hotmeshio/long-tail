@@ -56,8 +56,9 @@ import { registerExportTools } from './exports';
 import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 import { registerScanCodeTools } from './scan-codes';
+import { registerDomainContextTools } from './domain-context';
 
-const TOOL_COUNT = 101;
+const TOOL_COUNT = 103;
 
 let server: McpServer | null = null;
 
@@ -77,7 +78,7 @@ export async function createAdminServer(options?: {
   registerTaskTools(instance);              //  2 tools
   registerEscalationTools(instance);        // 20 tools (RO + RW single + metadata + bulk)
   registerWorkflowConfigTools(instance);    //  3 tools
-  registerWorkflowTools(instance);          //  3 tools
+  registerWorkflowTools(instance);          //  4 tools (+ terminate_workflow)
   registerMcpServerTools(instance);         //  4 tools
   registerYamlWorkflowTools(instance);      //  5 tools
   registerUserTools(instance);              // 10 tools (users + roles + role schemas)
@@ -94,7 +95,8 @@ export async function createAdminServer(options?: {
   registerOverviewTools(instance);          //  1 tool
   registerDiagnosticsTools(instance);       //  3 tools
   registerScanCodeTools(instance);          //  5 tools (scan schemes + rules + execute)
-  // Total: 101
+  registerDomainContextTools(instance);     //  1 tool  (get_domain_context)
+  // Total: 103
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
   return instance;

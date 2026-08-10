@@ -421,6 +421,16 @@ export interface LTStartConfig {
     /** Replace the built-in MCP adapter entirely. */
     adapter?: LTMcpAdapter;
     /**
+     * Path to a JSON DomainDictionary — the deployment's ontology (jargon
+     * terms mapped to roles/workflows/facets/verbs, plus runbooks). Resolved
+     * relative to the host process cwd and SEEDED into `lt_domain` at boot
+     * (insert-if-absent with drift + reference warnings; never fails boot).
+     * The DB row is the runtime truth: edit live via PUT /api/domain, which
+     * validates role/workflow references against the live registries. Exposed
+     * through the MCP `instructions` index and the `get_domain_context` tool.
+     */
+    domainDictionaryPath?: string;
+    /**
      * Controls which tools are exposed when this instance acts as an MCP server.
      * All fields are optional — omit the entire object for unrestricted access.
      */

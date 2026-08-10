@@ -181,6 +181,9 @@ export const LIST_ENFORCING_ROLES = `
 export const GET_ROLE_METADATA_SCHEMA = `
   SELECT metadata_schema FROM lt_roles WHERE role = $1`;
 
+export const GET_ROLE_PROPERTIES = `
+  SELECT properties FROM lt_roles WHERE role = $1`;
+
 export const GET_ROLE_UPSTREAMS = `
   SELECT upstream_role FROM lt_role_upstreams WHERE role = $1 ORDER BY upstream_role`;
 

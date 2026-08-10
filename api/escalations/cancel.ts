@@ -1,4 +1,6 @@
 import * as escalationService from '../../services/escalation';
+import { getRoleProperties } from '../../services/role';
+import { ROLE_PROPERTY_KEYS } from '../../services/role/types';
 import { validateIds, checkBulkPermission, assertWriteAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
@@ -28,7 +30,20 @@ export async function cancelSingleEscalation(
     if (!cancelled) {
       return { status: 409, error: 'Escalation is not cancellable (already terminal)' };
     }
-    return { status: 200, data: { cancelled: true, escalationId: id } };
+    // Cancel semantics invert by role — surface the role's own on_cancel
+    // statement (lt_roles.properties, ROLE_PROPERTY_KEYS) so the caller reads
+    // the true effect. The bag is open: only a plain string qualifies.
+    const properties = await getRoleProperties(cancelled.role);
+    const onCancel = properties?.[ROLE_PROPERTY_KEYS.ON_CANCEL];
+    return {
+      status: 200,
+      data: {
+        cancelled: true,
+        escalationId: id,
+        role: cancelled.role,
+        ...(typeof onCancel === 'string' && onCancel ? { note: onCancel } : {}),
+      },
+    };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

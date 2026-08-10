@@ -23,6 +23,15 @@ export {
 } from './escalation';
 
 export type {
+  DomainDictionary,
+  DomainTerm,
+  DomainTermKind,
+  DomainTermMapping,
+  DomainRunbook,
+  DomainIndex,
+} from './domain-manifest';
+
+export type {
   FacetRangeOp,
   FacetRange,
   FacetOrder,
