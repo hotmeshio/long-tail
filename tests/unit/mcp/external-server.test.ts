@@ -1,7 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// The domain-dictionary read is DB-backed and fail-soft; keep this suite
+// deterministic (no DB) by controlling the index the instructions build from.
+let mockIndex: Record<string, any> | null = null;
+vi.mock('../../../services/domain', () => ({
+  getDomainIndex: vi.fn(async () => mockIndex),
+  getDomainDictionary: vi.fn(async () => null),
+}));
+
 import { createUnifiedMcpServer } from '../../../services/mcp/external-server';
 
 describe('createUnifiedMcpServer', () => {
+  beforeEach(() => {
+    mockIndex = null;
+  });
+
+  it('carries no instructions when no dictionary is registered (fail-soft)', async () => {
+    const server = await createUnifiedMcpServer();
+    expect((server as any).server._instructions).toBeUndefined();
+  });
+
+  it('carries the dictionary index in instructions when registered', async () => {
+    mockIndex = {
+      name: 'acme farm',
+      version: '2',
+      overview: 'A print farm.',
+      terms: { entity: ['printer', 'order'], rule: ['claims-expire-is-recovery'] },
+      runbooks: ['kill a test order'],
+    };
+    const server = await createUnifiedMcpServer();
+    const instructions = (server as any).server._instructions as string;
+    expect(instructions).toContain('acme farm');
+    expect(instructions).toContain('A print farm.');
+    expect(instructions).toContain('entity: printer, order');
+    expect(instructions).toContain('runbooks: kill a test order');
+    expect(instructions).toContain('get_domain_context');
+  });
   it('creates a server with tools from shipped servers', async () => {
     const server = await createUnifiedMcpServer();
     const tools = (server as any)._registeredTools as Record<string, any>;

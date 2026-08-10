@@ -3,6 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { TimelineInterval } from '../../../api/escalation-analytics';
 
+// The facet-search affordance is a router Link; render it as a plain anchor
+// so this suite runs without mounting a Router.
+vi.mock('react-router-dom', () => ({
+  Link: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a>,
+}));
+
 // ── Mocks — head page via the hook, earlier pages via the one-shot fetch ─────
 
 const mockUseTimelineByFacet = vi.fn();
@@ -70,10 +76,10 @@ describe('EntityTimelinePanel pager + copy link', () => {
     vi.clearAllMocks();
   });
 
-  it('hides Load earlier when the head page has no overflow', () => {
+  it('hides Load older when the head page has no overflow', () => {
     setHead(HEAD_DESC, false);
     render(<EntityTimelinePanel facetKey="serialNumber" value="SN-100" entity="serialNumber" />);
-    expect(screen.queryByText('Load earlier')).not.toBeInTheDocument();
+    expect(screen.queryByText('Load older')).not.toBeInTheDocument();
   });
 
   it('colors interval dots from the injected resolver (the graphic\'s exact map)', () => {
@@ -93,12 +99,12 @@ describe('EntityTimelinePanel pager + copy link', () => {
     expect(screen.getByTitle('stationC')).toHaveStyle({ backgroundColor: 'rgb(1, 2, 3)' });
   });
 
-  it('loads earlier intervals with before = oldest loaded and prepends them', async () => {
+  it('loads older intervals with before = oldest loaded; newest-first they read downward', async () => {
     setHead(HEAD_DESC, true);
     mockFetchTimelineByFacet.mockResolvedValue({ intervals: EARLIER_DESC, overflow: false });
     render(<EntityTimelinePanel facetKey="serialNumber" value="SN-100" entity="serialNumber" />);
 
-    await userEvent.click(screen.getByText('Load earlier'));
+    await userEvent.click(screen.getByText('Load older'));
 
     expect(mockFetchTimelineByFacet).toHaveBeenCalledWith({
       facet: { key: 'serialNumber', value: 'SN-100' },
@@ -108,25 +114,39 @@ describe('EntityTimelinePanel pager + copy link', () => {
       limit: 100,
     });
 
-    // Prepended and chronological: A before B before C.
+    // Newest-first (default): C, then B, then the older A at the bottom.
+    await waitFor(() => expect(screen.getByText('stationA')).toBeInTheDocument());
+    const text = document.body.textContent ?? '';
+    expect(text.indexOf('stationC')).toBeLessThan(text.indexOf('stationB'));
+    expect(text.indexOf('stationB')).toBeLessThan(text.indexOf('stationA'));
+    expect(screen.getByText('3 intervals')).toBeInTheDocument();
+
+    // The older page reported no further overflow — the pager retires.
+    expect(screen.queryByText('Load older')).not.toBeInTheDocument();
+  });
+
+  it('the oldest-first toggle reads chronologically with the pager at the top', async () => {
+    setHead(HEAD_DESC, true);
+    mockFetchTimelineByFacet.mockResolvedValue({ intervals: EARLIER_DESC, overflow: false });
+    render(<EntityTimelinePanel facetKey="serialNumber" value="SN-100" entity="serialNumber" />);
+
+    await userEvent.click(screen.getByTestId('timeline-sort-toggle'));
+    await userEvent.click(screen.getByText('Load older'));
+
     await waitFor(() => expect(screen.getByText('stationA')).toBeInTheDocument());
     const text = document.body.textContent ?? '';
     expect(text.indexOf('stationA')).toBeLessThan(text.indexOf('stationB'));
     expect(text.indexOf('stationB')).toBeLessThan(text.indexOf('stationC'));
-    expect(screen.getByText('3 intervals')).toBeInTheDocument();
-
-    // The earlier page reported no further overflow — the pager retires.
-    expect(screen.queryByText('Load earlier')).not.toBeInTheDocument();
   });
 
-  it('keeps Load earlier while earlier pages still overflow', async () => {
+  it('keeps Load older while older pages still overflow', async () => {
     setHead(HEAD_DESC, true);
     mockFetchTimelineByFacet.mockResolvedValue({ intervals: EARLIER_DESC, overflow: true });
     render(<EntityTimelinePanel facetKey="serialNumber" value="SN-100" entity="serialNumber" />);
 
-    await userEvent.click(screen.getByText('Load earlier'));
+    await userEvent.click(screen.getByText('Load older'));
     await waitFor(() => expect(screen.getByText('stationA')).toBeInTheDocument());
-    expect(screen.getByText('Load earlier')).toBeInTheDocument();
+    expect(screen.getByText('Load older')).toBeInTheDocument();
   });
 
   it('copies the entity deep link to the clipboard with a transient note', async () => {

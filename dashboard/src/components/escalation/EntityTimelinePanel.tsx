@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { X, Link as LinkIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Link as LinkIcon, Search, ArrowDown, ArrowUp } from 'lucide-react';
 import {
   useTimelineByFacet,
   fetchTimelineByFacet,
@@ -10,6 +11,7 @@ import {
 import { useEscalationAnalyticsEvents } from '../../hooks/useEventHooks';
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { formatDateTime, formatDurationCompact } from '../../lib/format';
+import { metadataFacetUrl } from '../../lib/facet-url';
 import { assignLabelColors } from '../../pages/operations/mix-colors';
 import { useEntityStateColors } from '../../pages/operations/useEntityStateColors';
 
@@ -103,6 +105,19 @@ export function EntityTimelinePanel({
 
   const intervals = [...older, ...headIntervals];
 
+  // Display order — the dashboard convention is most-recent first, so the
+  // default is descending; the toggle is pure presentation over the loaded
+  // window. Paging is unchanged either way: the head is the newest page and
+  // the strict `before` cursor walks OLDER intervals — sound at thousands of
+  // rows (a printer's lifetime runs to ~4500 intervals), no offsets to drift.
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const displayed = sortOrder === 'desc' ? [...intervals].reverse() : intervals;
+  // The chronologically earlier/later pair for a rendered neighbor gap.
+  const gapPair = (i: number): { prev: TimelineInterval; next: TimelineInterval } =>
+    sortOrder === 'desc'
+      ? { prev: displayed[i], next: displayed[i - 1] }
+      : { prev: displayed[i - 1], next: displayed[i] };
+
   // Category colors — the same palette generator the timeline graphic uses,
   // keyed by each row's category and weighted by dwell so the dominant states
   // take the lead palette slots. The dot reads as "what this was," matching the
@@ -144,13 +159,33 @@ export function EntityTimelinePanel({
             {value}
           </p>
           {intervals.length > 0 && (
-            <p className="text-2xs text-text-quaternary mt-0.5">
-              {intervals.length} interval{intervals.length === 1 ? '' : 's'}
+            <p className="flex items-center gap-2 text-2xs text-text-quaternary mt-0.5">
+              <span>{intervals.length} interval{intervals.length === 1 ? '' : 's'}</span>
+              <span className="h-2.5 w-px bg-surface-border" />
+              <button
+                onClick={() => setSortOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
+                className="inline-flex items-center gap-0.5 icon-link"
+                title={sortOrder === 'desc' ? 'Newest first — click for oldest first' : 'Oldest first — click for newest first'}
+                data-testid="timeline-sort-toggle"
+              >
+                {sortOrder === 'desc'
+                  ? <><ArrowDown className="w-2.5 h-2.5" /> newest first</>
+                  : <><ArrowUp className="w-2.5 h-2.5" /> oldest first</>}
+              </button>
             </p>
           )}
         </div>
         <span className="flex items-center gap-1 mt-0.5 shrink-0 ml-2">
           {entity && <CopyLinkButton entity={entity} value={value} />}
+          {/* Search every queue for this facet value — the all-roles metadata search. */}
+          <Link
+            to={metadataFacetUrl(facetKey, value)}
+            className="icon-link"
+            title={`Search every queue for ${facetKey} ${value}`}
+            data-testid="timeline-facet-search"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </Link>
           <button onClick={() => closePanel('entity-timeline')} className="icon-link">
             <X className="w-4 h-4" />
           </button>
@@ -172,26 +207,23 @@ export function EntityTimelinePanel({
           </p>
         ) : (
           <div className="relative">
-            {(hasEarlier || earlierError) && (
-              <div className="pb-2 pl-5">
-                {hasEarlier && (
-                  <button
-                    onClick={loadEarlier}
-                    disabled={loadingEarlier}
-                    className="text-2xs text-text-tertiary hover:text-accent transition-colors disabled:opacity-40"
-                  >
-                    {loadingEarlier ? 'Loading earlier…' : 'Load earlier'}
-                  </button>
-                )}
-                {earlierError && <p className="text-2xs text-status-error mt-1">{earlierError}</p>}
-              </div>
+            {/* Older pages continue in the reading direction: at the TOP when
+                oldest-first, at the BOTTOM when newest-first. */}
+            {sortOrder === 'asc' && (
+              <LoadOlderControl
+                hasEarlier={hasEarlier}
+                loading={loadingEarlier}
+                error={earlierError}
+                onLoad={loadEarlier}
+                edge="top"
+              />
             )}
             {/* Left rail behind the dots */}
             <div className="absolute left-[4px] top-2 bottom-2 w-px bg-surface-border" />
             <div className="space-y-0">
-              {intervals.map((interval, i) => (
+              {displayed.map((interval, i) => (
                 <Fragment key={`${interval.startedAt}-${i}`}>
-                  {i > 0 && <GapRow prev={intervals[i - 1]} next={interval} />}
+                  {i > 0 && <GapRow {...gapPair(i)} />}
                   <IntervalRow
                     interval={interval}
                     color={resolveColor(interval) ?? categoryColors.get(categoryOf(interval))}
@@ -199,9 +231,49 @@ export function EntityTimelinePanel({
                 </Fragment>
               ))}
             </div>
+            {sortOrder === 'desc' && (
+              <LoadOlderControl
+                hasEarlier={hasEarlier}
+                loading={loadingEarlier}
+                error={earlierError}
+                onLoad={loadEarlier}
+                edge="bottom"
+              />
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The cursor pager — walks strictly-older intervals a page at a time. */
+function LoadOlderControl({
+  hasEarlier,
+  loading,
+  error,
+  onLoad,
+  edge,
+}: {
+  hasEarlier: boolean;
+  loading: boolean;
+  error: string | null;
+  onLoad: () => void;
+  edge: 'top' | 'bottom';
+}) {
+  if (!hasEarlier && !error) return null;
+  return (
+    <div className={`${edge === 'top' ? 'pb-2' : 'pt-2'} pl-5`}>
+      {hasEarlier && (
+        <button
+          onClick={onLoad}
+          disabled={loading}
+          className="text-2xs text-text-tertiary hover:text-accent transition-colors disabled:opacity-40"
+        >
+          {loading ? 'Loading older…' : 'Load older'}
+        </button>
+      )}
+      {error && <p className="text-2xs text-status-error mt-1">{error}</p>}
     </div>
   );
 }

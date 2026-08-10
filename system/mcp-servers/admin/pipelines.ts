@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as api from '../../../api/pipelines';
+import { pickPaths } from '../../../lib/json-path/pick';
 import {
   listPipelineEntitiesSchema,
   listPipelineJobsSchema,
@@ -56,7 +57,9 @@ export function registerPipelineTools(server: McpServer): void {
     'get_pipeline_execution',
     {
       title: 'Get Pipeline Execution',
-      description: 'Export execution details for a specific pipeline job.',
+      description:
+        'Export execution details for a specific pipeline job. Histories run to ' +
+        'tens of KB — pass select (dot paths) to return only what you need.',
       inputSchema: getJobExecutionSchema,
     },
     async (args: z.infer<typeof getJobExecutionSchema>) => {
@@ -67,7 +70,7 @@ export function registerPipelineTools(server: McpServer): void {
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(pickPaths(result.data, args.select)) }] };
     },
   );
 
@@ -76,7 +79,12 @@ export function registerPipelineTools(server: McpServer): void {
     'interrupt_pipeline_job',
     {
       title: 'Interrupt Pipeline Job',
-      description: 'Interrupt a running pipeline job.',
+      description:
+        'Engine-level interrupt of a running job. WARNING: this does NOT cancel the ' +
+        'workflow\'s escalations — they are stranded as pending orphans. To stop a ' +
+        'workflow cleanly use terminate_workflow, which also cancels its escalations. ' +
+        'Use interrupt_pipeline_job only for a raw engine interrupt when you have a ' +
+        'specific reason to leave escalation rows untouched.',
       inputSchema: interruptJobSchema,
     },
     async (args: z.infer<typeof interruptJobSchema>) => {

@@ -15,6 +15,7 @@ import {
   UPDATE_ROLE_METADATA,
   GET_ROLE_FORM_SCHEMA,
   GET_ROLE_METADATA_SCHEMA,
+  GET_ROLE_PROPERTIES,
   GET_ROLE_UPSTREAMS,
   LIST_ROLE_SCHEMA_VERSIONS,
   GET_ROLE_SCHEMA_VERSION,
@@ -287,6 +288,13 @@ export async function getRoleMetadataSchema(role: string): Promise<Record<string
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLE_METADATA_SCHEMA, [role]);
   return rows[0]?.metadata_schema ?? null;
+}
+
+/** The role's `properties` bag (incl. the reserved ROLE_PROPERTY_KEYS). One PK read. */
+export async function getRoleProperties(role: string): Promise<Record<string, any> | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_PROPERTIES, [role]);
+  return rows[0]?.properties ?? null;
 }
 
 /**

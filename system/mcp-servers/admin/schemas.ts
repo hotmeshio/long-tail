@@ -153,11 +153,28 @@ export const invokeWorkflowSchema = z.object({
   data: z.record(z.any()).describe('Business data for envelope.data'),
   metadata: z.record(z.any()).optional().describe('Control flow metadata'),
   execute_as: z.string().optional().describe('Bot external_id override (admin only)'),
+  options: z.record(z.any()).optional().describe(
+    'HotMesh WorkflowOptions passthrough (same surface as the HTTP invoke route). ' +
+    'workflowId sets a deterministic id — use the deployment\'s id convention (see ' +
+    'get_domain_context) so idempotence guards hold. entity/expire/search are safe. ' +
+    'taskQueue and namespace reroute execution — set them only when you know why.',
+  ),
 });
 
 export const getWorkflowStatusSchema = z.object({
   workflow_id: z.string().describe('HotMesh workflow ID'),
   app_id: z.string().optional().describe('HotMesh namespace for resolution (default: durable). Set this to read a child/workflow running in another app.'),
+});
+
+export const terminateWorkflowSchema = z.object({
+  workflow_id: z.string().describe('HotMesh workflow ID to terminate'),
+});
+
+export const getDomainContextSchema = z.object({
+  topic: z.enum(['term', 'entity', 'role', 'workflow', 'facet', 'action', 'rule', 'runbook']).optional()
+    .describe('Which slice of the dictionary to return; omit for the overview + index. `term` looks a word up across every kind.'),
+  name: z.string().optional()
+    .describe('Narrow to one entry — matches the term or any alias (case-insensitive), a live role name, a workflow type, or a runbook name.'),
 });
 
 // ── mcp servers (routes/mcp.ts) ─────────────────────────────────────────────
@@ -540,6 +557,10 @@ export const listPipelineJobsSchema = z.object({
 export const getJobExecutionSchema = z.object({
   job_id: z.string().describe('Job ID to retrieve'),
   app_id: z.string().optional().default('durable').describe('HotMesh application namespace (default: durable)'),
+  select: z.array(z.string()).optional().describe(
+    'Dot paths to project the result down to (e.g. ["execution.0.activity", "status"]). ' +
+    'Execution histories run to tens of KB — select what you need.',
+  ),
 });
 
 export const interruptJobSchema = z.object({
@@ -650,9 +671,13 @@ export const listExportJobsSchema = z.object({
 
 export const exportWorkflowStateSchema = z.object({
   workflow_id: z.string().describe('Workflow ID to export'),
-  allow: z.array(z.string()).optional().describe('Allowlisted field paths'),
-  block: z.array(z.string()).optional().describe('Blocklisted field paths'),
+  allow: z.array(z.string()).optional().describe('Allowlisted export sections (data|state|status|timeline|transitions) — filters what the engine fetches'),
+  block: z.array(z.string()).optional().describe('Blocklisted export sections — filters what the engine fetches'),
   values: z.record(z.any()).optional().describe('Override values'),
+  select: z.array(z.string()).optional().describe(
+    'Dot paths to project the fetched result down to (e.g. ["data.order.manifest", "status"]). ' +
+    'allow/block choose which sections are fetched; select trims what is returned.',
+  ),
 });
 
 export const exportWorkflowExecutionSchema = z.object({
@@ -661,6 +686,9 @@ export const exportWorkflowExecutionSchema = z.object({
   omitResults: z.boolean().optional().describe('Omit activity results'),
   mode: z.string().optional().describe('Export mode'),
   maxDepth: z.number().int().optional().describe('Max traversal depth'),
+  select: z.array(z.string()).optional().describe(
+    'Dot paths to project the result down to. Event histories run to tens of KB — select what you need.',
+  ),
 });
 
 export const getExportStatusSchema = z.object({

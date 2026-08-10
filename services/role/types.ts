@@ -5,6 +5,22 @@ export interface EscalationChain {
   target_role: string;
 }
 
+/**
+ * Reserved keys inside `lt_roles.properties` — the role's verb semantics for
+ * the domain dictionary. Everything else in the bag is user-owned. Values are
+ * plain strings; readers type-guard (the bag is open, PATCH can write anything).
+ *
+ *  - ON_CANCEL: what cancel MEANS for this row class, imperative
+ *    (e.g. "reset — the dispatcher re-mints the attempt").
+ *  - ON_TIMEOUT: expiry semantics for this row class.
+ *  - WORKED_BY: who works this queue ("humans at the dashboard" | "machines" | "both").
+ */
+export const ROLE_PROPERTY_KEYS = {
+  ON_CANCEL: 'on_cancel',
+  ON_TIMEOUT: 'on_timeout',
+  WORKED_BY: 'worked_by',
+} as const;
+
 export interface RoleDetail {
   role: string;
   title: string | null;
@@ -19,7 +35,8 @@ export interface RoleDetail {
    * and creation-time metadata validation.
    */
   metadata_schema: Record<string, any> | null;
-  /** Free-form user-owned bag. No reserved keys — use for icons, colors, tags, etc. */
+  /** Free-form user-owned bag (icons, colors, tags, …), plus the reserved
+   *  domain-semantics keys in ROLE_PROPERTY_KEYS (on_cancel, on_timeout, worked_by). */
   properties: Record<string, any>;
   ops_visible: boolean;
   /**

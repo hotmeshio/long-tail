@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { AggregateByFacetsInput } from '../../../api/escalation-analytics';
 
+// Row ⌘-click navigates to the all-queues facet search; spy the navigator.
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => mockNavigate,
+}));
+
 // ── Mocks — the analytics hooks are the lens's only data sources ─────────────
 
 const mockUseAggregateByFacets = vi.fn();
@@ -206,6 +213,20 @@ describe('EntityLensView entity table', () => {
     renderLens();
     fireEvent.click(screen.getByText('SN-1'));
     expect(onEntityChange).toHaveBeenCalledWith('SN-1');
+  });
+
+  it('⌘-click on a row searches every queue for the facet value (not the panel)', () => {
+    renderLens();
+    fireEvent.click(screen.getByText('SN-1'), { metaKey: true });
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    const target = mockNavigate.mock.calls[0][0] as string;
+    expect(target).toContain('/escalations/available?');
+    expect(target).toContain(encodeURIComponent(JSON.stringify({ serialNumber: 'SN-1' })));
+    expect(target).toContain('status=all');
+    expect(target).toContain('view=table');
+    // Most recent activity first — the dashboard default.
+    expect(target).toContain(encodeURIComponent(JSON.stringify([{ field: 'created_at', direction: 'desc' }])));
+    expect(onEntityChange).not.toHaveBeenCalled();
   });
 
   it('keeps the History affordance as the same deep-link action', () => {

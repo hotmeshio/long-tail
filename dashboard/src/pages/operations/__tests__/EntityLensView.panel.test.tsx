@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
+// Row ⌘-click uses the router's navigator — stub it (no Router in this suite).
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => vi.fn(),
+}));
+
 // ── Mocks — a mutable shell so tests can simulate open/close transitions ─────
 
 const mockSetPanel = vi.fn();

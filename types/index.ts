@@ -19,7 +19,17 @@ export type {
 export {
   isEffectivelyClaimed,
   isAvailable,
+  ESCALATION_METADATA_KEYS,
 } from './escalation';
+
+export type {
+  DomainDictionary,
+  DomainTerm,
+  DomainTermKind,
+  DomainTermMapping,
+  DomainRunbook,
+  DomainIndex,
+} from './domain-manifest';
 
 export type {
   FacetRangeOp,

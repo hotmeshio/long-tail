@@ -20,6 +20,7 @@ vi.mock('../../services/escalation');
 vi.mock('../../services/role', () => ({
   canEscalateTo: vi.fn(),
   getRoleMetadataSchema: vi.fn().mockResolvedValue(null),
+  getRoleProperties: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../../services/task', () => ({ createTask: vi.fn(), getTask: vi.fn() }));
 vi.mock('../../services/escalation-strategy', () => ({ escalationStrategyRegistry: { current: null } }));

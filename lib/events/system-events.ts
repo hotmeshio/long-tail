@@ -4,6 +4,9 @@ import type { LTEvent } from '../../types';
 
 import { eventRegistry } from './index';
 import { sanitizeSubjectToken } from './matching';
+// The ONE wire shape — see escalation-wire.ts for the convention. The engine
+// path emits the projection with no extra verb context.
+import { projectEscalationRow } from './escalation-wire';
 
 // ---------------------------------------------------------------------------
 // SDK system-event bridge (HotMesh 0.22.4 `EventsConfig.publish`).
@@ -51,10 +54,11 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
     const row = (event.data ?? {}) as Record<string, any>;
     const verb = segments[3] ?? '';
     // The SDK forms `system.escalation.{id}.{verb}`; long-tail's canonical
-    // subject carries the role as the organizing token. The committed row
-    // rides in `data`, so the role is lifted from it and the subject is
-    // rewritten to `system.escalation.{role}.{id}.{verb}` — the same shape
-    // publishEscalationEvent produces for the service-mediated path.
+    // subject carries the role as the organizing token. The SDK hands the
+    // committed row in `data`; routing fields are lifted from it and the subject
+    // is rewritten to `system.escalation.{role}.{id}.{verb}` — the same shape
+    // publishEscalationEvent produces for the service-mediated path. The row
+    // itself is projected (below) before it rides the wire.
     const role = (row.role as string) || undefined;
     return {
       type: `system.escalation.${sanitizeSubjectToken(role)}.${segments[2]}.${verb}`,
@@ -70,7 +74,11 @@ export function mapSystemEvent(event: SystemEvent): LTEvent {
       // not a column). Forward it so a consumer can tell a born-assigned,
       // system-directed hand-off (`claimed` with true) from an interactive claim.
       assignedAtCreation: event.assigned_at_creation,
-      data: row,
+      // Routing + facets only — never the heavy/sensitive JSON columns. This
+      // converges the engine-mediated path toward the thin shape the service
+      // path already publishes; a consumer needing the full row fetches it by
+      // id through the authenticated read API.
+      data: projectEscalationRow(row),
       timestamp: event.ts,
     };
   }

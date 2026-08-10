@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import type { TimelineInterval } from '../../../api/escalation-analytics';
+
+// The facet-search affordance is a router Link; render it as a plain anchor
+// so href assertions work without mounting a Router.
+vi.mock('react-router-dom', () => ({
+  Link: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a>,
+}));
 
 // ── Mocks — the analytics hook is the panel's only data source ───────────────
 
@@ -70,7 +76,7 @@ describe('EntityTimelinePanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the newest-first page chronologically with the facet header', () => {
+  it('renders newest first by default (dashboard convention) with the facet header', () => {
     setTimeline([
       // Contiguous handoff (500ms) — no untracked separator between them.
       interval({ role: 'assembly', startedAt: iso(600_500), endedAt: null, durationSeconds: 120 }),
@@ -82,10 +88,43 @@ describe('EntityTimelinePanel', () => {
     expect(screen.getByText('SN-100')).toBeInTheDocument();
     expect(screen.getByText('2 intervals')).toBeInTheDocument();
 
+    // assembly (newer) reads FIRST.
     const text = document.body.textContent ?? '';
-    expect(text.indexOf('print-station')).toBeGreaterThan(-1);
-    expect(text.indexOf('print-station')).toBeLessThan(text.indexOf('assembly'));
+    expect(text.indexOf('assembly')).toBeGreaterThan(-1);
+    expect(text.indexOf('assembly')).toBeLessThan(text.indexOf('print-station'));
     expect(screen.queryByText(/untracked/)).not.toBeInTheDocument();
+  });
+
+  it('the sort toggle flips to oldest-first (chronological) and back', () => {
+    setTimeline([
+      interval({ role: 'assembly', startedAt: iso(600_500), endedAt: null, durationSeconds: 120 }),
+      interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) }),
+    ]);
+    renderPanel();
+    const toggle = screen.getByTestId('timeline-sort-toggle');
+    expect(toggle.textContent).toContain('newest first');
+
+    fireEvent.click(toggle);
+    expect(toggle.textContent).toContain('oldest first');
+    let text = document.body.textContent ?? '';
+    expect(text.indexOf('print-station')).toBeLessThan(text.indexOf('assembly'));
+
+    fireEvent.click(toggle);
+    text = document.body.textContent ?? '';
+    expect(text.indexOf('assembly')).toBeLessThan(text.indexOf('print-station'));
+  });
+
+  it('offers the all-queues facet search adjacent to the header actions', () => {
+    setTimeline([interval({ role: 'print-station', startedAt: iso(0), endedAt: iso(600_000) })]);
+    renderPanel();
+    const search = screen.getByTestId('timeline-facet-search');
+    const href = search.getAttribute('href') ?? '';
+    expect(href).toContain('/escalations/available?');
+    expect(href).toContain(encodeURIComponent(JSON.stringify({ serialNumber: 'SN-100' })));
+    expect(href).toContain('status=all');
+    expect(href).toContain('view=table');
+    // Most recent activity first — the dashboard default.
+    expect(href).toContain(encodeURIComponent(JSON.stringify([{ field: 'created_at', direction: 'desc' }])));
   });
 
   it('renders an untracked separator for gaps over one second', () => {

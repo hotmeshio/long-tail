@@ -16,6 +16,7 @@ import {
   listDiscoveredWorkflowsSchema,
   invokeWorkflowSchema,
   getWorkflowStatusSchema,
+  terminateWorkflowSchema,
 } from './schemas';
 
 export function registerWorkflowTools(server: McpServer): void {
@@ -90,6 +91,9 @@ export function registerWorkflowTools(server: McpServer): void {
         data: args.data,
         metadata: args.metadata,
         executeAs: args.execute_as,
+        // WorkflowOptions passthrough — parity with the HTTP invoke route, which
+        // spreads extra body keys into options. signalIn stays service-forced.
+        options: args.options,
         auth: { userId: 'lt-system', role: 'superadmin' },
       });
       return {
@@ -148,6 +152,35 @@ export function registerWorkflowTools(server: McpServer): void {
           type: 'text' as const,
           text: JSON.stringify({ workflow_id: args.workflow_id, status: 'complete', result: resultResult.data?.result }),
         }],
+      };
+    },
+  );
+
+  // mirrors POST /api/workflows/:workflowId/terminate — the COMPLETE kill.
+  // Terminates the handle AND cancels the workflow's escalations (the engine's
+  // app_id never matches the escalation rows', so its auto-cancel is a no-op).
+  // Prefer this over interrupt_pipeline_job, which strands escalations.
+  (server as any).registerTool(
+    'terminate_workflow',
+    {
+      title: 'Terminate Workflow',
+      description:
+        'Completely terminate a workflow: kills the durable handle AND cancels the ' +
+        'workflow\'s pending escalations. This is the correct way to stop a workflow — ' +
+        'interrupt_pipeline_job is an engine-level interrupt that leaves escalation ' +
+        'rows stranded as orphans.',
+      inputSchema: terminateWorkflowSchema,
+    },
+    async (args: z.infer<typeof terminateWorkflowSchema>) => {
+      const result = await workflowApi.terminateWorkflow({ workflowId: args.workflow_id });
+      if (result.error) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result.data) }],
       };
     },
   );

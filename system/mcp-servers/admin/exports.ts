@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as api from '../../../api/exports';
+import { pickPaths } from '../../../lib/json-path/pick';
 import {
   listExportJobsSchema,
   exportWorkflowStateSchema,
@@ -39,7 +40,8 @@ export function registerExportTools(server: McpServer): void {
       title: 'Export Workflow State',
       description:
         'Export the full workflow state using HotMesh durable export. ' +
-        'Optionally allow/block specific fields.',
+        'allow/block filter which sections the engine fetches; select projects the ' +
+        'returned JSON down to dot paths (token-efficient).',
       inputSchema: exportWorkflowStateSchema,
     },
     async (args: z.infer<typeof exportWorkflowStateSchema>) => {
@@ -52,7 +54,7 @@ export function registerExportTools(server: McpServer): void {
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(pickPaths(result.data, args.select)) }] };
     },
   );
 
@@ -63,7 +65,8 @@ export function registerExportTools(server: McpServer): void {
       title: 'Export Workflow Execution',
       description:
         'Export workflow state as a structured execution event history. ' +
-        'Useful for debugging and workflow compilation.',
+        'Useful for debugging and workflow compilation. Histories run large — ' +
+        'pass select (dot paths) to return only what you need.',
       inputSchema: exportWorkflowExecutionSchema,
     },
     async (args: z.infer<typeof exportWorkflowExecutionSchema>) => {
@@ -77,7 +80,7 @@ export function registerExportTools(server: McpServer): void {
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(pickPaths(result.data, args.select)) }] };
     },
   );
 

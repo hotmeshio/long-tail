@@ -10,7 +10,37 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../lib/logger';
 import { builtinMcpServerFactories } from '../../system';
+import { getDomainIndex } from '../domain';
 import type { ExposureConfig } from './exposure';
+
+/**
+ * The MCP `instructions` string. When a domain dictionary is registered,
+ * carries its overview + a compact names-only index and points the agent at
+ * `get_domain_context` for detail. The full ontology stays behind that tool —
+ * only this lightweight index rides every session's context. The dictionary
+ * read is TTL-cached and fails soft (null → no instructions).
+ */
+async function buildInstructions(): Promise<string | undefined> {
+  const index = await getDomainIndex();
+  if (!index) return undefined;
+  const kindLines = Object.entries(index.terms)
+    .filter(([, names]) => names && names.length)
+    .map(([kind, names]) => `${kind}: ${names!.join(', ')}`);
+  const lines = [
+    `# ${index.name} (v${index.version})`,
+    '',
+    index.overview,
+    '',
+    '## Deployment dictionary',
+    ...kindLines,
+    index.runbooks.length ? `runbooks: ${index.runbooks.join(', ')}` : '',
+    '',
+    'Call `get_domain_context` (topic + optional name) before acting on anything ' +
+    'whose meaning is deployment-specific — cancel/terminate semantics invert by ' +
+    'role, and an entity\'s id facet + roles come from its entry.',
+  ];
+  return lines.filter((l) => l !== '').join('\n');
+}
 
 // ── Shipped server allowlist ─────────────────────────────────────────────────
 // Only these servers are exposed via the /mcp endpoint.
@@ -105,7 +135,10 @@ export async function createUnifiedMcpServer(
   exposure?: ExposureConfig,
   callerScopes?: string[],
 ): Promise<McpServer> {
-  const unified = new McpServer({ name: 'long-tail', version: '1.0.0' });
+  const unified = new McpServer(
+    { name: 'long-tail', version: '1.0.0' },
+    { instructions: await buildInstructions() },
+  );
   const registered = new Set<string>();
 
   for (const [name] of Object.entries(builtinMcpServerFactories)) {

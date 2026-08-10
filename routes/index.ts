@@ -33,6 +33,7 @@ import capabilitiesRouter from './capabilities';
 import topicsRouter from './topics';
 import natsCredentialsRouter from './nats-credentials';
 import scanCodesRouter from './scan-codes';
+import domainRouter from './domain';
 
 const router = Router();
 
@@ -74,6 +75,7 @@ router.use('/agents', agentsRouter);
 router.use('/capabilities', capabilitiesRouter);
 router.use('/topics', topicsRouter);
 router.use('/scan-codes', scanCodesRouter);
+router.use('/domain', domainRouter);
 
 import overviewRouter from './overview';
 router.use('/overview', overviewRouter);

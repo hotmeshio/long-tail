@@ -283,6 +283,13 @@ export async function startWorkers(
   await seedSystemTopics();
   if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics);
 
+  // Seed the domain dictionary (every container, workers or not) — insert-if-
+  // absent with warn-only reference validation; the DB row is runtime truth.
+  if (startConfig.mcp?.domainDictionaryPath) {
+    const { seedDomainDictionary } = await import('../services/domain');
+    await seedDomainDictionary(startConfig.mcp.domainDictionaryPath);
+  }
+
   // Seed example topics when examples are enabled
   if (startConfig.examples) {
     try {
