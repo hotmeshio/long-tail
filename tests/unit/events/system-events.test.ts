@@ -79,6 +79,47 @@ describe('mapSystemEvent', () => {
     expect(mapped.assignedAtCreation).toBeUndefined();
   });
 
+  it('drops the heavy/sensitive JSON columns from the wire data', () => {
+    const mapped = mapSystemEvent(makeEscalationEvent({
+      type: 'system.escalation.esc-1.resolved',
+      data: {
+        id: 'esc-1',
+        role: 'qc_inspector',
+        status: 'resolved',
+        envelope: '{"big":"envelope"}',
+        escalation_payload: '{"initial":"payload"}',
+        resolver_payload: '{"mandate":"gcode…"}',
+      },
+    } as Partial<Types.SystemEvent>));
+    const data = mapped.data as Record<string, any>;
+    expect(data.envelope).toBeUndefined();
+    expect(data.escalation_payload).toBeUndefined();
+    expect(data.resolver_payload).toBeUndefined();
+    // Routing/classification scalars survive.
+    expect(data.id).toBe('esc-1');
+    expect(data.status).toBe('resolved');
+  });
+
+  it('keeps metadata routing facets but strips an embedded form_schema', () => {
+    const mapped = mapSystemEvent(makeEscalationEvent({
+      data: {
+        id: 'esc-1',
+        role: 'qc_inspector',
+        metadata: {
+          orderId: 'ORD-9',
+          serialNumber: 'PRN-001',
+          schema_version: 3,
+          form_schema: { type: 'object', properties: { huge: {} } },
+        },
+      },
+    } as Partial<Types.SystemEvent>));
+    const md = (mapped.data as Record<string, any>).metadata;
+    expect(md.orderId).toBe('ORD-9');
+    expect(md.serialNumber).toBe('PRN-001');
+    expect(md.schema_version).toBe(3);
+    expect(md.form_schema).toBeUndefined();
+  });
+
   it('non-escalation events pass through with their canonical type', () => {
     const mapped = mapSystemEvent({
       event_id: 'e-1',

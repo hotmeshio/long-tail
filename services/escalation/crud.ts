@@ -1,5 +1,6 @@
 import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
+import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 
 import { escalations, ensureEscalationCompatView } from './client';
@@ -67,7 +68,7 @@ export async function createEscalation(
     escalationId: escalation.id,
     role: escalation.role,
     status: 'pending',
-    data: { type: input.type, role: input.role },
+    data: escalationEventData(escalation),
   });
 
   return escalation;
@@ -97,7 +98,7 @@ export async function claimEscalation(
     escalationId: escalation.id,
     role: escalation.role,
     status: 'claimed',
-    data: { assigned_to: userId },
+    data: escalationEventData(escalation),
   });
 
   return { escalation, isExtension: result.isExtension };
@@ -146,7 +147,7 @@ export async function resolveEscalation(
     escalationId: escalation.id,
     role: escalation.role,
     status: 'resolved',
-    data: {},
+    data: escalationEventData(escalation),
   });
 
   return escalation;
@@ -185,7 +186,7 @@ export async function resolveEscalationsByIds(
       escalationId: escalation.id,
     role: escalation.role,
       status: 'resolved',
-      data: {},
+      data: escalationEventData(escalation),
     });
   }
   return records;
@@ -233,7 +234,7 @@ export async function resolveEscalationsAllOrNone(
       escalationId: escalation.id,
     role: escalation.role,
       status: 'resolved',
-      data: {},
+      data: escalationEventData(escalation),
     });
   }
   return { ok: true, escalations: records };
@@ -313,7 +314,7 @@ export async function cancelEscalation(
     escalationId: cancelled.id,
     role: cancelled.role,
     status: 'cancelled',
-    data: { reason: 'workflow_terminated' },
+    data: escalationEventData(cancelled, { reason: 'workflow_terminated' }),
   });
   return cancelled;
 }
@@ -382,7 +383,7 @@ export async function releaseEscalation(
     escalationId: released.id,
     role: released.role,
     status: 'released',
-    data: { released_by: userId },
+    data: escalationEventData(released, { released_by: userId }),
   });
   return released;
 }
@@ -435,7 +436,7 @@ export async function escalateToRole(
       escalationId: escalation.id,
       role,
       status: 'pending',
-      data: { from_role: fromRole, to_role: escalation.role },
+      data: escalationEventData(escalation, { from_role: fromRole, to_role: escalation.role }),
     });
   }
   return escalation;
@@ -487,15 +488,15 @@ export async function cancelEscalationsByWorkflowId(
 ): Promise<number> {
   await ensureEscalationCompatView();
   const pool = getPool();
-  const { rows } = await pool.query<{
-    id: string; workflow_id: string | null; workflow_type: string | null;
-    task_queue: string | null; role: string | null;
-  }>(
+  // RETURNING * so each cancelled row publishes the SAME wire projection as the
+  // single-row cancel path (escalationEventData strips the heavy JSON columns);
+  // no extra query — the UPDATE already returns the rows.
+  const { rows } = await pool.query<Record<string, any>>(
     `UPDATE public.hmsh_escalations
         SET status = 'cancelled', updated_at = NOW()
       WHERE workflow_id = $1
         AND status = 'pending'
-      RETURNING id, workflow_id, workflow_type, task_queue, role`,
+      RETURNING *`,
     [workflowId],
   );
 
@@ -509,7 +510,7 @@ export async function cancelEscalationsByWorkflowId(
       escalationId: row.id,
       role: row.role || '',
       status: 'cancelled',
-      data: { reason: 'workflow_terminated' },
+      data: escalationEventData(row, { reason: 'workflow_terminated' }),
     });
   }
   return rows.length;
@@ -627,7 +628,7 @@ export async function claimByMetadata(
     escalationId: escalation.id,
     role: escalation.role,
     status: 'claimed',
-    data: { assigned_to: userId },
+    data: escalationEventData(escalation),
   });
 
   return {
@@ -740,7 +741,7 @@ export async function resolveByMetadataAtomic(
       escalationId: escalation.id,
     role: escalation.role,
       status: 'resolved',
-      data: { resolved_by: userId },
+      data: escalationEventData(escalation, { resolved_by: userId }),
     });
 
     return { outcome: 'resolved', escalation };

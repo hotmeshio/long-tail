@@ -81,6 +81,14 @@ System families declare the fields they populate. Which fields exist is a functi
 
 Escalation subjects carry the **role** (the queue) as the organizing token. Subscribe to one queue (`system.escalation.{role}.>`), one verb across queues (`system.escalation.*.*.created`), or one item across role hops (`system.escalation.*.{id}.>`). The role token is sanitized to subject-safe characters (`[A-Za-z0-9_-]`); a `reassigned` event publishes under **both** the departing and arriving role so either queue's subscribers observe the move.
 
+#### Escalation `data` — one wire shape
+
+A lifecycle event is a **notification**, not a transport. Its `data` is the **wire-safe projection** of the escalation row — routing/classification scalars plus the metadata **facets** — and never the heavy or sensitive JSON columns. Both publisher families (the service-mediated `crud.ts` path and the engine-mediated SDK hook) build `data` through one definition, `lib/events/escalation-wire.ts`, so the shape is identical regardless of who transitioned the row.
+
+- **Kept:** the scalar columns (an allowlist) and every metadata facet (`orderId`, `serialNumber`, entity keys, `schema_version`, …) — the surface agent triggers filter/map on and the entity/faceted views route by. Verbs add their provenance alongside (`reason`, `released_by`, `resolved_by`, `from_role`/`to_role`).
+- **Dropped:** `envelope`, `escalation_payload`, `resolver_payload`, and `metadata.form_schema`. A subscriber needing these fetches the row by id through the authenticated read API — the pub channel is not authenticated.
+- **Bulk exception:** `publishBulk*` operate on many rows they don't hold in full; they publish the delta plus `bulk: true` (fetching each row to project would cost one query per row) and let subscribers fetch by id.
+
 Consumers (adapters, the agent trigger registry, input_mapping) type against the broad **`LTEvent`** — the base plus every extension as **optional** — since they can't assume any extension is present. Producers (`lib/events/publish.ts`) construct the precise `LT*Event` family types, all assignable to `LTEvent`.
 
 ### Who mints it

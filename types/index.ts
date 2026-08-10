@@ -19,6 +19,7 @@ export type {
 export {
   isEffectivelyClaimed,
   isAvailable,
+  ESCALATION_METADATA_KEYS,
 } from './escalation';
 
 export type {

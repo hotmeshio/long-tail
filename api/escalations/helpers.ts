@@ -299,6 +299,9 @@ export function publishBulkReassignEvents(
         escalationId: row.id,
         role,
         status: 'pending',
+        // Bulk exception to the one-shape convention (see lib/events/escalation-wire.ts):
+        // these rows aren't held in full, so we publish the delta + `bulk: true`
+        // rather than fetch each row to project. Subscribers fetch by id for detail.
         data: { from_role: row.role, to_role: targetRole, bulk: true },
       });
     }
@@ -327,6 +330,8 @@ export function publishBulkClaimEvents(ids: string[], assignedTo: string, knownR
         escalationId: id,
         role: roleById.get(id) ?? '',
         status: 'claimed',
+        // Bulk exception to the one-shape convention (see lib/events/escalation-wire.ts):
+        // delta + `bulk: true`, no per-row fetch. Subscribers fetch by id for detail.
         data: { assigned_to: assignedTo, bulk: true },
       });
     }
