@@ -23,6 +23,26 @@ export function safeParseJson(text: string): { ok: boolean; value?: Record<strin
 // JSON path, so they are strictly validated).
 export const FACET_KEY = /^[a-zA-Z0-9_]+$/;
 
+// ── Kiosk flag — the reserved `kiosk` key in the role's properties bag ────────
+// The draft keeps properties as a JSON string; these read/flip the one key
+// without disturbing the rest of the bag.
+
+export function readKioskFlag(properties: string): boolean {
+  const parsed = safeParseJson(properties);
+  return parsed.ok && parsed.value?.kiosk === true;
+}
+
+/** Flip the kiosk key; returns the updated JSON string, or null when the bag
+ *  is unparseable (leave it untouched rather than destroy user data). */
+export function toggleKioskFlag(properties: string): string | null {
+  const parsed = safeParseJson(properties);
+  if (!parsed.ok) return null;
+  const bag: Record<string, unknown> = { ...(parsed.value ?? {}) };
+  if (bag.kiosk === true) delete bag.kiosk;
+  else bag.kiosk = true;
+  return JSON.stringify(bag, null, 2);
+}
+
 // ── Draft state — one draft across every section; the shell owns it ──────────
 
 export interface Draft {

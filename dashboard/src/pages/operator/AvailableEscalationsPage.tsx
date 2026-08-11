@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
 import { useAccess } from '../../hooks/useAccess';
 import { useAuth } from '../../hooks/useAuth';
+import { useKioskMode } from '../../hooks/useKioskMode';
 import { isSystemTierRole } from '../../lib/task-queues';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
@@ -155,6 +156,9 @@ export function AvailableEscalationsPage() {
   }, [location.pathname, location.search, prefsData, patchPrefs]);
 
   const { canBulk: canBulkManage } = useAccess();
+  // Kiosk sessions ARE their role: the title is a plain heading and the role
+  // filter disappears — there is no other queue to switch to.
+  const { kiosk } = useKioskMode();
   const facetHighlightKeys = facetFilters.facets ? Object.keys(facetFilters.facets) : [];
 
   // View mode is DEEP-LINKED (?view=table|timeline|rich) and tied to the filter-bar
@@ -420,14 +424,16 @@ export function AvailableEscalationsPage() {
       {/* The title IS the queue selector: it reads as the chosen role's title,
           or "All Escalations". The role filter therefore leaves the bar. */}
       <div className="flex items-center gap-2 mb-10 min-w-0">
-        <EscalationTitleSelect role={filters.role} options={roleOptions} onChange={(v) => setFilter('role', v)} />
-        <button
-          onClick={() => { window.location.hash = '#docs:dashboard.md:all-escalations'; }}
-          className="text-text-quaternary hover:text-accent transition-colors mt-1 shrink-0"
-          title="Open docs for this page"
-        >
-          <BookOpen className="w-4 h-4" strokeWidth={1.5} />
-        </button>
+        <EscalationTitleSelect role={filters.role} options={roleOptions} onChange={(v) => setFilter('role', v)} locked={kiosk} />
+        {!kiosk && (
+          <button
+            onClick={() => { window.location.hash = '#docs:dashboard.md:all-escalations'; }}
+            className="text-text-quaternary hover:text-accent transition-colors mt-1 shrink-0"
+            title="Open docs for this page"
+          >
+            <BookOpen className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        )}
       </div>
 
       <EscalationFilterBar
@@ -437,6 +443,7 @@ export function AvailableEscalationsPage() {
         types={typesData?.types ?? []}
         showStatus
         showSearch={false}
+        showRole={!kiosk}
         actions={
           <>
             {showTimeline && (

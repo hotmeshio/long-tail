@@ -123,3 +123,42 @@ describe('RoleDetailPage — section sub-nav', () => {
     expect(screen.queryByText('States from')).not.toBeInTheDocument();
   });
 });
+
+describe('Members section — the kiosk toggle', () => {
+  it('renders the Station Kiosk group with an unchecked toggle for a plain role', () => {
+    renderPage('/admin/roles/print-station?section=members');
+    expect(screen.getByText('Station Kiosk')).toBeInTheDocument();
+    expect(screen.getByText('Lock single-role members to this queue')).toBeInTheDocument();
+    const toggle = screen.getByTitle('Kiosk station viewport');
+    expect(toggle.className).not.toContain('bg-accent');
+  });
+
+  it('flipping the toggle arms the draft (Save changes) and reads as on', () => {
+    renderPage('/admin/roles/print-station?section=members');
+    const toggle = screen.getByTitle('Kiosk station viewport');
+    fireEvent.click(toggle);
+    expect(toggle.className).toContain('bg-accent');
+    expect(screen.getByText('Save changes')).toBeInTheDocument();
+    // Flip back off — round-trips cleanly.
+    fireEvent.click(toggle);
+    expect(toggle.className).not.toContain('bg-accent');
+  });
+});
+
+describe('kiosk property helpers', () => {
+  it('read/toggle flip only the kiosk key, preserving the rest of the bag', async () => {
+    const { readKioskFlag, toggleKioskFlag } = await import('../role-detail-shared');
+    const bag = JSON.stringify({ color: 'blue' }, null, 2);
+    expect(readKioskFlag(bag)).toBe(false);
+    const on = toggleKioskFlag(bag)!;
+    expect(readKioskFlag(on)).toBe(true);
+    expect(JSON.parse(on)).toEqual({ color: 'blue', kiosk: true });
+    const off = toggleKioskFlag(on)!;
+    expect(JSON.parse(off)).toEqual({ color: 'blue' });
+  });
+
+  it('leaves an unparseable bag untouched (returns null)', async () => {
+    const { toggleKioskFlag } = await import('../role-detail-shared');
+    expect(toggleKioskFlag('{not json')).toBeNull();
+  });
+});

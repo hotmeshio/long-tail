@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
 import { useFollowMyClaims } from '../../hooks/useFollowMyClaims';
+import { useKioskMode, isKioskAllowedPath } from '../../hooks/useKioskMode';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
@@ -51,6 +52,9 @@ function ShellLayout() {
   const [docsOpen, setDocsOpen] = useState(() => window.location.hash.startsWith('#docs'));
   const location = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
+  // Kiosk (locked station viewport): single-role members of a kiosk role get
+  // no left nav and are held to the role list / detail / scan screens.
+  const { kiosk, homePath } = useKioskMode();
 
   // Cross-fade on route change
   useEffect(() => {
@@ -70,18 +74,26 @@ function ShellLayout() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Kiosk sessions live on the role list, the detail page, and the scan
+  // screens; the home page and every other route redirect to the locked home.
+  if (kiosk && homePath && !isKioskAllowedPath(location.pathname)) {
+    return <Navigate to={homePath} replace />;
+  }
+
   return (
     <div className="h-screen bg-surface flex flex-col">
       {/* Full-width header */}
       <Header
         onToggleEventFeed={() => setFeedOpen((v) => !v)}
         onToggleDocs={() => setDocsOpen((v) => !v)}
-        onToggleNav={() => setNavOpen((v) => !v)}
+        onToggleNav={kiosk ? undefined : () => setNavOpen((v) => !v)}
       />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar — the rail lives at lg+; below lg the NavDrawer is the nav. */}
+        {/* Sidebar — the rail lives at lg+; below lg the NavDrawer is the nav.
+            Kiosk sessions have no nav at all. */}
+        {!kiosk && (
         <aside
           className={`${
             collapsed ? 'w-16' : 'w-60'
@@ -119,6 +131,7 @@ function ShellLayout() {
             </div>
           )}
         </aside>
+        )}
 
         {/* Main content */}
         <main className="flex-1 min-w-0 overflow-y-auto">
@@ -136,16 +149,18 @@ function ShellLayout() {
         <ShellRightPanel />
       </div>
 
-      {/* Below-lg navigation drawer */}
-      <NavDrawer
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        aiEnabled={aiEnabled}
-        isBuilder={isBuilder}
-        isOps={isOps}
-        viewAs={viewAs}
-        canSeePaceBoard={canSeePaceBoard}
-      />
+      {/* Below-lg navigation drawer — absent in kiosk sessions. */}
+      {!kiosk && (
+        <NavDrawer
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          aiEnabled={aiEnabled}
+          isBuilder={isBuilder}
+          isOps={isOps}
+          viewAs={viewAs}
+          canSeePaceBoard={canSeePaceBoard}
+        />
+      )}
 
       {/* Global event feed */}
       <EventFeed open={feedOpen} onToggle={() => setFeedOpen((v) => !v)} configOpen={feedConfigOpen} onToggleConfig={() => setFeedConfigOpen((v) => !v)} />

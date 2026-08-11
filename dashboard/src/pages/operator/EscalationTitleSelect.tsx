@@ -19,12 +19,15 @@ export function EscalationTitleSelect({
   options,
   onChange,
   emptyLabel = 'All Escalations',
+  locked = false,
 }: {
   role: string;
   options: RoleTitleOption[];
   onChange: (role: string) => void;
   /** The no-role title — the page's generic name ("All Escalations", "My Escalations"). */
   emptyLabel?: string;
+  /** Kiosk sessions: the title is a plain heading — no menu, no chevron. */
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -51,6 +54,14 @@ export function EscalationTitleSelect({
     `w-full text-left px-3 py-1.5 text-sm flex items-baseline gap-2 transition-colors ${
       active ? 'text-accent bg-accent/5' : 'text-text-primary hover:bg-surface-hover'
     }`;
+
+  if (locked) {
+    return (
+      <h1 className="heading-1 min-w-0 truncate" data-testid="escalation-title-locked">
+        {current}
+      </h1>
+    );
+  }
 
   return (
     <div ref={ref} className="relative min-w-0">

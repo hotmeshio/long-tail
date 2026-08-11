@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Tag, Inbox, GitBranch, Check, Braces, Users, BookOpen, LayoutDashboard, Pin as PinIcon,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { useRoleDetails, useUpdateRole } from '../../../api/roles';
 import { RoleMembersSection } from './RoleMembersSection';
@@ -9,8 +10,11 @@ import {
   EMPTY_DRAFT,
   FACET_KEY,
   SectionGroup,
+  Toggle,
   draftFrom,
   safeParseJson,
+  readKioskFlag,
+  toggleKioskFlag,
   type Draft,
   type DraftErrors,
 } from './role-detail-shared';
@@ -246,14 +250,43 @@ export function RoleDetailPage() {
             />
           )}
           {section === 'members' && (
-            <SectionGroup
-              icon={Users}
-              label="Members"
-              annotation="read = what appears · write = what they can act on"
-              accent
-            >
-              <RoleMembersSection role={role.role} />
-            </SectionGroup>
+            <div className="space-y-14">
+              <SectionGroup
+                icon={Users}
+                label="Members"
+                annotation="read = what appears · write = what they can act on"
+                accent
+              >
+                <RoleMembersSection role={role.role} />
+              </SectionGroup>
+
+              {/* Kiosk — how single-role members experience the dashboard */}
+              <SectionGroup
+                icon={MonitorSmartphone}
+                label="Station Kiosk"
+                annotation="the locked viewport for single-role logins"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs text-text-secondary">Lock single-role members to this queue</p>
+                    <p className="text-2xs text-text-tertiary leading-relaxed mt-1">
+                      A member who holds only this role signs in to a locked viewport:
+                      no side navigation, this queue as home, held to the list, the
+                      item detail, and the scan screens. Members with other roles keep
+                      the full dashboard.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={readKioskFlag(draft.properties)}
+                    onChange={() => {
+                      const next = toggleKioskFlag(draft.properties);
+                      if (next !== null) update({ properties: next });
+                    }}
+                    title="Kiosk station viewport"
+                  />
+                </div>
+              </SectionGroup>
+            </div>
           )}
           {section === 'pins' && <PinsSection role={role} />}
         </div>

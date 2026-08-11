@@ -48,4 +48,15 @@ describe('EscalationTitleSelect', () => {
     fireEvent.click(screen.getByText('All Escalations'));
     expect(onChange).toHaveBeenCalledWith('');
   });
+
+  it('locked (kiosk) renders a plain heading — no menu opens on click', () => {
+    const onChange = vi.fn();
+    render(<EscalationTitleSelect role="intake-reviewer" options={OPTIONS} onChange={onChange} locked />);
+    const title = screen.getByTestId('escalation-title-locked');
+    expect(title.textContent).toBe('Intake Reviewer');
+    fireEvent.click(title);
+    // No menu, no role switch.
+    expect(screen.queryByText('All Escalations')).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
