@@ -88,6 +88,19 @@ Resolution order on submit: `x-lt-transition` (wait for the hand-off) →
 transition step, `x-lt-transition-done` is also where the wait lands if the
 follow-on never arrives.
 
+**Station recipe — submit lands on the list.** Shared-station flows (badge
+scan → claim → resolve) arrive at the detail page from angles where browser
+history is meaningless, so the `history.back()` default confuses. Declare the
+destination on the role's form-schema root and every submit returns to the
+role's queue:
+
+```jsonc
+{ "x-lt-transition-done": "/escalations/available?role={{escalation.role}}&status=available" }
+```
+
+No `x-lt-transition` needed when there is no follow-on to wait for — the
+navigation is immediate.
+
 ## If the live event is missed
 
 Event delivery is at-most-once: a crash between the commit and the publish drops

@@ -6,19 +6,23 @@ export interface EscalationChain {
 }
 
 /**
- * Reserved keys inside `lt_roles.properties` — the role's verb semantics for
- * the domain dictionary. Everything else in the bag is user-owned. Values are
- * plain strings; readers type-guard (the bag is open, PATCH can write anything).
+ * Reserved keys inside `lt_roles.properties`. Everything else in the bag is
+ * user-owned. Readers type-guard (the bag is open, PATCH can write anything).
  *
  *  - ON_CANCEL: what cancel MEANS for this row class, imperative
  *    (e.g. "reset — the dispatcher re-mints the attempt").
  *  - ON_TIMEOUT: expiry semantics for this row class.
  *  - WORKED_BY: who works this queue ("humans at the dashboard" | "machines" | "both").
+ *  - KIOSK: boolean — the locked station viewport. When a signed-in user is a
+ *    MEMBER of exactly this one role, the dashboard drops the left nav, the
+ *    role's escalation list becomes home, and navigation is held to the list,
+ *    the detail page, and the scan screens. Multi-role users get full chrome.
  */
 export const ROLE_PROPERTY_KEYS = {
   ON_CANCEL: 'on_cancel',
   ON_TIMEOUT: 'on_timeout',
   WORKED_BY: 'worked_by',
+  KIOSK: 'kiosk',
 } as const;
 
 export interface RoleDetail {

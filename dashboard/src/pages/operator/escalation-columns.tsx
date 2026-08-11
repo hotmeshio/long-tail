@@ -317,6 +317,7 @@ export function EscalationFilterBar({
   types,
   showStatus = false,
   showSearch = true,
+  showRole = true,
   actions,
 }: {
   filters: { role: string; type: string; priority: string; status?: string; search?: string };
@@ -327,6 +328,8 @@ export function EscalationFilterBar({
   // Free-text search lives here by default, but the faceted page folds it into
   // the drawer instead so there's a single search surface.
   showSearch?: boolean;
+  /** Kiosk sessions hide the role filter — the session IS the role. */
+  showRole?: boolean;
   actions?: React.ReactNode;
 }) {
   // Non-default filters power the folded Filters button's badge.
@@ -351,16 +354,21 @@ export function EscalationFilterBar({
           <FilterDivider />
         </>
       )}
-      {/* Role is the queue's primary facet — always present, always URL-driven
-          (?role=). Pages whose title doubles as a queue selector share the same
-          param, so the two controls mirror each other. */}
-      <FilterSelect
-        label="Role"
-        value={filters.role}
-        onChange={(v) => setFilter('role', v)}
-        options={roles.map((r) => ({ value: r, label: r }))}
-      />
-      <FilterDivider />
+      {/* Role is the queue's primary facet — URL-driven (?role=). Pages whose
+          title doubles as a queue selector share the same param, so the two
+          controls mirror each other. Kiosk sessions hide it: the session IS
+          the role. */}
+      {showRole && (
+        <>
+          <FilterSelect
+            label="Role"
+            value={filters.role}
+            onChange={(v) => setFilter('role', v)}
+            options={roles.map((r) => ({ value: r, label: r }))}
+          />
+          <FilterDivider />
+        </>
+      )}
       <FilterSelect
         label="Priority"
         value={filters.priority}

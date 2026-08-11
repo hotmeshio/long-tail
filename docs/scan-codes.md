@@ -216,6 +216,30 @@ takes the badge layer, and `write_scope: 'none'` is the structural
 backstop — even a misconfigured rule cannot mutate as the station, because
 the RBAC write gate denies the account itself.
 
+`write_scope: 'none'` is also what makes the badge challenge fire:
+`requireActingIdentity` is satisfied by a badge grant **or** by a login whose
+own write scope covers the step, so a write-capable base login self-satisfies
+the requirement and claims/resolves as itself with no badge demanded. The
+badge-every-time contract requires the read-all/write-none base login.
+
+### Kiosk mode — the locked station viewport
+
+A role opts in with `properties.kiosk: true` (the reserved role-property key,
+set with the same `PATCH /api/roles/:role` as every other dial). When the
+signed-in user is a **member of exactly that one role** — the station-login
+shape — the dashboard locks the viewport: the left nav is gone entirely, the
+role's escalation list is home (`/` and every other surface redirect to it),
+and the session is held to the list, the escalation detail page, and the scan
+screens (choice, badge). The header toolbar and event feed remain. A user
+holding more than one role, or an admin-type grant, always gets full chrome —
+kiosk is for the single-role floor login, never a way to hide the product from
+a real operator.
+
+Pair kiosk with `x-lt-transition-done` on the role's form schema
+(`"/escalations/available?role={{escalation.role}}&status=available"`) so a
+resolve lands back on the list rather than walking browser history — see
+[x-lt-transition](./hitl/x-lt-transition.md).
+
 Mutations attribute to the badged person (`assigned_to`, `resolved_by`)
 with the device recorded beside them (`scanStation` in the scan
 provenance) — every action individually owned and geographically placed.
