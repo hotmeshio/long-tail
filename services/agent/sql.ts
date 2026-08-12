@@ -25,6 +25,10 @@ export const GET_AGENT = `
   SELECT * FROM lt_agents WHERE id = $1
 `;
 
+export const LIST_AGENT_IDS = `
+  SELECT id FROM lt_agents ORDER BY id
+`;
+
 export const INSERT_AGENT = `
   INSERT INTO lt_agents (id, description, status, user_id, knowledge_domain,
     capabilities, behaviors, goals, rules, workflow_type, pipeline_id, metadata)
@@ -59,6 +63,35 @@ export const SEED_AGENT = `
     capabilities, behaviors, goals, rules, workflow_type, pipeline_id, metadata)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
   ON CONFLICT (id) DO NOTHING
+`;
+
+/**
+ * Apply — code is source of truth for the declared fields. Runtime state
+ * (user_id, capabilities, metadata, last_run_at) is never touched; the
+ * IS DISTINCT FROM guard makes an unchanged declaration a zero-row no-op.
+ */
+export const APPLY_AGENT = `
+  INSERT INTO lt_agents (id, description, status, user_id, knowledge_domain,
+    capabilities, behaviors, goals, rules, workflow_type, pipeline_id, metadata)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  ON CONFLICT (id) DO UPDATE SET
+    description = EXCLUDED.description,
+    status = EXCLUDED.status,
+    knowledge_domain = EXCLUDED.knowledge_domain,
+    behaviors = EXCLUDED.behaviors,
+    goals = EXCLUDED.goals,
+    rules = EXCLUDED.rules,
+    workflow_type = EXCLUDED.workflow_type,
+    pipeline_id = EXCLUDED.pipeline_id,
+    updated_at = NOW()
+  WHERE (lt_agents.description, lt_agents.status, lt_agents.knowledge_domain,
+         lt_agents.behaviors, lt_agents.goals, lt_agents.rules,
+         lt_agents.workflow_type, lt_agents.pipeline_id)
+    IS DISTINCT FROM
+        (EXCLUDED.description, EXCLUDED.status, EXCLUDED.knowledge_domain,
+         EXCLUDED.behaviors, EXCLUDED.goals, EXCLUDED.rules,
+         EXCLUDED.workflow_type, EXCLUDED.pipeline_id)
+  RETURNING (xmax = 0) AS inserted
 `;
 
 export const KNOWLEDGE_COUNT = `

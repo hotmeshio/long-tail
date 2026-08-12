@@ -83,6 +83,26 @@ describe('SSO scope preservation', () => {
     expect(grant.write_scope).toBe('none');
   });
 
+  it('a seeded read-only station keeps EXACTLY ONE grant across logins', async () => {
+    // The live station shape: one pre-seeded role at read:all/write:none, and
+    // a host role the roleMap does not know. Login must not add a second
+    // grant — write:none is the badge-challenge backstop, and the kiosk lock
+    // engages only for members of exactly one role.
+    await userService.addUserRole(userId, ROLE, 'member', {
+      read_scope: 'all',
+      write_scope: 'none',
+    });
+
+    await ssoProvision(
+      { externalId: EXT_ID, displayName: 'Station', roles: ['HOST_UNMAPPED_STATION'] },
+      ssoConfig,
+    );
+
+    const roles = await userService.getUserRoles(userId);
+    expect(roles).toHaveLength(1);
+    expect(roles[0]).toMatchObject({ role: ROLE, type: 'member', write_scope: 'none' });
+  });
+
   it('an unmapped host role grants nothing — a removed membership stays removed', async () => {
     // Admin removes the grant; the operator's host role no longer maps.
     await userService.removeUserRole(userId, ROLE);

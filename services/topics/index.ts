@@ -10,6 +10,7 @@ import {
   SEED_TOPIC,
   RESET_TOPIC,
   LIST_SUBSCRIBERS,
+  LIST_CONFIG_TOPIC_NAMES,
 } from './sql';
 
 export interface TopicCatalogEntry {
@@ -34,6 +35,13 @@ export interface TopicSubscriber {
   agent_name: string;
   topic: string;
   reaction_type: string;
+}
+
+/** Config-declared topic names — the startup orphan report's candidate set. */
+export async function listConfigTopicNames(): Promise<string[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(LIST_CONFIG_TOPIC_NAMES);
+  return rows.map((r: any) => r.topic);
 }
 
 export async function listTopics(filters: {

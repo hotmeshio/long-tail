@@ -55,6 +55,31 @@ export const ENSURE_ROLE_EXISTS = `
 export const LIST_ROLES = `
   SELECT role FROM lt_roles ORDER BY role`;
 
+/**
+ * Roles carrying real configuration (a title or a form schema). Bare FK rows
+ * and membership-only roles are excluded — the startup orphan report uses
+ * this so auto-ensured rows never read as drift.
+ */
+export const LIST_CONFIGURED_ROLES = `
+  SELECT role FROM lt_roles
+  WHERE title IS NOT NULL OR form_schema IS NOT NULL
+  ORDER BY role`;
+
+/** One role's full metadata row (plus upstream inputs) for startup diffing. */
+export const GET_ROLE_ROW = `
+  SELECT
+    r.role, r.title, r.description, r.form_schema, r.metadata_schema,
+    r.properties, r.ops_visible, r.ops_home_default, r.parent_role,
+    r.sla_minutes, r.target_per_hour, r.worker_count,
+    r.priority_threshold_minutes, r.priority_facet,
+    r.entity_facet, r.entity_state_source,
+    r.list_schema, r.default_pins, r.enforce_schema,
+    r.current_schema_version, r.current_list_schema_version,
+    COALESCE((SELECT array_agg(u.upstream_role ORDER BY u.upstream_role)
+              FROM lt_role_upstreams u WHERE u.role = r.role), '{}') AS upstream_roles
+  FROM lt_roles r
+  WHERE r.role = $1`;
+
 export const DELETE_ROLE = `
   DELETE FROM lt_roles WHERE role = $1`;
 

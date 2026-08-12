@@ -6,6 +6,7 @@ import {
   UPDATE_SUBSCRIPTION,
   DELETE_SUBSCRIPTION,
   SEED_SUBSCRIPTION,
+  APPLY_SUBSCRIPTION,
   LIST_ACTIVE_SUBSCRIPTIONS,
 } from './subscription-sql';
 
@@ -123,4 +124,30 @@ export async function seedSubscription(
     data.tool_name ?? null,
   ]);
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Apply a subscription declaration at startup (code is source of truth).
+ * Reaction fields are written when they differ; `enabled` is honored as an
+ * admin kill-switch and never flipped on update.
+ */
+export async function applySubscription(
+  agentId: string,
+  data: Partial<AgentSubscription>,
+): Promise<'applied' | 'unchanged'> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(APPLY_SUBSCRIPTION, [
+    agentId,
+    data.topic,
+    data.filter ? JSON.stringify(data.filter) : null,
+    data.reaction_type,
+    data.workflow_type ?? null,
+    data.pipeline_id ?? null,
+    data.mcp_prompt ?? null,
+    JSON.stringify(data.input_mapping ?? {}),
+    data.execute_as ?? null,
+    data.server_id ?? null,
+    data.tool_name ?? null,
+  ]);
+  return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
 }

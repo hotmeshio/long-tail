@@ -13,6 +13,13 @@ import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
 import * as yamlWorkflowWorkers from '../services/yaml-workflow/workers';
 import { migrate } from '../lib/db/migrate';
+import {
+  ownedByCode,
+  newSurfaceReport,
+  recordOutcome,
+  logSurfaceReport,
+  withConfigLock,
+} from './apply-report';
 
 import type { LTStartConfig, LTWorkerConfig } from '../types/startup';
 
@@ -107,6 +114,49 @@ export async function startWorkers(
   const { seedMcpServiceAccount } = await import('../services/mcp/seed-service-account');
   await seedMcpServiceAccount();
 
+  // Who owns declared configuration after first boot ('db' = insert-if-absent).
+  const configSource = startConfig.configSource ?? 'db';
+  const codeOwnedBoot = configSource === 'code';
+
+  // Register declared roles (every container — roles are independent of workers).
+  if (startConfig.roles?.length) {
+    const { applyRoleConfig, listConfiguredRoles } = await import('../services/role/seed');
+    const roleReport = newSurfaceReport();
+    await withConfigLock(async () => {
+      for (const roleCfg of startConfig.roles!) {
+        try {
+          const outcome = await applyRoleConfig(roleCfg, ownedByCode(roleCfg.reset, configSource));
+          recordOutcome(roleReport, roleCfg.role, outcome);
+          if (outcome === 'applied') loggerRegistry.info(`[long-tail] role applied: ${roleCfg.role}`);
+        } catch (err: any) {
+          loggerRegistry.warn(`[long-tail] role apply failed for ${roleCfg.role}: ${err.message}`);
+        }
+      }
+    });
+    if (codeOwnedBoot && !startConfig.examples) {
+      // Orphans = configured roles (title or form schema set) neither declared
+      // here nor referenced by a declared workflow profile. Bare FK rows and
+      // membership-only roles never count. Skipped under examples — the demo
+      // seeders own their roles.
+      const declared = new Set<string>(['reviewer', 'superadmin', 'system']);
+      for (const r of startConfig.roles) {
+        declared.add(r.role);
+        if (r.parent_role) declared.add(r.parent_role);
+        for (const t of r.escalation_targets ?? []) declared.add(t);
+        for (const u of r.upstream_roles ?? []) declared.add(u);
+      }
+      for (const w of workers) {
+        if (!w.config) continue;
+        declared.add(w.config.defaultRole ?? 'reviewer');
+        for (const role of [...(w.config.roles ?? []), ...(w.config.invocationRoles ?? [])]) {
+          declared.add(role);
+        }
+      }
+      roleReport.orphans = (await listConfiguredRoles()).filter((r) => !declared.has(r));
+    }
+    if (codeOwnedBoot) logSurfaceReport('roles', roleReport);
+  }
+
   const connection = buildConnection();
 
   // Readonly mode: all user-provided workers are observers — skip crons, triggers, and agent seeding.
@@ -162,16 +212,19 @@ export async function startWorkers(
       `[long-tail] workers started on queues: ${workers.map((w) => w.taskQueue).join(', ')}`,
     );
 
-    // Seed workflow configs (insert-if-absent — DB is source of truth)
+    // Register workflow configs — ownership per configSource / per-entry reset.
+    // Code-owned profiles are diffed and applied; db-owned profiles keep the
+    // insert-if-absent contract (DB is source of truth after first boot).
     const workersWithConfig = workers.filter((w) => w.config);
     if (workersWithConfig.length) {
-      const { seedWorkflowConfig } = await import('../services/config/write');
+      const { seedWorkflowConfig, applyWorkflowConfig } = await import('../services/config/write');
       const { ltConfig } = await import('../modules/ltconfig');
-      for (const w of workersWithConfig) {
-        const workflowType = w.workflow.name;
-        const c = w.config!;
-        try {
-          const inserted = await seedWorkflowConfig({
+      const wfReport = newSurfaceReport();
+      await withConfigLock(async () => {
+        for (const w of workersWithConfig) {
+          const workflowType = w.workflow.name;
+          const c = w.config!;
+          const declaration = {
             workflow_type: workflowType,
             task_queue: w.taskQueue,
             invocable: c.invocable ?? false,
@@ -186,11 +239,29 @@ export async function startWorkers(
             resolver_schema: c.resolverSchema ?? null,
             cron_schedule: c.cronSchedule ?? null,
             execute_as: c.executeAs ?? null,
-          });
-          if (inserted) loggerRegistry.info(`[long-tail] config seeded: ${workflowType}`);
-        } catch (err: any) {
-          loggerRegistry.warn(`[long-tail] config seed failed for ${workflowType}: ${err.message}`);
+          };
+          try {
+            if (ownedByCode(c.reset, configSource)) {
+              const outcome = await applyWorkflowConfig(declaration);
+              recordOutcome(wfReport, workflowType, outcome);
+              if (outcome === 'applied') loggerRegistry.info(`[long-tail] config applied: ${workflowType}`);
+            } else {
+              const inserted = await seedWorkflowConfig(declaration);
+              recordOutcome(wfReport, workflowType, 'db-owned');
+              if (inserted) loggerRegistry.info(`[long-tail] config seeded: ${workflowType}`);
+            }
+          } catch (err: any) {
+            loggerRegistry.warn(`[long-tail] config seed failed for ${workflowType}: ${err.message}`);
+          }
         }
+      });
+      if (codeOwnedBoot) {
+        const { listWorkflowConfigs } = await import('../services/config/read');
+        const registered = new Set(workers.map((w) => w.workflow.name));
+        wfReport.orphans = (await listWorkflowConfigs())
+          .map((cfg) => cfg.workflow_type)
+          .filter((t) => !registered.has(t));
+        logSurfaceReport('workflows', wfReport);
       }
       ltConfig.invalidate();
     }
@@ -215,7 +286,7 @@ export async function startWorkers(
     // Register MCP server factories: built-in (from system/) + user-provided
     // Both system and user factories can carry inline config for DB seeding.
     const { registerBuiltinServer } = await import('../services/mcp/client');
-    const { seedMcpServer, cleanStaleBuiltinServers } = await import('../services/mcp/db');
+    const { seedMcpServer, applyMcpServer, cleanStaleBuiltinServers } = await import('../services/mcp/db');
     const userFactories = startConfig.mcp?.serverFactories ?? {};
 
     // Resolve user factories — plain function or { factory, config }
@@ -244,17 +315,28 @@ export async function startWorkers(
     const { setExposureConfig } = await import('../services/mcp/exposure');
     setExposureConfig(startConfig.mcp?.exposure);
 
-    // 2. Seed MCP server configs (insert-if-absent + drift log)
+    // 2. Register MCP server configs — ownership per configSource / per-entry
+    // reset. Code-owned entries apply the config fields (runtime state stays
+    // untouched); db-owned entries keep insert-if-absent + drift log.
+    const mcpReport = newSurfaceReport();
     for (const [name, entry] of Object.entries(allFactories)) {
       if (entry.config) {
         try {
-          const inserted = await seedMcpServer({ name, ...entry.config });
-          if (inserted) loggerRegistry.info(`[long-tail] MCP server seeded: ${name}`);
+          if (ownedByCode(entry.config.reset, configSource)) {
+            const outcome = await applyMcpServer({ name, ...entry.config });
+            recordOutcome(mcpReport, name, outcome);
+            if (outcome === 'applied') loggerRegistry.info(`[long-tail] MCP server applied: ${name}`);
+          } else {
+            const inserted = await seedMcpServer({ name, ...entry.config });
+            recordOutcome(mcpReport, name, 'db-owned');
+            if (inserted) loggerRegistry.info(`[long-tail] MCP server seeded: ${name}`);
+          }
         } catch (err: any) {
           loggerRegistry.warn(`[long-tail] MCP server seed failed for ${name}: ${err.message}`);
         }
       }
     }
+    if (codeOwnedBoot) logSurfaceReport('mcp-servers', mcpReport);
 
     // 3. Clean stale builtin servers no longer in factory list
     await cleanStaleBuiltinServers(Object.keys(allFactories));
@@ -278,16 +360,35 @@ export async function startWorkers(
     await yamlWorkflowWorkers.registerAllActiveWorkers();
   }
 
-  // Seed topic catalog (system topics + user-declared topics)
+  // Seed topic catalog (system topics + user-declared topics). Declared
+  // topics follow configSource; per-entry `reset` overrides in either direction.
   const { seedSystemTopics, seedConfigTopics } = await import('../services/topics/system-topics');
   await seedSystemTopics();
-  if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics);
+  if (startConfig.topics?.length) await seedConfigTopics(startConfig.topics, codeOwnedBoot);
+  if (codeOwnedBoot) {
+    const { listConfigTopicNames } = await import('../services/topics');
+    const declaredTopics = new Set((startConfig.topics ?? []).map((t) => t.topic));
+    if (startConfig.examples) {
+      try {
+        const { EXAMPLE_TOPICS } = await import('../examples');
+        for (const t of EXAMPLE_TOPICS ?? []) declaredTopics.add(t.topic);
+      } catch { /* examples not available */ }
+    }
+    const orphanTopics = (await listConfigTopicNames()).filter((t) => !declaredTopics.has(t));
+    if (orphanTopics.length) {
+      loggerRegistry.warn(`[long-tail] config apply (topics): orphans: [${orphanTopics.join(', ')}]`);
+    }
+  }
 
-  // Seed the domain dictionary (every container, workers or not) — insert-if-
-  // absent with warn-only reference validation; the DB row is runtime truth.
+  // Seed the domain dictionary (every container, workers or not). Db-owned:
+  // insert-if-absent, the DB row is runtime truth. Code-owned: the file is
+  // compared and applied, bumping the version once per changed document.
   if (startConfig.mcp?.domainDictionaryPath) {
     const { seedDomainDictionary } = await import('../services/domain');
-    await seedDomainDictionary(startConfig.mcp.domainDictionaryPath);
+    await seedDomainDictionary(
+      startConfig.mcp.domainDictionaryPath,
+      startConfig.mcp.domainDictionaryReset ?? codeOwnedBoot,
+    );
   }
 
   // Seed example topics when examples are enabled
@@ -304,9 +405,11 @@ export async function startWorkers(
     : [];
   const allAgentConfigs = [...(startConfig.agents ?? []), ...systemAgents];
   if (allAgentConfigs.length > 0) {
-    const { seedAgent } = await import('../services/agent');
-    const { seedSubscription } = await import('../services/agent/subscriptions');
+    const { seedAgent, applyAgent, listAgentIds } = await import('../services/agent');
+    const { seedSubscription, applySubscription, listSubscriptions } = await import('../services/agent/subscriptions');
+    const agentReport = newSurfaceReport();
     for (const agentConfig of allAgentConfigs) {
+      const codeOwned = ownedByCode(agentConfig.reset, configSource);
       try {
         // Map flat schedules into behaviors.schedules for DB storage
         const behaviors: Record<string, any> = {};
@@ -314,7 +417,7 @@ export async function startWorkers(
           behaviors.schedules = agentConfig.schedules;
           behaviors.cron = agentConfig.schedules[0].cron;
         }
-        const inserted = await seedAgent({
+        const declaration = {
           id: agentConfig.name,
           description: agentConfig.description,
           goals: agentConfig.goals,
@@ -323,23 +426,55 @@ export async function startWorkers(
           knowledge_domain: agentConfig.knowledge_domain,
           behaviors,
           workflow_type: agentConfig.schedules?.[0]?.workflow_type,
-        });
-        if (inserted) loggerRegistry.info(`[long-tail] agent seeded: ${agentConfig.name}`);
+        };
+        if (codeOwned) {
+          const outcome = await applyAgent(declaration);
+          recordOutcome(agentReport, agentConfig.name, outcome);
+          if (outcome === 'applied') loggerRegistry.info(`[long-tail] agent applied: ${agentConfig.name}`);
+        } else {
+          const inserted = await seedAgent(declaration);
+          recordOutcome(agentReport, agentConfig.name, 'db-owned');
+          if (inserted) loggerRegistry.info(`[long-tail] agent seeded: ${agentConfig.name}`);
+        }
 
-        // Seed subscriptions for this agent — id IS the name
+        // Subscriptions for this agent — id IS the name
         if (agentConfig.subscriptions?.length) {
           for (const sub of agentConfig.subscriptions) {
             try {
-              const subInserted = await seedSubscription(agentConfig.name, sub);
-              if (subInserted) loggerRegistry.info(`[long-tail] subscription seeded: ${agentConfig.name}/${sub.topic}`);
+              if (codeOwned) {
+                const outcome = await applySubscription(agentConfig.name, sub);
+                if (outcome === 'applied') loggerRegistry.info(`[long-tail] subscription applied: ${agentConfig.name}/${sub.topic}`);
+              } else {
+                const subInserted = await seedSubscription(agentConfig.name, sub);
+                if (subInserted) loggerRegistry.info(`[long-tail] subscription seeded: ${agentConfig.name}/${sub.topic}`);
+              }
             } catch (subErr: any) {
               loggerRegistry.warn(`[long-tail] subscription seed failed: ${agentConfig.name}/${sub.topic}: ${subErr.message}`);
             }
           }
         }
+
+        // Undeclared subscriptions on a code-owned agent are reported, never
+        // deleted — disabling or removing one stays a deliberate act.
+        if (codeOwned) {
+          const declaredSubs = new Set((agentConfig.subscriptions ?? []).map((s) => s.topic));
+          const existingSubs = await listSubscriptions(agentConfig.name);
+          agentReport.orphans.push(
+            ...existingSubs
+              .filter((s) => !declaredSubs.has(s.topic))
+              .map((s) => `${agentConfig.name}/${s.topic}`),
+          );
+        }
       } catch (err: any) {
         loggerRegistry.warn(`[long-tail] agent seed failed for ${agentConfig.name}: ${err.message}`);
       }
+    }
+    if (codeOwnedBoot) {
+      const declaredAgents = new Set(allAgentConfigs.map((a) => a.name));
+      agentReport.orphans.push(
+        ...(await listAgentIds()).filter((id) => !declaredAgents.has(id)),
+      );
+      logSurfaceReport('agents', agentReport);
     }
   }
 

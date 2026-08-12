@@ -10,6 +10,8 @@ import {
   UPDATE_AGENT,
   DELETE_AGENT,
   SEED_AGENT,
+  APPLY_AGENT,
+  LIST_AGENT_IDS,
   KNOWLEDGE_COUNT,
   ESCALATION_COUNT,
 } from './sql';
@@ -39,6 +41,13 @@ export async function listAgents(
     agents: dataRes.rows,
     total: countRes.rows[0]?.total ?? 0,
   };
+}
+
+/** Every agent id — the startup orphan report's candidate set. */
+export async function listAgentIds(): Promise<string[]> {
+  const pool = getPool();
+  const { rows } = await pool.query(LIST_AGENT_IDS);
+  return rows.map((r: any) => r.id);
 }
 
 export async function getAgent(id: string): Promise<LTAgent | null> {
@@ -179,6 +188,33 @@ export async function seedAgent(
   }
 
   return inserted;
+}
+
+/**
+ * Apply an agent declaration at startup (code is source of truth).
+ * Declared fields — description, status, knowledge domain, behaviors, goals,
+ * rules, reaction targets — are written when they differ; runtime state
+ * (user_id, capabilities, metadata, last_run_at) is never touched.
+ */
+export async function applyAgent(
+  data: Partial<LTAgent> & { id: string },
+): Promise<'applied' | 'unchanged'> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(APPLY_AGENT, [
+    data.id,
+    data.description ?? null,
+    data.status ?? 'inactive',
+    data.user_id ?? null,
+    data.knowledge_domain ?? null,
+    JSON.stringify(data.capabilities ?? []),
+    JSON.stringify(data.behaviors ?? {}),
+    data.goals ?? null,
+    data.rules ?? null,
+    data.workflow_type ?? null,
+    data.pipeline_id ?? null,
+    JSON.stringify(data.metadata ?? {}),
+  ]);
+  return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
 }
 
 /**

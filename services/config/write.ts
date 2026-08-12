@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 import { getPool } from '../../lib/db';
 import type { LTWorkflowConfig } from '../../types';
 import { getWorkflowConfig } from './read';
@@ -27,9 +29,16 @@ function resolveCertified(config: LTWorkflowConfig): boolean {
   );
 }
 
-export async function upsertWorkflowConfig(
-  config: LTWorkflowConfig & { lifecycle?: any },
-): Promise<LTWorkflowConfig> {
+/**
+ * Full replace of one workflow config in a single transaction: FK role
+ * ensures, the workflow row upsert, and replace semantics for the roles and
+ * invocation-roles side tables. Both the admin upsert and the startup apply
+ * write through here — they differ only in how `certified` resolves.
+ */
+async function replaceWorkflowConfig(
+  config: LTWorkflowConfig,
+  certified: boolean,
+): Promise<void> {
   const pool = getPool();
   const client = await pool.connect();
 
@@ -59,7 +68,7 @@ export async function upsertWorkflowConfig(
         config.cron_schedule ?? null,
         config.tool_tags || [],
         config.execute_as ?? null,
-        resolveCertified(config),
+        certified,
       ],
     );
 
@@ -82,7 +91,12 @@ export async function upsertWorkflowConfig(
   } finally {
     client.release();
   }
+}
 
+export async function upsertWorkflowConfig(
+  config: LTWorkflowConfig & { lifecycle?: any },
+): Promise<LTWorkflowConfig> {
+  await replaceWorkflowConfig(config, resolveCertified(config));
   return (await getWorkflowConfig(config.workflow_type))!;
 }
 
@@ -158,4 +172,46 @@ export async function seedWorkflowConfig(
   }
 
   return inserted;
+}
+
+/** Order-insensitive comparison for role lists and other unordered arrays. */
+function sortedEqual(a: string[], b: string[]): boolean {
+  return isDeepStrictEqual([...a].sort(), [...b].sort());
+}
+
+/**
+ * Apply a workflow config at startup (code is source of truth).
+ *
+ * The declared config is diffed against the stored row — jsonb fields as
+ * parsed values, role lists order-insensitively — and written through the
+ * same full-replace transaction the admin surface uses only when something
+ * actually differs. `certified` is explicit-only on this path: an omitted
+ * flag registers the workflow as NOT certified.
+ */
+export async function applyWorkflowConfig(
+  config: LTWorkflowConfig,
+): Promise<'applied' | 'unchanged'> {
+  const certified = config.certified ?? false;
+  const existing = await getWorkflowConfig(config.workflow_type);
+
+  if (existing) {
+    const unchanged =
+      existing.invocable === config.invocable &&
+      existing.task_queue === config.task_queue &&
+      existing.default_role === config.default_role &&
+      (existing.description ?? null) === (config.description ?? null) &&
+      existing.certified === certified &&
+      (existing.cron_schedule ?? null) === (config.cron_schedule ?? null) &&
+      (existing.execute_as ?? null) === (config.execute_as ?? null) &&
+      sortedEqual(existing.consumes ?? [], config.consumes ?? []) &&
+      sortedEqual(existing.tool_tags ?? [], config.tool_tags ?? []) &&
+      sortedEqual(existing.roles ?? [], config.roles ?? []) &&
+      sortedEqual(existing.invocation_roles ?? [], config.invocation_roles ?? []) &&
+      isDeepStrictEqual(existing.envelope_schema ?? null, config.envelope_schema ?? null) &&
+      isDeepStrictEqual(existing.resolver_schema ?? null, config.resolver_schema ?? null);
+    if (unchanged) return 'unchanged';
+  }
+
+  await replaceWorkflowConfig(config, certified);
+  return 'applied';
 }

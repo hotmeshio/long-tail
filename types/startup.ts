@@ -23,8 +23,10 @@ export interface LTWorkerConfig {
   invocable?: boolean;
   /**
    * Certify for HITL escalation — the interceptor wraps the workflow with
-   * task tracking, escalation handling, and re-run detection. Omitted →
-   * derived from roles/consumes presence (the pre-flag behavior).
+   * task tracking, escalation handling, and re-run detection. On the
+   * insert-if-absent path an omitted flag is derived from roles/consumes
+   * presence (the pre-flag behavior). On the code-owned apply path the flag
+   * is explicit-only: omitted registers as NOT certified.
    */
   certified?: boolean;
   /** Roles allowed to invoke this workflow. */
@@ -53,6 +55,12 @@ export interface LTWorkerConfig {
   cronSchedule?: string;
   /** Bot identity to run as (proxy invocation). */
   executeAs?: string;
+  /**
+   * Per-entry ownership override. `true` → this profile is compared and
+   * applied on every boot (code is source of truth); `false` → the DB owns
+   * the row after first insert. Omitted → follows `configSource`.
+   */
+  reset?: boolean;
 }
 
 /**
@@ -79,6 +87,14 @@ export interface LTMcpServerConfig {
     /** Tool only reads data — safe to expose to external MCP consumers without write permission. */
     read_safe?: boolean;
   }>;
+  /**
+   * Per-entry ownership override. `true` → description, tags, category,
+   * compile hints, and credential providers are compared and applied on every
+   * boot (runtime state — tool manifest, connection status — is never
+   * touched); `false` → the DB owns the row after first insert. Omitted →
+   * follows `configSource`.
+   */
+  reset?: boolean;
 }
 
 /**
@@ -115,6 +131,14 @@ export interface LTAgentConfig {
     filter?: Record<string, any>;
     execute_as?: string;
   }>;
+
+  /**
+   * Per-entry ownership override. `true` → the agent's declared fields and
+   * subscriptions are compared and applied on every boot (subscriptions not
+   * declared in code are reported, never deleted); `false` → the DB owns the
+   * rows after first insert. Omitted → follows `configSource`.
+   */
+  reset?: boolean;
 }
 
 /**
@@ -144,6 +168,56 @@ export interface LTTopicConfig {
 }
 
 /**
+ * Declarative role registration. The role is created if missing and its
+ * metadata written through the same versioned write path the dashboard uses:
+ * a changed form_schema/metadata_schema pair advances the role's schema
+ * version and snapshots the prior shape, so in-flight escalations keep the
+ * form they were created against. Only declared fields are written —
+ * omitted fields are never touched.
+ *
+ * Ownership follows `configSource` (overridable per entry with `reset`):
+ * code-owned roles are compared and applied on every boot; db-owned roles
+ * receive their metadata once at creation and belong to the DB afterward.
+ */
+export interface LTRoleConfig {
+  role: string;
+  title?: string;
+  description?: string;
+  /** JSON Schema for the escalation resolve form (versioned). */
+  form_schema?: Record<string, any>;
+  /** JSON Schema for lt_escalations.metadata under this role (versioned with form_schema). */
+  metadata_schema?: Record<string, any>;
+  /** x-lt-* contract formatting the role-scoped escalation list page (independently versioned). */
+  list_schema?: Record<string, any>;
+  /** Free-form bag plus the reserved keys (on_cancel, on_timeout, worked_by, kiosk). */
+  properties?: Record<string, any>;
+  ops_visible?: boolean;
+  /** Make this role's sequence the home Pace Board's default segment (single-holder). */
+  ops_home_default?: boolean;
+  parent_role?: string;
+  /** Upstream-input roles from other sequences (replace semantics when declared). */
+  upstream_roles?: string[];
+  /** Roles this role may escalate to (replace semantics when declared). */
+  escalation_targets?: string[];
+  /** Pinned-view seeds handed to members: [{ label, url, badge? }]. */
+  default_pins?: { label: string; url: string; badge?: boolean }[];
+  /** Server-side resolver schema validation for this role. */
+  enforce_schema?: boolean;
+  sla_minutes?: number;
+  target_per_hour?: number;
+  worker_count?: number;
+  priority_threshold_minutes?: number;
+  priority_facet?: string;
+  entity_facet?: string;
+  entity_state_source?: 'role' | 'subtype';
+  /**
+   * Per-entry ownership override. `true` → compared and applied on every
+   * boot; `false` → db-owned after creation. Omitted → follows `configSource`.
+   */
+  reset?: boolean;
+}
+
+/**
  * Declarative graph (YAML/DAG) workflow registered at startup — the graph-form
  * peer of a `workers` entry (which registers a procedural workflow). Hand-author
  * the HotMesh YAML; no MCP server or LLM Designer is required. Each flow is
@@ -167,6 +241,23 @@ export interface LTGraphWorkflowConfig {
 }
 
 export interface LTStartConfig {
+  /**
+   * Who owns declared configuration after first boot.
+   *
+   * - `'db'` (default) — declarations are seeded insert-if-absent; the DB
+   *   owns each record once it exists, and code/DB drift is warn-logged.
+   * - `'code'` — declarations are compared and applied on EVERY boot; code
+   *   is the source of truth and dashboard edits to declared surfaces are
+   *   replaced at the next deploy. Records present in the DB but absent from
+   *   code are reported at boot, never deleted. Versioned role schemas
+   *   advance (snapshot + increment) when the declared schema differs —
+   *   version lineage only grows.
+   *
+   * Every declarable entry (worker config, role, topic, MCP server, agent)
+   * accepts a per-entry `reset` override in either direction.
+   */
+  configSource?: 'code' | 'db';
+
   /** PostgreSQL connection. Provide individual fields or a connectionString. */
   database: {
     host?: string;
@@ -387,10 +478,16 @@ export interface LTStartConfig {
    */
   examples?: boolean;
 
-  /** Declarative topic catalog entries. Seeded on first boot (insert-if-absent). */
+  /**
+   * Declarative role registrations — titles, versioned form/list schemas,
+   * escalation targets, and ops dials, owned per `configSource`.
+   */
+  roles?: LTRoleConfig[];
+
+  /** Declarative topic catalog entries, owned per `configSource` / per-entry `reset`. */
   topics?: LTTopicConfig[];
 
-  /** Declarative agent configurations. Seeded on first boot (insert-if-absent). */
+  /** Declarative agent configurations, owned per `configSource` / per-entry `reset`. */
   agents?: LTAgentConfig[];
 
   /**
@@ -430,6 +527,13 @@ export interface LTStartConfig {
      * through the MCP `instructions` index and the `get_domain_context` tool.
      */
     domainDictionaryPath?: string;
+    /**
+     * Ownership override for the domain dictionary. `true` → the file is
+     * compared and applied on every boot (a changed document bumps the
+     * dictionary version, exactly like a PUT); `false` → the DB owns the
+     * document after first insert. Omitted → follows `configSource`.
+     */
+    domainDictionaryReset?: boolean;
     /**
      * Controls which tools are exposed when this instance acts as an MCP server.
      * All fields are optional — omit the entire object for unrestricted access.
