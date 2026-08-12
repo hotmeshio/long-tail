@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 
 import { config } from './config';
 import { getSSOConfig } from './sso';
+import { loggerRegistry } from '../lib/logger';
 import { isSuperAdmin } from '../services/user';
 import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
@@ -134,7 +135,10 @@ export const requireAuth: RequestHandler = async (req: Request, res: Response, n
     return mw(req, res, next);
   }
 
-  // SSO fallback: no Bearer, but host may have authenticated via cookies/headers
+  // SSO fallback: no Bearer, but host may have authenticated via cookies/headers.
+  // `res` is deliberately NOT passed to resolve here: this path runs on every
+  // cookie-bearing request, and ambient API traffic must never slide the host
+  // session — only the explicit exchange (login + gated keepalive beat) does.
   const ssoConfig = getSSOConfig();
   if (ssoConfig) {
     try {
@@ -154,8 +158,10 @@ export const requireAuth: RequestHandler = async (req: Request, res: Response, n
         };
         return next();
       }
-    } catch {
-      // SSO resolve failed — fall through to 401
+    } catch (err: any) {
+      // SSO resolve failed — fall through to 401, but leave a trace so host
+      // resolve errors are diagnosable.
+      loggerRegistry.debug(`[long-tail] sso resolve failed on auth fallback: ${err?.message}`);
     }
   }
 

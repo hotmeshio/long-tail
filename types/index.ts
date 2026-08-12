@@ -148,6 +148,8 @@ export type {
   LTAgentConfig,
   LTTopicConfig,
   LTRoleConfig,
+  LTScanSchemeConfig,
+  LTScanRuleConfig,
 } from './startup';
 
 export type {

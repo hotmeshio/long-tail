@@ -12,6 +12,8 @@ export {
   deleteScanRule,
   seedScanScheme,
   seedScanRule,
+  applyScanScheme,
+  applyScanRule,
   type ScanSchemeInput,
   type ScanRuleInput,
 } from './write';

@@ -360,6 +360,30 @@ The same CRUD rides `PUT/GET/DELETE /api/scan-codes/schemes/:version[/actions/:c
 rules fail the write with the exact problem — an `escalate` step names its
 `targetRole`, a `resolve` step carries its payload.
 
+## Declaring schemes in code
+
+Schemes and their rules declare on `LTStartConfig.scanSchemes` and follow the
+[code-owned configuration](code-owned-configuration.md) contract: under
+`configSource: 'code'` a changed scheme or rule in code is live after the next
+boot on every environment; under `'db'` (the default) the declaration seeds
+once and the admin surfaces own it afterward. Per-entry `reset` overrides the
+dial in either direction, covering the scheme and its rules together.
+
+```typescript
+scanSchemes: [
+  {
+    version: 12,
+    name: 'Serial locate',
+    target_facet: 'serialNumber',
+    encoding: 'fixed',
+    target_length: 8,
+    rules: [
+      { category: '1', name: 'Locate', steps: [{ verb: 'show-detail' }] },
+    ],
+  },
+],
+```
+
 ## The printer demo
 
 The example seed (`examples/seed-scan-codes.ts`) configures scheme 10 over

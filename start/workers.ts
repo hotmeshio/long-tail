@@ -478,6 +478,60 @@ export async function startWorkers(
     }
   }
 
+  // Register declared scan schemes (with their rules) — ownership per
+  // configSource / per-entry reset. A scheme and its rules are one ownership
+  // unit; the scheme applies first so rule validation sees its kind.
+  if (startConfig.scanSchemes?.length) {
+    const {
+      seedScanScheme, seedScanRule, applyScanScheme, applyScanRule,
+      listScanSchemes, listScanRules,
+    } = await import('../services/scan-code');
+    const scanReport = newSurfaceReport();
+    for (const scheme of startConfig.scanSchemes) {
+      const codeOwned = ownedByCode(scheme.reset, configSource);
+      const { rules, reset: _reset, ...schemeInput } = scheme;
+      try {
+        if (codeOwned) {
+          let outcome = await applyScanScheme(schemeInput);
+          for (const rule of rules ?? []) {
+            const ruleOutcome = await applyScanRule({ scheme_version: scheme.version, ...rule });
+            if (ruleOutcome === 'applied') outcome = 'applied';
+          }
+          recordOutcome(scanReport, `scheme ${scheme.version}`, outcome);
+          if (outcome === 'applied') loggerRegistry.info(`[long-tail] scan scheme applied: ${scheme.version}`);
+          // Undeclared rules on a code-owned scheme are reported, never deleted.
+          const declaredCategories = new Set((rules ?? []).map((r) => r.category));
+          const existingRules = await listScanRules(scheme.version);
+          scanReport.orphans.push(
+            ...existingRules
+              .filter((r) => !declaredCategories.has(r.category))
+              .map((r) => `${scheme.version}/${r.category}`),
+          );
+        } else {
+          const inserted = await seedScanScheme(schemeInput);
+          for (const rule of rules ?? []) {
+            await seedScanRule({ scheme_version: scheme.version, ...rule });
+          }
+          recordOutcome(scanReport, `scheme ${scheme.version}`, 'db-owned');
+          if (inserted) loggerRegistry.info(`[long-tail] scan scheme seeded: ${scheme.version}`);
+        }
+      } catch (err: any) {
+        loggerRegistry.warn(`[long-tail] scan scheme seed failed for ${scheme.version}: ${err.message}`);
+      }
+    }
+    if (codeOwnedBoot && !startConfig.examples) {
+      // Schemes in the DB not declared here (demo seeds own theirs under examples).
+      const declaredVersions = new Set(startConfig.scanSchemes.map((s) => s.version));
+      scanReport.orphans.push(
+        ...(await listScanSchemes())
+          .map((s) => s.version)
+          .filter((v) => !declaredVersions.has(v))
+          .map(String),
+      );
+    }
+    if (codeOwnedBoot) logSurfaceReport('scan-schemes', scanReport);
+  }
+
   // Register the in-process callback adapter for agent event triggers.
   // Reuse existing instance if already registered (e.g., from SDK createClient).
   const { CallbackEventAdapter } = await import('../lib/events/callback');
