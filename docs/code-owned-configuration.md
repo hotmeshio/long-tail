@@ -63,6 +63,7 @@ The domain dictionary's override lives beside its path:
 | MCP servers | `mcp.serverFactories[].config` | description, tags, category, compile hints, credential providers | tool manifest, connection status |
 | Agents | `agents[]` | description, status, goals, rules, domain, schedules | capabilities, metadata, run history |
 | Agent subscriptions | `agents[].subscriptions` | reaction fields on (agent, topic) | `enabled` — the admin kill-switch |
+| Scan schemes | `scanSchemes[]` | whole scheme + its rules (one ownership unit; `enabled` is declarative here) | — |
 | Domain dictionary | `mcp.domainDictionaryPath` | whole document (version bumps once per change) | — |
 | Graph workflows | `graphWorkflows[]` | always compare-and-apply: description/schema sync, redeploy on YAML version bump | run history |
 
@@ -104,6 +105,32 @@ escalations pin the version they were created against, so the forms they
 render keep working while new escalations pick up the new shape. Version
 lineage only grows — an apply never rewinds or rewrites an existing version.
 `list_schema` versions independently, exactly as it does from the dashboard.
+
+## Scan schemes: scheme + rules as one unit
+
+A scan scheme and its rules declare together — a rule cannot exist without its
+scheme, so the pair is the ownership unit and one `reset` covers both:
+
+```typescript
+scanSchemes: [
+  {
+    version: 12,
+    name: 'Serial locate',
+    target_facet: 'serialNumber',
+    encoding: 'fixed',
+    target_length: 8,
+    rules: [
+      { category: '1', name: 'Locate', steps: [{ verb: 'show-detail' }] },
+    ],
+  },
+],
+```
+
+The scheme applies before its rules so rule validation sees the scheme's kind.
+Rules present in the database but absent from a code-owned scheme's
+declaration are reported as `version/category` orphans. The pass runs whether
+or not the dashboard scan affordances (`features.scanCodes`) are enabled —
+declaring schemes states intent.
 
 ## The boot report
 

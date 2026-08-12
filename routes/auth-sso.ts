@@ -13,7 +13,11 @@ const router = Router();
  * login form with a transparent token exchange.
  */
 router.post('/sso', async (req, res) => {
-  const result = await api.exchangeSSO(req);
+  const result = await api.exchangeSSO(req, res);
+  // A host's resolve may only set headers on `res`; if one violates the
+  // contract and writes the response, degrade to a skipped beat instead of
+  // a headers-after-send crash.
+  if (res.headersSent) return;
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

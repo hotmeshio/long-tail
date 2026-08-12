@@ -1,4 +1,4 @@
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import { getSSOConfig } from '../modules/sso';
 import { ssoProvision } from '../services/user/sso-provision';
@@ -8,20 +8,23 @@ import type { LTApiResult } from '../types/sdk';
 /**
  * Exchange host authentication for a Long Tail JWT.
  *
- * Calls `sso.resolve(req)` to extract the host identity, JIT provisions
+ * Calls `sso.resolve(req, res)` to extract the host identity, JIT provisions
  * the user in `lt_users`, and returns a signed JWT the dashboard can
  * store for subsequent API calls.
  *
  * No request body required — the host's cookies/headers carry the auth.
+ * `res` gives cookie-owning hosts the response handle at the exchange
+ * boundary (login and every keepalive beat) to set/refresh their session
+ * cookie — headers only; the route writes the response body.
  */
-export async function exchangeSSO(req: Request): Promise<LTApiResult> {
+export async function exchangeSSO(req: Request, res?: Response): Promise<LTApiResult> {
   try {
     const ssoConfig = getSSOConfig();
     if (!ssoConfig) {
       return { status: 404, error: 'SSO not configured' };
     }
 
-    const identity = await ssoConfig.resolve(req);
+    const identity = await ssoConfig.resolve(req, res);
     if (!identity) {
       return { status: 401, error: 'Host authentication required' };
     }

@@ -7,7 +7,16 @@ import {
   type ScanStep,
   type ScanRuleFallback,
 } from '../../types';
-import { UPSERT_SCHEME, DELETE_SCHEME, UPSERT_ACTION, DELETE_ACTION, SEED_SCHEME, SEED_ACTION } from './sql';
+import {
+  UPSERT_SCHEME,
+  DELETE_SCHEME,
+  UPSERT_ACTION,
+  DELETE_ACTION,
+  SEED_SCHEME,
+  SEED_ACTION,
+  APPLY_SCHEME,
+  APPLY_ACTION,
+} from './sql';
 import { assertValidIdentityRule, assertValidScheme, assertValidSteps } from './validate';
 import { getScanScheme } from './read';
 
@@ -84,7 +93,8 @@ export async function deleteScanScheme(version: number): Promise<boolean> {
   return (rowCount ?? 0) > 0;
 }
 
-export async function upsertScanRule(input: ScanRuleInput): Promise<ScanRule> {
+/** Shared rule-input validation — the upsert and startup-apply paths enforce the same contract. */
+async function assertValidRuleInput(input: ScanRuleInput): Promise<void> {
   if (!/^[0-9]$/.test(input.category)) {
     throw new Error('category must be a single digit (0-9)');
   }
@@ -93,6 +103,10 @@ export async function upsertScanRule(input: ScanRuleInput): Promise<ScanRule> {
   if (input.steps.length === 0 && !input.fallback?.markdown && !input.fallback?.route) {
     throw new Error('a rule needs at least one step or a fallback');
   }
+}
+
+export async function upsertScanRule(input: ScanRuleInput): Promise<ScanRule> {
+  await assertValidRuleInput(input);
   const { rows } = await getPool().query(UPSERT_ACTION, ruleParams(input));
   return rows[0];
 }
@@ -116,4 +130,22 @@ export async function seedScanRule(input: ScanRuleInput): Promise<boolean> {
   await assertStepsForScheme(input);
   const { rowCount } = await getPool().query(SEED_ACTION, ruleParams(input));
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Apply a scheme declaration at startup (code is source of truth). Same
+ * validation as the upsert; the IS DISTINCT FROM guard makes an unchanged
+ * declaration a zero-row no-op.
+ */
+export async function applyScanScheme(input: ScanSchemeInput): Promise<'applied' | 'unchanged'> {
+  assertValidScheme(input);
+  const { rowCount } = await getPool().query(APPLY_SCHEME, schemeParams(input));
+  return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
+}
+
+/** Apply a rule declaration at startup (code is source of truth). */
+export async function applyScanRule(input: ScanRuleInput): Promise<'applied' | 'unchanged'> {
+  await assertValidRuleInput(input);
+  const { rowCount } = await getPool().query(APPLY_ACTION, ruleParams(input));
+  return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
 }

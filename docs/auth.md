@@ -231,9 +231,34 @@ Response 200:
 }
 ```
 
+### Host Session on the Exchange
+
+The exchange is the session boundary between the host and Long Tail, and `resolve` receives the response handle there: `resolve(req, res)`. Hosts that own their session cookie set or refresh it inside `resolve` — headers only; Long Tail writes the response status and body after `resolve` returns.
+
+```typescript
+auth: {
+  sso: {
+    keepaliveSeconds: 300,
+    resolve: (req, res) => {
+      const session = validateHostCookie(req);
+      if (!session) return null;
+      // Slide the host session on every exchange — login and each keepalive beat.
+      res?.setHeader('Set-Cookie', mintHostCookie(session));
+      return { externalId: session.userId, roles: session.roles };
+    },
+  },
+},
+```
+
+With `keepaliveSeconds` set, the dashboard re-runs the exchange on a visibility- and idle-gated interval, so an active operator's host session slides exactly as it would under host-app navigation — hosts whose middleware slides on any request get this automatically, and cookie-minting hosts re-mint via `res`. Pair a sliding TTL with an absolute session max-age: a sliding-only session is otherwise extendable indefinitely.
+
+A resolve that slides the session makes this endpoint a session-refresh surface — give it the same CSRF posture as your own refresh route. `SameSite=Lax` or `Strict` session cookies cover it (cross-site POSTs carry no cookie); a host running `SameSite=None` should verify `Origin` or `Sec-Fetch-Site` inside `resolve` before sliding.
+
+`res` is present only on the explicit exchange (`POST /api/auth/sso`). The per-request fallback below calls `resolve(req)` without it, so ambient cookie-bearing API traffic — prefetches, background fetches — never slides the host session.
+
 ### requireAuth Fallback
 
-When SSO is configured and a request arrives without a Bearer token, `requireAuth` calls `sso.resolve(req)` as a fallback. This allows direct API calls from the host backend (which forward cookies but not Bearer tokens) to authenticate without an explicit exchange. The dashboard always uses Bearer after the initial exchange.
+When SSO is configured and a request arrives without a Bearer token, `requireAuth` calls `sso.resolve(req)` as a fallback. This allows direct API calls from the host backend (which forward cookies but not Bearer tokens) to authenticate without an explicit exchange. The dashboard always uses Bearer after the initial exchange. The fallback never passes `res` — session sliding belongs exclusively to the exchange.
 
 ### Role Mapping
 

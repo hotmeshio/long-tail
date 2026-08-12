@@ -1,6 +1,7 @@
 import type { LoggerOptions } from 'pino';
 
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
+import type { ScanEncoding, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
 import type { LTOAuthStartConfig } from './oauth';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
@@ -213,6 +214,52 @@ export interface LTRoleConfig {
   /**
    * Per-entry ownership override. `true` → compared and applied on every
    * boot; `false` → db-owned after creation. Omitted → follows `configSource`.
+   */
+  reset?: boolean;
+}
+
+/**
+ * One rule (category) of a declared scan scheme. Categories are single
+ * digits; a rule needs at least one step or a fallback.
+ */
+export interface LTScanRuleConfig {
+  /** Single digit '0'-'9'. */
+  category: string;
+  name: string;
+  steps: ScanStep[];
+  fallback?: ScanRuleFallback;
+  /** Shown when the scan arrives with no primed work surface. */
+  notPrimed?: ScanRuleFallback;
+  enabled?: boolean;
+}
+
+/**
+ * Declarative scan scheme registration — the scheme and its rules are one
+ * ownership unit, owned per `configSource` (overridable per entry with
+ * `reset`). Code-owned schemes are compared and applied on every boot;
+ * db-owned schemes are insert-if-absent.
+ */
+export interface LTScanSchemeConfig {
+  /** Scheme version prefix, 10-99. The scheme's identity. */
+  version: number;
+  name: string;
+  description?: string | null;
+  /** The escalation metadata facet a scanned target resolves against. */
+  target_facet: string;
+  encoding?: ScanEncoding;
+  delimiter?: string;
+  target_length?: number | null;
+  /** 'action' (default) or 'identity' (badge grants). */
+  kind?: ScanSchemeKind;
+  grant_ttl_seconds?: number | null;
+  grant_max_uses?: number;
+  enabled?: boolean;
+  /** The scheme's rules, one per category. */
+  rules?: LTScanRuleConfig[];
+  /**
+   * Per-entry ownership override for the scheme AND its rules. `true` →
+   * compared and applied on every boot; `false` → the DB owns the rows after
+   * first insert. Omitted → follows `configSource`.
    */
   reset?: boolean;
 }
@@ -483,6 +530,14 @@ export interface LTStartConfig {
    * escalation targets, and ops dials, owned per `configSource`.
    */
   roles?: LTRoleConfig[];
+
+  /**
+   * Declarative scan schemes (with their rules), owned per `configSource` /
+   * per-entry `reset`. Declaring schemes states intent — the pass runs
+   * whether or not the dashboard scan affordances (`features.scanCodes`) are
+   * enabled.
+   */
+  scanSchemes?: LTScanSchemeConfig[];
 
   /** Declarative topic catalog entries, owned per `configSource` / per-entry `reset`. */
   topics?: LTTopicConfig[];

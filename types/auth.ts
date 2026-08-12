@@ -1,4 +1,4 @@
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 /**
  * The identity payload extracted from an authenticated request.
@@ -95,8 +95,17 @@ export interface LTSSOConfig {
   /** Extract user identity from the host's authenticated request.
    *  Return `null` if the request is not authenticated by the host.
    *  The `req` object carries cookies, headers, and any properties
-   *  attached by upstream middleware (e.g., `req.user`). */
-  resolve: (req: Request) => Promise<SSOIdentity | null> | (SSOIdentity | null);
+   *  attached by upstream middleware (e.g., `req.user`).
+   *
+   *  `res` is defined only during the explicit SSO exchange
+   *  (`POST /api/auth/sso` — the login exchange and every keepalive beat).
+   *  Hosts that own their session cookie set/refresh it here: headers only —
+   *  never write the status or body; the exchange route writes the response
+   *  after `resolve` returns. `res` is deliberately absent on the per-request
+   *  auth fallback, so ambient cookie-bearing API traffic (prefetches,
+   *  background fetches) never slides the host session — only the login
+   *  exchange and the visibility/idle-gated keepalive beat do. */
+  resolve: (req: Request, res?: Response) => Promise<SSOIdentity | null> | (SSOIdentity | null);
   /** Map host role names to LT role names.
    *  Key = host role, value = LT role name.
    *  A configured map is the COMPLETE contract: an unmapped host role means
@@ -118,10 +127,15 @@ export interface LTSSOConfig {
   /**
    * Session keepalive: while the dashboard is open and visible, the SPA
    * re-runs the credentialed SSO exchange (`POST /api/auth/sso`, host cookies
-   * included) every `keepaliveSeconds`, keeping a short-lived sliding host
-   * session warm exactly the way host-app navigation does. Each beat re-runs
-   * `resolve`, so a host that revokes access cuts the dashboard off at the
-   * next beat. 0/omitted = no keepalive. Values under 15s are clamped to 15s.
+   * included) every `keepaliveSeconds`. Each beat re-runs `resolve`, so a
+   * host that revokes access cuts the dashboard off at the next beat.
+   * 0/omitted = no keepalive. Values under 15s are clamped to 15s.
+   *
+   * Hosts whose middleware slides the session on any request get the sliding
+   * effect from the beat automatically. Hosts that mint the session cookie in
+   * their own login flow re-mint it inside `resolve` via the `res` parameter.
+   * Either way, pair a sliding TTL with an absolute session max-age — a
+   * sliding-only session is otherwise extendable indefinitely.
    */
   keepaliveSeconds?: number;
   /**
