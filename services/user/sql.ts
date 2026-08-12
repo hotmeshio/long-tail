@@ -98,6 +98,16 @@ export const UPSERT_USER_ROLE =
      granted_by_persona = NULL
    RETURNING role, type, read_scope, write_scope, created_at`;
 
+/** Insert a user–role assignment ONLY when absent. The scope-safe grant for
+ *  sync paths (SSO, claim-time provisioning): an existing row — whatever its
+ *  type/scope/provenance — is left untouched; zero rows return on conflict.
+ *  Identity sync may add a missing membership but never mutates authorization
+ *  an admin already set. */
+export const INSERT_USER_ROLE_IF_ABSENT =
+  `INSERT INTO lt_user_roles (user_id, role, type, read_scope, write_scope) VALUES ($1, $2, $3, $4, $5)
+   ON CONFLICT (user_id, role) DO NOTHING
+   RETURNING role, type, read_scope, write_scope, created_at`;
+
 export const DELETE_USER_ROLE =
   'DELETE FROM lt_user_roles WHERE user_id = $1 AND role = $2';
 

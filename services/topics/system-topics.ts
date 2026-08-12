@@ -326,9 +326,13 @@ export async function seedSystemTopics(): Promise<void> {
 
 /**
  * Seed user-declared topics from startConfig.topics[].
- * Respects `reset: true` — overwrites DB from config on every boot.
+ * Ownership per entry: `reset ?? defaultReset` — code-owned topics are
+ * overwritten from config on every boot; db-owned topics are insert-if-absent.
  */
-export async function seedConfigTopics(topics: LTTopicConfig[]): Promise<void> {
+export async function seedConfigTopics(
+  topics: LTTopicConfig[],
+  defaultReset = false,
+): Promise<void> {
   for (const def of topics) {
     try {
       const payload = {
@@ -341,7 +345,7 @@ export async function seedConfigTopics(topics: LTTopicConfig[]): Promise<void> {
         tags: def.tags ?? [],
       };
 
-      if (def.reset) {
+      if (def.reset ?? defaultReset) {
         await resetTopic(payload);
         loggerRegistry.info(`[long-tail] topic reset: ${def.topic} (config)`);
       } else {

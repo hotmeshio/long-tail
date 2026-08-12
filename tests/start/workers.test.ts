@@ -22,7 +22,14 @@ vi.mock('@hotmeshio/hotmesh', () => ({
 
 vi.mock('../../lib/db', () => ({
   getConnection: () => ({ class: Object, options: {} }),
-  getPool: () => ({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) }),
+  getPool: () => ({
+    query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+    // withConfigLock takes a dedicated client for the advisory lock
+    connect: async () => ({
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    }),
+  }),
 }));
 
 vi.mock('../../lib/db/migrate', () => ({
@@ -76,10 +83,14 @@ vi.mock('../../services/agent/trigger-registry', () => ({
 
 vi.mock('../../services/agent', () => ({
   seedAgent: vi.fn().mockResolvedValue(false),
+  applyAgent: vi.fn().mockResolvedValue('unchanged'),
+  listAgentIds: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../services/agent/subscriptions', () => ({
   seedSubscription: vi.fn().mockResolvedValue(false),
+  applySubscription: vi.fn().mockResolvedValue('unchanged'),
+  listSubscriptions: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../services/maintenance', () => ({
@@ -100,11 +111,13 @@ vi.mock('../../services/mcp/client', () => ({
 
 vi.mock('../../services/mcp/db', () => ({
   seedMcpServer: vi.fn().mockResolvedValue(true),
+  applyMcpServer: vi.fn().mockResolvedValue('unchanged'),
   cleanStaleBuiltinServers: vi.fn(),
 }));
 
 vi.mock('../../services/config/write', () => ({
   seedWorkflowConfig: vi.fn().mockResolvedValue(true),
+  applyWorkflowConfig: vi.fn().mockResolvedValue('unchanged'),
   upsertWorkflowConfig: vi.fn(),
 }));
 

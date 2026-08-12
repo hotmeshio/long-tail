@@ -147,6 +147,7 @@ export type {
   LTMcpServerConfig,
   LTAgentConfig,
   LTTopicConfig,
+  LTRoleConfig,
 } from './startup';
 
 export type {

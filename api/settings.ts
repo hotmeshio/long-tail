@@ -74,6 +74,9 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         auth: {
           sso: isSSOEnabled(),
           ssoLogoutUrl: getSSOConfig()?.logoutUrl ?? null,
+          // Session keepalive dials for the SPA (null = no keepalive / no idle gate).
+          ssoKeepaliveSeconds: getSSOConfig()?.keepaliveSeconds ?? null,
+          ssoKeepaliveIdleTimeoutSeconds: getSSOConfig()?.keepaliveIdleTimeoutSeconds ?? null,
         },
         ai: {
           enabled: hasLLMApiKey(),

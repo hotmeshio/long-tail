@@ -296,4 +296,17 @@ describe('getSettings — SSO', () => {
     expect(result.data.auth.sso).toBe(true);
     expect(result.data.auth.ssoLogoutUrl).toBe('/auth/logout');
   });
+
+  it('exposes the keepalive dials when configured, null otherwise', async () => {
+    const { setSSOConfig } = await import('../../modules/sso');
+    setSSOConfig({ resolve: () => null });
+    let result = await getSettings();
+    expect(result.data.auth.ssoKeepaliveSeconds).toBeNull();
+    expect(result.data.auth.ssoKeepaliveIdleTimeoutSeconds).toBeNull();
+
+    setSSOConfig({ resolve: () => null, keepaliveSeconds: 300, keepaliveIdleTimeoutSeconds: 900 });
+    result = await getSettings();
+    expect(result.data.auth.ssoKeepaliveSeconds).toBe(300);
+    expect(result.data.auth.ssoKeepaliveIdleTimeoutSeconds).toBe(900);
+  });
 });

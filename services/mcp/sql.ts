@@ -117,3 +117,27 @@ export const SEED_MCP_SERVER = `
     (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, category, last_connected_at)
   VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, $10, NOW())
   ON CONFLICT (name) DO NOTHING`;
+
+/**
+ * Apply — code is source of truth for the CONFIG fields only. On conflict the
+ * update rewrites description/tags/category/compile_hints/credential_providers
+ * and leaves runtime state (tool_manifest, status, last_connected_at,
+ * transport_config) untouched; the IS DISTINCT FROM guard makes an unchanged
+ * declaration a zero-row no-op. `(xmax = 0)` distinguishes insert from update.
+ */
+export const APPLY_MCP_SERVER = `
+  INSERT INTO lt_mcp_servers
+    (name, description, transport_type, transport_config, auto_connect, status, tool_manifest, metadata, tags, compile_hints, credential_providers, category, last_connected_at)
+  VALUES ($1, $2, $3, $4, true, 'connected', $5, $6, $7, $8, $9, $10, NOW())
+  ON CONFLICT (name) DO UPDATE SET
+    description = EXCLUDED.description,
+    tags = EXCLUDED.tags,
+    category = EXCLUDED.category,
+    compile_hints = EXCLUDED.compile_hints,
+    credential_providers = EXCLUDED.credential_providers
+  WHERE (lt_mcp_servers.description, lt_mcp_servers.tags, lt_mcp_servers.category,
+         lt_mcp_servers.compile_hints, lt_mcp_servers.credential_providers)
+    IS DISTINCT FROM
+        (EXCLUDED.description, EXCLUDED.tags, EXCLUDED.category,
+         EXCLUDED.compile_hints, EXCLUDED.credential_providers)
+  RETURNING (xmax = 0) AS inserted`;

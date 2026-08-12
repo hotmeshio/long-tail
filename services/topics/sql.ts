@@ -23,6 +23,11 @@ export const COUNT_TOPICS = `
     AND ($2::text IS NULL OR topic ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
 `;
 
+/** Config-declared topic names — the startup orphan report's candidate set. */
+export const LIST_CONFIG_TOPIC_NAMES = `
+  SELECT topic FROM lt_topic_catalog WHERE source = 'config' ORDER BY topic
+`;
+
 export const GET_TOPIC = `
   SELECT * FROM lt_topic_catalog WHERE topic = $1
 `;

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { setToken } from '../api/client';
+import { useSsoKeepalive } from './useSsoKeepalive';
 import { decodeJwtPayload, getTokenExpiry, isTokenExpired } from '../lib/jwt';
 import type { LTUserRole, LTRoleType } from '../api/types';
 import { LT_BASE } from '../lib/base-path';
@@ -209,9 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRoleNames,
       }}
     >
+      <SsoKeepalive authenticated={user !== null} />
       {children}
     </AuthContext.Provider>
   );
+}
+
+/** Headless mount for the SSO session keepalive — re-evaluates on auth change. */
+function SsoKeepalive({ authenticated }: { authenticated: boolean }) {
+  useSsoKeepalive(authenticated ? sessionStorage.getItem('lt_token') : null);
+  return null;
 }
 
 export function useAuth(): AuthContextValue {

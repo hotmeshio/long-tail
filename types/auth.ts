@@ -99,11 +99,37 @@ export interface LTSSOConfig {
   resolve: (req: Request) => Promise<SSOIdentity | null> | (SSOIdentity | null);
   /** Map host role names to LT role names.
    *  Key = host role, value = LT role name.
-   *  Unmapped roles are ignored. If omitted, host roles pass through as-is. */
+   *  A configured map is the COMPLETE contract: an unmapped host role means
+   *  "no LT role" — a user whose host roles all miss the map provisions with
+   *  zero SSO-granted memberships (seeded/persona grants still apply). If
+   *  omitted, host roles pass through as-is and a user with no host roles
+   *  receives the default membership.
+   *
+   *  SSO synchronizes identity, never authorization: a role the user already
+   *  holds is left exactly as the admin set it (type, read/write scope,
+   *  persona provenance). Promotions and scope changes go through the admin
+   *  surfaces (`POST /api/users/:id/roles`, the admin MCP tools). */
   roleMap?: Record<string, string>;
   /** Default LT role type for provisioned users. Default: `'member'`. */
   defaultRoleType?: 'admin' | 'member';
   /** URL to redirect the browser on logout (host's logout endpoint).
    *  If omitted, the dashboard shows its own login page on logout. */
   logoutUrl?: string;
+  /**
+   * Session keepalive: while the dashboard is open and visible, the SPA
+   * re-runs the credentialed SSO exchange (`POST /api/auth/sso`, host cookies
+   * included) every `keepaliveSeconds`, keeping a short-lived sliding host
+   * session warm exactly the way host-app navigation does. Each beat re-runs
+   * `resolve`, so a host that revokes access cuts the dashboard off at the
+   * next beat. 0/omitted = no keepalive. Values under 15s are clamped to 15s.
+   */
+  keepaliveSeconds?: number;
+  /**
+   * Pause the keepalive after this much user inactivity (no pointer, key, or
+   * wheel input), so an abandoned-but-visible tab still expires on the host's
+   * schedule. Omitted = no activity gate: any visible tab keeps its session
+   * (the right default for station screens that go minutes between touches —
+   * badge-wedge scans count as key input).
+   */
+  keepaliveIdleTimeoutSeconds?: number;
 }

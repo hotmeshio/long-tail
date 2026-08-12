@@ -4,6 +4,7 @@ import { loggerRegistry } from '../../lib/logger';
 import {
   CREATE_MCP_SERVER,
   SEED_MCP_SERVER,
+  APPLY_MCP_SERVER,
   GET_MCP_SERVER,
   GET_MCP_SERVER_BY_NAME,
   DELETE_MCP_SERVER,
@@ -246,6 +247,38 @@ export async function seedMcpServer(input: {
   }
 
   return inserted;
+}
+
+/**
+ * Apply an MCP server declaration at startup (code is source of truth).
+ * Config fields — description, tags, category, compile hints, credential
+ * providers — are written when they differ; runtime state (tool manifest,
+ * connection status) is never touched. Returns 'applied' when the row was
+ * inserted or updated, 'unchanged' when the declaration already matches.
+ */
+export async function applyMcpServer(input: {
+  name: string;
+  description?: string;
+  tags?: string[];
+  category?: string;
+  compileHints?: string;
+  credentialProviders?: string[];
+  toolManifest?: any[];
+}): Promise<'applied' | 'unchanged'> {
+  const pool = getPool();
+  const { rowCount } = await pool.query(APPLY_MCP_SERVER, [
+    input.name,
+    input.description || null,
+    'stdio',
+    JSON.stringify({ builtin: true, process: 'in-memory' }),
+    JSON.stringify(input.toolManifest || []),
+    JSON.stringify({ builtin: true }),
+    input.tags || [],
+    input.compileHints || null,
+    input.credentialProviders || [],
+    input.category || null,
+  ]);
+  return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
 }
 
 /**

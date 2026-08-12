@@ -74,7 +74,14 @@ export async function applyServerAuthConfig(startConfig: LTStartConfig): Promise
   // SSO — store config for requireAuth fallback and /api/auth/sso exchange
   if (startConfig.auth?.sso) {
     const { setSSOConfig } = await import('../modules/sso');
-    setSSOConfig(startConfig.auth.sso);
+    const sso = { ...startConfig.auth.sso };
+    // A keepalive beat re-runs resolve + provisioning per tab; clamp runaway
+    // intervals (a 1s misconfiguration = one exchange per second per tab).
+    if (sso.keepaliveSeconds != null && sso.keepaliveSeconds > 0 && sso.keepaliveSeconds < 15) {
+      loggerRegistry.warn(`[long-tail] sso.keepaliveSeconds ${sso.keepaliveSeconds}s clamped to 15s`);
+      sso.keepaliveSeconds = 15;
+    }
+    setSSOConfig(sso);
     loggerRegistry.info('[long-tail] SSO enabled — host auth will be trusted');
   }
 }

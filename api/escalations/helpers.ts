@@ -263,9 +263,11 @@ export async function ensureRoleMembership(
   const declaredRole = provisionIfAbsent.roles?.find((r) => r.role === requiredRole);
   if (!declaredRole) return false;
 
-  // Add the role — idempotent (ON CONFLICT DO NOTHING)
+  // Add the role only when ABSENT (ON CONFLICT DO NOTHING). Provisioning is a
+  // sync of membership, never of scope: a grant the admin already restricted
+  // (e.g. write:none on a station) must survive every claim-time provision.
   try {
-    await userService.addUserRole(
+    await userService.grantRoleIfAbsent(
       userId,
       requiredRole,
       (declaredRole.type || 'member') as LTRoleType,

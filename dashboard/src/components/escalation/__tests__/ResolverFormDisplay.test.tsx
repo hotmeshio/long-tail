@@ -23,12 +23,12 @@ describe('dictionary display', () => {
 
   it('renders consecutive read-only facts as one definition list', () => {
     const { container } = render(
-      <ResolverForm value={formJson({ po: 'Hike Everyday', order_id: 'abc-123', approved: false }, schema)} onChange={vi.fn()} />,
+      <ResolverForm value={formJson({ po: 'Acme Everyday', order_id: 'abc-123', approved: false }, schema)} onChange={vi.fn()} />,
     );
     const dl = container.querySelector('dl');
     expect(dl).not.toBeNull();
     expect(dl!.querySelectorAll('dt')).toHaveLength(2);
-    expect(screen.getByText('Hike Everyday')).toBeInTheDocument();
+    expect(screen.getByText('Acme Everyday')).toBeInTheDocument();
     expect(screen.getByText('abc-123')).toBeInTheDocument();
     // The editable boolean keeps its checkbox
     expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();

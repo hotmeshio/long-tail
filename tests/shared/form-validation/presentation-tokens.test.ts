@@ -38,7 +38,7 @@ const DECORATED: Record<string, any> = {
 };
 
 const VALID = {
-  po: 'Hike Everyday',
+  po: 'Acme Everyday',
   order_id: 'abc-123',
   left_quantity: 1,
   right_quantity: 1,
@@ -47,7 +47,7 @@ const VALID = {
 };
 
 const INVALID = {
-  po: 'Hike Everyday',
+  po: 'Acme Everyday',
   order_id: 'abc-123',
   left_quantity: -1,
   right_quantity: 1,
