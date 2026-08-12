@@ -14,7 +14,8 @@ vi.mock('../../../lib/db', () => ({
 const mockGetUserByExternalId = vi.mocked(crud.getUserByExternalId);
 const mockCreateUser = vi.mocked(crud.createUser);
 const mockGetUserRoles = vi.mocked(roles.getUserRoles);
-const mockAddUserRole = vi.mocked(roles.addUserRole);
+// The sync path uses the scope-safe grant (never the scope-overwriting upsert).
+const mockAddUserRole = vi.mocked(roles.grantRoleIfAbsent);
 
 const baseSSOConfig: LTSSOConfig = {
   resolve: () => null,
@@ -153,6 +154,34 @@ describe('ssoProvision', () => {
     // unknown-role should be filtered out (not in roleMap)
     const callRoles = mockCreateUser.mock.calls[0][0].roles;
     expect(callRoles).toHaveLength(2);
+  });
+
+  it('a configured roleMap with nothing mapping provisions ZERO roles (no injected default)', async () => {
+    mockGetUserByExternalId.mockResolvedValue(null);
+    mockCreateUser.mockResolvedValue({
+      id: 'lt-uuid-2', external_id: 'unmapped-op', display_name: 'Unmapped Op',
+      status: 'active', account_type: 'user', created_at: '', updated_at: '', roles: [],
+    } as any);
+
+    const configWithMap: LTSSOConfig = { ...baseSSOConfig, roleMap: { admin: 'superadmin' } };
+    // The operator's host role (e.g. EDITOR) is deliberately absent from the map.
+    await ssoProvision({ externalId: 'unmapped-op', roles: ['EDITOR'] }, configWithMap);
+
+    expect(mockCreateUser).toHaveBeenCalledWith(expect.objectContaining({ roles: [] }));
+  });
+
+  it('a configured roleMap with nothing mapping grants NOTHING to an existing user', async () => {
+    mockGetUserByExternalId.mockResolvedValue({
+      id: 'lt-uuid-3', external_id: 'unmapped-op', display_name: 'Unmapped Op',
+      status: 'active', account_type: 'user', created_at: '', updated_at: '', roles: [],
+    } as any);
+    mockGetUserRoles.mockResolvedValue([{ role: 'finisher', type: 'member', created_at: '' } as any]);
+
+    const configWithMap: LTSSOConfig = { ...baseSSOConfig, roleMap: { admin: 'superadmin' } };
+    await ssoProvision({ externalId: 'unmapped-op', roles: ['EDITOR'] }, configWithMap);
+
+    // No injected member grant — repeated logins leave memberships untouched.
+    expect(mockAddUserRole).not.toHaveBeenCalled();
   });
 
   it('assigns default role when identity has no roles', async () => {

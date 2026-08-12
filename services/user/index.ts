@@ -12,6 +12,7 @@ export {
 export {
   isValidRoleType,
   addUserRole,
+  grantRoleIfAbsent,
   removeUserRole,
   getUserRoles,
   hasRole,

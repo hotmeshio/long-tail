@@ -14,7 +14,8 @@ vi.mock('../../../lib/logger', () => ({
 const mockGetUserByExternalId = vi.mocked(crud.getUserByExternalId);
 const mockCreateUser = vi.mocked(crud.createUser);
 const mockGetUserRoles = vi.mocked(roles.getUserRoles);
-const mockAddUserRole = vi.mocked(roles.addUserRole);
+// The sync path uses the scope-safe grant (never the scope-overwriting upsert).
+const mockAddUserRole = vi.mocked(roles.grantRoleIfAbsent);
 
 const ssoConfig: LTSSOConfig = { resolve: () => null, defaultRoleType: 'member' };
 const identity: SSOIdentity = {

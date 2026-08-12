@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
+
+// The provider mounts the SSO keepalive (react-query backed, tested in its own
+// suite); stub it so this suite runs without a QueryClient.
+vi.mock('../useSsoKeepalive', () => ({ useSsoKeepalive: vi.fn() }));
+
 import { AuthProvider, useAuth } from '../useAuth';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

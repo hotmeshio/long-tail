@@ -12,6 +12,14 @@ export interface AppSettings {
   ai?: {
     enabled: boolean;
   };
+  auth?: {
+    sso: boolean;
+    ssoLogoutUrl?: string | null;
+    /** SSO session keepalive interval (seconds); null/absent = no keepalive. */
+    ssoKeepaliveSeconds?: number | null;
+    /** Pause the keepalive after this much inactivity; null/absent = no idle gate. */
+    ssoKeepaliveIdleTimeoutSeconds?: number | null;
+  };
   features?: {
     /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
     dbMaintenance?: boolean;

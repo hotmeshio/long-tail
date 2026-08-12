@@ -1,6 +1,6 @@
 import { loggerRegistry } from '../../lib/logger';
 import { getUserByExternalId, createUser } from './crud';
-import { addUserRole, getUserRoles } from './roles';
+import { grantRoleIfAbsent, getUserRoles } from './roles';
 import type { SSOIdentity, LTSSOConfig } from '../../types/auth';
 import type { LTRoleType } from '../../types';
 
@@ -62,7 +62,15 @@ export async function ssoProvision(
   }
 }
 
-/** Ensure all resolved roles exist on an already-provisioned user. */
+/**
+ * Ensure all resolved roles exist on an already-provisioned user.
+ *
+ * SSO synchronizes IDENTITY, never authorization scope: a missing membership
+ * is added, an existing one is left exactly as the admin set it (type, scope,
+ * persona provenance). The has-check keeps the steady-state login read-only;
+ * `grantRoleIfAbsent` (INSERT … DO NOTHING) is the database-level guarantee
+ * for anything that races past it.
+ */
 async function syncExistingUser(
   userId: string,
   ltRoles: Array<{ role: string; type: string }>,
@@ -71,7 +79,7 @@ async function syncExistingUser(
   for (const lr of ltRoles) {
     const has = currentRoles.some((r) => r.role === lr.role);
     if (!has) {
-      await addUserRole(userId, lr.role, lr.type as LTRoleType);
+      await grantRoleIfAbsent(userId, lr.role, lr.type as LTRoleType);
     }
   }
   const updatedRoles = await getUserRoles(userId);
@@ -91,8 +99,11 @@ function resolveRoles(
     ? hostRoles.filter((r) => roleMap[r]).map((r) => roleMap[r])
     : hostRoles;
 
+  // A configured roleMap is the complete contract: an unmapped host role means
+  // "no LT role" — never an injected default. The default membership applies
+  // only when no roleMap exists (raw host roles pass through, empty = default).
   if (mapped.length === 0) {
-    return [{ role: defaultRoleType, type: defaultRoleType }];
+    return roleMap ? [] : [{ role: defaultRoleType, type: defaultRoleType }];
   }
 
   return mapped.map((role) => ({

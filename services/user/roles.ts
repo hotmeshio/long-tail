@@ -7,6 +7,7 @@ import {
   GET_ROLES_BY_USER_ID,
   HAS_ROLE,
   HAS_ROLE_TYPE,
+  INSERT_USER_ROLE_IF_ABSENT,
   UPSERT_USER_ROLE,
 } from './sql';
 import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
@@ -46,6 +47,42 @@ export async function addUserRole(
     const { rows } = await client.query(UPSERT_USER_ROLE, [userId, role, type, eff.read, eff.write]);
     await client.query('COMMIT');
     return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Grant a role ONLY when the user does not already hold it — the scope-safe
+ * add for sync paths (SSO provisioning, claim-time provisioning). An existing
+ * grant is never touched: identity sync adds missing memberships, it never
+ * mutates the type/scope/provenance an admin set. Returns the inserted row, or
+ * null when the membership already existed.
+ */
+export async function grantRoleIfAbsent(
+  userId: string,
+  role: string,
+  type: LTRoleType,
+  scope?: RoleScopeInput,
+): Promise<LTUserRole | null> {
+  const eff = effectiveScope(
+    type,
+    scope?.read_scope ?? DEFAULT_READ_SCOPE,
+    scope?.write_scope ?? DEFAULT_WRITE_SCOPE,
+  );
+  const pool = getPool();
+  // Same ensure-role + insert transaction as addUserRole: the FK target and the
+  // assignment commit together.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(ENSURE_ROLE_EXISTS, [role]);
+    const { rows } = await client.query(INSERT_USER_ROLE_IF_ABSENT, [userId, role, type, eff.read, eff.write]);
+    await client.query('COMMIT');
+    return rows[0] ?? null;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
