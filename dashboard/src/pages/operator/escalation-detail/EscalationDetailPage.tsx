@@ -559,13 +559,13 @@ function EscalationDetailView({ id }: { id: string }) {
                   hoverClass: 'hover:text-accent',
                   icon: <RotateCcw className="w-4 h-4" strokeWidth={1.5} />,
                 },
-                {
+                ...(footerLabels.cancel === false ? [] : [{
                   onClick: () => setCancelModalOpen(true),
                   disabled: false,
                   label: footerLabels.cancel ?? 'Cancel',
                   hoverClass: 'hover:text-status-error',
                   icon: <X className="w-4 h-4" strokeWidth={1.5} />,
-                },
+                }]),
                 {
                   onClick: () => setSidePanelOpen((prev) => { savePanelOpen(!prev); return !prev; }),
                   disabled: false,
@@ -714,6 +714,7 @@ function EscalationDetailView({ id }: { id: string }) {
         onConfirm={handleConfirmCancel}
         isPending={cancel.isPending}
         error={cancel.error as Error | null}
+        actionLabel={typeof footerLabels.cancel === 'string' ? footerLabels.cancel : undefined}
       />
 
       {/* Scan hand-off: a scanned confirm-step lands here with the pending

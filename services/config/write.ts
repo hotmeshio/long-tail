@@ -69,6 +69,7 @@ async function replaceWorkflowConfig(
         config.tool_tags || [],
         config.execute_as ?? null,
         certified,
+        config.read_safe ?? false,
       ],
     );
 
@@ -142,6 +143,7 @@ export async function seedWorkflowConfig(
     config.tool_tags || [],
     config.execute_as ?? null,
     resolveCertified(config),
+    config.read_safe ?? false,
   ]);
 
   const inserted = (rowCount ?? 0) > 0;
@@ -162,6 +164,7 @@ export async function seedWorkflowConfig(
       if (config.description && existing.description !== config.description) drifts.push('description');
       if (config.invocable !== existing.invocable) drifts.push('invocable');
       if (resolveCertified(config) !== existing.certified) drifts.push('certified');
+      if ((config.read_safe ?? false) !== (existing.read_safe ?? false)) drifts.push('read_safe');
       if (config.default_role !== existing.default_role) drifts.push('default_role');
       if (JSON.stringify(config.envelope_schema) !== JSON.stringify(existing.envelope_schema)) drifts.push('envelope_schema');
       if (JSON.stringify(config.resolver_schema) !== JSON.stringify(existing.resolver_schema)) drifts.push('resolver_schema');
@@ -201,6 +204,7 @@ export async function applyWorkflowConfig(
       existing.default_role === config.default_role &&
       (existing.description ?? null) === (config.description ?? null) &&
       existing.certified === certified &&
+      (existing.read_safe ?? false) === (config.read_safe ?? false) &&
       (existing.cron_schedule ?? null) === (config.cron_schedule ?? null) &&
       (existing.execute_as ?? null) === (config.execute_as ?? null) &&
       sortedEqual(existing.consumes ?? [], config.consumes ?? []) &&

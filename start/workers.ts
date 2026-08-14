@@ -239,6 +239,7 @@ export async function startWorkers(
             resolver_schema: c.resolverSchema ?? null,
             cron_schedule: c.cronSchedule ?? null,
             execute_as: c.executeAs ?? null,
+            read_safe: c.readSafe ?? false,
           };
           try {
             if (ownedByCode(c.reset, configSource)) {
@@ -478,9 +479,8 @@ export async function startWorkers(
     }
   }
 
-  // Register declared scan schemes (with their rules) — ownership per
-  // configSource / per-entry reset. A scheme and its rules are one ownership
-  // unit; the scheme applies first so rule validation sees its kind.
+  // Declared scan schemes + rules (one ownership unit, one reset). The scheme
+  // applies first — rule validation reads its kind.
   if (startConfig.scanSchemes?.length) {
     const {
       seedScanScheme, seedScanRule, applyScanScheme, applyScanRule,
@@ -499,7 +499,6 @@ export async function startWorkers(
           }
           recordOutcome(scanReport, `scheme ${scheme.version}`, outcome);
           if (outcome === 'applied') loggerRegistry.info(`[long-tail] scan scheme applied: ${scheme.version}`);
-          // Undeclared rules on a code-owned scheme are reported, never deleted.
           const declaredCategories = new Set((rules ?? []).map((r) => r.category));
           const existingRules = await listScanRules(scheme.version);
           scanReport.orphans.push(
@@ -520,7 +519,6 @@ export async function startWorkers(
       }
     }
     if (codeOwnedBoot && !startConfig.examples) {
-      // Schemes in the DB not declared here (demo seeds own theirs under examples).
       const declaredVersions = new Set(startConfig.scanSchemes.map((s) => s.version));
       scanReport.orphans.push(
         ...(await listScanSchemes())

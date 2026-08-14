@@ -84,6 +84,7 @@ export async function listDiscoveredWorkflows(input: {
           registered: !!config,
           active: !!worker,
           invocable: config?.invocable ?? !!worker,
+          read_safe: config?.read_safe ?? false,
           system: SYSTEM_WORKFLOWS.has(workflowType),
           description: config?.description ?? null,
           roles: config?.roles ?? [],

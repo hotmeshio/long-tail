@@ -120,12 +120,14 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
             </div>
             {/* Action row — right-aligned */}
             <div className="flex items-center gap-3">
-              <button
-                onClick={onCancel}
-                className="text-xs text-text-tertiary hover:text-status-error transition-colors"
-              >
-                {labels.cancel ?? 'Cancel escalation'}
-              </button>
+              {labels.cancel !== false && (
+                <button
+                  onClick={onCancel}
+                  className="text-xs text-text-tertiary hover:text-status-error transition-colors"
+                >
+                  {labels.cancel ?? 'Cancel escalation'}
+                </button>
+              )}
               <div className="flex-1" />
               {isCustom && (
                 <CustomDurationPicker onChange={onCustomChange} compact autoFocus />
@@ -180,12 +182,14 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               >
                 {labels.release ?? 'Release'}
               </button>
-              <button
-                onClick={onCancel}
-                className="text-xs transition-colors text-text-tertiary hover:text-status-error"
-              >
-                {labels.cancel ?? 'Cancel'}
-              </button>
+              {labels.cancel !== false && (
+                <button
+                  onClick={onCancel}
+                  className="text-xs transition-colors text-text-tertiary hover:text-status-error"
+                >
+                  {labels.cancel ?? 'Cancel'}
+                </button>
+              )}
             </div>
 
             {/* ── Resolve controls ── */}

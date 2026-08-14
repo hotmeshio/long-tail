@@ -22,6 +22,7 @@ import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
 import { ScanInputProvider } from '../../hooks/useScanInput';
 import { ActingIdentityProvider } from '../../hooks/useActingIdentity';
 import { ScanToast } from '../scan/ScanToast';
+import { AnnouncementBanner } from './AnnouncementBanner';
 
 /**
  * The canonical container layout. Every authenticated page renders inside it:
@@ -88,6 +89,9 @@ function ShellLayout() {
         onToggleDocs={() => setDocsOpen((v) => !v)}
         onToggleNav={kiosk ? undefined : () => setNavOpen((v) => !v)}
       />
+
+      {/* Broadcast notices — full width, under the header */}
+      <AnnouncementBanner />
 
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">

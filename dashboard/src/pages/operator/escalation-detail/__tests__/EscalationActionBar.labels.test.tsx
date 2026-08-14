@@ -69,4 +69,17 @@ describe('EscalationActionBar — x-lt-labels overrides', () => {
     expect(screen.getByText('Send to Triage')).toBeInTheDocument();
     expect(screen.queryByText('Approve')).not.toBeInTheDocument();
   });
+
+  it('cancel: false removes the cancel control from the available bar', () => {
+    renderBar({ mode: 'available', labels: { cancel: false } });
+    expect(screen.queryByText('Cancel escalation')).not.toBeInTheDocument();
+    expect(screen.getByText('Claim')).toBeInTheDocument();
+  });
+
+  it('cancel: false removes the cancel control from the claimed bar, other actions intact', () => {
+    renderBar({ mode: 'claimed_by_me', labels: { cancel: false } });
+    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+    expect(screen.getByText('Release')).toBeInTheDocument();
+    expect(screen.getByText('Resolve')).toBeInTheDocument();
+  });
 });

@@ -7,6 +7,8 @@ interface ConfirmCancelModalProps {
   selectedCount?: number;
   isPending?: boolean;
   error?: Error | null;
+  /** Replacement label from x-lt-labels.cancel — the challenge speaks it. */
+  actionLabel?: string;
 }
 
 export function ConfirmCancelModal({
@@ -16,19 +18,22 @@ export function ConfirmCancelModal({
   selectedCount,
   isPending,
   error,
+  actionLabel,
 }: ConfirmCancelModalProps) {
-  const title = selectedCount && selectedCount > 1
-    ? `Cancel ${selectedCount} escalations`
-    : 'Cancel escalation';
+  // One template for every vocabulary: the title carries the verb (the
+  // pressed button's label), the body states the intent in general terms.
+  const isBulk = !!selectedCount && selectedCount > 1;
+  const label = (!isBulk && actionLabel) || 'Cancel';
+  const title = isBulk ? `Cancel ${selectedCount} Items` : label === 'Cancel' ? 'Cancel Item' : label;
+
+  const body = isBulk
+    ? `Are you sure? This removes ${selectedCount} items from the work queue.`
+    : `Are you sure you want to ${label}? This removes the item from the work queue.`;
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
-        <p className="text-sm text-text-secondary">
-          {selectedCount && selectedCount > 1
-            ? `This will permanently cancel ${selectedCount} escalations. Any waiting workflows will be unblocked and receive a cancellation signal.`
-            : 'This will permanently cancel this escalation. Any waiting workflow will be unblocked and receive a cancellation signal.'}
-        </p>
+        <p className="text-sm text-text-secondary">{body}</p>
         <p className="text-xs text-text-tertiary">This action cannot be undone.</p>
         {error && <p className="text-xs text-status-error">{error.message}</p>}
         <div className="flex justify-end gap-3 pt-2">
@@ -40,7 +45,7 @@ export function ConfirmCancelModal({
             disabled={isPending}
             className="bg-status-error text-text-inverse px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {isPending ? 'Cancelling...' : 'Yes, Cancel'}
+            {isPending ? 'Working...' : `Yes, ${label}`}
           </button>
         </div>
       </div>

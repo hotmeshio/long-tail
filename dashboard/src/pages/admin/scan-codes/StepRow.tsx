@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash2, X } from 'lucide-react';
 import { SCAN_VERBS, type ScanStep, type ScanVerb } from '../../../api/scan-codes';
 import { ScanChoiceEditor } from './ScanChoiceEditor';
 
@@ -53,6 +53,14 @@ export function StepRow({
     }
   };
 
+  const selectedRoles = step.query.roles ?? [];
+  const remainingRoles = roleKeys.filter((r) => !selectedRoles.includes(r));
+  const addRole = (r: string) => patchQuery({ roles: [...selectedRoles, r] });
+  const removeRole = (r: string) => {
+    const next = selectedRoles.filter((x) => x !== r);
+    patchQuery({ roles: next.length ? next : undefined });
+  };
+
   const isPresent = step.verb === SCAN_VERBS.PRESENT;
   const needsTargetRole = step.verb === SCAN_VERBS.ESCALATE;
   const needsPayload = step.verb === SCAN_VERBS.RESOLVE
@@ -76,18 +84,38 @@ export function StepRow({
       </div>
 
       <div className="flex flex-wrap gap-4">
-        <label className="block">
-          <span className="block text-xs text-text-secondary mb-1">Look in <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">The queue the item is expected in.</span>
-          <select
-            value={step.query.roles?.[0] ?? ''}
-            onChange={(e) => patchQuery({ roles: e.target.value ? [e.target.value] : undefined })}
-            className="select font-mono"
-          >
-            <option value="">Any queue I can see</option>
-            {roleKeys.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </label>
+        <div className="block">
+          <span className="block text-xs text-text-secondary mb-1">Look in</span>
+          <span className="block text-2xs text-text-tertiary mb-1">The queues the item is expected in — empty means any.</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {selectedRoles.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => removeRole(r)}
+                className="inline-flex items-center gap-1 text-2xs font-mono text-text-primary border border-surface-border px-1.5 py-0.5 hover:text-status-error hover:border-status-error/50 transition-colors"
+                title={`Remove ${r}`}
+              >
+                {r}
+                <X className="w-3 h-3" strokeWidth={1.5} />
+              </button>
+            ))}
+            {selectedRoles.length === 0 && (
+              <span className="text-2xs text-text-tertiary italic">Any queue I can see</span>
+            )}
+            {remainingRoles.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => e.target.value && addRole(e.target.value)}
+                className="select font-mono"
+                aria-label="Add a queue"
+              >
+                <option value="">Add a queue…</option>
+                {remainingRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Held by</span>
           <span className="block text-2xs text-text-tertiary mb-1">Narrow to claimed, unclaimed, or my items.</span>

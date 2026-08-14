@@ -32,6 +32,12 @@ export interface LTWorkflowConfig {
   cron_schedule?: string | null;
   /** Bot external_id to run as. When set, workflows use this bot's identity. */
   execute_as?: string | null;
+  /**
+   * Side-effect-free workflow, eligible for `invoke_workflow_read_safe` —
+   * the invocation surface exposed to read-scoped MCP callers. Fail-closed:
+   * omitted reads as false.
+   */
+  read_safe?: boolean;
 }
 
 /**
@@ -53,6 +59,8 @@ export interface LTResolvedConfig {
   resolverSchema: Record<string, any> | null;
   cronSchedule: string | null;
   executeAs: string | null;
+  /** Side-effect-free — eligible for the read-scoped invocation surface. */
+  readSafe: boolean;
 }
 
 /**

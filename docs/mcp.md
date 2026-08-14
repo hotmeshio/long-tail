@@ -172,6 +172,8 @@ Put plainly: **scope is which tools, role is which records.** A read key answers
 
 Creating an escalation shows both at work. `escalate_to_human` changes state, so the key needs `mcp:full`, and the account needs a role allowed to route to that queue. Reading the same queue back — `get_available_work`, `check_resolution` — needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
 
+**Read-safe workflow invocation.** A workflow registered with `read_safe: true` in its config (a side-effect-free lookup) is invocable by read-scoped callers through `invoke_workflow_read_safe` — the read-safe variant of `invoke_workflow`. Any workflow may be attempted; one without the flag fails with a clear error, so the flag on the config is the whole contract. Declare it on the worker profile (`readSafe: true`) or set it through the workflow-config admin surface; the flag is fail-closed and defaults off.
+
 ### 1. Create a service account
 
 In the dashboard: **Admin → Bot Accounts → Create**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
