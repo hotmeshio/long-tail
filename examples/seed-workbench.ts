@@ -29,7 +29,19 @@ const WORKBENCH_FORM_SCHEMA = {
     type: 'iframe',
     src: `${BASE_URL}/design?workbenchId={workbenchId}&companyId={companyId}`,
   },
+  // The schema is the submission contract even though no form renders: with
+  // enforce_schema on the role, EVERY resolve surface (the iframe's lt:submit,
+  // resolve-by-metadata bridges, MCP tools) must satisfy it or 422 with
+  // nothing written. responseType is root-required with no showIf, so an
+  // empty or errant payload can never close the row.
+  required: ['responseType'],
   properties: {
+    responseType: {
+      type: 'string',
+      title: 'Response',
+      enum: ['approved', 'rework', 'hold'],
+      description: 'The outcome the embedded editor submits — one of its action buttons.',
+    },
     stl_url: {
       type: 'string',
       title: 'STL File URL',
@@ -56,6 +68,7 @@ export async function seedWorkbenchRole(): Promise<void> {
         sla_minutes: 30,
         target_per_hour: 4,
         form_schema: WORKBENCH_FORM_SCHEMA,
+        enforce_schema: true,
       });
       loggerRegistry.info(`[examples] workbench role created (${WORKBENCH_ROLE})`);
       return;
@@ -77,6 +90,7 @@ export async function seedWorkbenchRole(): Promise<void> {
         sla_minutes: 30,
         target_per_hour: 4,
         form_schema: WORKBENCH_FORM_SCHEMA,
+        enforce_schema: true,
       });
       loggerRegistry.info(`[examples] workbench role configured (${WORKBENCH_ROLE})`);
     } catch (err: any) {
@@ -87,7 +101,7 @@ export async function seedWorkbenchRole(): Promise<void> {
 
   // Always push the latest schema so URL template changes take effect on boot.
   try {
-    await updateRoleMetadata(WORKBENCH_ROLE, { form_schema: WORKBENCH_FORM_SCHEMA });
+    await updateRoleMetadata(WORKBENCH_ROLE, { form_schema: WORKBENCH_FORM_SCHEMA, enforce_schema: true });
     loggerRegistry.info(`[examples] workbench schema refreshed (${WORKBENCH_ROLE})`);
   } catch (err: any) {
     loggerRegistry.warn(`[examples] failed to refresh workbench schema: ${err.message}`);

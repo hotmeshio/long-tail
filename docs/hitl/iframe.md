@@ -1,6 +1,6 @@
 # Iframe Viewport Protocol
 
-For fully custom UIs — PDF viewers, complex multi-step forms, specialized domain interfaces — replace the generated form with an iframe. The iframe owns its entire surface: platform-side validation, layout, widgets, and draft persistence apply to the generated form, so the embedded app provides its own. Reach for the schema-driven form first ([choosing your surface](../hitl-guide.md#choosing-your-surface)); use the iframe when the domain demands a surface the schema cannot express.
+For fully custom UIs — PDF viewers, complex multi-step forms, specialized domain interfaces — replace the generated form with an iframe. The iframe owns its rendering: layout, widgets, and draft persistence belong to the embedded app. The schema remains the submission contract — with [server-side enforcement](../schema-enforcement.md) on the role, every payload the iframe (or anything else) submits validates against it. Reach for the schema-driven form first ([choosing your surface](../hitl-guide.md#choosing-your-surface)); use the iframe when the domain demands a surface the schema cannot express.
 
 ---
 
@@ -16,7 +16,7 @@ For fully custom UIs — PDF viewers, complex multi-step forms, specialized doma
 }
 ```
 
-When `x-lt-viewport` is present, the dashboard renders an iframe instead of the standard form. The `properties` block still defines the resolver payload shape for typing purposes.
+When `x-lt-viewport` is present, the dashboard renders an iframe instead of the standard form. The `properties` block still defines the resolver payload shape — and with enforcement on, it is the binding contract for every submission (see Submission Rules below).
 
 ---
 
@@ -152,7 +152,7 @@ Communication happens via `window.postMessage`.
     document.getElementById('submit').addEventListener('click', () => {
       window.parent.postMessage({
         type: 'lt:submit',
-        payload: { approved: true, reviewed_at: new Date().toISOString() },
+        payload: { responseType: 'approved', reviewed_at: new Date().toISOString() },
       }, '*');
     });
   </script>
@@ -162,9 +162,59 @@ Communication happens via `window.postMessage`.
 
 ---
 
+## Submission Rules — the schema is still the contract
+
+The iframe replaces the rendering, never the contract. Declare submission
+rules on the same schema that carries `x-lt-viewport`, and turn on
+[`enforce_schema`](../schema-enforcement.md) for the role:
+
+```json
+{
+  "x-lt-viewport": { "type": "iframe", "src": "https://your-app.example.com/hitl-form" },
+  "required": ["responseType"],
+  "properties": {
+    "responseType": {
+      "type": "string",
+      "enum": ["approved", "rework", "hold"]
+    }
+  }
+}
+```
+
+With enforcement on, the gate sits at the API — on **every** resolve surface,
+not just the iframe's `lt:submit`: resolve by id, `resolve_by_metadata`,
+signal-key resolves, bulk, and the MCP tools all validate the payload against
+this schema before anything is written. A submission missing `responseType`
+(or carrying a value outside the enum) is rejected with the canonical 422 and
+the escalation stays pending. That makes the pattern defensible against
+errant ingress: a bridge or event handler that resolves rows generically with
+a minimal payload can never close one of these — only a caller that states an
+explicit, legal `responseType` can.
+
+The rules for making the contract airtight:
+
+- Put the deciding field in the root `required` array and give it **no
+  `x-lt-showIf`** — a field hidden by a condition is waived from `required`,
+  so an unconditional field is the unforgeable part of the contract.
+- An `enum` bounds the legal outcomes; each of the embedded app's action
+  buttons submits one of them.
+- The iframe receives the schema in `lt:init`, so the embedded app can read
+  the contract it must satisfy rather than duplicating it.
+- The dashboard routes an enforcement 422 into the standard errors panel, so
+  a contract violation from the embedded app is visible to the operator.
+- Schema versions pin at escalation creation: rows created before the rule
+  existed validate against their pinned version. Drain or migrate pending
+  rows when introducing a new required field to an in-flight queue.
+
+The `cad-designer` example (`examples/seed-workbench.ts`) ships this shape:
+a required `responseType` enum on the viewport schema with `enforce_schema`
+on the role.
+
+---
+
 ## Security
 
 - The iframe runs with `sandbox="allow-scripts allow-same-origin allow-forms"`
-- The parent validates message origins — only messages from the iframe's declared origin are accepted
-- The `envelope` field (which may contain secrets) is not sent to the iframe
-- Only safe escalation metadata (`id`, `type`, `description`, `status`, `priority`, `role`) is exposed
+- The parent validates message origins — only messages from the iframe's declared origin are accepted, and `lt:init` posts only to that origin
+- `lt:init` carries the escalation context the embedded app needs (`id`, `type`, `description`, `status`, `priority`, `role`, `envelope`, `metadata`, `escalation_payload`) — because the envelope travels, declare only trusted `src` origins
+- With `enforce_schema` on the role, a compromised or buggy embedded app still cannot resolve outside the schema's contract — the server gate validates every payload
