@@ -364,27 +364,36 @@ export async function getEscalationScopeRows(
 /**
  * Release a single escalation claim back to the available pool.
  * Only the assigned user (or superadmin via route) may release.
+ *
+ * `quiet` performs the identical release without publishing the `released`
+ * event — for bookkeeping releases (a dispatcher's held-skip loop frees rows
+ * every ranking window) that are not lifecycle transitions. Faceted machine
+ * claims are already silent; this is the release-side counterpart. Default
+ * stays loud.
  */
 export async function releaseEscalation(
   id: string,
   userId: string,
+  opts?: { quiet?: boolean },
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
   const result = await client.release({ id, assignee: userId });
   if (!result.ok) return null;
 
   const released = toEscalationRecord(result.entry);
-  publishEscalationChange({
-    type: 'escalation.released',
-    source: 'service',
-    workflowId: released.workflow_id || '',
-    workflowName: released.workflow_type || '',
-    taskQueue: released.task_queue || '',
-    escalationId: released.id,
-    role: released.role,
-    status: 'released',
-    data: escalationEventData(released, { released_by: userId }),
-  });
+  if (!opts?.quiet) {
+    publishEscalationChange({
+      type: 'escalation.released',
+      source: 'service',
+      workflowId: released.workflow_id || '',
+      workflowName: released.workflow_type || '',
+      taskQueue: released.task_queue || '',
+      escalationId: released.id,
+      role: released.role,
+      status: 'released',
+      data: escalationEventData(released, { released_by: userId }),
+    });
+  }
   return released;
 }
 

@@ -883,7 +883,11 @@ Release a claimed escalation back to the available pool. Only the user who holds
 |-----------|-------------|
 | `id` | Escalation UUID |
 
-**Request body:** None.
+**Request body (optional):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `quiet` | boolean | Perform the identical release without publishing the `released` event. For bookkeeping releases — a dispatcher's held-skip loop freeing rows every ranking window — that are not lifecycle transitions. Faceted machine claims are already silent; this is the release-side counterpart. Default: `false` (loud). |
 
 **Response 200:**
 

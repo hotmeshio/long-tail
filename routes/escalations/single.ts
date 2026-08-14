@@ -64,12 +64,14 @@ export function registerSingleRoutes(router: Router): void {
    * Release a claimed escalation back to the available pool.
    * Only the assigned actor (token user, or the badged person when an
    * X-LT-Acting-Token grant rides the request) may release their own claim.
+   * `quiet: true` in the body performs the identical release without the
+   * `released` event — bookkeeping releases only; default stays loud.
    */
   router.post('/:id/release', async (req, res) => {
     const auth = await effectiveWorkAuth(req, res);
     if (!auth) return;
     const result = await api.releaseEscalation(
-      { id: req.params.id },
+      { id: req.params.id, quiet: req.body?.quiet === true },
       auth,
     );
     res.status(result.status).json(result.data ?? { error: result.error });
