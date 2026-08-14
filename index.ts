@@ -83,6 +83,10 @@ async function main() {
       },
     },
     examples: true,
+    features: {
+      // The examples ship the full scan demo (schemes 10/11); surface it.
+      scanCodes: true,
+    },
     mcp: {
       server: { enabled: true },
     },
