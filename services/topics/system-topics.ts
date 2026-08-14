@@ -272,6 +272,28 @@ const SYSTEM_TOPICS: LTTopicConfig[] = [
     example_payload: { workflowId: 'wf-abc', workflowName: 'processOrder', milestones: [{ name: 'items_processed', value: 42 }] },
     tags: ['progress', 'core'],
   },
+
+  // Surfaces
+  {
+    topic: 'system.surfaces.dashboard',
+    description:
+      'A dashboard announcement was published or removed. Delivery reaches ' +
+      'every authenticated subscriber — role targeting is display scoping, ' +
+      'so bodies must never carry secrets.',
+    category: 'surfaces',
+    payload_schema: objectSchema({
+      action: { type: 'string', description: 'created | deleted' },
+      announcement: {
+        type: 'object',
+        description: 'The announcement row (id, title, body, layout, roles, expires_at)',
+      },
+    }),
+    example_payload: {
+      action: 'created',
+      announcement: { id: 'ann-001', title: 'Maintenance tonight', layout: 'banner', roles: [] },
+    },
+    tags: ['surface', 'dashboard'],
+  },
 ];
 
 // ── Seeding ─────────────────────────────────────────────────────────────────────

@@ -140,6 +140,31 @@ export function publishActivityEvent(params: {
 }
 
 /**
+ * The dashboard-surface broadcast subject. Announcements publish here and the
+ * dashboard subscribes; the payload is the announcement row (small by
+ * nature). Delivery reaches every authenticated socket — role targeting is
+ * display scoping, never confidentiality.
+ */
+export const ANNOUNCEMENT_TOPIC = 'system.surfaces.dashboard';
+
+/**
+ * Publish a dashboard announcement event.
+ * Subject: system.surfaces.dashboard (fixed — one surface, one channel)
+ */
+export function publishAnnouncementEvent(params: {
+  type: 'announcement.created' | 'announcement.deleted';
+  announcement: Record<string, any>;
+}): Promise<void> {
+  const action = params.type.split('.')[1];
+  return fireAndForget({
+    type: ANNOUNCEMENT_TOPIC,
+    source: 'announcement',
+    data: { action, announcement: params.announcement },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Publish a knowledge lifecycle event.
  * Subject: system.knowledge.{domain}.{action}
  */

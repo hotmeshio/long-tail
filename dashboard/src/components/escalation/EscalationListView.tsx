@@ -8,6 +8,7 @@ import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
 import { StickyPagination } from '../common/data/StickyPagination';
 import { useEscalations, useClaimEscalation } from '../../api/escalations';
+import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { formatAgoCompact } from '../../lib/format';
 import { getDeep } from '../../lib/x-lt-bind';
@@ -303,6 +304,7 @@ function HistoryColumn({ role, def, onRowClick }: {
     order: 'desc',
     limit: def.limit ?? 25,
     enabled: show,
+    include: schemaNeedsEnvelope(def) ? 'envelope' : undefined,
   });
   const rows = query.data?.escalations ?? [];
   const total = query.data?.total ?? 0;

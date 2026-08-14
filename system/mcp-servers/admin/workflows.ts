@@ -105,6 +105,57 @@ export function registerWorkflowTools(server: McpServer): void {
     },
   );
 
+  // invoke_workflow gated to configs registered read-safe — the invocation
+  // surface exposed to read-scoped MCP callers. Any workflow may be attempted;
+  // one lacking the flag fails with a clear error.
+  (server as any).registerTool(
+    'invoke_workflow_read_safe',
+    {
+      title: 'Invoke Read-Safe Workflow',
+      description:
+        'Start a workflow registered read-safe (side-effect-free). Same contract ' +
+        'as invoke_workflow, gated to configs carrying read_safe=true — the ' +
+        'variant exposed to read-scoped MCP callers. A workflow without the ' +
+        'flag fails with a clear error.',
+      inputSchema: invokeWorkflowSchema,
+    },
+    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+      const config = await configService.getWorkflowConfig(args.workflow_type);
+      if (!config?.invocable) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `workflow ${args.workflow_type} is not invocable` }),
+          }],
+          isError: true,
+        };
+      }
+      if (!config.read_safe) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `workflow ${args.workflow_type} is not registered read-safe` }),
+          }],
+          isError: true,
+        };
+      }
+      const result = await invokeWorkflow({
+        workflowType: args.workflow_type,
+        data: args.data,
+        metadata: args.metadata,
+        executeAs: args.execute_as,
+        options: args.options,
+        auth: { userId: 'lt-system', role: 'superadmin' },
+      });
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({ workflow_id: result.workflowId, message: 'Workflow started' }),
+        }],
+      };
+    },
+  );
+
   // mirrors GET /api/workflows/:workflowId/status + /result
   (server as any).registerTool(
     'get_workflow_status',

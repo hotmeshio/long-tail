@@ -45,6 +45,7 @@ import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { createBulkHandlers } from './helpers';
+import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
 import { ClaimModal } from './ClaimModal';
 import { EscalationTimeline } from '../../components/escalation/EscalationTimeline';
 import type { LTEscalationRecord } from '../../api/types';
@@ -226,6 +227,14 @@ export function AvailableEscalationsPage() {
     : isAvailable ? undefined
     : undefined;
 
+  // The single-role list_schema resolves ahead of the rows queries: it decides
+  // whether the rows request needs the heavy envelope/payload columns.
+  const singleRole = filters.role
+    || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
+  const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
+  const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
+  const schemaSettled = !singleRole || listSchemaQuery.isFetched;
+
   // Timeline mode fetches 100 per page so the spine has enough story to tell.
   const timelinePageSize = 100;
   const sharedFilters = {
@@ -241,18 +250,19 @@ export function AvailableEscalationsPage() {
     search: debouncedSearch || undefined,
     // Faceted metadata query (composes with role-scope + the basic filters in SQL).
     ...facetFilters,
+    include: schemaNeedsEnvelope(listSchema) ? ('envelope' as const) : undefined,
   };
 
   const availableQuery = useAvailableEscalations({
     ...sharedFilters,
-    enabled: isAvailable,
+    enabled: isAvailable && schemaSettled,
   });
 
   const escalationsQuery = useEscalations({
     status: apiStatus,
     claimed: isClaimed || undefined,
     ...sharedFilters,
-    enabled: !isAvailable,
+    enabled: !isAvailable && schemaSettled,
   });
 
   const activeQuery = isAvailable ? availableQuery : escalationsQuery;
@@ -285,15 +295,7 @@ export function AvailableEscalationsPage() {
   // from the query — no client-side filtering of the current page.
   const escalations = data?.escalations ?? [];
   const total = data?.total ?? 0;
-  // Role-owned rich view: only when the list targets exactly ONE role (the basic
-  // filter, or a single faceted role) and that role owns a list_schema. Absent
-  // or multi-role → the engineer table, unchanged. `forceTable` lets the user
-  // flip back to the columns.
-  const singleRole = filters.role
-    || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
-  const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
-  const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
-  // A rich view is available for this list; the toggle flips to the table.
+  // Rich view: a single-role list whose role owns a non-table list_schema.
   const hasRichView = !!singleRole && !!listSchema
     && !!listSchema['x-lt-layout'] && listSchema['x-lt-layout'] !== 'table';
   const useRichView = hasRichView && !showTimeline

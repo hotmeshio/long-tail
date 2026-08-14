@@ -21,7 +21,7 @@ to render in their place:
 | Target | Default | Control |
 |--------|---------|---------|
 | `claim` | Claim | The claim button (unclaimed). |
-| `cancel` | Cancel / Cancel escalation | The cancel control, both states. |
+| `cancel` | Cancel / Cancel escalation | The cancel control, both states. A string renames it; `false` removes it from both footer states. |
 | `submit` | Submit / Acknowledge | The resolve button (claimed). |
 | `release` | Release | The release tab. |
 
@@ -34,9 +34,21 @@ to render in their place:
 ```
 
 Only the known targets are read; unknown keys and non-string values are
-ignored. Any target the schema omits keeps its default, so a schema overrides
-just the controls it cares about. The pending, triage, and confirmation states
-("Claiming…", "Send to Triage", "Yes, Release") keep their own copy.
+ignored — except `cancel: false`, the hide instruction. Any target the schema
+omits keeps its default, so a schema overrides just the controls it cares
+about. The pending, triage, and confirmation states ("Claiming…", "Send to
+Triage", "Yes, Release") keep their own copy.
+
+Roles whose process routes work onward rather than discarding it hide the
+cancel control and rename the actions that remain — an escalate-only surface
+declares `{ "cancel": false, "submit": "Send to Service" }` so the footer
+offers exactly the verbs the process means.
+
+The confirmation challenge speaks whatever the control says: one template
+carries any vocabulary — the modal titles with the label, asks "Are you sure
+you want to Send to Service? This removes the item from the work queue," and
+confirms with "Yes, Send to Service". The default label follows the same
+shape with "Cancel".
 
 ## `x-lt-submit-on-claim` — the one-gesture claim
 

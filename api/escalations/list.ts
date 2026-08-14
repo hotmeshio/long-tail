@@ -17,6 +17,31 @@ export interface FacetInput {
   /** Only rows past their role's priority threshold — see FacetQuery.jeopardy. */
   jeopardy?: boolean;
   orderBy?: FacetOrder[];
+  /**
+   * List rows omit the two heavyweight JSON columns (`envelope`,
+   * `escalation_payload`) by default — at scale they dominate the payload.
+   * Pass `'envelope'` to restore both (list schemas interpolating
+   * `{{envelope.*}}`/`{{payload.*}}` need them). The single-item GET always
+   * carries the full record.
+   */
+  include?: string;
+}
+
+/** Strip the heavyweight JSON columns from list rows unless asked back. */
+function projectListRows<T extends Record<string, any>>(
+  rows: T[],
+  include?: string,
+): Record<string, any>[] {
+  if (include === 'envelope') return rows;
+  return rows.map(({ envelope: _e, escalation_payload: _p, ...rest }) => rest);
+}
+
+/** Apply the list projection to a { escalations, ... } service result. */
+function projectListResult<T extends { escalations: Record<string, any>[] }>(
+  result: T,
+  include?: string,
+): T {
+  return { ...result, escalations: projectListRows(result.escalations, include) };
 }
 
 /** True when the caller asked for anything the plain list path can't express. */
@@ -105,7 +130,7 @@ export async function listEscalations(
         limit: input.limit ?? 50,
         offset: input.offset ?? 0,
       });
-      return { status: 200, data: result };
+      return { status: 200, data: projectListResult(result, input.include) };
     }
 
     const result = await escalationService.listEscalations({
@@ -126,7 +151,7 @@ export async function listEscalations(
       selfRoles: scope.global ? undefined : scope.selfRoles,
       meUserId: auth.userId,
     });
-    return { status: 200, data: result };
+    return { status: 200, data: projectListResult(result, input.include) };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -195,7 +220,7 @@ export async function listAvailableEscalations(
         limit: input.limit ?? 50,
         offset: input.offset ?? 0,
       });
-      return { status: 200, data: result };
+      return { status: 200, data: projectListResult(result, input.include) };
     }
 
     const result = await escalationService.listAvailableEscalations({
@@ -212,7 +237,7 @@ export async function listAvailableEscalations(
       selfRoles: scope.global ? undefined : scope.selfRoles,
       meUserId: auth.userId,
     });
-    return { status: 200, data: result };
+    return { status: 200, data: projectListResult(result, input.include) };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

@@ -22,6 +22,11 @@ export interface FacetFilters {
    *  exact predicate, so a jeopardy list's total equals the pill's count. */
   jeopardy?: boolean;
   orderBy?: FacetOrder[];
+  /**
+   * List rows arrive without `envelope`/`escalation_payload` by default —
+   * pass 'envelope' only when the surface's schema interpolates them.
+   */
+  include?: 'envelope';
 }
 
 interface EscalationFilters extends FacetFilters {
@@ -52,6 +57,7 @@ function appendFacetParams(params: URLSearchParams, f: FacetFilters): void {
   if (f.orderBy?.length) params.set('orderBy', JSON.stringify(f.orderBy));
   if (f.available !== undefined) params.set('available', String(f.available));
   if (f.jeopardy === true) params.set('jeopardy', '1');
+  if (f.include) params.set('include', f.include);
 }
 
 export interface EscalationStats {

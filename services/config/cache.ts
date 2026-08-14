@@ -19,6 +19,7 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       resolverSchema: c.resolver_schema ?? null,
       cronSchedule: c.cron_schedule ?? null,
       executeAs: c.execute_as ?? null,
+      readSafe: c.read_safe ?? false,
     });
   }
 

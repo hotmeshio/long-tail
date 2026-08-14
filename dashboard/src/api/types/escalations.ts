@@ -19,9 +19,11 @@ export interface LTEscalationRecord {
   assigned_until: string | null;
   resolved_at: string | null;
   claimed_at: string | null;
-  envelope: string;
+  /** Absent on list rows unless the request opts in with include=envelope. */
+  envelope?: string;
   metadata: Record<string, unknown> | null;
-  escalation_payload: string | null;
+  /** Absent on list rows unless the request opts in with include=envelope. */
+  escalation_payload?: string | null;
   resolver_payload: string | null;
   created_at: string;
   updated_at: string;

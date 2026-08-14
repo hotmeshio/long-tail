@@ -57,6 +57,11 @@ export interface LTWorkerConfig {
   /** Bot identity to run as (proxy invocation). */
   executeAs?: string;
   /**
+   * Side-effect-free workflow, eligible for `invoke_workflow_read_safe` —
+   * the invocation surface exposed to read-scoped MCP callers. Default: false.
+   */
+  readSafe?: boolean;
+  /**
    * Per-entry ownership override. `true` → this profile is compared and
    * applied on every boot (code is source of truth); `false` → the DB owns
    * the row after first insert. Omitted → follows `configSource`.

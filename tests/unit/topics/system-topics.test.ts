@@ -25,6 +25,7 @@ const EXPECTED_SYSTEM_TOPICS = [
   'system.file.stored', 'system.file.deleted',
   'system.agent.*.started', 'system.agent.*.completed', 'system.agent.*.failed', 'system.agent.*.status_changed',
   'system.milestone.*',
+  'system.surfaces.dashboard',
 ];
 
 // Roleless escalation names retired from the catalog after every seed pass.
@@ -87,7 +88,7 @@ describe('seedSystemTopics', () => {
   });
 
   it('every topic has a valid category', async () => {
-    const validCategories = ['task', 'workflow', 'escalation', 'activity', 'knowledge', 'file', 'agent', 'milestone'];
+    const validCategories = ['task', 'workflow', 'escalation', 'activity', 'knowledge', 'file', 'agent', 'milestone', 'surfaces'];
     await seedSystemTopics();
     for (const call of seedCalls(mockQuery)) {
       const category = call[1][2]; // 3rd param

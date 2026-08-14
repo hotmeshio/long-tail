@@ -15,12 +15,16 @@
  *   - x-lt-require-all against the checklist items resolved from context
  *   - static + dynamic bounds (minimum/x-lt-minimum, lengths, patterns)
  *
+ * Root-level x-lt-require-any groups run after the per-field pass: each group
+ * needs a value in at least one visible member (all-hidden groups are waived).
+ *
  * The showIf/`resolver.*` domain is always the FLAT form representation, so a
  * condition like `resolver.approved` reads the same on both sides.
  */
 import { type FieldError, validateField } from './field-validator';
 import { evaluateShowIf, type ShowIfContext } from './x-lt-show-if';
 import { mapPayloadToForm } from './x-lt-bind';
+import { readRequireAnyGroups, hasRequireAnyValue } from './x-lt-require-any';
 
 export type { FieldError } from './field-validator';
 
@@ -59,6 +63,22 @@ export function validateResolverForm(
       liveCtx as Record<string, unknown>,
     );
     if (err) errors.push({ field, message: err });
+  }
+
+  // Require-any groups: at least one VISIBLE member per group carries a value.
+  // A member hidden by showIf (or naming no property) can neither satisfy nor
+  // be demanded; an all-hidden group is waived.
+  for (const group of readRequireAnyGroups(schema)) {
+    const visible = group.filter(
+      (k) => properties[k] && evaluateShowIf(properties[k]['x-lt-showIf'], liveCtx),
+    );
+    if (visible.length === 0) continue;
+    if (visible.some((k) => hasRequireAnyValue(formValues[k]))) continue;
+    const titles = visible.map((k) => (properties[k].title as string | undefined) ?? k);
+    errors.push({
+      field: visible[0],
+      message: `Enter a value for at least one of: ${titles.join(', ')}`,
+    });
   }
   return errors;
 }

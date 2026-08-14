@@ -78,6 +78,7 @@ export async function upsertWorkflowConfig(input: {
   envelope_schema?: any;
   resolver_schema?: any;
   cron_schedule?: string | null;
+  read_safe?: boolean;
 }): Promise<LTApiResult> {
   try {
     // Validate cron expression before persisting
@@ -101,6 +102,7 @@ export async function upsertWorkflowConfig(input: {
       envelope_schema: input.envelope_schema ?? null,
       resolver_schema: input.resolver_schema ?? null,
       cron_schedule: input.cron_schedule ?? null,
+      read_safe: input.read_safe ?? false,
     });
     ltConfig.invalidate();
     await cronRegistry.restartCron(config);

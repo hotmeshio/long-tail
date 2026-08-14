@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // MCP wiring only — every dependency is mocked.
 const mockInvokeWorkflow = vi.fn();
 const mockTerminateWorkflow = vi.fn();
+const mockGetWorkflowConfig = vi.fn();
 
 vi.mock('../../../../services/workflow-invocation', () => ({
   invokeWorkflow: (...a: unknown[]) => mockInvokeWorkflow(...a),
@@ -10,6 +11,7 @@ vi.mock('../../../../services/workflow-invocation', () => ({
 }));
 vi.mock('../../../../services/config', () => ({
   listWorkflowConfigs: vi.fn().mockResolvedValue([]),
+  getWorkflowConfig: (...a: unknown[]) => mockGetWorkflowConfig(...a),
 }));
 vi.mock('../../../../services/workers/registry', () => ({
   getRegisteredWorkers: vi.fn().mockReturnValue(new Map()),
@@ -60,6 +62,28 @@ describe('admin workflow MCP tools', () => {
     mockTerminateWorkflow.mockResolvedValue({ status: 404, error: 'not found' });
     const result = await tools.get('terminate_workflow')!({ workflow_id: 'missing' });
     expect(result.isError).toBe(true);
+  });
+
+  it('invoke_workflow_read_safe refuses a workflow without the read_safe flag', async () => {
+    mockGetWorkflowConfig.mockResolvedValue({ workflow_type: 'lookup', invocable: true, read_safe: false });
+    const result = await tools.get('invoke_workflow_read_safe')!({ workflow_type: 'lookup', data: {} });
+    expect(result.isError).toBe(true);
+    expect(parse(result).error).toBe('workflow lookup is not registered read-safe');
+    expect(mockInvokeWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('invoke_workflow_read_safe refuses a non-invocable workflow', async () => {
+    mockGetWorkflowConfig.mockResolvedValue({ workflow_type: 'lookup', invocable: false, read_safe: true });
+    const result = await tools.get('invoke_workflow_read_safe')!({ workflow_type: 'lookup', data: {} });
+    expect(result.isError).toBe(true);
+    expect(parse(result).error).toBe('workflow lookup is not invocable');
+  });
+
+  it('invoke_workflow_read_safe starts an invocable read-safe workflow', async () => {
+    mockGetWorkflowConfig.mockResolvedValue({ workflow_type: 'lookup', invocable: true, read_safe: true });
+    mockInvokeWorkflow.mockResolvedValue({ workflowId: 'wf-lookup-1' });
+    const result = await tools.get('invoke_workflow_read_safe')!({ workflow_type: 'lookup', data: { q: 'x' } });
+    expect(parse(result)).toEqual({ workflow_id: 'wf-lookup-1', message: 'Workflow started' });
   });
 
   it('invoke_workflow forwards WorkflowOptions (deterministic ids ride options.workflowId)', async () => {

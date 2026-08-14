@@ -7,6 +7,7 @@ import { useEscalations, useResolveEscalation } from '../../../api/escalations';
 import { useAuth } from '../../../hooks/useAuth';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
 import { resolveScopedQuery, type EmbedQuery } from '../../../lib/x-lt-query';
+import { schemaNeedsEnvelope } from '../../../lib/schema-needs-envelope';
 import type { WidgetProps } from './index';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -118,6 +119,7 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
     available: scoped.available,
     limit: scoped.limit ?? 5,
     enabled: scoped.enabled,
+    include: schemaNeedsEnvelope({ columns, actions }) ? 'envelope' : undefined,
   });
 
   const escalations = data?.escalations ?? [];

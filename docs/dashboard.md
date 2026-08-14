@@ -445,6 +445,21 @@ Credentials flow through the system via the `_scope` identity context — workfl
 
 ## Global Features
 
+### Announcements
+
+A full-width notice line under the header carries published announcements —
+maintenance windows, shift notes, anything the floor should read. Role
+managers (superadmin, admin, engineer) publish through
+`POST /api/announcements` or the `publish_announcement` admin tool; only the
+markdown body is required, and title, layout, role targeting, and expiry
+(default 24 hours) fill in. Connected dashboards show a new announcement live
+over the `system.surfaces.dashboard` event; everyone else sees it on their
+next load. The collapsed line shows the headline; expanding renders the
+markdown body. Each user dismisses per-browser.
+
+Role targeting scopes display, never access: the live event reaches every
+authenticated subscriber, so announcement bodies must never carry secrets.
+
 ### Inbox
 
 The Inbox icon in the header shows a badge count when the current user has pending escalations assigned to their roles. The count updates live via NATS — no polling needed.

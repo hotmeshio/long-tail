@@ -120,6 +120,29 @@ On a blocked submit, each unchecked mandatory item highlights red inline, and th
 
 ---
 
+## Require Any of a Set (`x-lt-require-any`)
+
+A schema root can require a value in **at least one** field of a group — the either/or form where a Left quantity or a Right quantity satisfies, but blank-both fails:
+
+```json
+{
+  "x-lt-require-any": [["left_quantity", "right_quantity"]],
+  "properties": {
+    "left_quantity":  { "type": "number", "title": "Left Quantity" },
+    "right_quantity": { "type": "number", "title": "Right Quantity" }
+  }
+}
+```
+
+The token is an array of groups; each group is an array of property names and enforces independently. A group passes when any member carries a value: `false` and `0` are answers; empty string, null, and undefined are not.
+
+- Visibility composes: a member hidden by `x-lt-showIf` (or naming no schema property) can neither satisfy the group nor be demanded of the submitter, and a group whose members are all hidden is waived.
+- An unsatisfied group yields one violation on the group's first visible field: `Enter a value for at least one of: Left Quantity, Right Quantity` (member titles, falling back to keys).
+- Composes with `required`: a field listed in `required` must be filled regardless; the group check is the softer at-least-one layered on top.
+- The same pass runs on both sides of the wire — the dashboard panel blocks the submit, and an enforced role's server gate rejects a violating payload with the canonical 422.
+
+---
+
 ## Pattern Guard
 
 Apply a regular expression guard with `pattern`. If the input does not match, the field blocks submission. Provide `x-lt-pattern-error` for a human-readable error message; otherwise the generic "Invalid format" is shown.

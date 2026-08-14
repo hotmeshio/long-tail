@@ -43,6 +43,7 @@ export async function getWorkflowConfig(
     resolver_schema: wf.resolver_schema ?? null,
     cron_schedule: wf.cron_schedule ?? null,
     execute_as: wf.execute_as ?? null,
+    read_safe: wf.read_safe ?? false,
   };
 }
 
@@ -86,5 +87,6 @@ export async function listWorkflowConfigs(): Promise<LTWorkflowConfig[]> {
     resolver_schema: wf.resolver_schema ?? null,
     cron_schedule: wf.cron_schedule ?? null,
     execute_as: wf.execute_as ?? null,
+    read_safe: wf.read_safe ?? false,
   }));
 }

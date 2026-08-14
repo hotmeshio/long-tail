@@ -18,3 +18,4 @@ export * as workflowSets from './workflow-sets';
 export * as dba from './dba';
 export * as namespaces from './namespaces';
 export * as maintenance from './maintenance';
+export * as announcements from './announcements';
