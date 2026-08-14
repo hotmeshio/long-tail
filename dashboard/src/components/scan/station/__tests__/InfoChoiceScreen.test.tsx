@@ -56,6 +56,20 @@ function renderScreen(overrides?: { hasActingIdentity?: boolean; response?: Scan
 describe('InfoChoiceScreen', () => {
   beforeEach(() => { interceptor = null; });
 
+  it('hides plumbing metadata (form_schema, underscore keys) from the fact list', () => {
+    const response = choicesResponse();
+    (response.escalation as { metadata?: Record<string, unknown> }).metadata = {
+      orderId: '4412',
+      form_schema: { type: 'object', properties: { note: { type: 'string' } } },
+      _internal: 'never shown',
+    };
+    renderScreen({ response });
+    expect(screen.getByText('4412')).toBeInTheDocument();
+    expect(screen.queryByText(/form_schema/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/"properties"/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never shown/)).not.toBeInTheDocument();
+  });
+
   it('states the reality: description, queue, claim state, age, metadata', () => {
     renderScreen();
     expect(screen.getByText('Order 4412 — left insole')).toBeInTheDocument();
