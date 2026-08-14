@@ -15,6 +15,7 @@ import { TriageContext } from './TriageContext';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
 import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
+import { displayMetadataEntries } from '../../lib/metadata-display';
 import type { LTEscalationRecord } from '../../api/types';
 import type { FieldError } from '../../lib/field-validator';
 
@@ -40,13 +41,8 @@ function readPanelView(validIds: readonly string[]): PanelViewId {
 
 type PanelViewId = (typeof ESCALATION_PANEL_VIEWS)[keyof typeof ESCALATION_PANEL_VIEWS];
 
-/** Metadata keys that are plumbing, not information for the person resolving. */
-const HIDDEN_METADATA_KEYS = new Set(['form_schema']);
-
 function MetadataList({ metadata, role }: { metadata: Record<string, unknown> | null; role: string }) {
-  const entries = Object.entries(metadata ?? {}).filter(
-    ([k]) => !k.startsWith('_') && !HIDDEN_METADATA_KEYS.has(k),
-  );
+  const entries = displayMetadataEntries(metadata);
   if (entries.length === 0) {
     return <p className="text-xs text-text-tertiary italic">No metadata on this escalation.</p>;
   }

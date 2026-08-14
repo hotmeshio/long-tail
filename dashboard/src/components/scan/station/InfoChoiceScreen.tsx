@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../common/modal/Modal';
 import { useScanInput } from '../../../hooks/useScanInput';
 import { formatTimeAgo } from '../../../lib/format';
+import { displayMetadataEntries } from '../../../lib/metadata-display';
 import { isChoiceEnabled, matchChoiceByCode } from './choice-code';
 import type { ScanExecuteResponse, ScanPresentedChoice } from '../../../api/scan-codes';
 
@@ -85,7 +86,7 @@ export function InfoChoiceScreen({
   const claimState = !assignedTo ? 'Unclaimed' : assignedTo === selfId ? 'Claimed by you' : 'Claimed';
   const claimClass = assignedTo === selfId ? 'text-accent' : 'text-text-secondary';
   const typeLine = [escalation.type, escalation.subtype].filter(Boolean).join(' · ');
-  const metaEntries = Object.entries(metadata);
+  const metaEntries = displayMetadataEntries(metadata);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col max-w-form">
