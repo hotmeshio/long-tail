@@ -55,14 +55,16 @@ export async function claimEscalation(
  * Release a claimed escalation back to the pool.
  *
  * Only the user who holds the claim can release it. Publishes a
- * `escalation.released` event.
+ * `escalation.released` event unless `quiet` — the identical release with no
+ * event, for bookkeeping releases that are not lifecycle transitions.
  *
  * @param input.id — escalation UUID
+ * @param input.quiet — suppress the `released` event (default: loud)
  * @param auth — authenticated user context
  * @returns `{ status: 200, data: { escalation } }` or 409
  */
 export async function releaseEscalation(
-  input: { id: string },
+  input: { id: string; quiet?: boolean },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -74,7 +76,9 @@ export async function releaseEscalation(
     const manageDenied = await assertQueueManageAccess(auth.userId, escalation.role);
     if (manageDenied) return manageDenied;
 
-    const result = await escalationService.releaseEscalation(input.id, auth.userId);
+    const result = await escalationService.releaseEscalation(input.id, auth.userId, {
+      quiet: input.quiet === true,
+    });
     if (!result) {
       return { status: 409, error: 'Escalation not found or not claimed by you' };
     }
