@@ -133,6 +133,8 @@ interface FormSectionProps {
   onOpenHelp?: () => void;
   /** Fires when the user clicks the locked (unclaimed) form. */
   onDisabledClick?: () => void;
+  /** Cursor-following hint over the locked form. */
+  disabledHint?: React.ReactNode;
 }
 
 /**
@@ -163,6 +165,7 @@ export function EscalationFormSection({
   hasAI,
   onOpenHelp,
   onDisabledClick,
+  disabledHint,
 }: FormSectionProps) {
   const schema = effectiveSchema;
   const showIfCtx = buildShowIfContext(esc);
@@ -187,6 +190,7 @@ export function EscalationFormSection({
           onChange={() => {}}
           disabled
           escalationContext={showIfCtx}
+          disabledHint={disabledHint}
         />
       </div>
     );
@@ -237,6 +241,7 @@ export function EscalationFormSection({
           escalationContext={showIfCtx}
           onOpenHelp={onOpenHelp}
           onDisabledClick={onDisabledClick}
+          disabledHint={disabledHint}
         />
       )}
     </div>

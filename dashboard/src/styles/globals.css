@@ -443,6 +443,15 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Locked-form click hint: pops in above the click, holds, drifts out. */
+@keyframes click-hint {
+  0%   { opacity: 0; transform: translate(-50%, calc(-100% + 6px)) scale(0.94); }
+  10%  { opacity: 1; transform: translate(-50%, -100%) scale(1.03); }
+  18%  { transform: translate(-50%, -100%) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-100% - 10px)) scale(1); }
+}
+
 /* Striped pattern for pending timeline bars */
 .bg-stripes {
   background-image: repeating-linear-gradient(
