@@ -14,7 +14,13 @@ import { IdentitySummary } from './IdentitySummary';
 import { EnvelopeEditor } from './EnvelopeEditor';
 import { SimpleMarkdown } from '../../../components/common/display/SimpleMarkdown';
 
-export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkflowConfig; executionsPath: string }) {
+export function StartNowPanel({ selected, executionsPath, inline = false }: {
+  selected: LTWorkflowConfig;
+  executionsPath: string;
+  /** In page flow (compact layouts) the footer sticks to the viewport bottom
+   *  instead of pinning to a fixed-height panel edge. */
+  inline?: boolean;
+}) {
   const navigate = useNavigate();
   const { isSuperAdmin, hasRoleType } = useAuth();
   const isAdmin = isSuperAdmin || hasRoleType('admin');
@@ -121,16 +127,15 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
     } catch { /* error via mutation */ }
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-mono font-medium text-text-primary">{selected.workflow_type}</h2>
-        {selected.description && (
-          <div className="text-xs text-text-secondary mt-1 leading-relaxed">
-            <SimpleMarkdown content={selected.description} compact />
-          </div>
-        )}
-      </div>
+  // The name heads the shell panel (InvokeRunPanel); the form leads with the
+  // description and pins its submit footer so Start is always reachable.
+  const content = (
+    <>
+      {selected.description && (
+        <div className="text-xs text-text-secondary leading-relaxed">
+          <SimpleMarkdown content={selected.description} compact />
+        </div>
+      )}
 
       <IdentitySummary
         config={selected}
@@ -165,13 +170,37 @@ export function StartNowPanel({ selected, executionsPath }: { selected: LTWorkfl
         onSetFormFields={setFormFields}
       />
 
+    </>
+  );
+
+  const footer = (
+    <div
+      className={`shrink-0 border-t border-surface-border/40 pt-3 pb-4 space-y-2 ${
+        inline ? 'sticky bottom-0 z-10 bg-surface' : 'bg-surface-raised'
+      }`}
+    >
       {parseError && <p className="text-xs text-status-error">{parseError}</p>}
       {invokeMutation.error && <p className="text-xs text-status-error">{invokeMutation.error.message}</p>}
       {invokeMutation.isSuccess && <p className="text-xs text-status-success">Workflow started</p>}
-
-      <button onClick={handleInvoke} disabled={invokeMutation.isPending} className="btn-primary">
+      <button onClick={handleInvoke} disabled={invokeMutation.isPending} className="btn-primary w-full">
         {invokeMutation.isPending ? 'Starting...' : 'Start Workflow'}
       </button>
+    </div>
+  );
+
+  if (inline) {
+    return (
+      <div className="space-y-6 max-w-2xl">
+        {content}
+        {footer}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto space-y-6 pt-1 pb-4">{content}</div>
+      {footer}
     </div>
   );
 }

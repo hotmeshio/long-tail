@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 
@@ -35,5 +35,34 @@ export function useAnnouncements(enabled = true) {
     queryFn: () => apiFetch<{ announcements: Announcement[] }>('/announcements'),
     enabled,
     staleTime: 30_000,
+  });
+}
+
+/** Publish an announcement (role managers). Expiry arrives precomputed. */
+export function useCreateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { body: string; title?: string; roles?: string[]; expiresAt?: string }) =>
+      apiFetch<Announcement>('/announcements', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+    },
+  });
+}
+
+/** Remove an announcement; subscribers see it drop live. */
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ deleted: boolean; id: string }>(`/announcements/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+    },
   });
 }

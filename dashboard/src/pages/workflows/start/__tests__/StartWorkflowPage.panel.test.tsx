@@ -106,7 +106,7 @@ describe('StartWorkflowPage ?type= ↔ run panel sync', () => {
     render(page(['/workflows/durable/invoke?type=reviewContent']));
     const call = lastInvokePanelCall();
     expect(call).toBeDefined();
-    expect(call[1]).toEqual({ key: 'invoke-run', width: 420 });
+    expect(call[1]).toEqual({ key: 'invoke-run', width: 630 });
     renderPanelNode(call[0]);
     expect(screen.getByText('Start Workflow')).toBeInTheDocument();
   });

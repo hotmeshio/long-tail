@@ -5,6 +5,7 @@ import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../..
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { useShellPanelOptional } from '../../../hooks/useShellPanel';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
 import { WorkflowSelector, workflowQueues } from './WorkflowSelector';
 import { StartNowPanel } from './StartNowPanel';
@@ -12,7 +13,8 @@ import { StartNowPanel } from './StartNowPanel';
 // Shell-panel ownership key — the invoke form claims/releases this slot.
 const INVOKE_PANEL_KEY = 'invoke-run';
 
-/** The invoke form framed for the shell panel: small header with a close X. */
+/** The invoke form framed for the shell panel: the workflow's name heads the
+ *  panel, and the form owns the scroll so its submit footer stays pinned. */
 function InvokeRunPanel({
   config,
   executionsPath,
@@ -24,13 +26,15 @@ function InvokeRunPanel({
 }) {
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Invoke</p>
-        <button onClick={onClose} className="icon-link" title="Close" aria-label="Close">
+      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
+        <h2 className="text-base font-mono font-medium text-text-primary truncate" title={config.workflow_type}>
+          {config.workflow_type}
+        </h2>
+        <button onClick={onClose} className="icon-link shrink-0" title="Close" aria-label="Close">
           <X className="w-4 h-4" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 pb-6 pt-1">
+      <div className="flex-1 min-h-0 px-5">
         <StartNowPanel selected={config} executionsPath={executionsPath} />
       </div>
     </div>
@@ -43,6 +47,11 @@ export function StartWorkflowPage() {
   const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
   const { data: cronEntries } = useCronStatus();
   const shell = useShellPanelOptional();
+  // Below xl the list + a 630px side panel can't share the row. The list
+  // folds into a select and the form renders inline at full width. The
+  // viewport (not the container) drives this so an opening panel can't
+  // feed back into its own layout decision.
+  const compact = useMediaQuery('(max-width: 1279px)');
 
   const selectedType = searchParams.get('type') ?? '';
   // The list filters live at page level so the FilterBar spans the page —
@@ -123,21 +132,21 @@ export function StartWorkflowPage() {
   const panelWasOpen = useRef(false);
   useEffect(() => {
     if (!shell) return;
-    const type = selectedConfig ? selectedType : null;
+    const type = !compact && selectedConfig ? selectedType : null;
     if (type === appliedType.current) return;
     appliedType.current = type;
     if (type && selectedConfig) {
       shell.setPanel(
         <InvokeRunPanel config={selectedConfig} executionsPath={executionsPath} onClose={clearSelection} />,
-        { key: INVOKE_PANEL_KEY, width: 420 },
+        { key: INVOKE_PANEL_KEY, width: 630 },
       );
     } else {
       panelWasOpen.current = false;
       shell.closePanel(INVOKE_PANEL_KEY);
     }
-  }, [selectedType, selectedConfig, shell, clearSelection, executionsPath]);
+  }, [selectedType, selectedConfig, shell, clearSelection, executionsPath, compact]);
   useEffect(() => {
-    if (!shell || !selectedType) return;
+    if (!shell || !selectedType || compact) return;
     if (shell.open && shell.ownerKey === INVOKE_PANEL_KEY) {
       panelWasOpen.current = true;
       return;
@@ -146,7 +155,7 @@ export function StartWorkflowPage() {
       panelWasOpen.current = false;
       clearSelection();
     }
-  }, [shell, selectedType, clearSelection]);
+  }, [shell, selectedType, clearSelection, compact]);
   // Unmount with the panel open releases the slot (keyed — never yanks
   // another claimant's panel).
   const shellRef = useRef(shell);
@@ -180,6 +189,40 @@ export function StartWorkflowPage() {
           <p className="text-sm text-text-primary mb-1">No invocable workflows</p>
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
+      ) : compact ? (
+        <>
+          {/* Compact: the list folds into a grouped select and the form takes
+              the full width, its submit footer sticking to the viewport. */}
+          <label className="block mb-6 max-w-2xl">
+            <span className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Workflow</span>
+            <select
+              value={selectedType}
+              onChange={(e) => setType(e.target.value || null)}
+              className="select text-xs font-mono w-full"
+            >
+              <option value="">Choose a workflow…</option>
+              {workflowQueues(invocableConfigs).map((q) => (
+                <optgroup key={q} label={q}>
+                  {invocableConfigs
+                    .filter((c) => (c.task_queue || '') === q)
+                    .map((c) => (
+                      <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
+                    ))}
+                </optgroup>
+              ))}
+              {invocableConfigs
+                .filter((c) => !c.task_queue)
+                .map((c) => (
+                  <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
+                ))}
+            </select>
+          </label>
+          {selectedConfig ? (
+            <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} inline />
+          ) : (
+            <p className="text-xs text-text-tertiary">Choose a workflow to fill out its form.</p>
+          )}
+        </>
       ) : (
         <>
           {/* The standard full-width sticky filter band — above the list. */}

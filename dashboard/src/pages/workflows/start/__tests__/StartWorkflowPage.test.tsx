@@ -195,6 +195,6 @@ describe('StartWorkflowPage', () => {
     discoveredOverride = { data: [], isLoading: false };
     renderPage();
     expect(mockSetPanel).toHaveBeenCalled();
-    expect(mockSetPanel.mock.calls[0][1]).toEqual({ key: 'invoke-run', width: 420 });
+    expect(mockSetPanel.mock.calls[0][1]).toEqual({ key: 'invoke-run', width: 630 });
   });
 });
