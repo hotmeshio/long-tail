@@ -14,6 +14,7 @@ export function ResolverSection({
   escalationContext,
   onOpenHelp,
   onDisabledClick,
+  disabledHint,
 }: {
   json: string;
   onJsonChange: (v: string) => void;
@@ -29,6 +30,8 @@ export function ResolverSection({
   onOpenHelp?: () => void;
   /** Fires when the user clicks the locked (unclaimed) form. */
   onDisabledClick?: () => void;
+  /** Cursor-following hint over the locked form. */
+  disabledHint?: React.ReactNode;
 }) {
   return (
     <>
@@ -74,7 +77,7 @@ export function ResolverSection({
       <div className="relative min-h-[200px]">
         {/* Form controls */}
         <div className={requestTriage ? 'pointer-events-none select-none' : ''}>
-          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} escalationContext={escalationContext} onOpenHelp={onOpenHelp} onDisabledClick={onDisabledClick} />
+          <ResolverForm value={json} onChange={onJsonChange} disabled={disabled} submitAttempted={submitAttempted} escalationContext={escalationContext} onOpenHelp={onOpenHelp} onDisabledClick={onDisabledClick} disabledHint={disabledHint} />
         </div>
 
         {/* Triage overlay — occludes the form when AI Triage is checked */}

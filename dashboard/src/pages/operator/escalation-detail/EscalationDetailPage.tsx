@@ -31,6 +31,7 @@ import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
 import { EscalationSidePanel, ESCALATION_PANEL_VIEWS } from '../../../components/escalation/EscalationSidePanel';
 import { EscalationActionBar } from './EscalationActionBar';
 import type { ActionBarMode, ActiveView } from './EscalationActionBar';
+import { UserName } from '../../../components/common/display/UserName';
 import type { FieldError } from '../../../lib/field-validator';
 import { validateResolverForm } from '../../../lib/field-validator';
 import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
@@ -377,6 +378,19 @@ function EscalationDetailView({ id }: { id: string }) {
         ? 'claimed_by_other'
         : 'available';
 
+  // The locked form's cursor hint — names the state or the unlocking gesture
+  // (in the role's own vocabulary) at the exact point of interaction.
+  const lockedFormHint: React.ReactNode =
+    actionBarMode === 'available'
+      ? `${typeof footerLabels.claim === 'string' ? footerLabels.claim : 'Claim'} this escalation to edit the form`
+      : actionBarMode === 'claimed_by_other'
+        ? <>Claimed by {esc.assigned_to ? <UserName userId={esc.assigned_to} /> : 'another user'}</>
+        : esc.status === 'cancelled'
+          ? 'This escalation is cancelled'
+          : esc.status === 'resolved'
+            ? 'This escalation is resolved — the submitted values are shown'
+            : null;
+
   // Every mutation below targets the mount-fixed route id, never esc.id.
   // The two are equal for the life of this keyed view, but binding to the
   // prop makes it impossible for an in-flight render against refreshed
@@ -654,6 +668,7 @@ function EscalationDetailView({ id }: { id: string }) {
                   setPanelActiveView(ESCALATION_PANEL_VIEWS.HELP);
                 }}
                 onDisabledClick={() => setClaimNudge((n) => n + 1)}
+                disabledHint={lockedFormHint}
               />
 
               <div className="h-10" />

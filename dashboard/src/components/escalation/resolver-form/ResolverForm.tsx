@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { LockedFormFrame } from './LockedFormFrame';
 import { HelpCircle } from 'lucide-react';
 import { evaluateShowIf, type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateField } from '../../../lib/field-validator';
@@ -19,7 +20,7 @@ import { type FormEntry, type JsonValue } from './form-cells';
  *
  * Calls `onChange` with the full JSON string on every edit.
  */
-export function ResolverForm({ value, onChange, disabled, submitAttempted, escalationContext, onOpenHelp, onDisabledClick }: {
+export function ResolverForm({ value, onChange, disabled, submitAttempted, escalationContext, onOpenHelp, onDisabledClick, disabledHint }: {
   value: string;
   onChange: (json: string) => void;
   disabled?: boolean;
@@ -29,6 +30,8 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   onOpenHelp?: () => void;
   /** Fires when the user clicks the locked form — the page points them at Claim. */
   onDisabledClick?: () => void;
+  /** Cursor-following hint over the locked form naming the state or gesture. */
+  disabledHint?: ReactNode;
 }) {
   const [data, setData] = useState<Record<string, JsonValue>>({});
   const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
@@ -177,14 +180,13 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
     );
   };
 
-  return (
-    // A locked form stays fully readable — no fade. `inert` (not just
-    // pointer-events) locks the body for keyboard and assistive-tech users —
-    // fields leave the tab order entirely — and makes it transparent to hit
-    // testing, so a click anywhere on the locked form lands on the outer
-    // wrapper, which reports the interaction (the page points at Claim).
-    // max-w-form: the form holds a readable measure on any monitor.
-    <div className="pb-8 max-w-form" onClick={disabled ? onDisabledClick : undefined}>
+  // A locked form stays fully readable — no fade. `inert` (not just
+  // pointer-events) locks the body for keyboard and assistive-tech users —
+  // fields leave the tab order entirely — and makes it transparent to hit
+  // testing, so a click anywhere on the locked form lands on the frame,
+  // which reports the interaction and carries the cursor hint.
+  // max-w-form: the form holds a readable measure on any monitor.
+  const body = (
       <div
         className={disabled ? 'pointer-events-none' : undefined}
         inert={disabled || undefined}
@@ -223,6 +225,14 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         ))}
       </div>
       </div>
-    </div>
   );
+
+  if (disabled) {
+    return (
+      <LockedFormFrame hint={disabledHint} onLockedClick={onDisabledClick}>
+        {body}
+      </LockedFormFrame>
+    );
+  }
+  return <div className="pb-8 max-w-form">{body}</div>;
 }
