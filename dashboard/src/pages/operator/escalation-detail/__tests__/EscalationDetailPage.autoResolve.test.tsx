@@ -38,7 +38,7 @@ vi.mock('../../../../api/settings', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useSettings: () => ({ data: undefined }),
 }));
-vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { userId: 'resolver-1' } }) }));
+vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { userId: 'resolver-1' }, isSuperAdmin: false, hasRoleType: () => false }) }));
 vi.mock('../../../../hooks/useAccess', () => ({ useAccess: () => ({ isBuilder: false }) }));
 vi.mock('../../../../hooks/useEventHooks', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

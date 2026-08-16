@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BulkActionBar } from '../modal/BulkActionBar';
 
@@ -13,10 +13,12 @@ function defaultProps(): React.ComponentProps<typeof BulkActionBar> {
     onSetPriority: vi.fn(),
     onClaim: vi.fn(),
     onAssign: vi.fn(),
+    onUnassign: vi.fn(),
     onTriage: vi.fn(),
     isPriorityPending: false,
     isClaimPending: false,
     isAssignPending: false,
+    isUnassignPending: false,
     isTriagePending: false,
     onCancel: vi.fn(),
     isCancelPending: false,
@@ -58,6 +60,17 @@ describe('BulkActionBar', () => {
 
     fireEvent.click(screen.getByText('Assign to…'));
     expect(props.onAssign).toHaveBeenCalledOnce();
+  });
+
+  it('speaks the scoped role cancel vocabulary and hides on cancel: false', () => {
+    renderBar({ cancelLabel: 'Send Home' });
+    expect(screen.getByText('Send Home')).toBeInTheDocument();
+    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+
+    cleanup();
+    renderBar({ cancelLabel: false });
+    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+    expect(screen.queryByText('Send Home')).not.toBeInTheDocument();
   });
 
   it('calls onTriage when Triage button is clicked', () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Info, Bell } from 'lucide-react';
 import { SlidePanel, SlidePanelViews, PanelField, type SlidePanelView } from '../../../components/common/layout/SlidePanel';
-import { StatusBadge } from '../../../components/common/display/StatusBadge';
+import { StatusBadge, STATUS_DOT_STYLES } from '../../../components/common/display/StatusBadge';
 import { CopyableId } from '../../../components/common/display/CopyableId';
 import { DateValue } from '../../../components/common/display/DateValue';
 import { DurationValue } from '../../../components/common/display/DurationValue';
@@ -29,11 +29,21 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Status as a bare outlined dot — colour carries the meaning, hover names it. */
+function StatusDot({ status }: { status: string }) {
+  return (
+    <span
+      className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${STATUS_DOT_STYLES[status] ?? 'bg-status-active'}`}
+      title={status}
+    />
+  );
+}
+
 /**
  * A workflow can escalate to multiple targets, and multiple times across its
- * lifecycle — each escalation is its own row: role and type on the left, the
- * status badge in a right-aligned column, so a long history reads as a table
- * instead of running on.
+ * lifecycle — each escalation is its own row: status dot, then role and type,
+ * with the age right-aligned, so a long history reads as a table instead of
+ * running on.
  */
 function EscalationRows({ escalations }: { escalations: LTEscalationRecord[] }) {
   return (
@@ -42,16 +52,16 @@ function EscalationRows({ escalations }: { escalations: LTEscalationRecord[] }) 
         <Link
           key={esc.id}
           to={`/escalations/detail/${esc.id}`}
-          className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 border-b border-surface-border/40 last:border-b-0 group"
+          className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 py-2 border-b border-surface-border/40 last:border-b-0 group"
         >
+          <StatusDot status={esc.status} />
           <span className="min-w-0">
             <span className="block text-xs font-mono text-text-primary group-hover:text-accent transition-colors truncate" title={esc.type}>
               {esc.type}
             </span>
             <span className="block text-2xs text-text-tertiary truncate">{esc.role}</span>
           </span>
-          <DateValue date={esc.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap" />
-          <span className="w-20 flex justify-end"><StatusBadge status={esc.status} /></span>
+          <DateValue date={esc.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap text-right" />
         </Link>
       ))}
     </div>
@@ -65,16 +75,16 @@ function TaskRows({ tasks }: { tasks: LTTaskRecord[] }) {
         <Link
           key={t.id}
           to={`/workflows/tasks/detail/${t.id}`}
-          className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 border-b border-surface-border/40 last:border-b-0 group"
+          className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 py-2 border-b border-surface-border/40 last:border-b-0 group"
         >
+          <StatusDot status={t.status} />
           <span className="min-w-0">
             <span className="block text-xs font-mono text-text-primary group-hover:text-accent transition-colors truncate" title={t.workflow_type}>
               {t.workflow_type}
             </span>
             <span className="block text-2xs text-text-tertiary truncate">{t.lt_type}</span>
           </span>
-          <DateValue date={t.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap" />
-          <span className="w-20 flex justify-end"><StatusBadge status={t.status} /></span>
+          <DateValue date={t.created_at} format="relative" className="text-2xs text-text-tertiary whitespace-nowrap text-right" />
         </Link>
       ))}
     </div>

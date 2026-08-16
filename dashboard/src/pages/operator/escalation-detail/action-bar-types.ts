@@ -58,4 +58,11 @@ export interface EscalationActionBarProps {
   actingName?: string | null;
   /** True when a badge scan could turn claimed-by-other into claimed-by-you. */
   badgePrompt?: boolean;
+  /** Admin/superadmin — surfaces the claim-override actions on claimed_by_other. */
+  canManage?: boolean;
+  /** Hand this claim to another user (opens the assign modal, takeover implied). */
+  onReassign?: () => void;
+  /** Return this claim to the available pool. */
+  onUnassign?: () => void;
+  unassignPending?: boolean;
 }

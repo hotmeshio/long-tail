@@ -79,7 +79,7 @@ System families declare the fields they populate. Which fields exist is a functi
 
 `status` is a **per-family vocabulary**, not one global enum: workflow `started|in_progress|running|completed|failed`; task `created|in_progress|completed|needs_intervention|failed`; escalation `pending|claimed|released|resolved|cancelled|expired`.
 
-Escalation subjects carry the **role** (the queue) as the organizing token. Subscribe to one queue (`system.escalation.{role}.>`), one verb across queues (`system.escalation.*.*.created`), or one item across role hops (`system.escalation.*.{id}.>`). The role token is sanitized to subject-safe characters (`[A-Za-z0-9_-]`); a `reassigned` event publishes under **both** the departing and arriving role so either queue's subscribers observe the move.
+User-level assignment changes travel as claim state: an admin reassign publishes `claimed` (with `reassigned_from` in the delta) and an unassign publishes `released` (with `released_by`) — `reassigned` names the ROLE move only. Escalation subjects carry the **role** (the queue) as the organizing token. Subscribe to one queue (`system.escalation.{role}.>`), one verb across queues (`system.escalation.*.*.created`), or one item across role hops (`system.escalation.*.{id}.>`). The role token is sanitized to subject-safe characters (`[A-Za-z0-9_-]`); a `reassigned` event publishes under **both** the departing and arriving role so either queue's subscribers observe the move.
 
 #### Escalation `data` — one wire shape
 

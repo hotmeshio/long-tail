@@ -294,14 +294,32 @@ export function useBulkAssignEscalations() {
       ids,
       targetUserId,
       durationMinutes,
+      reassign,
     }: {
       ids: string[];
       targetUserId: string;
       durationMinutes: number;
+      /** Also take over rows under a live claim (admin/superadmin). */
+      reassign?: boolean;
     }) =>
       apiFetch<{ assigned: number; skipped: number }>('/escalations/bulk-assign', {
         method: 'POST',
-        body: JSON.stringify({ ids, targetUserId, durationMinutes }),
+        body: JSON.stringify({ ids, targetUserId, durationMinutes, ...(reassign ? { reassign: true } : {}) }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'], refetchType: 'all' });
+    },
+  });
+}
+
+export function useBulkUnassignEscalations() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids }: { ids: string[] }) =>
+      apiFetch<{ unassigned: number; skipped: number }>('/escalations/bulk-unassign', {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escalations'], refetchType: 'all' });

@@ -103,7 +103,7 @@ describe('x-lt-row-action', () => {
     expect(mockMutate).not.toHaveBeenCalled();
   });
 
-  it('claim button is absent on rows under a live claim window', () => {
+  it('claim button renders disabled on rows under a live claim window', () => {
     const claimed = makeRow({
       assigned_to: 'someone',
       assigned_until: new Date(Date.now() + 60_000).toISOString(),
@@ -115,7 +115,7 @@ describe('x-lt-row-action', () => {
         activeEscalations={[claimed]}
       />,
     );
-    expect(screen.queryByTestId('row-action-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('row-action-button')).toBeDisabled();
   });
 
   it('a rejected claim surfaces its message inline', async () => {

@@ -50,6 +50,12 @@ you want to Send to Service? This removes the item from the work queue," and
 confirms with "Yes, Send to Service". The default label follows the same
 shape with "Cancel".
 
+The label carries beyond the footer: when a list page is scoped to a single
+role (`?role=`), the admin selection bar's Cancel button and its bulk
+confirmation speak the same `x-lt-labels.cancel` — and `cancel: false` removes
+the bulk verb there too. One authored word governs every surface that can
+cancel the role's items.
+
 ## `x-lt-submit-on-claim` — the one-gesture claim
 
 When true, clicking Claim also resolves the escalation in the same gesture,

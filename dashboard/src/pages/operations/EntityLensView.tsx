@@ -317,22 +317,19 @@ export function EntityLensView({
           {dwellGroups.length > 0 ? (
             <>
               <StateBand groups={dwellGroups} colors={colors} height="h-3" />
-              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2.5">
-                {dwellGroups.map((g) => (
-                  <span key={g.state} className="flex items-center gap-1.5 text-2xs">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors.get(g.state ?? '—') }} />
-                    <span className="font-mono text-text-secondary">{stateLabel(g.state)}</span>
-                    <span className="font-mono tabular-nums text-text-tertiary">
-                      {formatDurationCompact((g.dwellSeconds ?? 0) * 1000)}
+              {/* Dot + label only — the proportions are the band; specifics live on hover. */}
+              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5">
+                {dwellGroups.map((g) => {
+                  const now = nowByState.get(g.state ?? '—') ?? 0;
+                  const pct = Math.round(((g.dwellSeconds ?? 0) / totalDwell(dwellGroups)) * 100);
+                  const detail = `${formatDurationCompact((g.dwellSeconds ?? 0) * 1000)} · ${pct}%${now > 0 ? ` · ${now} now` : ''}`;
+                  return (
+                    <span key={g.state} className="flex items-center gap-1.5 text-2xs" title={detail}>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors.get(g.state ?? '—') }} />
+                      <span className="font-mono text-text-secondary">{stateLabel(g.state)}</span>
                     </span>
-                    <span className="font-mono tabular-nums text-text-quaternary">
-                      {Math.round(((g.dwellSeconds ?? 0) / totalDwell(dwellGroups)) * 100)}%
-                    </span>
-                    {(nowByState.get(g.state ?? '—') ?? 0) > 0 && (
-                      <span className="text-text-quaternary">· {nowByState.get(g.state ?? '—')} now</span>
-                    )}
-                  </span>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (

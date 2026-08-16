@@ -56,6 +56,10 @@ export type TxnStep3V1 = z.infer<typeof TxnStep3ResolverV1Schema>;
 
 export const TXN_STEP1_FORM_SCHEMA = {
   type: 'object',
+  // Cancel in this process means "send home": the item returns to the queue
+  // and the chain re-creates the same step. The footer and every admin cancel
+  // surface (detail, bulk toolbar, confirm modal) speak this label.
+  'x-lt-labels': { cancel: 'Send Home' },
   'x-lt-transition': true,
   'x-lt-transition-message': [
     '**Account saved.**',
@@ -71,6 +75,9 @@ export const TXN_STEP1_FORM_SCHEMA = {
     '',
     'Enter the account details and submit. You will be taken straight to the',
     'next step — no need to return to a queue.',
+    '',
+    '**Send Home** returns the account to the pool; onboarding restarts from',
+    'this step.',
   ].join('\n'),
   'x-lt-order': ['full_name', 'email'],
   required: ['full_name', 'email'],
@@ -125,6 +132,7 @@ export const TXN_STEP1_LIST_SCHEMA = {
 
 export const TXN_STEP2_FORM_SCHEMA = {
   type: 'object',
+  'x-lt-labels': { cancel: 'Send Home' },
   'x-lt-transition': true,
   'x-lt-transition-message': [
     '**Preferences saved.**',
@@ -167,6 +175,7 @@ export const TXN_STEP2_FORM_SCHEMA = {
 
 export const TXN_STEP3_FORM_SCHEMA = {
   type: 'object',
+  'x-lt-labels': { cancel: 'Send Home' },
   // The last step is reached by a forward transition, so history.back() is
   // wrong. Declare where "done" goes — here, the pool of accounts awaiting
   // onboarding, so the operator flows straight into the next one. Any internal

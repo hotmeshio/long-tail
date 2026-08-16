@@ -1,12 +1,13 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { X, Eye, Sparkles } from 'lucide-react';
+import { X, Eye, Sparkles, Megaphone } from 'lucide-react';
+import { AlertsSection } from './AlertsSection';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../api/settings';
 import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, getScanOverride, setScanOverride, clearScanOverride, type ViewAsRole } from '../../lib/view-as';
 import { LT_BASE } from '../../lib/base-path';
 
 type RealTier = 'superadmin' | 'admin' | 'engineer' | 'operator';
-type Section = 'viewas' | 'features';
+type Section = 'viewas' | 'features' | 'alerts';
 
 interface ViewOption {
   id: ViewAsRole | null;
@@ -86,9 +87,13 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
 
   // The panel's concerns, each behind an icon in the segmented selector.
   // "Role declination" (view-as) only appears when relevant.
+  // The publish route accepts role managers (superadmin, admin type,
+  // engineer) — the tab mirrors that exactly.
+  const canPublishAlerts = realTier !== 'operator';
   const sections: { id: Section; label: string; icon: typeof Eye }[] = [
     ...(hasViewOptions ? [{ id: 'viewas' as const, label: 'View As', icon: Eye }] : []),
     { id: 'features' as const, label: 'Features', icon: Sparkles },
+    ...(canPublishAlerts ? [{ id: 'alerts' as const, label: 'Alerts', icon: Megaphone }] : []),
   ];
   const [section, setSection] = useState<Section>(sections[0].id);
 
@@ -271,6 +276,8 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         )}
+
+        {section === 'alerts' && canPublishAlerts && <AlertsSection />}
 
         <hr className="border-surface-border/50 mt-8" />
         <p className="mt-4 text-2xs text-text-quaternary text-center">Esc or click outside to close</p>

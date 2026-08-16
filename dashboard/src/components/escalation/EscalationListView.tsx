@@ -16,6 +16,15 @@ import { typeColor } from '../../lib/type-color';
 import { RefineDialog, type RefinePair } from './RefineDialog';
 import type { LTEscalationRecord } from '../../api/types';
 
+/** Dot colour matches the standard table view: blue = pending unclaimed,
+ * orange = under a live claim; other statuses follow the shared map. */
+function escalationDotClass(e: LTEscalationRecord): string {
+  if (e.status === 'pending') {
+    return isEffectivelyClaimed(e) ? 'bg-status-claimed-graphic' : 'bg-status-active';
+  }
+  return STATUS_DOT_STYLES[e.status] ?? 'bg-status-active';
+}
+
 /**
  * EscalationListView — the role-authored rich view of an escalation list, driven
  * by a versioned `list_schema` (x-lt-* markup). The list-page analog of the
@@ -56,6 +65,10 @@ export interface ColumnDef {
    * the rest fold.
    */
   priority?: 1 | 2 | 3;
+  /** CSS column width ("40%", "12rem"). Unset columns share the remainder;
+   *  when no column declares one, the first column gets 40% — the identity
+   *  is nearly always the row's most important value. */
+  width?: string;
 }
 
 interface BoardCardDef {
@@ -198,7 +211,9 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
   const location = useLocation();
   const [error, setError] = useState('');
 
-  if (action === 'claim' && !isClaimable(row)) return null;
+  // A spent gesture stays visible — the disabled button keeps every row's
+  // layout uniform instead of leaving a hole on resolved/held rows.
+  const spent = action === 'claim' && !isClaimable(row);
 
   const fire = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -226,15 +241,16 @@ function RowActionButton({ row, def, onView, prominent, forceView }: {
   };
 
   const classes = prominent
-    ? 'btn-primary text-xs shrink-0 disabled:opacity-50'
-    : 'px-2 py-0.5 rounded text-2xs font-medium text-accent/70 border border-accent/30 hover:text-accent hover:border-accent/60 hover:bg-accent/5 transition-colors disabled:opacity-40 whitespace-nowrap';
+    ? 'btn-primary text-xs shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent'
+    : 'px-2 py-0.5 rounded text-2xs font-medium text-accent/70 border border-accent/30 enabled:hover:text-accent enabled:hover:border-accent/60 enabled:hover:bg-accent/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap';
 
   return (
     <span className="inline-flex flex-col items-end gap-0.5">
       <button
         type="button"
         onClick={fire}
-        disabled={claim.isPending}
+        disabled={claim.isPending || spent}
+        title={spent ? (row.status === 'pending' ? 'claimed' : row.status) : undefined}
         className={classes}
         data-testid="row-action-button"
       >
@@ -343,7 +359,7 @@ function HistoryColumn({ role, def, onRowClick }: {
             >
               {/* Status as a bare outlined dot — colour carries the meaning. */}
               <span
-                className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${STATUS_DOT_STYLES[e.status] ?? 'bg-status-pending'}`}
+                className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${escalationDotClass(e)}`}
                 title={e.status}
               />
               <span className="min-w-0 flex-1">
@@ -437,7 +453,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       className: 'w-10',
       render: (row) => (
         <span
-          className={`w-2.5 h-2.5 inline-block rounded-full dot-ring ${STATUS_DOT_STYLES[row.status] ?? 'bg-status-pending'}`}
+          className={`w-2.5 h-2.5 inline-block rounded-full dot-ring ${escalationDotClass(row)}`}
           title={row.status}
         />
       ),
@@ -446,6 +462,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       key: `col-${i}`,
       label: col.label,
       priority: col.priority ?? (i === 0 ? 1 : 2),
+      width: col.width ?? (i === 0 && !columnDefs.some((c) => c.width) ? '40%' : undefined),
       render: (row) => {
         const ctx = rowContext(row);
         const text = interpolateHelp(col.value, ctx);
@@ -664,11 +681,9 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
               </dl>
             )}
 
-            {(forceView || (rowAction?.action ?? 'claim') === 'view' || isClaimable(g.latest)) && (
-              <div className="mt-3 flex justify-end">
-                <RowActionButton row={g.latest} def={rowAction} onView={() => onOpenDetail?.(g.latest)} forceView={forceView} />
-              </div>
-            )}
+            <div className="mt-3 flex justify-end">
+              <RowActionButton row={g.latest} def={rowAction} onView={() => onOpenDetail?.(g.latest)} forceView={forceView} />
+            </div>
           </div>
         );
       })}

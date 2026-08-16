@@ -31,6 +31,51 @@ WHERE status = 'pending'
   AND assigned_until <= NOW()`;
 
 /**
+ * Reassign: hand pending rows to a user, INCLUDING rows under a live claim —
+ * the management override that plain assign (claimMany, which skips live
+ * claims) deliberately is not. One statement: the CTE reads each row's
+ * pre-update assignee (CTEs share one snapshot), so callers get
+ * prior_assignee for the event with no read-then-write window. An in-flight
+ * resolve by the prior assignee fails its claim assertion once assigned_to
+ * changes.
+ */
+export const BULK_REASSIGN = `\
+WITH prior AS (
+  SELECT id, assigned_to FROM public.hmsh_escalations WHERE id = ANY($1::uuid[])
+)
+UPDATE public.hmsh_escalations e
+SET assigned_to = $2,
+    assigned_until = NOW() + ($3::int * interval '1 minute'),
+    claimed_at = NOW(),
+    updated_at = NOW()
+FROM prior
+WHERE e.id = prior.id
+  AND e.status = 'pending'
+RETURNING e.*, prior.assigned_to AS prior_assignee`;
+
+/**
+ * Unassign: return pending claimed rows to the available pool (an admin
+ * override of someone else's claim — self-return stays the release verb).
+ * Clears the same field set as RELEASE_EXPIRED_CLAIMS, without the expiry
+ * predicate.
+ */
+export const BULK_UNASSIGN = `\
+WITH prior AS (
+  SELECT id, assigned_to FROM public.hmsh_escalations WHERE id = ANY($1::uuid[])
+)
+UPDATE public.hmsh_escalations e
+SET assigned_to = NULL,
+    assigned_until = NULL,
+    claimed_at = NULL,
+    claim_expires_at = NULL,
+    updated_at = NOW()
+FROM prior
+WHERE e.id = prior.id
+  AND e.status = 'pending'
+  AND e.assigned_to IS NOT NULL
+RETURNING e.*, prior.assigned_to AS prior_assignee`;
+
+/**
  * Escalation search by correlation id.
  *
  * The SDK's `client.list()` filters by structured columns only. Long-tail adds a

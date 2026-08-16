@@ -15,6 +15,7 @@ import {
   useSetEscalationPriority,
   useBulkClaimEscalations,
   useBulkAssignEscalations,
+  useBulkUnassignEscalations,
   useBulkTriageEscalations,
   useBulkCancelEscalations,
   type FacetFilters,
@@ -23,7 +24,8 @@ import {
 import { FacetQueryPanel } from './FacetQueryPanel';
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
-import { useRoles, useRoleDetails, useRoleListSchema } from '../../api/roles';
+import { readFooterLabels } from '../../lib/x-lt-labels';
+import { useRoles, useRoleDetails, useRoleListSchema, useRoleSchema } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 import { EscalationTitleSelect } from './EscalationTitleSelect';
 import { EscalationSortControl } from './EscalationSortControl';
@@ -45,6 +47,7 @@ import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { createBulkHandlers } from './helpers';
+import { isEffectivelyClaimed } from '../../lib/escalation';
 import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
 import { ClaimModal } from './ClaimModal';
 import { EscalationTimeline } from '../../components/escalation/EscalationTimeline';
@@ -67,6 +70,21 @@ export function AvailableEscalationsPage() {
   const [customClaimMinutes, setCustomClaimMinutes] = useState(0);
   const onCustomClaimChange = useCallback((m: number) => setCustomClaimMinutes(m), []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // The pinned control band's height varies (selection bar, facet pills), so
+  // its measured height feeds --lt-sticky-top for the table headers below.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const bandObserver = useRef<ResizeObserver | null>(null);
+  const bandRef = useCallback((el: HTMLDivElement | null) => {
+    bandObserver.current?.disconnect();
+    bandObserver.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      // 1px under the opaque band so fractional heights never leave a seam.
+      rootRef.current?.style.setProperty('--lt-sticky-top', `${el.offsetHeight - 1}px`);
+    });
+    observer.observe(el);
+    bandObserver.current = observer;
+  }, []);
   // Faceted query — DEEP-LINKED in the URL (a shared link reproduces the exact query).
   // The drawer is the editor surface; fetched keys feed the autocomplete.
   const [facetDrawerOpen, setFacetDrawerOpen] = useState(false);
@@ -188,6 +206,7 @@ export function AvailableEscalationsPage() {
   const setPriority = useSetEscalationPriority();
   const bulkClaim = useBulkClaimEscalations();
   const bulkAssign = useBulkAssignEscalations();
+  const bulkUnassign = useBulkUnassignEscalations();
   const bulkTriage = useBulkTriageEscalations();
   const bulkCancel = useBulkCancelEscalations();
   const { data: rolesData } = useRoles();
@@ -232,6 +251,12 @@ export function AvailableEscalationsPage() {
   const singleRole = filters.role
     || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
   const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
+  // The queue's cancel vocabulary: when scoped to one role, the bulk Cancel
+  // speaks the role form's x-lt-labels.cancel (false hides the verb).
+  const roleSchemaQuery = useRoleSchema(singleRole ?? '', undefined, !!singleRole);
+  const cancelLabel = singleRole
+    ? readFooterLabels(roleSchemaQuery.data?.form_schema).cancel
+    : undefined;
   const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
   const schemaSettled = !singleRole || listSchemaQuery.isFetched;
 
@@ -318,6 +343,13 @@ export function AvailableEscalationsPage() {
     return [...roles];
   }, [escalations, selectedIds]);
 
+  // Selected rows under a live claim — plain assign skips them; the modal
+  // offers the explicit takeover when any are present.
+  const selectedClaimedCount = useMemo(
+    () => escalations.filter((esc) => selectedIds.has(esc.id) && isEffectivelyClaimed(esc)).length,
+    [escalations, selectedIds],
+  );
+
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const handleClaim = () => {
@@ -340,6 +372,7 @@ export function AvailableEscalationsPage() {
     handleBulkClaim,
     handleBulkTriage,
     handleBulkAssign,
+    handleBulkUnassign,
     handleBulkCancel,
   } = createBulkHandlers({
     selectedIds,
@@ -348,6 +381,7 @@ export function AvailableEscalationsPage() {
     bulkClaim,
     bulkTriage,
     bulkAssign,
+    bulkUnassign,
     bulkCancel,
     closeTriageModal: () => setTriageModalOpen(false),
     closeAssignModal: () => setAssignModalOpen(false),
@@ -422,7 +456,7 @@ export function AvailableEscalationsPage() {
   ];
 
   return (
-    <div>
+    <div ref={rootRef}>
       {/* The title IS the queue selector: it reads as the chosen role's title,
           or "All Escalations". The role filter therefore leaves the bar. */}
       <div className="flex items-center gap-2 mb-10 min-w-0">
@@ -438,6 +472,11 @@ export function AvailableEscalationsPage() {
         )}
       </div>
 
+      {/* Pinned control band — filters, selection actions, and active facet
+          pills stick as one group so bulk actions stay reachable from any row.
+          Its measured height feeds --lt-sticky-top so table headers stick
+          right beneath it, whatever the band currently holds. */}
+      <div ref={bandRef} className="sticky top-0 z-20 bg-surface">
       <EscalationFilterBar
         filters={filters}
         setFilter={setFilter}
@@ -514,22 +553,25 @@ export function AvailableEscalationsPage() {
       {/* Always mounted so the bar can animate in AND out as the selection changes. */}
       <BulkActionBar
         selectedCount={selectedIds.size}
-          onClearSelection={() => setSelectedIds(new Set())}
-          onSetPriority={handleSetPriority}
-          onClaim={handleBulkClaim}
-          onAssign={() => setAssignModalOpen(true)}
-          onTriage={() => setTriageModalOpen(true)}
-          onCancel={() => setCancelModalOpen(true)}
-          isPriorityPending={setPriority.isPending}
-          isClaimPending={bulkClaim.isPending}
-          isAssignPending={bulkAssign.isPending}
-          isTriagePending={bulkTriage.isPending}
-          isCancelPending={bulkCancel.isPending}
-        />
+        onClearSelection={() => setSelectedIds(new Set())}
+        onSetPriority={handleSetPriority}
+        onClaim={handleBulkClaim}
+        onAssign={() => setAssignModalOpen(true)}
+        onUnassign={handleBulkUnassign}
+        onTriage={() => setTriageModalOpen(true)}
+        onCancel={() => setCancelModalOpen(true)}
+        isPriorityPending={setPriority.isPending}
+        isClaimPending={bulkClaim.isPending}
+        isAssignPending={bulkAssign.isPending}
+        isUnassignPending={bulkUnassign.isPending}
+        isTriagePending={bulkTriage.isPending}
+        isCancelPending={bulkCancel.isPending}
+        cancelLabel={cancelLabel}
+      />
 
-      {/* Active facet pills — sticky below the shell header, opaque so timeline scrolls beneath */}
+      {/* Active facet pills — ride the pinned band, opaque so timeline scrolls beneath */}
       {((facetFilters.facets && Object.keys(facetFilters.facets).length > 0) || facetFilters.jeopardy) && (
-        <div className="sticky top-14 z-30 bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-page-x px-page-x py-2 flex items-center gap-1.5 flex-wrap">
+        <div className="bg-surface/98 backdrop-blur-sm border-b border-surface-border/30 -mx-page-x px-page-x py-2 flex items-center gap-1.5 flex-wrap">
           {facetFilters.jeopardy && (
             <span className="inline-flex items-center gap-1 rounded-full bg-status-error px-2.5 py-0.5 text-2xs font-semibold text-text-inverse">
               <TriangleAlert className="w-2.5 h-2.5" strokeWidth={2.5} />
@@ -571,6 +613,7 @@ export function AvailableEscalationsPage() {
           )}
         </div>
       )}
+      </div>
 
       {queryError && (
         <div className="mb-4 px-4 py-3 rounded-md bg-status-error/10 border border-status-error/20 text-xs text-status-error">
@@ -661,6 +704,7 @@ export function AvailableEscalationsPage() {
         onClose={() => setAssignModalOpen(false)}
         selectedCount={selectedIds.size}
         selectedRoles={selectedRoles}
+        claimedCount={selectedClaimedCount}
         onSubmit={handleBulkAssign}
         isPending={bulkAssign.isPending}
       />
@@ -672,6 +716,7 @@ export function AvailableEscalationsPage() {
         selectedCount={selectedIds.size}
         isPending={bulkCancel.isPending}
         error={bulkCancel.error as Error | null}
+        actionLabel={typeof cancelLabel === 'string' ? cancelLabel : undefined}
       />
     </div>
   );

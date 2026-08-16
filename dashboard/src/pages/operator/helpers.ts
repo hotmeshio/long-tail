@@ -24,7 +24,8 @@ export function createBulkHandlers(deps: {
   setPriority: UseMutationResult<{ updated: number }, Error, { ids: string[]; priority: 1 | 2 | 3 | 4 }>;
   bulkClaim: UseMutationResult<{ claimed: number; skipped: number }, Error, { ids: string[]; durationMinutes: number }>;
   bulkTriage: UseMutationResult<{ triaged: number }, Error, { ids: string[]; hint?: string }>;
-  bulkAssign: UseMutationResult<{ assigned: number; skipped: number }, Error, { ids: string[]; targetUserId: string; durationMinutes: number }>;
+  bulkAssign: UseMutationResult<{ assigned: number; skipped: number }, Error, { ids: string[]; targetUserId: string; durationMinutes: number; reassign?: boolean }>;
+  bulkUnassign: UseMutationResult<{ unassigned: number; skipped: number }, Error, { ids: string[] }>;
   bulkCancel: UseMutationResult<{ cancelled: number; skipped: number }, Error, { ids: string[] }>;
   closeTriageModal: () => void;
   closeAssignModal: () => void;
@@ -54,12 +55,19 @@ export function createBulkHandlers(deps: {
     )({ ids: ids(), hint });
   };
 
-  const handleBulkAssign = (targetUserId: string, durationMinutes: number) => {
+  const handleBulkAssign = (targetUserId: string, durationMinutes: number, reassign?: boolean) => {
     bulkHandler(
       deps.bulkAssign,
       deps.clearSelection,
       deps.closeAssignModal,
-    )({ ids: ids(), targetUserId, durationMinutes });
+    )({ ids: ids(), targetUserId, durationMinutes, reassign });
+  };
+
+  const handleBulkUnassign = () => {
+    bulkHandler(
+      deps.bulkUnassign,
+      deps.clearSelection,
+    )({ ids: ids() });
   };
 
   const handleBulkCancel = () => {
@@ -70,5 +78,5 @@ export function createBulkHandlers(deps: {
     )({ ids: ids() });
   };
 
-  return { handleSetPriority, handleBulkClaim, handleBulkTriage, handleBulkAssign, handleBulkCancel };
+  return { handleSetPriority, handleBulkClaim, handleBulkTriage, handleBulkAssign, handleBulkUnassign, handleBulkCancel };
 }

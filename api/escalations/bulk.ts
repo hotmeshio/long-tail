@@ -3,7 +3,7 @@ import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
-import { validateIds, checkBulkPermission, publishBulkClaimEvents, publishBulkReassignEvents, hasGlobalEscalationAccess } from './helpers';
+import { validateIds, checkBulkPermission, publishBulkClaimEvents, publishBulkReassignEvents, publishBulkReleaseEvents, hasGlobalEscalationAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Bulk routes ────────────────────────────────────────────────────────────
@@ -108,6 +108,9 @@ export async function bulkClaim(
  * @param input.query — `{ role, facets? }` selector (query form)
  * @param input.targetUserId — user to assign to
  * @param input.durationMinutes — assignment duration (default: 30)
+ * @param input.reassign — also take over rows under a LIVE claim (ids form
+ *   only; requires admin/superadmin). Default false: live claims are skipped
+ *   and counted in `skipped`.
  * @param auth — authenticated user context
  * @returns `{ status: 200, data: { assigned, skipped } }`
  */
@@ -117,11 +120,12 @@ export async function bulkAssign(
     query?: { role: string; facets?: Record<string, unknown> };
     targetUserId: string;
     durationMinutes?: number;
+    reassign?: boolean;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const { ids, query, targetUserId, durationMinutes } = input;
+    const { ids, query, targetUserId, durationMinutes, reassign } = input;
     if (!targetUserId || typeof targetUserId !== 'string') {
       return { status: 400, error: 'targetUserId is required' };
     }
@@ -129,6 +133,14 @@ export async function bulkAssign(
     const hasQuery = !!query && typeof query === 'object';
     if (hasIds === hasQuery) {
       return { status: 400, error: 'provide exactly one of ids or query' };
+    }
+    if (reassign === true && hasQuery) {
+      return { status: 400, error: 'reassign requires the ids form' };
+    }
+    // Taking over a LIVE claim is a management override — stricter than
+    // pre-assigning pool rows, which role-scoped admins may do.
+    if (reassign === true && !(await hasGlobalEscalationAccess(auth.userId))) {
+      return { status: 403, error: 'Forbidden: reassign requires admin access' };
     }
 
     if (hasQuery) {
@@ -177,6 +189,19 @@ export async function bulkAssign(
       }
     }
 
+    if (reassign === true) {
+      const result = await escalationService.bulkReassignEscalations(
+        ids!,
+        targetUserId,
+        durationMinutes ?? 30,
+      );
+      if (result.assigned > 0) {
+        const priorById = new Map(result.changes.map((c) => [c.id, c.prior_assignee]));
+        publishBulkClaimEvents(result.changes.map((c) => c.id), targetUserId, undefined, priorById);
+      }
+      return { status: 200, data: { assigned: result.assigned, skipped: result.skipped } };
+    }
+
     const result = await escalationService.bulkAssignEscalations(
       ids!,
       targetUserId,
@@ -186,6 +211,37 @@ export async function bulkAssign(
     if (result.assigned > 0) publishBulkClaimEvents(ids!, targetUserId);
 
     return { status: 200, data: result };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Return claimed escalations to the available pool — the admin override of
+ * someone else's live claim (self-return stays the release verb). One
+ * guarded statement; unclaimed and terminal rows are skipped. Publishes a
+ * `released` event per returned row with the acting admin in the delta.
+ *
+ * RBAC: admin/superadmin (global escalation access) only.
+ *
+ * @param input.ids — array of escalation UUIDs
+ * @returns `{ status: 200, data: { unassigned, skipped } }`
+ */
+export async function bulkUnassign(
+  input: { ids?: string[] },
+  auth: LTApiAuth,
+): Promise<LTApiResult> {
+  try {
+    if (!validateIds(input.ids ?? [])) {
+      return { status: 400, error: 'ids must be a non-empty array' };
+    }
+    if (!(await hasGlobalEscalationAccess(auth.userId))) {
+      return { status: 403, error: 'Forbidden: unassign requires admin access' };
+    }
+
+    const result = await escalationService.bulkUnassignEscalations(input.ids!);
+    if (result.unassigned > 0) publishBulkReleaseEvents(result.changes, auth.userId);
+    return { status: 200, data: { unassigned: result.unassigned, skipped: result.skipped } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

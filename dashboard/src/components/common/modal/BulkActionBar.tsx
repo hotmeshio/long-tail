@@ -9,17 +9,21 @@ interface BulkActionBarProps {
   onSetPriority: (priority: 1 | 2 | 3 | 4) => void;
   onClaim: (durationMinutes: number) => void;
   onAssign: () => void;
+  onUnassign: () => void;
   onTriage: () => void;
   onCancel: () => void;
+  /** The scoped role's x-lt-labels.cancel — renames the button; false hides it. */
+  cancelLabel?: string | false;
   isPriorityPending: boolean;
   isClaimPending: boolean;
   isAssignPending: boolean;
+  isUnassignPending: boolean;
   isTriagePending: boolean;
   isCancelPending: boolean;
 }
 
 const anyPending = (props: BulkActionBarProps) =>
-  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isTriagePending || props.isCancelPending;
+  props.isPriorityPending || props.isClaimPending || props.isAssignPending || props.isUnassignPending || props.isTriagePending || props.isCancelPending;
 
 // One control chrome for the whole bar — white pill-free buttons on the band,
 // hairline border, a barely-there 3px radius (square reads timeless, not dated),
@@ -98,6 +102,11 @@ export function BulkActionBar(props: BulkActionBarProps) {
         {props.isAssignPending ? 'Assigning…' : 'Assign to…'}
       </button>
 
+      {/* Unassign — return claimed selections to the pool */}
+      <button onClick={props.onUnassign} disabled={disabled} className={CTRL}>
+        {props.isUnassignPending ? 'Unassigning…' : 'Unassign'}
+      </button>
+
       {/* Triage — LLM-powered, shown only when AI is enabled */}
       {aiEnabled && (
         <button onClick={props.onTriage} disabled={disabled} className={CTRL}>
@@ -105,10 +114,14 @@ export function BulkActionBar(props: BulkActionBarProps) {
         </button>
       )}
 
-      {/* Cancel */}
-      <button onClick={props.onCancel} disabled={disabled} className={DANGER}>
-        {props.isCancelPending ? 'Cancelling…' : 'Cancel'}
-      </button>
+      {/* Cancel — speaks the scoped role's vocabulary when one is authored */}
+      {props.cancelLabel !== false && (
+        <button onClick={props.onCancel} disabled={disabled} className={DANGER}>
+          {props.isCancelPending
+            ? (props.cancelLabel ? `${props.cancelLabel}…` : 'Cancelling…')
+            : (props.cancelLabel || 'Cancel')}
+        </button>
+      )}
 
       <div className="flex-1" />
 

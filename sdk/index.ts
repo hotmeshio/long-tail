@@ -121,6 +121,7 @@ export function createClient(options: LTClientOptions = {}) {
       updatePriority: bindAuth(escalationsApi.updatePriority, auth),
       bulkClaim: bindAuth(escalationsApi.bulkClaim, auth),
       bulkAssign: bindAuth(escalationsApi.bulkAssign, auth),
+      bulkUnassign: bindAuth(escalationsApi.bulkUnassign, auth),
       bulkEscalate: bindAuth(escalationsApi.bulkEscalate, auth),
       bulkTriage: bindAuth(escalationsApi.bulkTriage, auth),
       findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),

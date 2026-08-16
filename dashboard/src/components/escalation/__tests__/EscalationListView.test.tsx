@@ -106,10 +106,10 @@ describe('EscalationListView', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('hides Claim when the item is already effectively claimed', () => {
+  it('disables Claim when the item is already effectively claimed', () => {
     const claimed = { ...ROW, assigned_to: 'bob', assigned_until: '2099-01-01T00:00:00.000Z' };
     render(<EscalationListView role="policy-document" listSchema={SCHEMA} activeEscalations={[claimed]} />, { wrapper: wrapper() });
-    expect(screen.queryByRole('button', { name: /Claim/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Claim/ })).toBeDisabled();
   });
 
   it('falls back to the row type when no title template is given', () => {

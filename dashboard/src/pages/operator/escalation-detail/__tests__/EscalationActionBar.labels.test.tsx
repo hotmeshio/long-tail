@@ -82,4 +82,16 @@ describe('EscalationActionBar — x-lt-labels overrides', () => {
     expect(screen.getByText('Release')).toBeInTheDocument();
     expect(screen.getByText('Resolve')).toBeInTheDocument();
   });
+
+  it('claimed-by-other shows the claim overrides only for managers', () => {
+    renderBar({ mode: 'claimed_by_other', assignedTo: 'user-2', canManage: true });
+    expect(screen.getByTestId('admin-reassign')).toBeInTheDocument();
+    expect(screen.getByTestId('admin-unassign')).toBeInTheDocument();
+  });
+
+  it('claimed-by-other hides the overrides from non-managers', () => {
+    renderBar({ mode: 'claimed_by_other', assignedTo: 'user-2' });
+    expect(screen.queryByTestId('admin-reassign')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('admin-unassign')).not.toBeInTheDocument();
+  });
 });

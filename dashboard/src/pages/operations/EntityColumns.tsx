@@ -62,7 +62,7 @@ export function EntityRowItem({
       className={`${ROW_GRID} text-2xs cursor-pointer group py-0.5`}
     >
       <span
-        className="w-2 h-2 rounded-full dot-ring justify-self-center"
+        className="w-2 h-2 rounded-full justify-self-center"
         style={{ backgroundColor: row.nowState ? colors.get(row.nowState) : 'transparent' }}
         title={row.nowState ? stateLabel(row.nowState) : 'no current state'}
       />

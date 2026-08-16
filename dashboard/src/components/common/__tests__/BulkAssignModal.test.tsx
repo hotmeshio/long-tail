@@ -136,7 +136,7 @@ describe('BulkAssignModal', () => {
     fireEvent.click(screen.getByText('Assign'));
 
     expect(props.onSubmit).toHaveBeenCalledOnce();
-    expect(props.onSubmit).toHaveBeenCalledWith('u3', 60);
+    expect(props.onSubmit).toHaveBeenCalledWith('u3', 60, false);
   });
 
   it('disables Assign button when pending', () => {
@@ -164,5 +164,28 @@ describe('BulkAssignModal', () => {
   it('renders nothing when closed', () => {
     renderModal({ open: false });
     expect(screen.queryByText('Assign Escalations')).not.toBeInTheDocument();
+  });
+
+  it('offers the takeover only when the selection includes live claims', () => {
+    const { props } = renderModal({ claimedCount: 2 });
+    fireEvent.click(screen.getByText('Alice Adams'));
+    const checkbox = screen.getByRole('checkbox');
+    expect(screen.getByText(/Also reassign/)).toBeInTheDocument();
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText('Assign'));
+    expect(props.onSubmit).toHaveBeenCalledWith('u1', 30, true);
+  });
+
+  it('hides the takeover when nothing selected is claimed', () => {
+    renderModal({ claimedCount: 0 });
+    fireEvent.click(screen.getByText('Alice Adams'));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('reports skipped live claims after a plain assign', () => {
+    renderModal({ claimedCount: 1, result: { assigned: 2, skipped: 1 } });
+    fireEvent.click(screen.getByText('Alice Adams'));
+    expect(screen.getByTestId('assign-skip-note')).toHaveTextContent('skipped 1');
   });
 });
