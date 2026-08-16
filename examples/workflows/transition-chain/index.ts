@@ -12,12 +12,16 @@
  * `parentId` is the correlation key: it equals the escalation the owner is on
  * when they submit, so the born-assigned `claimed` event routes them precisely
  * to their next step and nothing else can.
+ *
+ * Cancel means "send home" (the forms label it that way via x-lt-labels): a
+ * cancelled step simply re-enters the queue — the workflow re-creates the same
+ * step and waits again, so the chain only ever completes through submission.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, EscalationResolution } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditionLT, type ConditionEscalationConfig } from '../../../services/orchestrator/condition';
 import {
   TXN_STEP1_ROLE,
   TXN_STEP2_ROLE,
@@ -31,6 +35,22 @@ import {
 // Hold the born-assigned steps as a hard claim so the follow-on stays with the
 // owner (an assignee with no window is a soft hint others could claim).
 const HOLD_MINUTES = 30;
+
+/**
+ * Wait for a step, treating cancel as "send home": a cancelled escalation
+ * resumes the wait with null, and the loop re-creates the SAME step as a
+ * fresh escalation under a new signal id. The chain only ever moves forward
+ * on a real submission.
+ */
+async function awaitStep<T>(signalBase: string, config: ConditionEscalationConfig): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const result = await conditionLT<T>(
+      attempt === 0 ? signalBase : `${signalBase}-r${attempt}`,
+      config,
+    );
+    if (result !== null && result !== false) return result;
+  }
+}
 
 /** A placeholder email derived from the account name, so step 1's seeded
  *  defaults are valid and can be submitted straight from the list. */
@@ -48,7 +68,7 @@ export async function transitionChain(envelope: LTEnvelope): Promise<any> {
   const { account = 'New account' } = (envelope.data ?? {}) as TransitionChainEnvelopeData;
 
   // ── Step 1: Account — open to the pool ────────────────────────────────────
-  const step1 = await conditionLT<TxnStep1V1 & { $resolution?: EscalationResolution }>(
+  const step1 = await awaitStep<TxnStep1V1 & { $resolution?: EscalationResolution }>(
     `txn-step-1-${ctx.workflowId}`,
     {
       role: TXN_STEP1_ROLE,
@@ -65,14 +85,13 @@ export async function transitionChain(envelope: LTEnvelope): Promise<any> {
       schemaVersion: TXN_SCHEMA_VERSION,
     },
   );
-  if (!step1) return { type: 'return' as const, data: { stage: 'account', completed: false } };
 
   // Whoever resolved step 1 owns the chain; step 1's id parents step 2.
   const owner = step1.$resolution?.resolvedBy;
   const parent1 = step1.$resolution?.escalationId;
 
   // ── Step 2: Preferences — born assigned to the owner ──────────────────────
-  const step2 = await conditionLT<TxnStep2V1 & { $resolution?: EscalationResolution }>(
+  const step2 = await awaitStep<TxnStep2V1 & { $resolution?: EscalationResolution }>(
     `txn-step-2-${ctx.workflowId}`,
     {
       role: TXN_STEP2_ROLE,
@@ -89,12 +108,11 @@ export async function transitionChain(envelope: LTEnvelope): Promise<any> {
       schemaVersion: TXN_SCHEMA_VERSION,
     },
   );
-  if (!step2) return { type: 'return' as const, data: { stage: 'preferences', completed: false } };
 
   const parent2 = step2.$resolution?.escalationId;
 
   // ── Step 3: Review & confirm — born assigned; terminal (no hand-off) ──────
-  const step3 = await conditionLT<TxnStep3V1>(`txn-step-3-${ctx.workflowId}`, {
+  const step3 = await awaitStep<TxnStep3V1>(`txn-step-3-${ctx.workflowId}`, {
     role: TXN_STEP3_ROLE,
     type: 'onboarding',
     subtype: 'confirm',
@@ -108,7 +126,6 @@ export async function transitionChain(envelope: LTEnvelope): Promise<any> {
     parentId: parent2,
     schemaVersion: TXN_SCHEMA_VERSION,
   });
-  if (!step3) return { type: 'return' as const, data: { stage: 'confirm', completed: false } };
 
   return {
     type: 'return' as const,

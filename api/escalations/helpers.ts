@@ -310,10 +310,16 @@ export function publishBulkReassignEvents(
   }
 }
 
-export function publishBulkClaimEvents(ids: string[], assignedTo: string, knownRole?: string): void {
+export function publishBulkClaimEvents(
+  ids: string[],
+  assignedTo: string,
+  knownRole?: string,
+  priorById?: Map<string, string | null>,
+): void {
   // The claimed subject carries each row's role token. Query-form callers
   // already know the single role; id-form callers resolve roles with one
-  // indexed read. Fire-and-forget, like every event publish.
+  // indexed read. Fire-and-forget, like every event publish. `priorById`
+  // (reassign) adds the displaced assignee to each row's delta.
   void (async () => {
     const roleById = new Map<string, string>();
     if (knownRole) {
@@ -323,6 +329,7 @@ export function publishBulkClaimEvents(ids: string[], assignedTo: string, knownR
       for (const row of rows) roleById.set(row.id, row.role);
     }
     for (const id of ids) {
+      const prior = priorById?.get(id);
       publishEscalationEvent({
         type: 'escalation.claimed',
         source: 'api',
@@ -334,8 +341,36 @@ export function publishBulkClaimEvents(ids: string[], assignedTo: string, knownR
         status: 'claimed',
         // Bulk exception to the one-shape convention (see lib/events/escalation-wire.ts):
         // delta + `bulk: true`, no per-row fetch. Subscribers fetch by id for detail.
-        data: { assigned_to: assignedTo, bulk: true },
+        data: { assigned_to: assignedTo, bulk: true, ...(prior ? { reassigned_from: prior } : {}) },
       });
     }
   })().catch(() => {});
+}
+
+/**
+ * Per-row released events for an admin unassign — the row returns to the
+ * pool under the same verb a self-release produces, with the acting admin in
+ * the delta.
+ */
+export function publishBulkReleaseEvents(
+  changes: Array<{ id: string; role: string; prior_assignee: string | null }>,
+  releasedBy: string,
+): void {
+  for (const change of changes) {
+    void publishEscalationEvent({
+      type: 'escalation.released',
+      source: 'api',
+      workflowId: '',
+      workflowName: '',
+      taskQueue: '',
+      escalationId: change.id,
+      role: change.role,
+      status: 'released',
+      data: {
+        released_by: releasedBy,
+        bulk: true,
+        ...(change.prior_assignee ? { unassigned_from: change.prior_assignee } : {}),
+      },
+    });
+  }
 }

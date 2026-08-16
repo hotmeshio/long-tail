@@ -2,7 +2,7 @@ export { createEscalation } from './create';
 export { listEscalations, listAvailableEscalations, listDistinctTypes, listFacetKeys, getEscalationStats, getStationMetrics } from './list';
 export { getEscalation, getEscalationsByWorkflowId, escalateToRole } from './single';
 export { claimEscalation, releaseEscalation } from './claim';
-export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkEscalate, bulkTriage } from './bulk';
+export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkUnassign, bulkEscalate, bulkTriage } from './bulk';
 export { resolveEscalation, resolveBySignalKey, resolveByIds, resolveAllOrNone } from './resolve';
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';

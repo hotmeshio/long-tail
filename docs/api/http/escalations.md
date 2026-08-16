@@ -14,6 +14,8 @@ pending ──► claimed ──► resolved
 
 Claiming is implicit: `assigned_to` is set and `assigned_until` is set to a future timestamp. When the claim expires, the escalation becomes available again without any status change — it remains `pending`.
 
+Admins can override a live claim without touching status: [bulk-assign](#bulk-assign-escalations) with `reassign: true` hands the claim to another user (publishes `claimed`), and [bulk-unassign](#bulk-unassign) returns it to the pool (publishes `released`). The `reassigned` event names the role move ([bulk-escalate](#bulk-escalate-to-role)) only.
+
 `cancelled` is a terminal state. A cancelled escalation cannot be claimed, resolved, or re-cancelled. When a workflow is terminated (`POST /api/workflows/:workflowId/terminate`), HotMesh automatically cancels any pending escalations tied to that workflow. Escalations can also be cancelled directly via `POST /api/escalations/:id/cancel`.
 
 ## Work-Surface Scope
@@ -621,6 +623,8 @@ POST /api/escalations/bulk-assign
 
 Assign multiple escalations to a specific user, by id-set or by query (exactly one). Superadmins can assign anyone. Admins can only assign to users who hold the escalation's role.
 
+**Rows under a live claim are skipped** by a plain assign and counted in the response's `skipped` — assignment is claim-on-behalf, and an active claim wins. To take over live claims, pass `reassign: true` (ids form; admin/superadmin only): the takeover is one guarded statement, the displaced holder's in-flight resolve fails its claim assertion, and each taken row's `claimed` event carries `reassigned_from`.
+
 The query form is one atomic statement: selection and claim happen in the same UPDATE, so a row that re-parks between a search and an ids-assign is still captured. Use it whenever the population is describable by role + facets.
 
 **Request body:**
@@ -631,6 +635,7 @@ The query form is one atomic statement: selection and claim happen in the same U
 | `query` | `object` | | `{ role, facets? }` selector (query form); `role` is required, `facets` filter by metadata containment |
 | `targetUserId` | `string` | | User ID to assign the escalations to |
 | `durationMinutes` | `integer` | 30 | How long each assignment lasts |
+| `reassign` | `boolean` | false | Also take over rows under a live claim (ids form only; requires admin/superadmin) |
 
 **Example request (ids form):**
 
@@ -655,6 +660,30 @@ The query form is one atomic statement: selection and claim happen in the same U
 ```json
 { "error": "Target user does not hold the \"reviewer\" role" }
 ```
+
+## Bulk unassign
+
+```
+POST /api/escalations/bulk-unassign
+```
+
+Return claimed escalations to the available pool — the admin override of someone else's live claim (a holder returning their own item uses release). One guarded statement: unclaimed and terminal rows are skipped, and each returned row publishes a `released` event carrying `released_by` (the acting admin) and `unassigned_from` (the displaced holder).
+
+**RBAC:** admin or superadmin (global escalation access).
+
+**Request body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ids` | `string[]` | Escalation UUIDs to return to the pool |
+
+**Response 200:**
+
+```json
+{ "unassigned": 2, "skipped": 1 }
+```
+
+`skipped` counts rows that were unclaimed or terminal at call time.
 
 ## Bulk escalate to role
 

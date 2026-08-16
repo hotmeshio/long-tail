@@ -11,7 +11,10 @@ import {
   useResolveEscalation,
   useEscalateToRole,
   useCancelEscalation,
+  useBulkAssignEscalations,
+  useBulkUnassignEscalations,
 } from '../../../api/escalations';
+import { BulkAssignModal } from '../../../components/common/modal/BulkAssignModal';
 import { ApiError } from '../../../api/client';
 import { isValidationErrorBody } from '../../../lib/validation';
 import { ConfirmCancelModal } from '../../../components/common/modal/ConfirmCancelModal';
@@ -88,7 +91,9 @@ export function EscalationDetailPage() {
 }
 
 function EscalationDetailView({ id }: { id: string }) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin, hasRoleType } = useAuth();
+  // Claim overrides (reassign / return to queue) are management verbs.
+  const canManage = isSuperAdmin || hasRoleType('admin');
   const { identity: acting } = useActingIdentity();
   const scanEnabled = useScanEnabled();
   // The badge grant outranks the session: whoever badged in owns the claim
@@ -104,7 +109,10 @@ function EscalationDetailView({ id }: { id: string }) {
   const resolve = useResolveEscalation();
   const escalate = useEscalateToRole();
   const cancel = useCancelEscalation();
+  const bulkAssign = useBulkAssignEscalations();
+  const bulkUnassign = useBulkUnassignEscalations();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const { data: workflowConfigs } = useWorkflowConfigs();
   const { data: settings } = useSettings();
 
@@ -685,6 +693,10 @@ function EscalationDetailView({ id }: { id: string }) {
           labels={footerLabels}
           submitBlocked={submitGuard.blocked}
           submitBlockedMessage={submitGuard.message}
+          canManage={canManage}
+          onReassign={() => setReassignModalOpen(true)}
+          onUnassign={() => bulkUnassign.mutate({ ids: [id] })}
+          unassignPending={bulkUnassign.isPending}
         />}
       </div>
 
@@ -706,6 +718,20 @@ function EscalationDetailView({ id }: { id: string }) {
         formErrors={formErrors}
         activePanel={panelActiveView}
         onPanelChange={setPanelActiveView}
+      />
+
+      {/* The admin hand-off: the gesture IS reassign, so takeover is implied. */}
+      <BulkAssignModal
+        open={reassignModalOpen}
+        onClose={() => setReassignModalOpen(false)}
+        selectedCount={1}
+        selectedRoles={esc ? [esc.role] : []}
+        onSubmit={(targetUserId, durationMinutes) =>
+          bulkAssign.mutate(
+            { ids: [id], targetUserId, durationMinutes, reassign: true },
+            { onSuccess: () => setReassignModalOpen(false) },
+          )}
+        isPending={bulkAssign.isPending}
       />
 
       <ConfirmCancelModal

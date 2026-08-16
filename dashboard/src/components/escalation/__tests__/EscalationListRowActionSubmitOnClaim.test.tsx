@@ -72,7 +72,7 @@ describe('x-lt-row-action submitOnClaim', () => {
     );
   });
 
-  it('still hides the button on rows under a live claim window', () => {
+  it('still disables the button on rows under a live claim window', () => {
     render(
       <EscalationListView
         role="harvester"
@@ -80,6 +80,6 @@ describe('x-lt-row-action submitOnClaim', () => {
         activeEscalations={[makeRow({ assigned_to: 'someone', assigned_until: new Date(Date.now() + 60_000).toISOString() })]}
       />,
     );
-    expect(screen.queryByTestId('row-action-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('row-action-button')).toBeDisabled();
   });
 });

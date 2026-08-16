@@ -46,7 +46,7 @@ vi.mock('../../../../api/settings', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { userId: 'resolver-1' } }),
+  useAuth: () => ({ user: { userId: 'resolver-1' }, isSuperAdmin: false, hasRoleType: () => false }),
 }));
 
 vi.mock('../../../../hooks/useAccess', () => ({

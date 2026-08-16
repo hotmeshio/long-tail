@@ -6,7 +6,9 @@ type Status = LTTaskStatus | LTEscalationStatus | string;
  * Dots use the -graphic status variants: brighter hues sized for 3:1 graphic
  * contrast, while text-status-* stays on the darker text-safe values. */
 export const STATUS_DOT_STYLES: Record<string, string> = {
-  pending: 'bg-status-pending-graphic',
+  // Pending is the standard blue everywhere; amber/orange is reserved for
+  // held work (claimed) and warning states.
+  pending: 'bg-status-active',
   in_progress: 'bg-status-active animate-pulse',
   completed: 'bg-status-success-graphic',
   resolved: 'bg-status-success-graphic',

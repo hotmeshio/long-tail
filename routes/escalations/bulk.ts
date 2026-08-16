@@ -31,9 +31,16 @@ export function registerBulkRoutes(router: Router): void {
         query: req.body?.query,
         targetUserId: req.body?.targetUserId,
         durationMinutes: req.body?.durationMinutes,
+        // Take over live claims too (ids form; admin/superadmin only).
+        reassign: req.body?.reassign === true,
       },
       req.auth!,
     );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  router.post('/bulk-unassign', async (req, res) => {
+    const result = await api.bulkUnassign({ ids: req.body?.ids }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 

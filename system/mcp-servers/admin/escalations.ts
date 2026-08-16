@@ -35,6 +35,7 @@ import {
   resolveByMetadataSchema,
   bulkClaimSchema,
   bulkAssignSchema,
+  bulkUnassignSchema,
   bulkEscalateSchema,
   updatePrioritySchema,
   resolveByIdsSchema,
@@ -585,11 +586,28 @@ export function registerEscalationTools(server: McpServer): void {
     'bulk_assign',
     {
       title: 'Bulk Assign',
-      description: 'Assign multiple escalations to a specific user.',
+      description: 'Assign multiple escalations to a specific user. Rows under a live claim are skipped unless reassign=true (the admin takeover).',
       inputSchema: bulkAssignSchema,
     },
     async (args: z.infer<typeof bulkAssignSchema>) => {
       const result = await escalationBulkApi.bulkAssign(args, await systemAuth());
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/bulk-unassign
+  (server as any).registerTool(
+    'bulk_unassign',
+    {
+      title: 'Bulk Unassign',
+      description: 'Return claimed escalations to the available pool — the admin override of a live claim. Unclaimed and terminal rows are skipped.',
+      inputSchema: bulkUnassignSchema,
+    },
+    async (args: z.infer<typeof bulkUnassignSchema>) => {
+      const result = await escalationBulkApi.bulkUnassign(args, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

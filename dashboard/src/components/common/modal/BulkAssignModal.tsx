@@ -13,8 +13,15 @@ interface BulkAssignModalProps {
   selectedCount: number;
   /** Distinct roles of the selected escalations; scopes user list for admins */
   selectedRoles: string[];
-  onSubmit: (targetUserId: string, durationMinutes: number) => void;
+  onSubmit: (targetUserId: string, durationMinutes: number, reassign: boolean) => void;
   isPending: boolean;
+  /**
+   * Selected rows currently under a LIVE claim. Plain assign skips them;
+   * when > 0 the duration step offers the explicit takeover.
+   */
+  claimedCount?: number;
+  /** Assignment outcome from the last submit; skipped > 0 keeps the modal open to say so. */
+  result?: { assigned: number; skipped: number } | null;
 }
 
 export function BulkAssignModal({
@@ -24,6 +31,8 @@ export function BulkAssignModal({
   selectedRoles,
   onSubmit,
   isPending,
+  claimedCount = 0,
+  result = null,
 }: BulkAssignModalProps) {
   const { isSuperAdmin } = useAuth();
   const claimDurations = useClaimDurations();
@@ -32,6 +41,7 @@ export function BulkAssignModal({
   const [search, setSearch] = useState('');
   const [duration, setDuration] = useState('30');
   const [customMinutes, setCustomMinutes] = useState(0);
+  const [reassign, setReassign] = useState(false);
   const onCustomChange = useCallback((m: number) => setCustomMinutes(m), []);
 
   // Admins with a single role: scope to that role. Otherwise show all active users.
@@ -56,6 +66,7 @@ export function BulkAssignModal({
     setSearch('');
     setDuration('30');
     setCustomMinutes(0);
+    setReassign(false);
     onClose();
   };
 
@@ -72,7 +83,7 @@ export function BulkAssignModal({
     if (!selectedUser) return;
     const minutes = duration === 'custom' ? customMinutes : parseInt(duration);
     if (!minutes || minutes <= 0) return;
-    onSubmit(selectedUser.id, minutes);
+    onSubmit(selectedUser.id, minutes, reassign);
   };
 
   return (
@@ -158,6 +169,28 @@ export function BulkAssignModal({
             </select>
             {duration === 'custom' && (
               <CustomDurationPicker onChange={onCustomChange} autoFocus />
+            )}
+
+            {claimedCount > 0 && (
+              <label className="flex items-start gap-2 text-xs text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={reassign}
+                  onChange={(e) => setReassign(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Also reassign <span className="font-medium text-text-primary">{claimedCount}</span>{' '}
+                  item(s) with a live claim — the current holder loses the item.
+                  Unchecked, those are skipped.
+                </span>
+              </label>
+            )}
+
+            {result && result.skipped > 0 && (
+              <p className="text-xs text-status-warning" data-testid="assign-skip-note">
+                Assigned {result.assigned} · skipped {result.skipped} with live claims.
+              </p>
             )}
 
             <div className="flex justify-end gap-3 pt-2">

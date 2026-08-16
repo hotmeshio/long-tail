@@ -29,6 +29,10 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     submitBlockedMessage,
     actingName,
     badgePrompt,
+    canManage,
+    onReassign,
+    onUnassign,
+    unassignPending,
   } = props;
 
   const claimDurations = useClaimDurations();
@@ -161,6 +165,26 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               <p className="text-xs text-text-tertiary" data-testid="badge-prompt">
                 If this is your claim, scan your badge.
               </p>
+            )}
+            {canManage && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={onReassign}
+                  className="text-xs text-text-tertiary hover:text-accent transition-colors"
+                  data-testid="admin-reassign"
+                >
+                  Reassign…
+                </button>
+                <button
+                  onClick={onUnassign}
+                  disabled={unassignPending}
+                  className="text-xs text-text-tertiary hover:text-status-error transition-colors disabled:opacity-50"
+                  data-testid="admin-unassign"
+                >
+                  {unassignPending ? 'Returning…' : 'Return to queue'}
+                </button>
+              </>
             )}
           </div>
         )}

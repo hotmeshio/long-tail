@@ -23,11 +23,11 @@ export function ConfirmCancelModal({
   // One template for every vocabulary: the title carries the verb (the
   // pressed button's label), the body states the intent in general terms.
   const isBulk = !!selectedCount && selectedCount > 1;
-  const label = (!isBulk && actionLabel) || 'Cancel';
-  const title = isBulk ? `Cancel ${selectedCount} Items` : label === 'Cancel' ? 'Cancel Item' : label;
+  const label = actionLabel || 'Cancel';
+  const title = isBulk ? `${label} ${selectedCount} Items` : label === 'Cancel' ? 'Cancel Item' : label;
 
   const body = isBulk
-    ? `Are you sure? This removes ${selectedCount} items from the work queue.`
+    ? `Are you sure you want to ${label}? This removes ${selectedCount} items from the work queue.`
     : `Are you sure you want to ${label}? This removes the item from the work queue.`;
 
   return (

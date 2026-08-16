@@ -32,10 +32,19 @@ describe('ConfirmCancelModal', () => {
     expect(screen.queryByText('Yes, Cancel')).not.toBeInTheDocument();
   });
 
-  it('bulk cancels keep the count-based copy regardless of label', () => {
+  it('bulk cancels speak the label with the count-based copy', () => {
     renderModal({ selectedCount: 3, actionLabel: 'Send to Service' });
+    expect(screen.getByText('Send to Service 3 Items')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Are you sure you want to Send to Service\? This removes 3 items from the work queue\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Yes, Send to Service')).toBeInTheDocument();
+    expect(screen.queryByText('Yes, Cancel')).not.toBeInTheDocument();
+  });
+
+  it('bulk default keeps the Cancel vocabulary', () => {
+    renderModal({ selectedCount: 3 });
     expect(screen.getByText('Cancel 3 Items')).toBeInTheDocument();
-    expect(screen.getByText(/removes 3 items from the work queue/)).toBeInTheDocument();
     expect(screen.getByText('Yes, Cancel')).toBeInTheDocument();
   });
 });

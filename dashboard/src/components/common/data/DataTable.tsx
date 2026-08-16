@@ -8,6 +8,9 @@ export interface Column<T> {
   label: string | ReactNode;
   render: (row: T, index: number) => ReactNode;
   className?: string;
+  /** CSS width for the column (e.g. "40%", "12rem") — set on the header cell,
+   *  which sizes the whole column under `layout="fixed"`. */
+  width?: string;
   /** If true, this column header is clickable and triggers onSort. */
   sortable?: boolean;
   /**
@@ -239,7 +242,8 @@ export function DataTable<T>({
                 <th
                   key={col.key}
                   onClick={isSortable ? () => onSort(col.key) : undefined}
-                  className={`${inline ? '' : 'sticky top-[60px] z-10 '}bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''} ${
+                  style={col.width ? { width: col.width } : undefined}
+                  className={`${inline ? '' : 'sticky top-[var(--lt-sticky-top,60px)] z-10 '}bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''} ${
                     isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                   }`}
                 >

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../services/escalation', () => ({
   bulkAssignEscalations: vi.fn(),
   bulkAssignEscalationsByQuery: vi.fn(),
+  bulkReassignEscalations: vi.fn(),
+  bulkUnassignEscalations: vi.fn(),
   getEscalationRoles: vi.fn(),
 }));
 
@@ -14,6 +16,8 @@ vi.mock('../../../api/escalations/helpers', () => ({
   validateIds: (ids: unknown) => Array.isArray(ids) && ids.length > 0,
   checkBulkPermission: vi.fn(async () => ({ allowed: true })),
   publishBulkClaimEvents: vi.fn(),
+  publishBulkReassignEvents: vi.fn(),
+  publishBulkReleaseEvents: vi.fn(),
   hasGlobalEscalationAccess: vi.fn(),
 }));
 

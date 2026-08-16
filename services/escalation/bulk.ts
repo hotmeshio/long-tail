@@ -1,7 +1,16 @@
 import type { LTEscalationRecord } from '../../types';
 
-import { escalations } from './client';
+import { getPool } from '../../lib/db';
+import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
+import { BULK_REASSIGN, BULK_UNASSIGN } from './sql';
+
+/** One row touched by a reassign/unassign, with its pre-update assignee. */
+export interface AssignmentChange {
+  id: string;
+  role: string;
+  prior_assignee: string | null;
+}
 
 /**
  * Bulk claim escalations for a user.
@@ -55,6 +64,47 @@ export async function bulkAssignEscalationsByQuery(
     durationMinutes,
   });
   return { assigned: claimed, ids: entries.map((e) => e.id) };
+}
+
+/**
+ * Reassign pending rows to a user, INCLUDING rows under a live claim — the
+ * management override plain assign is not (claimMany skips live claims). One
+ * guarded statement; rows not returned were terminal or missing. Each
+ * returned row carries its pre-update assignee for the event.
+ */
+export async function bulkReassignEscalations(
+  ids: string[],
+  targetUserId: string,
+  durationMinutes: number = 30,
+): Promise<{ assigned: number; skipped: number; changes: AssignmentChange[] }> {
+  if (ids.length === 0) return { assigned: 0, skipped: 0, changes: [] };
+  await ensureEscalationCompatView();
+  const { rows } = await getPool().query(BULK_REASSIGN, [ids, targetUserId, durationMinutes]);
+  const changes = rows.map((r: any) => ({
+    id: r.id,
+    role: r.role,
+    prior_assignee: r.prior_assignee ?? null,
+  }));
+  return { assigned: rows.length, skipped: ids.length - rows.length, changes };
+}
+
+/**
+ * Return pending claimed rows to the available pool (admin override of
+ * someone else's claim — self-return stays the release verb). One guarded
+ * statement; unclaimed and terminal rows are skipped.
+ */
+export async function bulkUnassignEscalations(
+  ids: string[],
+): Promise<{ unassigned: number; skipped: number; changes: AssignmentChange[] }> {
+  if (ids.length === 0) return { unassigned: 0, skipped: 0, changes: [] };
+  await ensureEscalationCompatView();
+  const { rows } = await getPool().query(BULK_UNASSIGN, [ids]);
+  const changes = rows.map((r: any) => ({
+    id: r.id,
+    role: r.role,
+    prior_assignee: r.prior_assignee ?? null,
+  }));
+  return { unassigned: rows.length, skipped: ids.length - rows.length, changes };
 }
 
 /**

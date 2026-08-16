@@ -639,6 +639,11 @@ export const bulkAssignSchema = z.object({
   ids: z.array(z.string()).min(1).describe('Escalation UUIDs to assign'),
   targetUserId: z.string().describe('User ID to assign to'),
   durationMinutes: z.number().int().optional().describe('Lock duration in minutes'),
+  reassign: z.boolean().optional().describe('Also take over rows under a LIVE claim (admin/superadmin only). Default false: live claims are skipped.'),
+});
+
+export const bulkUnassignSchema = z.object({
+  ids: z.array(z.string()).min(1).describe('Escalation UUIDs to return to the pool'),
 });
 
 export const bulkEscalateSchema = z.object({
