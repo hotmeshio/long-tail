@@ -26,16 +26,17 @@ import { jeopardyQueueLink } from './priority-link';
 import { useAccess } from '../../hooks/useAccess';
 import { displayRoleTitle } from '../../lib/role-display';
 
-// Column band tints — same hues as the chart bands (~8% alpha).
-// Semantic palette: pending=sky, claimed=orange, resolved=green, target=slate, workers=accent.
+// Column band tints — same hues as the chart bands. Two sets: the slate
+// configuration trio (target, SLA, workers) and the vivid status trio.
+// Status bands carry ~15% of their bright -graphic hues so they hold up on
+// light surfaces without overpowering midnight.
 const SLA_COLOR     = TARGET_COLOR;
-const WORKERS_COLOR = 'rgb(var(--lt-accent))';
 const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
-const SLA_BAND      = withAlpha(TARGET_COLOR, 0.09);
-const WORKERS_BAND  = withAlpha(WORKERS_COLOR, 0.07);
-const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.08);
-const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.08);
-const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.08);
+const SLA_BAND      = TARGET_BAND;
+const WORKERS_BAND  = TARGET_BAND;
+const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.15);
+const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.15);
+const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.15);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ function StationRow({
         style={{ backgroundColor: WORKERS_BAND }}
         title={workers != null ? `~${workers} concurrent worker${workers === 1 ? '' : 's'} to sustain ${role.target_per_hour}/h within ${role.sla_minutes}m SLA` : undefined}
       >
-        <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`} style={workers != null ? { color: WORKERS_COLOR } : undefined}>
+        <span className={`text-xs font-mono tabular-nums ${workers != null ? '' : 'text-text-quaternary'}`}>
           {workers ?? '—'}
         </span>
       </td>
@@ -491,7 +492,7 @@ function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
 const COLORED_COLS = [
   { label: 'TARGET/H', band: TARGET_BAND,   hue: TARGET_COLOR,   w: 'w-[8%]' },
   { label: 'SLA/M',    band: SLA_BAND,      hue: SLA_COLOR,      w: 'w-[7%]' },
-  { label: 'WORKERS',  band: WORKERS_BAND,  hue: WORKERS_COLOR,  w: 'w-[8%]' },
+  { label: 'WORKERS',  band: WORKERS_BAND,  hue: TARGET_COLOR,   w: 'w-[8%]' },
   { label: 'PENDING',  band: PENDING_BAND,  hue: QUEUED_COLOR,   w: 'w-[8%]' },
   { label: 'CLAIMED',  band: ACTIVE_BAND,   hue: ACTIVE_COLOR,   w: 'w-[8%]' },
   { label: 'RESOLVED', band: RESOLVED_BAND, hue: RESOLVED_COLOR, w: 'w-[8%]' },
