@@ -154,7 +154,7 @@ export function searchEscalationsQuery(orderBy: string): string {
  * 3. `metadata.signal_id` present, row already claimed and claim not expired →
  *    a concurrent caller is handling the signal. `signal_already_claimed = true`;
  *    caller returns 409 without re-signaling.
- * 4. `signal_key` present (atomic conditionLT) → the write skips entirely.
+ * 4. `signal_key` present (atomic conditional) → the write skips entirely.
  *    Caller invokes SDK resolve to atomically mark resolved + deliver the signal.
  *
  * Signal_id hardening: the write runs for signal_id rows too, stamping

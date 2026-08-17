@@ -35,13 +35,13 @@ commit, using the HotMesh `condition({ assignee, durationMinutes, parentId })`
 primitive:
 
 ```ts
-const step1 = await conditionLT<Step1 & { $resolution?: EscalationResolution }>(sig1, {
+const step1 = await conditional<Step1 & { $resolution?: EscalationResolution }>(sig1, {
   role: STEP1_ROLE, /* … */ schemaVersion: 1,
 });
 const owner = step1.$resolution?.resolvedBy;      // who resolved step 1
 const parent = step1.$resolution?.escalationId;   // step 1's id — the correlation key
 
-await conditionLT<Step2>(sig2, {
+await conditional<Step2>(sig2, {
   role: STEP2_ROLE,
   assignee: owner,          // born assigned — no create-then-claim race
   durationMinutes: 30,      // a hard claim, so it stays with the owner

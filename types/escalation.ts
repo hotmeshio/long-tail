@@ -3,7 +3,7 @@ import type { Types } from '@hotmeshio/hotmesh';
 /**
  * Resolution provenance delivered to a waiting workflow under the reserved
  * `$resolution` signal key — who resolved the escalation and which row
- * delivered it. Declare it in the `conditionLT` payload generic to consume it.
+ * delivered it. Declare it in the `conditional` payload generic to consume it.
  * Re-exported from the HotMesh SDK so workflow authors import one package.
  */
 export type EscalationResolution = Types.EscalationResolution;
@@ -18,7 +18,7 @@ export const ESCALATION_METADATA_KEYS = {
    * Pins the lt_role_schemas version this escalation was created against.
    * The resolver UI renders that exact snapshot even after the role's schema
    * moves on; absent, the latest role schema applies. Set ergonomically via
-   * `conditionLT`'s `schemaVersion` config field.
+   * `conditional`'s `schemaVersion` config field.
    */
   SCHEMA_VERSION: 'schema_version',
   /** Per-escalation resolver form override — a full JSON Schema embedded on the row. */
@@ -29,7 +29,7 @@ export type LTEscalationStatus =
   | 'pending'
   | 'resolved'
   | 'cancelled'
-  /** SLA timer on a `conditionLT`/`condition` wait fired first — the workflow resumed with `false`; the row is terminal */
+  /** SLA timer on a `conditional`/`condition` wait fired first — the workflow resumed with `false`; the row is terminal */
   | 'expired';
 
 export type LTEscalationPriority = 1 | 2 | 3 | 4;
@@ -58,7 +58,7 @@ export interface LTEscalationRecord {
 
   // efficient (atomic) escalation resume key — set when the row was written
   // inside a workflow's Leg1 checkpoint via `condition(signalId, config)` /
-  // `conditionLT(signalId, config)`. The value is the signal id used to resume
+  // `conditional(signalId, config)`. The value is the signal id used to resume
   // the waiting workflow in place. Null for service-created rows.
   signal_key: string | null;
 

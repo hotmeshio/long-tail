@@ -40,7 +40,7 @@ The graph edges that don't fit the line. `lt_roles.parent_role` places a role in
 
 ### lt_role_schemas
 
-Immutable version history of each role's schema pair. Every change to a role's `form_schema` or `metadata_schema` (via `PATCH /api/roles/:role`, the SDK, or the `update_role` MCP tool) appends the next `(role, version)` snapshot in the same atomic statement that updates `lt_roles`. Escalations pin a version via `metadata.schema_version` (`conditionLT`'s `schemaVersion` field) so the resolver form they render stays exactly what their author specified; unpinned escalations use the live columns on `lt_roles`.
+Immutable version history of each role's schema pair. Every change to a role's `form_schema` or `metadata_schema` (via `PATCH /api/roles/:role`, the SDK, or the `update_role` MCP tool) appends the next `(role, version)` snapshot in the same atomic statement that updates `lt_roles`. Escalations pin a version via `metadata.schema_version` (`conditional`'s `schemaVersion` field) so the resolver form they render stays exactly what their author specified; unpinned escalations use the live columns on `lt_roles`.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -101,7 +101,7 @@ Tracks every workflow execution. Created by the LT interceptor when a workflow s
 
 Records human intervention requests. Created when a workflow returns
 `type: 'escalation'`, when `ltCreateEscalation` runs, or atomically when a
-workflow calls `condition(signalId, config)` / `conditionLT(signalId, config)`.
+workflow calls `condition(signalId, config)` / `conditional(signalId, config)`.
 Updated when claimed or resolved.
 
 The storage is the **shared HotMesh table `public.hmsh_escalations`**
@@ -112,7 +112,7 @@ Indexes are managed by the SDK on `hmsh_escalations` (see below).
 
 Role read/write scope does **not** add columns here. An escalation carries a `role`
 and an optional `assigned_to`; work-surface scope lives on the membership table
-(`lt_user_roles`) and is applied at read time. `condition()` / `conditionLT()` and
+(`lt_user_roles`) and is applied at read time. `condition()` / `conditional()` and
 the escalation engine are unaffected.
 
 The columns below are the `hmsh_escalations` table. The public API record

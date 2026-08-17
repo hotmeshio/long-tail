@@ -27,7 +27,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import { CONSTRAINT_ROLE, CONSTRAINT_SCHEMA_VERSION, type ConstraintResolverV1 } from './forms';
 
@@ -59,7 +59,7 @@ export async function constraintForm(envelope: LTEnvelope): Promise<any> {
     checklistItems.map((item) => [item.id, false]),
   );
 
-  const decision = await conditionLT<ConstraintResolverV1>(signalId, {
+  const decision = await conditional<ConstraintResolverV1>(signalId, {
     role: CONSTRAINT_ROLE,
     type: 'quality',
     subtype: 'constraint-form',

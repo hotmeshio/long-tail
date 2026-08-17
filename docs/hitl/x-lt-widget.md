@@ -144,7 +144,7 @@ The field type must be `"object"`. The submitted value is `Record<string, boolea
 
 `x-lt-source` uses the `"domain.path"` convention (same as `x-lt-showIf` and `x-lt-help` tokens). The renderer expects an array of `{ id: string; label: string; required?: boolean }` objects at that path.
 
-- `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditionLT`'s `envelope` parameter.
+- `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditional`'s `envelope` parameter.
 - `"metadata"` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
 
 ### Geometry (`x-lt-variant`)
@@ -191,7 +191,7 @@ const checklistItems = [
   { id: 'photos',  label: 'Before/after photos are present',           required: false },
 ];
 
-const decision = await conditionLT<{ checks: Record<string, boolean> }>(signalId, {
+const decision = await conditional<{ checks: Record<string, boolean> }>(signalId, {
   role: 'checklist-operator',
   envelope: {
     checklist_items: checklistItems,

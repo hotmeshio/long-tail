@@ -79,7 +79,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 
 | Topic | File |
 |-------|------|
-| Creating escalations with `conditionLT`, schema versioning | [escalation.md](hitl/escalation.md) |
+| Creating escalations with `conditional`, schema versioning | [escalation.md](hitl/escalation.md) |
 | Field types, formats, required, read-only | [form.md](hitl/form.md) |
 | Pre-submission validation guards (min, max, pattern, dynamic bounds) | [x-lt-validation.md](hitl/x-lt-validation.md) |
 | Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |

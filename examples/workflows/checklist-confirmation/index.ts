@@ -23,7 +23,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import {
   CHECKLIST_ROLE,
@@ -56,7 +56,7 @@ export async function checklistConfirmation(envelope: LTEnvelope): Promise<any> 
     checklistItems.map((item) => [item.id, false]),
   );
 
-  const decision = await conditionLT<ChecklistResolverV1>(signalId, {
+  const decision = await conditional<ChecklistResolverV1>(signalId, {
     role: CHECKLIST_ROLE,
     type: 'checklist',
     subtype: 'confirmation',

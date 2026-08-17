@@ -27,7 +27,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import { VERDICT_ROLE, VERDICT_SCHEMA_VERSION, type VerdictResolverV1 } from './forms';
 
@@ -56,7 +56,7 @@ export async function parameterizedForm(envelope: LTEnvelope): Promise<any> {
   const ctx = Durable.workflow.workflowInfo();
   const signalId = `parameterized-form-${ctx.workflowId}`;
 
-  const decision = await conditionLT<VerdictResolverV1>(signalId, {
+  const decision = await conditional<VerdictResolverV1>(signalId, {
     role: VERDICT_ROLE,
     type: 'verdict',
     subtype: 'sided-verdict',

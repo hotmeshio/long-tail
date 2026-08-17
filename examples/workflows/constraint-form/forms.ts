@@ -22,7 +22,7 @@ export const CONSTRAINT_ROLE = 'quality-reviewer';
 export const CONSTRAINT_SCHEMA_VERSION = 1;
 
 /**
- * The payload shape the workflow receives from conditionLT after the human
+ * The payload shape the workflow receives from conditional after the human
  * completes the Quality Review form. All constraint guards (min, max, pattern,
  * dynamic bounds) have already been enforced by the dashboard before submit.
  */

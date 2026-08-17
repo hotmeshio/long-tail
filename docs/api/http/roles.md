@@ -412,7 +412,7 @@ GET /api/roles/:role/schema
 GET /api/roles/:role/schema?version=3
 ```
 
-Fetch the role's `form_schema` + `metadata_schema` pair. Without `version`, returns the live (latest) schema along with the role's current version number. With `version`, returns that immutable snapshot from the version history — the snapshot an escalation pinned via `metadata.schema_version` (`conditionLT`'s `schemaVersion` field).
+Fetch the role's `form_schema` + `metadata_schema` pair. Without `version`, returns the live (latest) schema along with the role's current version number. With `version`, returns that immutable snapshot from the version history — the snapshot an escalation pinned via `metadata.schema_version` (`conditional`'s `schemaVersion` field).
 
 **Response 200:**
 

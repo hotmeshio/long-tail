@@ -19,7 +19,7 @@ import type { LTFieldViolation } from '../../types/validation';
  * Resolve a pending escalation with a human-provided payload.
  *
  * Handles multiple resolution paths:
- * 1. **Condition signal** — lightweight `conditionLT` signal via metadata.signal_id
+ * 1. **Condition signal** — lightweight `conditional` signal via metadata.signal_id
  * 2. **Signal-routed** — full signal_routing via YAML engine or Durable handle
  * 3. **Strategy triage** — escalation strategy redirects to a triage workflow
  * 4. **Notification-only** — no workflow_type; acknowledge and close
@@ -76,7 +76,7 @@ export async function resolveEscalation(
     // the payload via x-lt-bind before submitting). No server-side transform.
 
     // Resolution provenance, both surfaces at once: `resolvedBy` rides the
-    // signal to the waiting workflow ($resolution — see conditionLT), and
+    // signal to the waiting workflow ($resolution — see conditional), and
     // `resolved_by` merges into the row's GIN-indexed metadata inside the same
     // atomic resolve, making "who resolved it" `@>`-queryable without a
     // follow-up read.
@@ -89,7 +89,7 @@ export async function resolveEscalation(
     // resolve here pass it as the 3rd arg; paths that resume a workflow carry it on the
     // signal so the downstream resolve commits it atomically.
 
-    // Path A: conditionLT signal
+    // Path A: conditional signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
     if (metadataSignalId && escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
       return resolveViaConditionSignal(escalation, resolverPayload, outcome, resolvedBy);
@@ -387,7 +387,7 @@ export async function resolveAllOrNone(
 
 // ── Resolution paths ─────────────────────────────────────────────────────
 
-/** Path A: lightweight conditionLT signal — inject $escalation_id and signal the running workflow. */
+/** Path A: lightweight conditional signal — inject $escalation_id and signal the running workflow. */
 async function resolveViaConditionSignal(
   escalation: any,
   resolverPayload: Record<string, any>,
@@ -401,10 +401,10 @@ async function resolveViaConditionSignal(
     escalation.workflow_type,
     escalation.workflow_id,
   );
-  // The row is resolved downstream by the workflow's `conditionLT` → `ltResolveEscalation`.
+  // The row is resolved downstream by the workflow's `conditional` → `ltResolveEscalation`.
   // Carry the outcome patch on the signal ($escalation_metadata, symmetric to $escalation_id)
   // so it merges inside that single atomic resolve — never a separate write here.
-  // $resolution (provenance) is surfaced to the workflow by conditionLT and stripped
+  // $resolution (provenance) is surfaced to the workflow by conditional and stripped
   // from the stored resolver_payload, same as the other $-control keys.
   await handle.signal(signalId, {
     ...resolverPayload,

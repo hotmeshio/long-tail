@@ -120,8 +120,8 @@ Cancellation is terminal — a cancelled escalation cannot be re-opened.
 
 ### When cancellation happens
 
-- **Workflow termination** — `POST /api/workflows/:workflowId/terminate` automatically cancels any pending escalations tied to it. The waiting `conditionLT` call returns `null`.
-- **Explicit cancel** — cancel a single escalation via the API or from the dashboard. Any workflow waiting on that escalation via `conditionLT` receives `null`.
+- **Workflow termination** — `POST /api/workflows/:workflowId/terminate` automatically cancels any pending escalations tied to it. The waiting `conditional` call returns `null`.
+- **Explicit cancel** — cancel a single escalation via the API or from the dashboard. Any workflow waiting on that escalation via `conditional` receives `null`.
 
 ### API
 
@@ -139,10 +139,10 @@ Returns 409 if the escalation is already resolved or cancelled.
 
 ### Handling cancellation in workflows
 
-`conditionLT` returns `T | false | null`. Always guard before accessing the payload:
+`conditional` returns `T | false | null`. Always guard before accessing the payload:
 
 ```typescript
-const decision = await conditionLT<{ approved: boolean }>(signalId, escalationConfig);
+const decision = await conditional<{ approved: boolean }>(signalId, escalationConfig);
 
 if (decision === null) {
   // Escalation was cancelled

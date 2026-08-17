@@ -267,7 +267,7 @@ Accessible at `/admin/roles/:role/schema`. The versioned form behind a role's es
 
 - **Editor** — form fields as JSON Schema in a full-width editor, with an optional change summary recorded on the version the save creates. **Save Version** writes only the schema: every save that changes it appends an immutable snapshot and advances the current version.
 - **Version rail** — the full history with the current version marked. Expand any version to view its snapshot or load it into the editor as the base for the next save.
-- **Pinning** — workflows pin a version via `schemaVersion` in the `conditionLT` config, so their resolver form keeps that exact shape for the life of the run. Escalations without a pin render the latest version.
+- **Pinning** — workflows pin a version via `schemaVersion` in the `conditional` config, so their resolver form keeps that exact shape for the life of the run. Escalations without a pin render the latest version.
 
 **API:** `GET /api/roles/:role/schema` fetches the latest or a pinned version. `GET /api/roles/:role/schema/versions` lists the history. `PATCH /api/roles/:role` with `form_schema` (+ optional `change_summary`) saves a new version.
 

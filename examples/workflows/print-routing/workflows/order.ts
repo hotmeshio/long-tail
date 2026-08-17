@@ -8,7 +8,7 @@
 
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { conditionLT } from '../../../../services/orchestrator/condition';
+import { conditional } from '../../../../services/orchestrator/condition';
 import type { LTEnvelope } from '../../../../types';
 
 import { enqueueOrderUnits } from './proxy';
@@ -52,7 +52,7 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
     // The defect is transient: declared failures surface on the first print; a
     // reprint of the same unit succeeds. In production, reality decides.
     const failUnits = attempt === 0 ? (order.failUnits ?? []) : [];
-    const signoff = (await conditionLT<SignoffPayload>(`signoff-${ctx.workflowId}-a${attempt}`, {
+    const signoff = (await conditional<SignoffPayload>(`signoff-${ctx.workflowId}-a${attempt}`, {
       role: farmerPond,
       type: ORDER_SIGNOFF_TYPE,
       subtype: done.printerId,

@@ -14,7 +14,7 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  * compile-time LITERAL the workflow author sets, folded into
  * `metadata.schema_version` before the config reaches the engine, so the pin
  * rides the row's GIN-indexed metadata like any other facet. Folding is a pure
- * transform — no query, no activity — so a pinned `conditionLT` costs exactly
+ * transform — no query, no activity — so a pinned `conditional` costs exactly
  * what an unpinned one does. Omit it and the resolve UI renders the role's latest
  * form when the escalation is fetched.
  */
@@ -50,7 +50,7 @@ function toEngineConfig(
  * from the engine automatically.
  *
  * ```typescript
- * const decision = await conditionLT<{ approved: boolean }>(signalId, {
+ * const decision = await conditional<{ approved: boolean }>(signalId, {
  *   role: 'reviewer',
  *   type: 'orderPipeline',
  *   subtype: stationName,
@@ -71,7 +71,7 @@ function toEngineConfig(
  * ```typescript
  * import { INTAKE_SCHEMA_VERSION, type IntakeResolverV1 } from './forms';
  *
- * const decision = await conditionLT<IntakeResolverV1>(signalId, {
+ * const decision = await conditional<IntakeResolverV1>(signalId, {
  *   role: INTAKE_ROLE,
  *   description: instructions,
  *   schemaVersion: INTAKE_SCHEMA_VERSION, // the form version this code is written for
@@ -86,7 +86,7 @@ function toEngineConfig(
  * timer is inert.
  *
  * ```typescript
- * const decision = await conditionLT<{ approved: boolean }>(signalId, {
+ * const decision = await conditional<{ approved: boolean }>(signalId, {
  *   role: 'reviewer',
  *   description: instructions,
  *   metadata: { orderId },
@@ -107,7 +107,7 @@ function toEngineConfig(
  * ```typescript
  * import type { EscalationResolution } from '@hotmeshio/hotmesh/types';
  *
- * const decision = await conditionLT<{
+ * const decision = await conditional<{
  *   approved: boolean;
  *   $resolution?: EscalationResolution;
  * }>(signalId, { role: 'print-operator' });
@@ -128,10 +128,10 @@ function toEngineConfig(
  *
  * ```typescript
  * await activities.ltCreateEscalation({ type: 'approval', role: 'reviewer', metadata: { signal_id: signalId } });
- * const decision = await conditionLT<{ approved: boolean }>(signalId);
+ * const decision = await conditional<{ approved: boolean }>(signalId);
  * ```
  */
-export async function conditionLT<T = Record<string, any>>(
+export async function conditional<T = Record<string, any>>(
   signalId: string,
   escalation?: ConditionEscalationConfig,
 ): Promise<T | false | null> {
@@ -173,3 +173,6 @@ export async function conditionLT<T = Record<string, any>>(
 
   return raw as T;
 }
+
+/** @deprecated Alias of {@link conditional}. */
+export const conditionLT = conditional;

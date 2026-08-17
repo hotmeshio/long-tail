@@ -6,7 +6,7 @@ import { postgres_options, sleepFor } from '../setup';
 import { connectTelemetry, disconnectTelemetry } from '../setup/telemetry';
 import { migrate } from '../../lib/db/migrate';
 import * as escalationService from '../../services/escalation';
-import { conditionLT } from '../../services/orchestrator/condition';
+import { conditional } from '../../services/orchestrator/condition';
 
 const { Connection, Client, Worker } = Durable;
 
@@ -53,12 +53,12 @@ export async function isoActThenSerial(): Promise<{ a: any; b: any }> {
 
 /** D: activity, then Promise.all of N ESCALATION-bearing conditions, resolved via the
  *  escalation interface (the broker's actual harvest). Feature 22 proves ONE such
- *  collated condition; this proves N + the long-tail conditionLT wrapper. */
+ *  collated condition; this proves N + the long-tail conditional wrapper. */
 export async function isoActThenParallelEsc(role: string, sigA: string, sigB: string): Promise<{ a: any; b: any }> {
   await noopProxy();
   const [a, b] = await Promise.all([
-    conditionLT<any>(sigA, { role, type: 'iso-esc', priority: 2, description: 'iso a', metadata: { k: sigA } }),
-    conditionLT<any>(sigB, { role, type: 'iso-esc', priority: 2, description: 'iso b', metadata: { k: sigB } }),
+    conditional<any>(sigA, { role, type: 'iso-esc', priority: 2, description: 'iso a', metadata: { k: sigA } }),
+    conditional<any>(sigB, { role, type: 'iso-esc', priority: 2, description: 'iso b', metadata: { k: sigB } }),
   ]);
   return { a, b };
 }

@@ -120,7 +120,7 @@ Each capability shows who uses it: which agents, which pipelines, which workflow
 
 The orchestration backstage — the same durable workflow, offered two ways:
 
-- **Procedural** — readable, Temporal-like TypeScript. Configure it, invoke it, watch its executions. Emulated atop the graph: cheap to maintain, heavier to run.
+- **Procedural** — readable, durable TypeScript. Configure it, invoke it, watch its executions. Emulated atop the graph: cheap to maintain, heavier to run.
 - **Graph** — that same workflow as a compiled, deterministic DAG. Same guarantees, roughly 3x faster, less to read. Run or schedule it; the router discovers it and pulls the work when it's healthy to.
 
 Every procedural pattern has a graph equivalent and the reverse, so the choice is readability or speed — never durability, escalation, or transactional safety. Engineers move freely between them: execution traces, durable cycle replay, swimlane timelines. Nothing is hidden. The technical depth is the product.

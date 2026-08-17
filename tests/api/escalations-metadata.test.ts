@@ -298,7 +298,7 @@ describe('resolveByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
-  it('calls SDK resolve for atomic conditionLT escalation (signal_key set)', async () => {
+  it('calls SDK resolve for atomic conditional escalation (signal_key set)', async () => {
     const esc = makeEscalation({ status: 'resolved' });
     mockResolveByMetadataAtomic.mockResolvedValue({
       outcome: 'signal_required',

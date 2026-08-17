@@ -31,7 +31,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, EscalationResolution } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import {
   REL_ORIGINATOR_ROLE,
@@ -78,7 +78,7 @@ export async function relatedEscalationsWorkflow(envelope: LTEnvelope): Promise<
   // ── Stage 1: Originator ───────────────────────────────────────────────────
   const originatorSignalId = `rel-originator-${ctx.workflowId}`;
 
-  const originatorResult = await conditionLT<RelOriginatorResolverV1>(originatorSignalId, {
+  const originatorResult = await conditional<RelOriginatorResolverV1>(originatorSignalId, {
     role: REL_ORIGINATOR_ROLE,
     type: 'review',
     subtype: 'originator',
@@ -112,7 +112,7 @@ export async function relatedEscalationsWorkflow(envelope: LTEnvelope): Promise<
   const parentEscalationId = await lookupEscalationId(originatorSignalId);
 
   // ── Stage 2: Reviewer ─────────────────────────────────────────────────────
-  const reviewerResult = await conditionLT<RelReviewerResolverV1>(
+  const reviewerResult = await conditional<RelReviewerResolverV1>(
     `rel-reviewer-${ctx.workflowId}`,
     {
       role: REL_REVIEWER_ROLE,
@@ -163,7 +163,7 @@ export async function relatedEscalationsWorkflow(envelope: LTEnvelope): Promise<
   // the guard unlocks → one final submit. Zero navigation.
 
   // Fan the plates out as child workflows — each child runs a single inline
-  // conditionLT (its plate row commits in the child's Leg1) and signals back
+  // conditional (its plate row commits in the child's Leg1) and signals back
   // when the plate resolves. Only the starts are awaited here; the lone-waiter-
   // per-child shape is the engine's fan-out contract for parallel waits.
   // `originId` is the walk's rendezvous facet — the closeout form's embed,
@@ -194,7 +194,7 @@ export async function relatedEscalationsWorkflow(envelope: LTEnvelope): Promise<
 
   // Whoever resolves the walk claim owns the walk — their identity arrives
   // under the reserved $resolution key.
-  const walkClaim = await conditionLT<RelWalkerResolverV1 & { $resolution?: EscalationResolution }>(
+  const walkClaim = await conditional<RelWalkerResolverV1 & { $resolution?: EscalationResolution }>(
     `rel-walker-${ctx.workflowId}`,
     {
       role: REL_WALKER_ROLE,
@@ -232,7 +232,7 @@ export async function relatedEscalationsWorkflow(envelope: LTEnvelope): Promise<
   // SAME query drains. Each Bagged ✓ also completes that plate's child
   // workflow, whose done-signal buffers (the children signal with a long
   // expire) until the fan-in below registers.
-  const closeout = await conditionLT<RelCloserResolverV1>(`rel-closer-${ctx.workflowId}`, {
+  const closeout = await conditional<RelCloserResolverV1>(`rel-closer-${ctx.workflowId}`, {
     role: REL_CLOSER_ROLE,
     type: 'walk',
     subtype: 'closeout',

@@ -5,9 +5,9 @@
  * while waiting for human input. No interceptor, no certification.
  *
  *   1. Creates an escalation with `signal_id` in metadata
- *   2. Pauses via `conditionLT(signalId)` — workflow stays alive
+ *   2. Pauses via `conditional(signalId)` — workflow stays alive
  *   3. Dashboard resolver signals in with the form payload
- *   4. `conditionLT` resolves the escalation via durable activity
+ *   4. `conditional` resolves the escalation via durable activity
  *   5. Workflow continues with the clean resolver payload
  *
  * This demonstrates the lightweight alternative to the certified
@@ -17,7 +17,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as interceptorActivities from '../../../services/interceptor/activities';
 import * as activities from './activities';
 
@@ -79,8 +79,8 @@ export async function basicSignal(envelope: LTEnvelope): Promise<any> {
     },
   });
 
-  // Pause — conditionLT handles $escalation_id stripping and resolution
-  const decision = await conditionLT<{ approved: boolean; notes: string }>(signalId);
+  // Pause — conditional handles $escalation_id stripping and resolution
+  const decision = await conditional<{ approved: boolean; notes: string }>(signalId);
 
   // null = escalation cancelled (workflow terminated); false = timeout
   if (!decision) {

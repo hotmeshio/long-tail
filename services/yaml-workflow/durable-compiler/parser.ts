@@ -69,7 +69,10 @@ function extractDurablePrimitives(source: string): string[] {
     }
   }
 
-  // conditionLT (LT-specific wrapper)
+  // conditional / conditionLT (LT-specific wrappers)
+  if (/\bconditional\s*[<(]/.test(source) && !seen.has('conditional')) {
+    primitives.push('conditional');
+  }
   if (/conditionLT/.test(source) && !seen.has('conditionLT')) {
     primitives.push('conditionLT');
   }

@@ -279,7 +279,7 @@ Returned when the escalation has already been resolved or is otherwise not pendi
 
 ### Signal-based resolution (metadata.signal_id)
 
-When an escalation has `metadata.signal_id`, the resolve endpoint signals the running workflow instead of starting a new one. The workflow is still alive — it called `conditionLT(signalId)` and is paused.
+When an escalation has `metadata.signal_id`, the resolve endpoint signals the running workflow instead of starting a new one. The workflow is still alive — it called `conditional(signalId)` and is paused.
 
 The resolver payload is augmented with `$escalation_id` before signaling:
 
@@ -287,13 +287,13 @@ The resolver payload is augmented with `$escalation_id` before signaling:
 { "approved": true, "notes": "Looks good", "$escalation_id": "esc-a1b2c3d4-..." }
 ```
 
-The workflow is responsible for resolving the escalation. The `conditionLT()` helper handles this automatically — it strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload.
+The workflow is responsible for resolving the escalation. The `conditional()` helper handles this automatically — it strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload.
 
 If you use raw `Durable.workflow.condition()` instead, you must resolve the escalation yourself using the `$escalation_id` from the signal data.
 
 ### Signal-key resolution (efficient/atomic — `signal_key`)
 
-When an escalation was written atomically by `conditionLT(signalId, config)` (or `Durable.workflow.condition(signalId, config)`), the row carries a `signal_key` and no `signal_id`/`signal_routing` metadata. The resolve endpoint detects `signal_key` and resolves it through the SDK: the resolve marks the row resolved **and** delivers the signal to the waiting `condition()` in one transaction, so the original job resumes in place — no re-run, no separate resolve activity. `system.escalation.{role}.{id}.resolved` fires.
+When an escalation was written atomically by `conditional(signalId, config)` (or `Durable.workflow.condition(signalId, config)`), the row carries a `signal_key` and no `signal_id`/`signal_routing` metadata. The resolve endpoint detects `signal_key` and resolves it through the SDK: the resolve marks the row resolved **and** delivers the signal to the waiting `condition()` in one transaction, so the original job resumes in place — no re-run, no separate resolve activity. `system.escalation.{role}.{id}.resolved` fires.
 
 ```
 POST /api/escalations/resolve-by-signal-key
@@ -303,7 +303,7 @@ For callers that know the deterministic signal id (webhooks — e.g. `signal-sca
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `signalKey` | `string` | yes | The signal id passed to `conditionLT(signalId, config)` |
+| `signalKey` | `string` | yes | The signal id passed to `conditional(signalId, config)` |
 | `resolverPayload` | `object` | yes | The decision payload delivered to the waiting workflow |
 | `metadata` | `object` | no | Outcome facets merged into the row's GIN-indexed metadata (see [Resolve an escalation](#resolve-an-escalation)) |
 
@@ -325,7 +325,7 @@ When a reviewer claims an escalation, the dashboard renders a typed form instead
 
 ### Option 1: Role `form_schema` (versioned)
 
-The escalation form is owned by the target **role** as a versioned `form_schema`, declared on the role (e.g. via `PATCH /api/roles/:role`). Every escalation targeting that role resolves against it. A workflow pins a specific version through `conditionLT`'s `schemaVersion`, which stamps `metadata.schema_version` on the escalation; unpinned escalations resolve against the role's latest `form_schema`. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload.
+The escalation form is owned by the target **role** as a versioned `form_schema`, declared on the role (e.g. via `PATCH /api/roles/:role`). Every escalation targeting that role resolves against it. A workflow pins a specific version through `conditional`'s `schemaVersion`, which stamps `metadata.schema_version` on the escalation; unpinned escalations resolve against the role's latest `form_schema`. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload.
 
 The deprecated workflow-config `resolver_schema` remains only as a legacy fallback when no role `form_schema` is available.
 
@@ -830,7 +830,7 @@ Returns all escalations linked to a specific workflow ID.
 POST /api/escalations/:id/cancel
 ```
 
-Permanently cancels a pending or claimed escalation. The workflow waiting on this escalation (via `conditionLT`) receives `null` as the condition result, allowing it to handle the cancellation gracefully.
+Permanently cancels a pending or claimed escalation. The workflow waiting on this escalation (via `conditional`) receives `null` as the condition result, allowing it to handle the cancellation gracefully.
 
 Terminal escalations (`resolved` or already `cancelled`) return 409.
 
@@ -1060,7 +1060,7 @@ POST /api/escalations/resolve-by-metadata
 
 Single atomic query finds the pending escalation by metadata, auto-claims if unclaimed, and resolves it. RBAC is enforced in the SQL WHERE clause. Write scope is honored here: a `member` with `write_scope=self` may resolve their own assigned item atomically, which is how a one-time user completes the form routed to them.
 
-**Signal guard:** If the escalation has `metadata.signal_id` (created by `conditionLT`), the SQL does NOT resolve it directly. Instead, the endpoint signals the running workflow — `conditionLT` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
+**Signal guard:** If the escalation has `metadata.signal_id` (created by `conditional`), the SQL does NOT resolve it directly. Instead, the endpoint signals the running workflow — `conditional` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
 
 **Body:**
 
@@ -1089,7 +1089,7 @@ Single atomic query finds the pending escalation by metadata, auto-claims if unc
 }
 ```
 
-**Response 200 (signal-backed):** Workflow signaled; `conditionLT` resolves the escalation durably.
+**Response 200 (signal-backed):** Workflow signaled; `conditional` resolves the escalation durably.
 
 ```json
 {

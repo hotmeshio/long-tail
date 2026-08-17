@@ -256,7 +256,7 @@ export async function getEscalationsByIds(
 
 /**
  * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
- * passed to `conditionLT(signalId, config)` / `condition(signalId, config)`.
+ * passed to `conditional(signalId, config)` / `condition(signalId, config)`.
  * Returns null when no row carries that key.
  */
 export async function getEscalationBySignalKey(
@@ -661,9 +661,9 @@ export interface ResolveByMetadataResult {
   outcome: 'resolved' | 'signal_required' | 'conflict' | 'not_found' | 'validation_required';
   /** The resolved escalation (when outcome = 'resolved') */
   escalation?: LTEscalationRecord;
-  /** Legacy conditionLT signal info (when signalId is set, caller uses handle.signal) */
+  /** Legacy conditional signal info (when signalId is set, caller uses handle.signal) */
   signalId?: string;
-  /** Atomic conditionLT signal key (when signalKey is set, caller uses SDK resolve to atomically mark+signal) */
+  /** Atomic conditional signal key (when signalKey is set, caller uses SDK resolve to atomically mark+signal) */
   signalKey?: string;
   escalationId?: string;
   workflowId?: string;

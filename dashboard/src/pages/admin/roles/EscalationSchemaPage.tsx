@@ -13,7 +13,7 @@ import { JsonViewer } from '../../../components/common/data/JsonViewer';
 /**
  * The escalation form schema, on its own page (/admin/roles/:role/schema).
  * This is the form a person completes to resolve the role's escalations —
- * versioned, pinnable by workflows (conditionLT schemaVersion), and worth a
+ * versioned, pinnable by workflows (conditional schemaVersion), and worth a
  * full editing surface. Saving here writes ONLY the schema: one PATCH with
  * form_schema (+ optional change summary); every actual change appends the
  * next immutable version.

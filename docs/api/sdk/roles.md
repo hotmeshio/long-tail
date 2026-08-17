@@ -291,7 +291,7 @@ When the update changes `form_schema` or `metadata_schema`, the new pair is snap
 
 ## getSchema
 
-Fetch a role's `form_schema` + `metadata_schema` pair. With `version`, reads that immutable snapshot from the version history (the one an escalation pins via `conditionLT`'s `schemaVersion`); without it, reads the live (latest) schema and its current version number. A missing version is a 404 — it never falls back to a different version.
+Fetch a role's `form_schema` + `metadata_schema` pair. With `version`, reads that immutable snapshot from the version history (the one an escalation pins via `conditional`'s `schemaVersion`); without it, reads the live (latest) schema and its current version number. A missing version is a 404 — it never falls back to a different version.
 
 ```typescript
 const latest = await lt.roles.getSchema({ role: 'reviewer' });

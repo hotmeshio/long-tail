@@ -59,6 +59,7 @@ function extractPrimitives(source: string): string[] {
       primitives.push(p);
     }
   }
+  if (/\bconditional\s*[<(]/.test(source) && !seen.has('conditional')) primitives.push('conditional');
   if (/conditionLT/.test(source) && !seen.has('conditionLT')) primitives.push('conditionLT');
   if (/executeLT/.test(source) && !seen.has('executeLT')) primitives.push('executeLT');
   return primitives;

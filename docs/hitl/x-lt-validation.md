@@ -230,7 +230,7 @@ The path is dot-separated, with optional `[n]` array indices. A missing or non-n
 **Workflow side — passing the bound in the envelope:**
 
 ```typescript
-const decision = await conditionLT<{ score: number; notes: string }>(signalId, {
+const decision = await conditional<{ score: number; notes: string }>(signalId, {
   role: 'quality-reviewer',
   envelope: {
     min_score: 60,

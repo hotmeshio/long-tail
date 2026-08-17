@@ -1547,7 +1547,7 @@ Return the numeric status semaphore for a workflow.
 
 ## Ortho Pipeline
 
-AI-operable tools for driving the orthotic manufacturing pipeline. Each order passes through eight sequential stages (design → review → print → grind → glue → finish → qa → ship). The pipeline is a HotMesh durable workflow; each stage suspends at a `conditionLT` checkpoint until an escalation is resolved.
+AI-operable tools for driving the orthotic manufacturing pipeline. Each order passes through eight sequential stages (design → review → print → grind → glue → finish → qa → ship). The pipeline is a HotMesh durable workflow; each stage suspends at a `conditional` checkpoint until an escalation is resolved.
 
 A Claude agent loop calls `ortho_submit` to start an order, polls `ortho_pending` to see what's waiting, drives each stage forward with `ortho_complete_stage`, and monitors progress with `ortho_status`.
 

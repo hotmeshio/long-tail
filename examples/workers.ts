@@ -97,7 +97,7 @@ const basicEchoConfig: LTWorkerConfig = {
 };
 
 const basicSignalConfig: LTWorkerConfig = {
-  description: 'Signal-based escalation — workflow stays running while waiting for human input via conditionLT',
+  description: 'Signal-based escalation — workflow stays running while waiting for human input via conditional',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: REVIEWER,
@@ -435,7 +435,7 @@ const printShiftConfig: LTWorkerConfig = {
 
 const orthoPipelineConfig: LTWorkerConfig = {
   description:
-    'Ortho pipeline — MCP-operable 8-stage manufacturing workflow (design → review → print → grind → glue → finish → qa → ship). Each stage creates an escalation atomically via conditionLT and suspends; resolving via ortho_complete_stage auto-resumes the next stage. Drive the full order lifecycle with AI or human operators.',
+    'Ortho pipeline — MCP-operable 8-stage manufacturing workflow (design → review → print → grind → glue → finish → qa → ship). Each stage creates an escalation atomically via conditional and suspends; resolving via ortho_complete_stage auto-resumes the next stage. Drive the full order lifecycle with AI or human operators.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: REVIEWER,

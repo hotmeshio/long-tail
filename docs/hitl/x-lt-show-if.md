@@ -94,7 +94,7 @@ A queue that receives both regular items and a special signal type. The payload 
 In the workflow, guard the payload fields before accessing them:
 
 ```typescript
-const decision = await conditionLT<{
+const decision = await conditional<{
   approved: boolean;
   rejection_reason?: string;
   notes?: string;
