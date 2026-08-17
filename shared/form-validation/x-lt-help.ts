@@ -9,6 +9,7 @@
  *   {{envelope.formDefaults.customer.name}}    — the workflow-sent input envelope
  *   {{payload.category}}                       — the escalation context payload
  *   {{resolver.notes}}                         — the submitted resolver payload
+ *   {{lookup.materials.items}}                 — versioned knowledge lookups pinned on the row
  *
  * Paths reuse the x-lt-bind syntax (`a.b[0].c`). A missing value renders as an
  * em dash. `x-lt-context` is accepted as the plain-text fallback source when
@@ -17,7 +18,7 @@
 import { getDeep } from './x-lt-bind';
 
 /** The token domains a help template may reference. */
-export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver'] as const;
+export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver', 'lookup'] as const;
 export type HelpDomain = (typeof HELP_DOMAINS)[number];
 
 export type HelpTokenContext = Partial<Record<HelpDomain, Record<string, unknown> | null>>;

@@ -1,4 +1,5 @@
 import { resolveFieldOptions } from './x-lt-options';
+import { hasInterpolation, interpolatePath, resolveCtxPath } from './ctx-path';
 
 export interface FieldError { field: string; message: string }
 
@@ -6,23 +7,23 @@ interface ChecklistItem { id: string; label: string; required?: boolean }
 
 /**
  * Resolve a checklist widget's item definitions from its `x-lt-source`
- * "domain.path" against the escalation context. Missing domain/path or a
- * non-array value yields an empty list.
+ * "domain.path" against the escalation context. Paths may embed
+ * `{{domain.path}}` interpolation segments (cascading sources). Missing
+ * domain/path, an unresolved segment, or a non-array value yields an empty
+ * list.
  */
 export function resolveChecklistItems(
   sourcePath: unknown,
   ctx: Record<string, unknown> | undefined,
 ): ChecklistItem[] {
   if (typeof sourcePath !== 'string' || !ctx) return [];
-  const dot = sourcePath.indexOf('.');
-  if (dot === -1) return [];
-  const domainObj = ctx[sourcePath.slice(0, dot)];
-  if (!domainObj || typeof domainObj !== 'object') return [];
-  let cur: unknown = domainObj;
-  for (const p of sourcePath.slice(dot + 1).split('.')) {
-    cur = (cur as Record<string, unknown>)[p];
-    if (cur === undefined) return [];
+  let concrete = sourcePath;
+  if (hasInterpolation(sourcePath)) {
+    const resolved = interpolatePath(sourcePath, ctx);
+    if (resolved === null) return [];
+    concrete = resolved;
   }
+  const cur = resolveCtxPath(concrete, ctx);
   return Array.isArray(cur) ? (cur as ChecklistItem[]) : [];
 }
 
@@ -104,14 +105,17 @@ export function validateFieldConstraints(
 
   // Option membership — the form's select widget constrains choices; API-first
   // callers are unconstrained, so the effective option list is the contract:
-  // the static enum, or the x-lt-options list resolved from context.
+  // the static enum, or the x-lt-options list resolved from context. An
+  // interpolated list that currently offers nothing fails closed — a stale
+  // cascade child value never submits.
   const allowed = resolveFieldOptions(fieldSchema, ctx);
-  if (
-    allowed && allowed.length > 0
-    && value !== undefined && value !== null && value !== ''
-    && !allowed.includes(value as never)
-  ) {
-    return `Must be one of: ${allowed.map((v) => String(v)).join(', ')}`;
+  if (allowed !== undefined && value !== undefined && value !== null && value !== '') {
+    if (allowed.length === 0) {
+      return 'No valid options for this selection';
+    }
+    if (!allowed.includes(value as never)) {
+      return `Must be one of: ${allowed.map((v) => String(v)).join(', ')}`;
+    }
   }
 
   if (typeof value === 'string') {

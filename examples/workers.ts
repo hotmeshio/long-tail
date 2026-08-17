@@ -20,6 +20,8 @@ import * as checklistConfirmationWorkflow from './workflows/checklist-confirmati
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as parameterizedFormWorkflow from './workflows/parameterized-form';
 import { VERDICT_ROLE } from './workflows/parameterized-form/forms';
+import * as lookupCascadeWorkflow from './workflows/lookup-cascade';
+import { CASCADE_ROLE } from './workflows/lookup-cascade/forms';
 import * as policyDocumentWorkflow from './workflows/policy-document';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
@@ -152,6 +154,17 @@ const parameterizedFormConfig: LTWorkerConfig = {
       right_count: 2,
       return_stations: ['molding', 'finishing'],
     },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const lookupCascadeConfig: LTWorkerConfig = {
+  description: 'Lookup cascade — reference example for versioned knowledge lookups: one static role form whose dropdowns read version-pinned knowledge editions (x-lt-options from the lookup domain), a cascading country → region pair (lookup.geo.regions.{{resolver.country}} — region stays disabled until a country is chosen), and a lookup-sourced checklist. Invoke with materials_version 1 vs 2 to see two rows offer different material sets from the same form.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: CASCADE_ROLE,
+  envelopeSchema: {
+    data: { materials_version: 2 },
     metadata: { source: 'dashboard' },
   },
 };
@@ -517,6 +530,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },
+  { taskQueue: 'long-tail-examples', workflow: lookupCascadeWorkflow.lookupCascade, config: lookupCascadeConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relatedEscalationsWorkflow, config: relatedEscalationsConfig },

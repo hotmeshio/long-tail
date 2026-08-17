@@ -1,7 +1,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 import type { Types } from '@hotmeshio/hotmesh';
 
-import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
+import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs, type EscalationLookupRef } from '../../types/escalation';
 import * as interceptorActivities from '../interceptor/activities';
 
 type ActivitiesType = typeof interceptorActivities;
@@ -10,30 +10,43 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 
 /**
  * HotMesh's escalation config plus long-tail sugar. `schemaVersion` pins the
- * role form version (lt_role_schemas) the resolve UI renders; it is a
- * compile-time LITERAL the workflow author sets, folded into
- * `metadata.schema_version` before the config reaches the engine, so the pin
- * rides the row's GIN-indexed metadata like any other facet. Folding is a pure
- * transform — no query, no activity — so a pinned `conditional` costs exactly
- * what an unpinned one does. Omit it and the resolve UI renders the role's latest
- * form when the escalation is fetched.
+ * role form version (lt_role_schemas) the resolve UI renders; `lookups` pins
+ * versioned knowledge editions the form may read (the `lookup.*` context
+ * domain — see docs/hitl/lookups.md). Both are compile-time LITERALS the
+ * workflow author sets, folded before the config reaches the engine:
+ * schemaVersion into the GIN-indexed metadata (a queryable facet), lookups
+ * into the unindexed envelope (form plumbing, never a facet). Folding is a
+ * pure transform — no query, no activity — so a pinned `conditional` costs
+ * exactly what an unpinned one does. Omit `schemaVersion` and the resolve UI
+ * renders the role's latest form when the escalation is fetched.
  */
 export type ConditionEscalationConfig = Types.ConditionQueueConfig & {
   schemaVersion?: number;
+  lookups?: EscalationLookupRef[];
 };
 
-/** Fold the schemaVersion sugar into metadata; pass everything else through. */
+/**
+ * Fold the sugar before the config reaches the engine: schemaVersion into the
+ * GIN-indexed metadata (it is a queryable pin), lookups into the unindexed
+ * envelope (they are form plumbing, never a facet). Everything else passes
+ * through.
+ */
 function toEngineConfig(
   escalation?: ConditionEscalationConfig,
 ): Types.ConditionQueueConfig | undefined {
-  if (!escalation || escalation.schemaVersion == null) return escalation;
-  const { schemaVersion, ...config } = escalation;
+  if (!escalation || (escalation.schemaVersion == null && escalation.lookups == null)) {
+    return escalation;
+  }
+  const { schemaVersion, lookups, ...config } = escalation;
+  if (lookups != null) assertLookupRefs(lookups);
   return {
     ...config,
-    metadata: {
-      ...config.metadata,
-      [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: schemaVersion,
-    },
+    ...(schemaVersion != null
+      ? { metadata: { ...config.metadata, [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: schemaVersion } }
+      : {}),
+    ...(lookups != null
+      ? { envelope: { ...config.envelope, [ESCALATION_ENVELOPE_KEYS.LOOKUPS]: lookups } }
+      : {}),
   };
 }
 
@@ -75,6 +88,20 @@ function toEngineConfig(
  *   role: INTAKE_ROLE,
  *   description: instructions,
  *   schemaVersion: INTAKE_SCHEMA_VERSION, // the form version this code is written for
+ * });
+ * ```
+ *
+ * **Pin versioned knowledge lookups — option lists the form reads.** Each ref
+ * names an immutable knowledge edition; the resolve UI fetches them once and
+ * the form addresses the content as the `lookup.*` context domain
+ * (`x-lt-options: "lookup.materials.items"`). Evolve the list by writing the
+ * entry (a new version mints automatically) and repinning the literal here.
+ *
+ * ```typescript
+ * const decision = await conditional<PickerResolverV1>(signalId, {
+ *   role: 'catalog-picker',
+ *   description: instructions,
+ *   lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
  * });
  * ```
  *

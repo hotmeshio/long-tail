@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
-import { useGetKnowledge, useDeleteKnowledge, useStoreKnowledge, useSetKnowledgeField, useRemoveKnowledgeField } from '../../api/knowledge';
+import { useSearchParams } from 'react-router-dom';
+import { Trash2, History } from 'lucide-react';
+import { useGetKnowledge, useDeleteKnowledge, useStoreKnowledge, useSetKnowledgeField, useRemoveKnowledgeField, useKnowledgeVersions, useGetKnowledgeVersion } from '../../api/knowledge';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { TagInput } from '../../components/common/form/TagInput';
 
@@ -85,8 +86,29 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [jsonHint, setJsonHint] = useState<string | null>(null);
   const [editingTags, setEditingTags] = useState(false);
+  // Every data-changing save mints an immutable edition. The viewed edition
+  // is DEEP-LINKED (?version=N): a shared link reproduces the exact snapshot,
+  // and the version select writes the URL. Absent (or equal to the current
+  // version), the live entry shows.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const versionsQuery = useKnowledgeVersions(domain, entryKey, !!entry && entry.found !== false);
+  const versions = versionsQuery.data?.versions ?? [];
+  const rawVersion = searchParams.get('version');
+  const urlVersion = rawVersion && /^[0-9]+$/.test(rawVersion) ? parseInt(rawVersion, 10) : null;
+  const viewVersion = urlVersion != null && entry && urlVersion !== entry.current_version ? urlVersion : null;
+  const viewingPast = viewVersion != null;
+  const snapshotQuery = useGetKnowledgeVersion(domain, entryKey, viewVersion);
 
-  const data = entry?.data as Record<string, unknown> | undefined;
+  const selectVersion = useCallback((version: number, currentVersion: number) => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (version === currentVersion) p.delete('version');
+      else p.set('version', String(version));
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const data = (viewingPast ? snapshotQuery.data?.data : entry?.data) as Record<string, unknown> | undefined;
   const allFields = data ? Object.entries(data) : [];
 
   // Ghost field input doubles as a filter — if text is entered but not yet saved,
@@ -107,6 +129,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
     : false;
 
   function startEdit(field: string, column: 'field' | 'value') {
+    if (viewingPast) return; // editions are immutable — editing acts on the current entry only
     setEditing({ field, column });
     setDraft(originalValue(field, column));
     setPendingRemove(null);
@@ -246,6 +269,27 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
           )}
         </div>
         <div className="flex items-center gap-3">
+          {/* The edition selector — every data-changing save mints the next
+              one; picking a past edition deep-links it (?version=N). */}
+          <span className="inline-flex items-center gap-1.5">
+            <History className="w-3 h-3 text-accent/75 shrink-0" strokeWidth={1.5} />
+            <select
+              value={String(viewVersion ?? entry.current_version)}
+              onChange={(e) => selectVersion(parseInt(e.target.value, 10), entry.current_version)}
+              title="Version history"
+              aria-label="Version history"
+              className="select text-2xs py-1"
+            >
+              {(versions.length > 0
+                ? versions
+                : [{ version: entry.current_version, is_current: true }]
+              ).map((v) => (
+                <option key={v.version} value={String(v.version)}>
+                  v{v.version}{v.is_current ? ' · current' : ''}
+                </option>
+              ))}
+            </select>
+          </span>
           <span className="text-2xs text-text-tertiary"><TimeAgo date={entry.updated_at} /></span>
           {confirmDelete ? (
             <span className="flex items-center gap-2 text-2xs">
@@ -281,6 +325,21 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
         </div>
       </div>
 
+      {viewingPast && (
+        <div className="flex items-center gap-2 mb-2 px-1 text-2xs">
+          <span className="text-text-secondary">
+            Viewing <span className="font-mono font-medium">v{viewVersion}</span> — an immutable edition
+            {snapshotQuery.data?.created_at && <> from <TimeAgo date={snapshotQuery.data.created_at} /></>}
+          </span>
+          <button
+            onClick={() => selectVersion(entry.current_version, entry.current_version)}
+            className="font-medium text-accent hover:text-accent-hover"
+          >
+            Back to current
+          </button>
+        </div>
+      )}
+
       {jsonHint && (
         <div className="flex items-center justify-end gap-2 mb-2 px-1">
           <span className="inline-block w-2.5 h-2.5 rounded-full dot-ring bg-status-warning animate-pulse" />
@@ -295,7 +354,9 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
             <th className="px-3 py-2 font-medium w-[200px] border-r border-surface-border">Field</th>
             <th className="px-3 py-2 font-medium">Value</th>
           </tr>
-          {/* Input row — add new field or filter existing */}
+          {/* Input row — add new field or filter existing. Hidden while viewing
+              a past edition: snapshots are immutable, edits act on the current entry. */}
+          {!viewingPast && (
           <tr className="border-b border-surface-border bg-surface">
             <td className="px-3 py-2 align-top border-r border-surface-border">
               <input
@@ -332,6 +393,7 @@ export function KnowledgeEntryView({ domain, entryKey, onDeleted }: KnowledgeEnt
               )}
             </td>
           </tr>
+          )}
         </thead>
         <tbody>
           {fields.map(([field, value]) => {

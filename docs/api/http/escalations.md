@@ -156,6 +156,29 @@ GET /api/escalations/:id
 { "error": "Escalation not found" }
 ```
 
+## Get escalation lookups
+
+```
+GET /api/escalations/:id/lookups
+```
+
+Resolves the versioned knowledge lookups pinned on the row (`envelope.lookups`). The refs ARE the grant: any user who may read the escalation may fetch exactly the pinned editions it names — the general knowledge API stays a builder surface. See [lookups](../../hitl/lookups.md).
+
+**Scope:** Enforces the same read scope as `GET /api/escalations/:id`.
+
+**Response 200:**
+
+```json
+{
+  "lookups": [
+    { "domain": "catalog", "key": "materials", "version": 2, "data": { "items": ["aluminum", "steel"] } },
+    { "domain": "catalog", "key": "geo", "version": 9, "data": null, "missing": true }
+  ]
+}
+```
+
+A ref whose snapshot does not exist answers with `missing: true` — the batch never fails.
+
 ## Claim an escalation
 
 ```

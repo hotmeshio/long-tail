@@ -35,7 +35,23 @@ Store a value in a 3-level additive hierarchy: domain > key > field. Upserts by 
 
 ### get_knowledge
 
-Retrieve a single knowledge entry by domain and key.
+Retrieve a single knowledge entry by domain and key. Pass `version` to fetch a pinned immutable edition.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| domain | string | Yes | Knowledge domain |
+| key | string | Yes | Document key |
+| version | number | No | Fetch this immutable edition instead of the live entry |
+
+### list_knowledge_versions
+
+List every immutable edition of a knowledge entry, newest first, with the current one marked. Every data-changing write mints a new version.
 
 | | |
 |---|---|

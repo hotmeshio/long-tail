@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Bot, Brain, Radio, Clock, Check, Compass,
+  Bot, Braces, Radio, Clock, Check, Compass,
 } from 'lucide-react';
 import { useAgent, useCreateAgent, useUpdateAgent } from '../../../api/agents';
 import { useAgentSubscriptions, useCreateSubscription, useUpdateSubscription, useDeleteSubscription } from '../../../api/agent-subscriptions';
@@ -25,7 +25,7 @@ import { ReviewStep } from './ReviewStep';
 const SECTIONS = [
   { id: 1, label: 'Identity', icon: Bot },
   { id: 2, label: 'Motivation', icon: Compass },
-  { id: 3, label: 'Knowledge', icon: Brain },
+  { id: 3, label: 'Knowledge', icon: Braces },
   { id: 4, label: 'Subscriptions', icon: Radio },
   { id: 5, label: 'Schedules', icon: Clock },
   { id: 6, label: 'Review', icon: Check },

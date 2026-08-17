@@ -42,13 +42,17 @@ function parseJson(s: string | null | undefined): Record<string, unknown> | null
   try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
 }
 
-export function buildShowIfContext(esc: LTEscalationRecord): ShowIfContext {
+export function buildShowIfContext(
+  esc: LTEscalationRecord,
+  lookup?: Record<string, unknown> | null,
+): ShowIfContext {
   return {
     escalation: esc as unknown as Record<string, unknown>,
     metadata: esc.metadata ?? null,
     envelope: parseJson(esc.envelope),
     payload: parseJson(esc.escalation_payload),
     resolver: null,
+    ...(lookup ? { lookup } : {}),
   };
 }
 
@@ -117,6 +121,8 @@ interface FormSectionProps {
   metadataFormSchema: unknown;
   /** The resolved form schema (metadata-embedded, role-owned, or workflow fallback). */
   effectiveSchema: Record<string, unknown> | null;
+  /** Resolved versioned knowledge lookups — the form's `lookup.*` context domain. */
+  lookup?: Record<string, unknown> | null;
   json: string;
   onJsonChange: (v: string) => void;
   requestTriage: boolean;
@@ -151,6 +157,7 @@ export function EscalationFormSection({
   activeView,
   metadataFormSchema,
   effectiveSchema,
+  lookup,
   json,
   onJsonChange,
   requestTriage,
@@ -168,7 +175,7 @@ export function EscalationFormSection({
   disabledHint,
 }: FormSectionProps) {
   const schema = effectiveSchema;
-  const showIfCtx = buildShowIfContext(esc);
+  const showIfCtx = buildShowIfContext(esc, lookup);
 
   // Terminal: show the submitted resolution read-only. The stored payload is
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it

@@ -6,10 +6,6 @@ import {
   UPSERT_KNOWLEDGE,
   REPLACE_KNOWLEDGE,
   GET_KNOWLEDGE,
-  SEARCH_KNOWLEDGE,
-  COUNT_KNOWLEDGE_SEARCH,
-  LIST_KNOWLEDGE,
-  COUNT_KNOWLEDGE_LIST,
   DELETE_KNOWLEDGE,
   LIST_DOMAINS,
   SET_KNOWLEDGE_FIELD,
@@ -34,7 +30,7 @@ export async function storeKnowledge(args: {
   data: Record<string, any>;
   tags?: string[];
   replace?: boolean;
-}): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
+}): Promise<{ id: string; domain: string; key: string; current_version: number; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
     const sql = args.replace ? REPLACE_KNOWLEDGE : UPSERT_KNOWLEDGE;
     const { rows } = await client.query(
@@ -61,6 +57,7 @@ export async function getKnowledge(args: {
       key: row.key,
       data: row.data,
       tags: row.tags,
+      current_version: row.current_version,
       created_at: row.created_at.toISOString(),
       updated_at: row.updated_at.toISOString(),
     };
@@ -97,7 +94,7 @@ export async function searchKnowledge(args: {
     const offsetIdx = params.length;
 
     const { rows } = await client.query(
-      `SELECT id, domain, key, data, tags, created_at, updated_at
+      `SELECT id, domain, key, data, tags, current_version, created_at, updated_at
        FROM lt_knowledge
        WHERE domain = $1 AND data @> $2::jsonb${tagClause}
        ORDER BY updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
@@ -107,6 +104,7 @@ export async function searchKnowledge(args: {
     return {
       entries: rows.map((r) => ({
         id: r.id, domain: r.domain, key: r.key, data: r.data, tags: r.tags,
+        current_version: r.current_version,
         created_at: r.created_at.toISOString(), updated_at: r.updated_at.toISOString(),
       })),
       total: countResult.rows[0].total,
@@ -148,7 +146,7 @@ export async function listKnowledge(args: {
     const limitIdx = params.length + 1;
     const offsetIdx = params.length + 2;
     const { rows } = await client.query(
-      `SELECT id, domain, key, data, tags, created_at, updated_at
+      `SELECT id, domain, key, data, tags, current_version, created_at, updated_at
        FROM lt_knowledge WHERE domain = $1${extraClauses}
        ORDER BY updated_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       queryParams,
@@ -157,6 +155,7 @@ export async function listKnowledge(args: {
     return {
       entries: rows.map((r) => ({
         id: r.id, domain: r.domain, key: r.key, data: r.data, tags: r.tags,
+        current_version: r.current_version,
         created_at: r.created_at.toISOString(), updated_at: r.updated_at.toISOString(),
       })),
       total: countResult.rows[0].total,
@@ -184,7 +183,7 @@ export async function setKnowledgeField(args: {
   path: string;
   value: any;
   tags?: string[];
-}): Promise<{ id: string; domain: string; key: string; created: boolean; updated_at: string }> {
+}): Promise<{ id: string; domain: string; key: string; current_version: number; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
     const pathParts = args.path.split('.');
     // Build initial data for INSERT (nested structure from path)
@@ -242,7 +241,7 @@ export async function appendKnowledge(args: {
   key: string;
   path: string;
   value: any;
-}): Promise<{ id: string; domain: string; key: string; updated_at: string }> {
+}): Promise<{ id: string; domain: string; key: string; current_version: number; updated_at: string }> {
   return withClient(async (client) => {
     const pathParts = args.path.split('.');
     const pathArray = pathParts;

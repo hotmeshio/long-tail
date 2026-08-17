@@ -13,8 +13,25 @@ export interface KnowledgeEntry {
   key: string;
   data: Record<string, unknown>;
   tags: string[];
+  current_version: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface KnowledgeVersionMeta {
+  version: number;
+  change_summary: string | null;
+  created_at: string;
+  is_current: boolean;
+}
+
+export interface KnowledgeSnapshot {
+  domain: string;
+  key: string;
+  version: number;
+  data: Record<string, unknown>;
+  tags: string[];
+  created_at: string;
 }
 
 export interface ListDomainsResponse {
@@ -62,6 +79,32 @@ export function useGetKnowledge(domain: string, key: string | null) {
     queryKey: ['knowledge', domain, key],
     queryFn: () => apiFetch(`/knowledge/entry?${qs}`),
     enabled: !!domain && !!key,
+  });
+}
+
+/** The entry's edition lineage — every data-changing save mints one. */
+export function useKnowledgeVersions(domain: string, key: string | null, enabled: boolean) {
+  const params = new URLSearchParams();
+  if (domain) params.set('domain', domain);
+  if (key) params.set('key', key);
+  return useQuery<{ domain: string; key: string; versions: KnowledgeVersionMeta[] }>({
+    queryKey: ['knowledge', domain, key, 'versions'],
+    queryFn: () => apiFetch(`/knowledge/entry/versions?${params}`),
+    enabled: !!domain && !!key && enabled,
+  });
+}
+
+/** One immutable edition — never goes stale. */
+export function useGetKnowledgeVersion(domain: string, key: string | null, version: number | null) {
+  const params = new URLSearchParams();
+  if (domain) params.set('domain', domain);
+  if (key) params.set('key', key);
+  if (version != null) params.set('version', String(version));
+  return useQuery<KnowledgeSnapshot>({
+    queryKey: ['knowledge', domain, key, 'version', version],
+    queryFn: () => apiFetch(`/knowledge/entry?${params}`),
+    enabled: !!domain && !!key && version != null,
+    staleTime: Infinity,
   });
 }
 

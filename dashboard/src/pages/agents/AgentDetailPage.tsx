@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Bot, Play, Pause, Trash2, ArrowUpRight, Pencil, BookOpen,
-  Radio, Clock, Brain,
+  Radio, Clock, Braces,
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useDeleteAgent } from '../../api/agents';
 import { useSettings } from '../../api/settings';
@@ -210,7 +210,7 @@ export function AgentDetailPage() {
         {/* Col 3: Knowledge */}
         <div>
           <SectionHeader
-            icon={Brain}
+            icon={Braces}
             color="text-accent"
             actions={
               <SectionViewLink

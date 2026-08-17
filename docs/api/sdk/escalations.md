@@ -197,6 +197,27 @@ const result = await lt.escalations.get({ id: 'esc_123' });
 
 ---
 
+## getLookups
+
+Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Enforces the same read scope as `get`; the refs on the row grant exactly the pinned editions they name. See [lookups](../../hitl/lookups.md).
+
+```typescript
+const result = await lt.escalations.getLookups({ id: 'esc_123' });
+// result.data.lookups → [{ domain, key, version, as?, data, missing? }]
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Escalation UUID |
+
+**Returns:** `LTApiResult<{ lookups }>` -- each entry is `{ domain, key, version, as?, data, missing? }`.
+
+**Auth:** Required
+
+---
+
 ## getByWorkflowId
 
 List all escalations for a given workflow ID.

@@ -1,6 +1,7 @@
 export { createEscalation } from './create';
 export { listEscalations, listAvailableEscalations, listDistinctTypes, listFacetKeys, getEscalationStats, getStationMetrics } from './list';
 export { getEscalation, getEscalationsByWorkflowId, escalateToRole } from './single';
+export { getEscalationLookups } from './lookups';
 export { claimEscalation, releaseEscalation } from './claim';
 export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkUnassign, bulkEscalate, bulkTriage } from './bulk';
 export { resolveEscalation, resolveBySignalKey, resolveByIds, resolveAllOrNone } from './resolve';

@@ -16,6 +16,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 |----------|-----|-----|
 | Typed fields, formats, required | Plain JSON Schema | [form.md](hitl/form.md) |
 | Input guards (bounds, patterns, dynamic limits) | Validation keywords | [x-lt-validation.md](hitl/x-lt-validation.md) |
+| Option lists shared by thousands of rows, cascading selects | Versioned lookups | [lookups.md](hitl/lookups.md) |
 | Fields that appear based on another answer | `x-lt-showIf` | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Sections, columns, ordering, side-panel help | Layout keywords | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Runtime-driven items, files, signatures, SOP blocks | Widgets | [x-lt-widget.md](hitl/x-lt-widget.md) |
@@ -65,6 +66,7 @@ When you author a HITL-backed workflow, the platform handles:
 - **AI triage** — optional auto-resolution for common patterns
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Schema enforcement** — roles with `enforce_schema` validate every resolver payload server-side (dashboard, API, MCP, CLI alike) with the same pass the form runs, rejecting violations as a structured 422 (see [schema-enforcement.md](schema-enforcement.md))
+- **Versioned lookups** — escalations pin immutable knowledge editions for their option lists; the refs grant readers exactly those editions, and cascading selects resolve locally from one batch fetch (see [lookups.md](hitl/lookups.md))
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
 - **Bulk operations** — bulk claim, assign, triage, and cancel for queue management
 - **Cancellation** — cancel pending escalations from the API or dashboard
@@ -80,6 +82,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Topic | File |
 |-------|------|
 | Creating escalations with `conditional`, schema versioning | [escalation.md](hitl/escalation.md) |
+| Versioned knowledge lookups, the `lookup.*` domain, cascading selects | [lookups.md](hitl/lookups.md) |
 | Field types, formats, required, read-only | [form.md](hitl/form.md) |
 | Pre-submission validation guards (min, max, pattern, dynamic bounds) | [x-lt-validation.md](hitl/x-lt-validation.md) |
 | Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
@@ -101,7 +104,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Keyword | Level | Purpose |
 |---------|-------|---------|
 | `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
-| `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` |
+| `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"`; may embed `{{domain.path}}` interpolation segments |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
 | `x-lt-require-any` | schema | At-least-one guard — each `string[]` group needs a value in one visible member; `0`/`false` count as answers |
 | `x-lt-require-sum` | schema | Quantity-group guard — the numeric values of `{ fields, minimum? }` must total at least `minimum` (default 1) |
@@ -112,7 +115,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
-| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` to the field's option list; static `enum` wins |
+| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` to the field's option list; static `enum` wins; `{{domain.path}}` segments make cascading selects |
 | `x-lt-minimum` | field | Dynamic lower bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-maximum` | field | Dynamic upper bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-min-length` | field | Dynamic minimum string length — resolves a `"domain.path"` |

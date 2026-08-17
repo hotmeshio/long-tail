@@ -16,5 +16,6 @@ export * from './x-lt-show-if';
 export * from './x-lt-require-any';
 export * from './x-lt-require-sum';
 export * from './x-lt-options';
+export * from './ctx-path';
 export * from './field-validator';
 export * from './validate-resolver-payload';

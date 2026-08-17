@@ -110,8 +110,11 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   // list resolved from the escalation context (one static role form, per-row
   // legal options). Dispatched by SCHEMA, not runtime value: a number-typed
   // count seeded to its 0 default must render as a select, not a number input.
+  // An interpolated list that resolves to nothing yet (a cascade child whose
+  // parent is unanswered) renders as a DISABLED select — it enables and
+  // populates the moment the parent answer lands.
   const selectOptions = resolveFieldOptions(fieldSchema, escalationContext as Record<string, unknown> | undefined);
-  if (selectOptions?.length && (value === null || typeof value === 'string' || typeof value === 'number')) {
+  if (selectOptions && (value === null || typeof value === 'string' || typeof value === 'number')) {
     const current = value === null ? '' : String(value);
     // A value outside the option list (empty init, stale draft, options that
     // shrank per-row) renders an explicit disabled "Choose…" placeholder: the
@@ -124,6 +127,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
         {helperText && <FieldHelper id={helpId}>{helperText}</FieldHelper>}
         <select
           value={hasCurrent ? current : ''}
+          disabled={selectOptions.length === 0}
           onChange={(e) => {
             // Emit the option's own value so a numeric option stays a number.
             const picked = selectOptions.find((opt) => String(opt) === e.target.value);

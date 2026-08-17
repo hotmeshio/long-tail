@@ -31,6 +31,20 @@ export function registerSingleRoutes(router: Router): void {
   // -- Parameterized routes (must come after literal paths) --
 
   /**
+   * GET /api/escalations/:id/lookups
+   * Resolve the escalation's versioned knowledge lookups. The refs on the row
+   * are the grant: readers of the escalation may fetch exactly the pinned
+   * editions it names.
+   */
+  router.get('/:id/lookups', async (req, res) => {
+    const result = await api.getEscalationLookups(
+      { id: req.params.id },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations/:id
    * Get a single escalation by ID.
    * RBAC: superadmin sees all; others must hold the escalation's role.

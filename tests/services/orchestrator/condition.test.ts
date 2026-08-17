@@ -127,4 +127,35 @@ describe('conditional', () => {
   it('conditionLT remains a working alias of conditional', () => {
     expect(conditionLT).toBe(conditional);
   });
+
+  // ── Versioned lookup refs (envelope.lookups fold) ───────────────────────────
+
+  it('folds lookups into the unindexed envelope, schemaVersion into metadata', async () => {
+    mockCondition.mockResolvedValue({ approved: true });
+    await conditional<{ approved: boolean }>('sig-lk', {
+      role: 'catalog-picker',
+      metadata: { orderId: 'ORD-1' },
+      envelope: { instructions: 'pick one' },
+      schemaVersion: 3,
+      lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
+    });
+    expect(mockCondition).toHaveBeenCalledWith('sig-lk', {
+      role: 'catalog-picker',
+      metadata: { orderId: 'ORD-1', schema_version: 3 },
+      envelope: {
+        instructions: 'pick one',
+        lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
+      },
+    });
+  });
+
+  it('rejects a lookup ref without a version before the engine write', async () => {
+    await expect(
+      conditional('sig-bad', {
+        role: 'catalog-picker',
+        lookups: [{ domain: 'catalog', key: 'materials' } as any],
+      }),
+    ).rejects.toThrow(/positive integer version/);
+    expect(mockCondition).not.toHaveBeenCalled();
+  });
 });

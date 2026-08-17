@@ -32,19 +32,34 @@ export async function listEntries(domain: string, opts: { search?: string; limit
   output(data, entries, ENTRY_COLUMNS, opts, 'key');
 }
 
-export async function getEntry(domain: string, key: string, opts: { json?: boolean }): Promise<void> {
+export async function getEntry(domain: string, key: string, opts: { json?: boolean; version?: string }): Promise<void> {
   const params = new URLSearchParams({ domain, key });
+  if (opts.version) params.set('version', opts.version);
   const data = await apiFetch<any>(`/knowledge/entry?${params}`);
   if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
   if (data.found === false) {
     console.log(pc.yellow(`\n  Not found: ${domain}/${key}\n`));
     return;
   }
-  console.log(`\n  ${pc.bold(`${domain}/${key}`)} ${pc.dim(data.id)}`);
+  const versionLabel = data.version ?? data.current_version;
+  console.log(`\n  ${pc.bold(`${domain}/${key}`)}${versionLabel != null ? ` ${pc.dim(`v${versionLabel}`)}` : ''} ${data.id ? pc.dim(data.id) : ''}`);
   if (data.tags?.length) console.log(`  Tags: ${data.tags.join(', ')}`);
-  console.log(`  Updated: ${formatTime(data.updated_at)}\n`);
+  console.log(`  Updated: ${formatTime(data.updated_at ?? data.created_at)}\n`);
   console.log(JSON.stringify(data.data, null, 2));
   console.log();
+}
+
+const VERSION_COLUMNS = [
+  { key: 'version', label: 'Version', width: 8, align: 'right' as const },
+  { key: 'is_current', label: 'Current', width: 8, format: (v: boolean) => (v ? '●' : '') },
+  { key: 'change_summary', label: 'Summary', width: 32, format: (v: string | null) => v ?? '' },
+  { key: 'created_at', label: 'Created', width: 12, format: formatTime },
+];
+
+export async function listVersions(domain: string, key: string, opts: { json?: boolean; quiet?: boolean }): Promise<void> {
+  const params = new URLSearchParams({ domain, key });
+  const data = await apiFetch<any>(`/knowledge/entry/versions?${params}`);
+  output(data, data.versions || [], VERSION_COLUMNS, opts, 'version');
 }
 
 export async function setField(domain: string, key: string, path: string, value: string, opts: { json?: boolean }): Promise<void> {

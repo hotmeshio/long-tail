@@ -1,4 +1,4 @@
-import { Bot, Compass, Brain, Radio, Clock } from 'lucide-react';
+import { Bot, Compass, Braces, Radio, Clock } from 'lucide-react';
 import { EventTopicPill } from '../../../components/common/display/EventTopicPill';
 import { CronLabel } from '../../../components/common/display/CronLabel';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
@@ -44,7 +44,7 @@ export function ReviewStep({ form }: Props) {
         </Section>
       )}
 
-      <Section icon={Brain} color="text-accent" title="Knowledge">
+      <Section icon={Braces} color="text-accent" title="Knowledge">
         <Field label="Domain">{form.knowledge_domain || 'None'}</Field>
       </Section>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
@@ -7,6 +7,7 @@ import { useActingIdentity } from '../../../hooks/useActingIdentity';
 import { useScanEnabled } from '../../../hooks/useScanInput';
 import {
   useEscalation,
+  useEscalationLookups,
   useClaimEscalation,
   useResolveEscalation,
   useEscalateToRole,
@@ -106,6 +107,25 @@ function EscalationDetailView({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const { data: esc, isLoading, refetch, isFetching } = useEscalation(id);
   useEscalationDetailEvents(id);
+  // Versioned knowledge lookups pinned on the row's envelope — one immutable
+  // batch fetch, folded into the form context as the `lookup.*` domain.
+  // Cascade levels resolve locally from this data; no network during edits.
+  const hasLookupRefs = useMemo(() => {
+    if (!esc?.envelope) return false;
+    try {
+      const parsed = JSON.parse(esc.envelope);
+      return Array.isArray(parsed?.lookups) && parsed.lookups.length > 0;
+    } catch {
+      return false;
+    }
+  }, [esc?.envelope]);
+  const { data: lookupData } = useEscalationLookups(id, hasLookupRefs);
+  const lookupCtx = useMemo(() => {
+    if (!lookupData?.lookups?.length) return null;
+    return Object.fromEntries(
+      lookupData.lookups.filter((l) => !l.missing).map((l) => [l.as ?? l.key, l.data]),
+    );
+  }, [lookupData]);
   const claim = useClaimEscalation();
   const resolve = useResolveEscalation();
   const escalate = useEscalateToRole();
@@ -175,7 +195,7 @@ function EscalationDetailView({ id }: { id: string }) {
       const payload = JSON.parse(json) as Record<string, unknown>;
       const schema = payload._form_schema as Record<string, unknown> | undefined;
       if (!schema) { setFormErrors([]); return; }
-      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc)));
+      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc, lookupCtx)));
     } catch { /* leave errors unchanged on parse failure */ }
   }, [json, submitAttempted, esc]);
   // Schema resolution, most specific first:
@@ -199,7 +219,7 @@ function EscalationDetailView({ id }: { id: string }) {
   // bar) because it also drives auto-resolve-when-empty. Inert until the row
   // loads; the hook self-disables when the schema declares no guard.
   const submitGuardDef = readSubmitGuard(effectiveSchema as Record<string, unknown> | null);
-  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc) : undefined);
+  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc, lookupCtx) : undefined);
 
   // Initialize json from the form exactly once. Fields are seeded in priority order:
   // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
@@ -410,7 +430,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const resolveDoneDest = (): string | null => {
     const tmpl = readTransitionDone(effectiveSchema as Record<string, unknown> | null);
     if (!tmpl) return null;
-    return interpolateHelp(tmpl, buildShowIfContext(esc)) || null;
+    return interpolateHelp(tmpl, buildShowIfContext(esc, lookupCtx)) || null;
   };
 
   // Navigate to a resolved destination — internal path in-app, else external —
@@ -475,7 +495,7 @@ function EscalationDetailView({ id }: { id: string }) {
     // parent with its children to work; the auto-resolve effect closes it once
     // they clear (pair submitOnClaim with autoResolveWhenEmpty for full flow).
     if (submitGuard.blocked) return;
-    const result = buildResolverPayload(json, buildShowIfContext(esc));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx));
     if (result.parseError) return; // seeded form is malformed — leave it claimed
     if (result.errors.length > 0) {
       setSubmitAttempted(true);
@@ -504,7 +524,7 @@ function EscalationDetailView({ id }: { id: string }) {
   // clears. Revalidates first — if the parent's own form is incomplete, leave it
   // for the person rather than auto-closing an invalid record.
   autoResolveActionRef.current = () => {
-    const result = buildResolverPayload(json, buildShowIfContext(esc));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx));
     if (result.parseError || result.errors.length > 0) return;
     handleResolve(result.payload!);
   };
@@ -648,6 +668,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 isTerminal={isTerminal}
                 claimedByMe={claimedByMe}
                 activeView={activeView}
+                lookup={lookupCtx}
                 metadataFormSchema={metadataFormSchema}
                 effectiveSchema={effectiveSchema as Record<string, unknown> | null}
                 json={json}
@@ -677,7 +698,7 @@ function EscalationDetailView({ id }: { id: string }) {
         )}
 
         {!isIframeMode && <EscalationActionBar
-          escalationContext={buildShowIfContext(esc)}
+          escalationContext={buildShowIfContext(esc, lookupCtx)}
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}

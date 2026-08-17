@@ -120,6 +120,7 @@ When the envelope carries `left_quantity_options: [0, 1, 2, 3]`, the field rende
 - While the current value is outside the option list (an empty init, options that shrank per-row), the select opens on an explicit disabled **Choose…** placeholder — never an implicit first option.
 - A path that resolves to nothing (missing, empty array, no scalar entries) yields no options: the field renders as the plain input for its type and membership is not enforced for that submission.
 - Membership is enforced on both sides of the wire: the dashboard constrains the choices, and an enforced role's server gate rejects a payload whose value is outside the row's resolved list with the canonical 422 (`Must be one of: 0, 1, 2, 3`).
+- Option lists can also come from version-pinned knowledge entries (the `lookup` domain), and paths may embed `{{domain.path}}` interpolation segments for cascading selects — a dependent select whose parent is unanswered renders disabled and fails closed. See [lookups.md](lookups.md).
 
 ---
 
