@@ -32,20 +32,18 @@ import { EscalationSortControl } from './EscalationSortControl';
 import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { buildApiPath } from '../../lib/api-path';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
 import { BulkActionBar } from '../../components/common/modal/BulkActionBar';
 import { BulkAssignModal } from '../../components/common/modal/BulkAssignModal';
 import { BulkTriageModal } from '../../components/common/modal/BulkTriageModal';
 import { useClaimDurations } from '../../hooks/useClaimDurations';
-import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, BookOpen, TriangleAlert, Pin } from 'lucide-react';
+import { Activity, Lock, SlidersHorizontal, X, LayoutList, Table, BookOpen, TriangleAlert, Pin, RefreshCw } from 'lucide-react';
 import { usePatchPreferences, usePreferences } from '../../api/preferences';
 import { newPinId } from '../../lib/pinned-views';
 import { formatDurationCompact } from '../../lib/format';
 import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns';
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
-import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { createBulkHandlers } from './helpers';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
@@ -180,12 +178,11 @@ export function AvailableEscalationsPage() {
   const { kiosk } = useKioskMode();
   const facetHighlightKeys = facetFilters.facets ? Object.keys(facetFilters.facets) : [];
 
-  // View mode is DEEP-LINKED (?view=table|timeline|rich) and tied to the filter-bar
-  // toggles — a shared link reproduces the exact presentation. The table is the
-  // default: it is the dense, scannable, countable presentation, and a metadata
-  // facet search should show the most recent matching events at a glance. The
-  // timeline is opt-in (?view=timeline) via the filter-bar toggle; absent an
-  // explicit view the role's rich list view shows when one exists, else the table.
+  // View mode is DEEP-LINKED (?view=table|timeline|rich) and tied to the
+  // filter-bar view radio — a shared link reproduces the exact presentation.
+  // Each radio choice writes ?view= explicitly. Absent an explicit view the
+  // role's rich list view shows when one exists, else the table: the dense,
+  // scannable, countable presentation.
   const viewParam = searchParams.get('view');
   const setViewParam = useCallback((v: 'table' | 'timeline' | 'rich' | null) => {
     setSearchParams((prev) => {
@@ -293,29 +290,6 @@ export function AvailableEscalationsPage() {
   const activeQuery = isAvailable ? availableQuery : escalationsQuery;
   const { data, isLoading, error: queryError, refetch, isFetching } = activeQuery;
 
-  // Copy-URL/curl path built from the SAME params the active query sends, so the
-  // generated command always reproduces the real request (filters + search + sort).
-  const apiPath = buildApiPath(`/escalations${isAvailable ? '/available' : ''}`, {
-    status: apiStatus,
-    claimed: isClaimed || undefined,
-    role: filters.role || undefined,
-    type: filters.type || undefined,
-    priority: filters.priority || undefined,
-    search: debouncedSearch || undefined,
-    sort_by: 'created_at',
-    order: 'desc',
-    limit: pagination.pageSize,
-    offset: pagination.offset,
-    // Faceted query — JSON-encoded so the copy-URL/curl reproduces the exact query.
-    facets: facetFilters.facets && Object.keys(facetFilters.facets).length ? JSON.stringify(facetFilters.facets) : undefined,
-    block: facetFilters.block?.length ? JSON.stringify(facetFilters.block) : undefined,
-    range: facetFilters.range?.length ? JSON.stringify(facetFilters.range) : undefined,
-    exists: facetFilters.exists?.length ? JSON.stringify(facetFilters.exists) : undefined,
-    roles: facetFilters.roles?.length ? JSON.stringify(facetFilters.roles) : undefined,
-    orderBy: facetFilters.orderBy?.length ? JSON.stringify(facetFilters.orderBy) : undefined,
-    available: facetFilters.available != null ? String(facetFilters.available) : undefined,
-  });
-
   // Search is server-side (full result set), so results and total come straight
   // from the query — no client-side filtering of the current page.
   const escalations = data?.escalations ?? [];
@@ -325,6 +299,8 @@ export function AvailableEscalationsPage() {
     && !!listSchema['x-lt-layout'] && listSchema['x-lt-layout'] !== 'table';
   const useRichView = hasRichView && !showTimeline
     && (viewParam ? viewParam === 'rich' : true);
+  const activeView: 'table' | 'rich' | 'timeline' =
+    showTimeline ? 'timeline' : useRichView ? 'rich' : 'table';
 
   // The jeopardy pill names the role's limit so the red filter is self-explaining
   // ("in jeopardy · > 15m"): priority_threshold_minutes, falling back to SLA.
@@ -498,54 +474,73 @@ export function AvailableEscalationsPage() {
             )}
             {/* Universal sort — one control for table, timeline, and rich views. */}
             <EscalationSortControl orderBy={facetFilters.orderBy} onChange={setOrderBy} />
-            <span className="h-3.5 w-px bg-surface-border shrink-0" />
-            <ListToolbar
-              onRefresh={() => refetch()}
-              isFetching={isFetching}
-              apiPath={apiPath}
-            />
-            {hasRichView && !showTimeline && (
-              <button
-                onClick={() => setViewParam(useRichView ? 'table' : 'rich')}
-                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
-                title={useRichView ? 'Table view' : 'Rich view'}
-              >
-                {useRichView
-                  ? <Table className="w-4 h-4" />
-                  : <LayoutList className="w-4 h-4" />}
-              </button>
-            )}
-            {activeFacetCount > 0 && (
-              <button
-                onClick={() => setViewParam(showTimeline ? 'table' : 'timeline')}
-                className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
-                title={showTimeline ? 'Table view' : 'Timeline view'}
-              >
-                {showTimeline
-                  ? <Table className="w-4 h-4" />
-                  : <Activity className="w-4 h-4" />}
-              </button>
-            )}
-            <button
-              onClick={pinCurrentView}
-              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
-              title="Pin this view — save the current filters to your Pinned section"
-              data-testid="pin-current-view"
+            {/* View radio — one list, three presentations, bounded like the
+                sort direction pair beside it. Rich appears only when the
+                selected role owns a custom list template. */}
+            <div
+              role="radiogroup"
+              aria-label="List view"
+              className="flex items-center rounded overflow-hidden border border-surface-border"
             >
-              <Pin className="w-4 h-4" />
-            </button>
+              {[
+                { key: 'table' as const, title: 'Table view', Icon: Table },
+                { key: 'rich' as const, title: 'Rich view', Icon: LayoutList },
+                { key: 'timeline' as const, title: 'Timeline view', Icon: Activity },
+              ].filter((v) => v.key !== 'rich' || hasRichView).map(({ key, title, Icon }) => (
+                <button
+                  key={key}
+                  role="radio"
+                  aria-checked={activeView === key}
+                  onClick={() => setViewParam(key)}
+                  className={`px-1.5 py-1 transition-colors ${
+                    activeView === key
+                      ? 'bg-accent text-text-inverse'
+                      : 'icon-link hover:bg-surface-hover'
+                  }`}
+                  title={title}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              ))}
+            </div>
+            {/* Faceted-query toggle — the same bounded treatment as the radio
+                sets beside it: the accent fill means the drawer is open. */}
             <button
               onClick={() => setFacetDrawerOpen((v) => !v)}
-              className="relative ml-2 inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
+              aria-pressed={facetDrawerOpen}
+              className={`relative rounded border border-surface-border px-1.5 py-1 transition-colors ${
+                facetDrawerOpen
+                  ? 'bg-accent text-text-inverse'
+                  : 'icon-link hover:bg-surface-hover'
+              }`}
               title="Faceted query"
             >
-              <SlidersHorizontal className="w-4 h-4" />
+              <SlidersHorizontal className="w-3.5 h-3.5" />
               {activeFacetCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-accent px-0.5 text-2xs font-medium text-text-inverse">
                   {activeFacetCount}
                 </span>
               )}
             </button>
+            {/* Plain actions last — refresh and pin act once, no toggle state. */}
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover disabled:opacity-50"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={pinCurrentView}
+                className="inline-flex h-7 w-7 items-center justify-center rounded icon-link hover:bg-surface-hover"
+                title="Pin this view — save the current filters to your Pinned section"
+                data-testid="pin-current-view"
+              >
+                <Pin className="w-4 h-4" />
+              </button>
+            </div>
           </>
         }
       />
