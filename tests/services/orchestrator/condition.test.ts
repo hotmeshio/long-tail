@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock HotMesh Durable — conditionLT wraps Durable.workflow.condition
+// Mock HotMesh Durable — conditional wraps Durable.workflow.condition
 vi.mock('@hotmeshio/hotmesh', () => ({
   Durable: {
     workflow: {
@@ -10,31 +10,31 @@ vi.mock('@hotmeshio/hotmesh', () => ({
   },
 }));
 
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional, conditionLT } from '../../../services/orchestrator/condition';
 import { Durable } from '@hotmeshio/hotmesh';
 
 const mockCondition = Durable.workflow.condition as ReturnType<typeof vi.fn>;
 
-describe('conditionLT', () => {
+describe('conditional', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('returns null when condition returns null (escalation cancelled)', async () => {
     mockCondition.mockResolvedValue(null);
-    const result = await conditionLT('sig-1');
+    const result = await conditional('sig-1');
     expect(result).toBeNull();
   });
 
   it('returns false when condition returns false (timeout)', async () => {
     mockCondition.mockResolvedValue(false);
-    const result = await conditionLT('sig-1');
+    const result = await conditional('sig-1');
     expect(result).toBe(false);
   });
 
   it('returns payload directly when no $escalation_id present', async () => {
     mockCondition.mockResolvedValue({ approved: true });
-    const result = await conditionLT<{ approved: boolean }>('sig-1');
+    const result = await conditional<{ approved: boolean }>('sig-1');
     expect(result).toEqual({ approved: true });
   });
 
@@ -44,7 +44,7 @@ describe('conditionLT', () => {
     (proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
 
     mockCondition.mockResolvedValue({ approved: true, $escalation_id: 'esc-123' });
-    const result = await conditionLT<{ approved: boolean }>('sig-1');
+    const result = await conditional<{ approved: boolean }>('sig-1');
 
     expect(result).toEqual({ approved: true });
     expect(mockResolve).toHaveBeenCalledWith({
@@ -63,7 +63,7 @@ describe('conditionLT', () => {
       $escalation_id: 'esc-123',
       $resolution: resolution,
     });
-    const result = await conditionLT<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
+    const result = await conditional<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
 
     // the audit column stays clean — provenance never persists
     expect(mockResolve).toHaveBeenCalledWith({
@@ -77,7 +77,7 @@ describe('conditionLT', () => {
   it('efficient path: $resolution passes through untouched (already resolved server-side)', async () => {
     const resolution = { escalationId: 'esc-9', resolvedBy: 'user-2' };
     mockCondition.mockResolvedValue({ approved: true, $resolution: resolution });
-    const result = await conditionLT<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
+    const result = await conditional<{ approved: boolean; $resolution?: typeof resolution }>('sig-1');
     expect(result).toEqual({ approved: true, $resolution: resolution });
   });
 
@@ -85,7 +85,7 @@ describe('conditionLT', () => {
     const mockResolve = vi.fn();
     (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
     mockCondition.mockResolvedValue(null);
-    await conditionLT('sig-1');
+    await conditional('sig-1');
     expect(mockResolve).not.toHaveBeenCalled();
   });
 
@@ -93,7 +93,7 @@ describe('conditionLT', () => {
     const mockResolve = vi.fn();
     (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
     mockCondition.mockResolvedValue(false);
-    await conditionLT('sig-1');
+    await conditional('sig-1');
     expect(mockResolve).not.toHaveBeenCalled();
   });
 
@@ -101,7 +101,7 @@ describe('conditionLT', () => {
 
   it('forwards the full config — including timeout — to Durable.workflow.condition verbatim', async () => {
     mockCondition.mockResolvedValue({ approved: true });
-    // `timeout` typechecks here because conditionLT's param IS the SDK's
+    // `timeout` typechecks here because conditional's param IS the SDK's
     // ConditionQueueConfig — the passthrough is structural, not a copy.
     const config = {
       role: 'reviewer',
@@ -109,7 +109,7 @@ describe('conditionLT', () => {
       metadata: { orderId: 'ORD-1' },
       timeout: '24h',
     };
-    await conditionLT<{ approved: boolean }>('sig-sla', config);
+    await conditional<{ approved: boolean }>('sig-sla', config);
     expect(mockCondition).toHaveBeenCalledWith('sig-sla', config);
   });
 
@@ -117,10 +117,45 @@ describe('conditionLT', () => {
     const mockResolve = vi.fn();
     (Durable.workflow.proxyActivities as ReturnType<typeof vi.fn>).mockReturnValue({ ltResolveEscalation: mockResolve });
     mockCondition.mockResolvedValue(false);
-    const result = await conditionLT('sig-sla', { role: 'reviewer', timeout: '30m' });
+    const result = await conditional('sig-sla', { role: 'reviewer', timeout: '30m' });
     expect(result).toBe(false);
     // The engine already expired the row in its timeout path — the wrapper
     // must never issue its own resolve against an expired escalation.
     expect(mockResolve).not.toHaveBeenCalled();
+  });
+
+  it('conditionLT remains a working alias of conditional', () => {
+    expect(conditionLT).toBe(conditional);
+  });
+
+  // ── Versioned lookup refs (envelope.lookups fold) ───────────────────────────
+
+  it('folds lookups into the unindexed envelope, schemaVersion into metadata', async () => {
+    mockCondition.mockResolvedValue({ approved: true });
+    await conditional<{ approved: boolean }>('sig-lk', {
+      role: 'catalog-picker',
+      metadata: { orderId: 'ORD-1' },
+      envelope: { instructions: 'pick one' },
+      schemaVersion: 3,
+      lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
+    });
+    expect(mockCondition).toHaveBeenCalledWith('sig-lk', {
+      role: 'catalog-picker',
+      metadata: { orderId: 'ORD-1', schema_version: 3 },
+      envelope: {
+        instructions: 'pick one',
+        lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
+      },
+    });
+  });
+
+  it('rejects a lookup ref without a version before the engine write', async () => {
+    await expect(
+      conditional('sig-bad', {
+        role: 'catalog-picker',
+        lookups: [{ domain: 'catalog', key: 'materials' } as any],
+      }),
+    ).rejects.toThrow(/positive integer version/);
+    expect(mockCondition).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
 import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
+import { ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
 
 import { escalations, ensureEscalationCompatView } from './client';
 import { listEscalations, invalidateEscalationAggregates } from './queries';
@@ -38,6 +39,12 @@ const LOOKUP_LIMIT = 1000;
 export async function createEscalation(
   input: CreateEscalationInput,
 ): Promise<LTEscalationRecord> {
+  // Lookup refs must pin immutable knowledge editions — reject malformed refs
+  // before the row exists rather than let a broken grant reach the queue.
+  const envelopeObj = toEnvelopeObject(input.envelope);
+  if (envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS] !== undefined) {
+    assertLookupRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+  }
   const client = await escalations();
   const entry = await client.create({
     type: input.type,
@@ -53,7 +60,7 @@ export async function createEscalation(
     workflowType: input.workflow_type,
     traceId: input.trace_id,
     spanId: input.span_id,
-    envelope: toEnvelopeObject(input.envelope),
+    envelope: envelopeObj,
     metadata: input.metadata,
     escalationPayload: toJsonObject(input.escalation_payload),
   });
@@ -256,7 +263,7 @@ export async function getEscalationsByIds(
 
 /**
  * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
- * passed to `conditionLT(signalId, config)` / `condition(signalId, config)`.
+ * passed to `conditional(signalId, config)` / `condition(signalId, config)`.
  * Returns null when no row carries that key.
  */
 export async function getEscalationBySignalKey(
@@ -661,9 +668,9 @@ export interface ResolveByMetadataResult {
   outcome: 'resolved' | 'signal_required' | 'conflict' | 'not_found' | 'validation_required';
   /** The resolved escalation (when outcome = 'resolved') */
   escalation?: LTEscalationRecord;
-  /** Legacy conditionLT signal info (when signalId is set, caller uses handle.signal) */
+  /** Legacy conditional signal info (when signalId is set, caller uses handle.signal) */
   signalId?: string;
-  /** Atomic conditionLT signal key (when signalKey is set, caller uses SDK resolve to atomically mark+signal) */
+  /** Atomic conditional signal key (when signalKey is set, caller uses SDK resolve to atomically mark+signal) */
   signalKey?: string;
   escalationId?: string;
   workflowId?: string;

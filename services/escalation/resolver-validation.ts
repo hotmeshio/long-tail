@@ -20,7 +20,8 @@
 import { validateResolverPayload, type ShowIfContext } from '../../shared/form-validation';
 import { checkSubmitGuard } from './submit-guard';
 import { getEnforcingRoles, getEnforcedFormSchema } from '../role/enforcement-cache';
-import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
+import { resolveLookupContext } from '../knowledge';
+import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS } from '../../types/escalation';
 import { LT_ERROR_CODES, type LTFieldViolation, type LTValidationErrorBody } from '../../types/validation';
 
 /** The row fields the gate reads — every resolve surface already holds these. */
@@ -93,11 +94,17 @@ export async function checkResolverPayload(
     ? await loadEnvelope()
     : parseJsonOrNull(escalation.envelope) ?? {};
 
+  // Versioned lookup refs ride the envelope; they resolve through the
+  // immutable snapshot cache, so enforcement reads the exact editions the
+  // form rendered from. Rows without refs cost zero SQL here.
+  const lookup = await resolveLookupContext(envelope[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+
   const ctx: ShowIfContext = {
     escalation: escalation as Record<string, unknown>,
     metadata,
     envelope,
     payload: parseJsonOrNull(escalation.escalation_payload),
+    ...(lookup ? { lookup } : {}),
   };
 
   const violations = validateResolverPayload(schema, resolverPayload, ctx);

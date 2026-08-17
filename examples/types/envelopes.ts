@@ -36,7 +36,7 @@ export interface BasicEchoEnvelopeData {
 
 // ── basicSignal ──────────────────────────────────────────────
 
-/** Basic signal — lightweight escalation via conditionLT. */
+/** Basic signal — lightweight escalation via conditional. */
 export interface BasicSignalEnvelopeData {
   /** Message shown to the reviewer in the escalation description. */
   message?: string;

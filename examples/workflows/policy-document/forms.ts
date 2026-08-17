@@ -17,7 +17,7 @@ export const POLICY_ROLE = 'policy-document';
 /** The form version this workflow is written against (a compile-time literal). */
 export const POLICY_SCHEMA_VERSION = 1;
 
-/** The shape the workflow gets back from conditionLT (produced by x-lt-bind). */
+/** The shape the workflow gets back from conditional (produced by x-lt-bind). */
 export interface PolicyResolverV1 {
   policy: {
     title: string;

@@ -57,7 +57,7 @@ export async function processReview(input: RelReviewerResolverV1): Promise<Revie
 }
 
 /**
- * Resolve the UUID of an efficient conditionLT escalation from its signal key.
+ * Resolve the UUID of an efficient conditional escalation from its signal key.
  * Returns null when the escalation is not found (e.g. the workflow was cancelled
  * before the row was written).
  */

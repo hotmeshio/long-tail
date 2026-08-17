@@ -15,7 +15,7 @@ export const CHECKLIST_ROLE = 'checklist-operator';
 export const CHECKLIST_SCHEMA_VERSION = 1;
 
 /**
- * The payload shape the workflow receives from conditionLT. Each key is an item
+ * The payload shape the workflow receives from conditional. Each key is an item
  * id; the value is true (confirmed) or false (not confirmed). Validate with zod
  * if you want runtime guarantees beyond TypeScript.
  */

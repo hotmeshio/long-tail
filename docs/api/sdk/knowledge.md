@@ -51,6 +51,33 @@ const result = await lt.knowledge.getEntry({
 
 **Returns:** `LTApiResult<KnowledgeEntry>` or `{ found: false }` if not found.
 
+## getEntryVersion
+
+Get an immutable edition from an entry's version history.
+
+```typescript
+const result = await lt.knowledge.getEntryVersion({
+  domain: 'catalog',
+  key: 'materials',
+  version: 2,
+});
+```
+
+**Returns:** `LTApiResult<{ domain, key, version, data, tags, created_at }>` — 404 when the edition does not exist.
+
+## listEntryVersions
+
+List every edition of an entry, newest first, with the current one marked.
+
+```typescript
+const result = await lt.knowledge.listEntryVersions({
+  domain: 'catalog',
+  key: 'materials',
+});
+```
+
+**Returns:** `LTApiResult<{ domain, key, versions: [{ version, change_summary, created_at, is_current }] }>`
+
 ## storeEntry
 
 Create or update a knowledge entry. Data is merged by default; set `replace: true` to fully overwrite.

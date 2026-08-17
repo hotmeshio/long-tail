@@ -4,7 +4,7 @@
  *
  * Legacy (`basic-signal`):
  *   1. `ltCreateEscalation(...)`        ← separate proxyActivity round-trip
- *   2. `conditionLT(signalId)`          ← waits; on resume runs ltResolveEscalation
+ *   2. `conditional(signalId)`          ← waits; on resume runs ltResolveEscalation
  *
  * Efficient (this workflow):
  *   1. `condition(signalId, queueConfig)` ← writes the escalation row inside the

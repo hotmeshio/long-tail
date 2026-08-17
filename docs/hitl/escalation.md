@@ -1,17 +1,19 @@
 # Creating Escalations
 
-## `conditionLT` — Atomic Pattern
+## `conditional` — Atomic Pattern
 
-Pass an escalation config to `conditionLT`. The escalation row, its metadata, and the resume timer all commit inside the workflow's Leg1 checkpoint — one write, crash-safe. The `signal_key` on the row is the resume key: the dashboard resolve endpoint and `POST /api/escalations/resolve-by-signal-key` both resume this job in place, and the `system.escalation.{role}.{id}.created` event fires automatically.
+Pass an escalation config to `conditional`. The escalation row, its metadata, and the resume timer all commit inside the workflow's Leg1 checkpoint — one write, crash-safe. The `signal_key` on the row is the resume key: the dashboard resolve endpoint and `POST /api/escalations/resolve-by-signal-key` both resume this job in place, and the `system.escalation.{role}.{id}.created` event fires automatically.
+
+> `conditionLT` is a deprecated alias of `conditional`. Existing code continues to work.
 
 ```typescript
-import { conditionLT } from '@hotmeshio/long-tail';
+import { conditional } from '@hotmeshio/long-tail';
 
 export async function approvalWorkflow(envelope: LTEnvelope) {
   const ctx = Durable.workflow.workflowInfo();
   const signalId = `approval-${ctx.workflowId}`;
 
-  const decision = await conditionLT<{ approved: boolean; notes?: string }>(signalId, {
+  const decision = await conditional<{ approved: boolean; notes?: string }>(signalId, {
     role: 'finance-reviewer',
     type: 'approval',
     subtype: 'budget-request',
@@ -48,7 +50,7 @@ export async function approvalWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-`conditionLT` returns `T | false | null`:
+`conditional` returns `T | false | null`:
 - `T` — the human's resolver payload
 - `false` — SLA timeout (omit `timeout` for an open-ended wait)
 - `null` — cancellation (workflow terminated or explicit cancel)
@@ -60,7 +62,7 @@ Interactive and webhook resolves deliver the resolver's identity alongside the p
 ```typescript
 import type { EscalationResolution } from '@hotmeshio/long-tail';
 
-const decision = await conditionLT<{
+const decision = await conditional<{
   approved: boolean;
   $resolution?: EscalationResolution;
 }>(signalId, { role: 'order-reviewer', metadata: { orderId } });
@@ -80,7 +82,7 @@ Every field of the config — including all `metadata` facets — commits inside
 
 ### Early-signal buffering
 
-A resolve that races ahead of the `conditionLT` registration (a fast webhook, or a payload deposited before the workflow starts) is held as a pending signal and delivered when the wait registers — 10 minutes by default; pass `expire` to `signal()` when signaling early on purpose. Fan-out (`Promise.all` over many waits) scales the same way.
+A resolve that races ahead of the `conditional` registration (a fast webhook, or a payload deposited before the workflow starts) is held as a pending signal and delivered when the wait registers — 10 minutes by default; pass `expire` to `signal()` when signaling early on purpose. Fan-out (`Promise.all` over many waits) scales the same way.
 
 ---
 
@@ -89,7 +91,7 @@ A resolve that races ahead of the `conditionLT` registration (a fast webhook, or
 Every role carries a versioned `form_schema`. Every save that changes it appends an immutable snapshot to `lt_role_schemas` and advances the role's current version. Escalations pin one with `schemaVersion`:
 
 ```typescript
-const decision = await conditionLT<{ approved: boolean; lotNumber: string }>(signalId, {
+const decision = await conditional<{ approved: boolean; lotNumber: string }>(signalId, {
   role: 'reviewer',
   description: instructions,
   schemaVersion: 3,   // renders role schema v3, always, regardless of later edits
@@ -130,12 +132,12 @@ The reference examples ship as fully runnable seeds:
 ### Simple approval
 
 ```typescript
-import { conditionLT } from '@hotmeshio/long-tail';
+import { conditional } from '@hotmeshio/long-tail';
 
 export async function approveSpendWorkflow(envelope: LTEnvelope) {
   const ctx = Durable.workflow.workflowInfo();
 
-  const decision = await conditionLT<{ approved: boolean; notes?: string }>(
+  const decision = await conditional<{ approved: boolean; notes?: string }>(
     `spend-approval-${ctx.workflowId}`,
     {
       role: 'finance-reviewer',
@@ -173,7 +175,7 @@ export async function approveSpendWorkflow(envelope: LTEnvelope) {
 Dynamic checklist where item labels come from the workflow's envelope, not the static schema. Item count and wording vary per escalation without touching the form schema.
 
 ```typescript
-import { conditionLT } from '@hotmeshio/long-tail';
+import { conditional } from '@hotmeshio/long-tail';
 
 export async function stationCheckWorkflow(envelope: LTEnvelope) {
   const ctx = Durable.workflow.workflowInfo();
@@ -184,7 +186,7 @@ export async function stationCheckWorkflow(envelope: LTEnvelope) {
     { id: 'step_2', label: 'Sign the dispensing log' },
   ];
 
-  const result = await conditionLT<{ checks: Record<string, boolean> }>(
+  const result = await conditional<{ checks: Record<string, boolean> }>(
     `station-check-${ctx.workflowId}`,
     {
       role: 'station-operator',

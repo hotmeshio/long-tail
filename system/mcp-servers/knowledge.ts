@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import * as knowledge from '../activities/knowledge';
+import { getKnowledgeVersion, listKnowledgeVersions } from '../../services/knowledge';
 
 const storeSchema = z.object({
   domain: z.string().describe('Namespace grouping related entries (e.g. "screenshots", "config", "analysis").'),
@@ -13,6 +14,12 @@ const storeSchema = z.object({
 });
 
 const getSchema = z.object({
+  domain: z.string().describe('Knowledge domain'),
+  key: z.string().describe('Document key'),
+  version: z.number().int().min(1).optional().describe('Fetch this immutable edition instead of the live entry'),
+});
+
+const listVersionsSchema = z.object({
   domain: z.string().describe('Knowledge domain'),
   key: z.string().describe('Document key'),
 });
@@ -105,12 +112,32 @@ function registerTools(server: McpServer) {
     'get_knowledge',
     {
       title: 'Get Knowledge',
-      description: 'Retrieve a single knowledge entry by domain and key.',
+      description: 'Retrieve a single knowledge entry by domain and key. Pass version to fetch a pinned immutable edition.',
       inputSchema: getSchema,
     },
     async (args: z.infer<typeof getSchema>) => {
-      const result = await knowledge.getKnowledge(args);
+      if (args.version !== undefined) {
+        const snapshot = await getKnowledgeVersion(args.domain, args.key, args.version);
+        const result = snapshot ?? { found: false, domain: args.domain, key: args.key, version: args.version };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+      }
+      const result = await knowledge.getKnowledge({ domain: args.domain, key: args.key });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    },
+  );
+
+  (server as any).registerTool(
+    'list_knowledge_versions',
+    {
+      title: 'List Knowledge Versions',
+      description: 'List every immutable edition of a knowledge entry, newest first, with the current one marked. Every data-changing write mints a new version.',
+      inputSchema: listVersionsSchema,
+    },
+    async (args: z.infer<typeof listVersionsSchema>) => {
+      const versions = await listKnowledgeVersions(args.domain, args.key);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ domain: args.domain, key: args.key, versions }) }],
+      };
     },
   );
 

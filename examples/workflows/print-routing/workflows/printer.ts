@@ -8,7 +8,7 @@
 
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { conditionLT } from '../../../../services/orchestrator/condition';
+import { conditional } from '../../../../services/orchestrator/condition';
 import type { LTEnvelope } from '../../../../types';
 
 import { runPrintJob } from './proxy';
@@ -45,7 +45,7 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
     // Needs filament — advertise maintenance; a technician resolves "added filament".
     if (runsUntilRefill <= 0) {
       const refillSignal = `refill-${ctx.workflowId}-r${totalRuns}`;
-      await conditionLT<RefillPayload>(refillSignal, {
+      await conditional<RefillPayload>(refillSignal, {
         role: printerPond,
         type: PRINT_WORKFLOWS.PRINTER,
         subtype: PRINTER_STATE.MAINTENANCE,
@@ -63,7 +63,7 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
     // Ready — advertise availability. The broker resolves this advert with a job
     // (orderId + a callback key); the printer runs it and signals the broker back.
     const readySignal = `ready-${ctx.workflowId}-r${totalRuns}`;
-    const job = await conditionLT<PrinterJobPayload>(readySignal, {
+    const job = await conditional<PrinterJobPayload>(readySignal, {
       role: printerPond,
       type: PRINT_WORKFLOWS.PRINTER,
       subtype: PRINTER_STATE.READY,

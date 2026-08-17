@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronRight, Brain, Database, Table2, Plus } from 'lucide-react';
+import { ChevronRight, Braces, Database, Table2, Plus } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -103,7 +103,7 @@ export function KnowledgePage() {
     <DropZone onDrop={handleJsonDrop} label="Drop a JSON file to create an entry" accept=".json,application/json">
     <div>
       <PageHeader
-        title="Knowledge"
+        title="Knowledge Base"
         docsHash="#docs:dashboard.md:knowledge"
         actions={
           <button
@@ -126,7 +126,7 @@ export function KnowledgePage() {
               : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
           }`}
         >
-          <Brain className="w-4 h-4 text-accent/75" strokeWidth={1.5} />
+          <Braces className="w-4 h-4 text-accent/75" strokeWidth={1.5} />
           <span>All Domains</span>
         </button>
         {domain && (
@@ -189,7 +189,7 @@ export function KnowledgePage() {
           ) : level === 'domains' ? (
             filteredDomains.length === 0 ? (
               <div className="cursor-pointer" onClick={() => { setPrefillData(undefined); setShowCreate(true); }}>
-                <EmptyState icon={Brain} title={search ? 'No matching domains' : 'No knowledge yet'} description={search ? undefined : 'Create your first entry or drop a JSON file'} />
+                <EmptyState icon={Braces} title={search ? 'No matching domains' : 'Knowledge Base Empty'} description={search ? undefined : 'Create your first entry or drop a JSON file'} />
               </div>
             ) : (
               <table className="w-full mt-2">
@@ -239,6 +239,7 @@ export function KnowledgePage() {
                       <th className="pb-2 pl-2 font-medium w-[200px]">Key</th>
                       <th className="pb-2 font-medium">Tags</th>
                       <th className="pb-2 font-medium w-16 text-right">Fields</th>
+                      <th className="pb-2 font-medium w-20 text-right">Version</th>
                       <th className="pb-2 pr-2 font-medium w-32 text-right">Updated</th>
                     </tr>
                   </thead>
@@ -276,6 +277,9 @@ export function KnowledgePage() {
                         </td>
                         <td className="py-2 text-right text-xs text-text-secondary tabular-nums">
                           {entry.data ? Object.keys(entry.data).length : 0}
+                        </td>
+                        <td className="py-2 text-right text-xs text-text-secondary font-mono tabular-nums">
+                          v{entry.current_version}
                         </td>
                         <td className="py-2 pr-2 text-right text-xs text-text-secondary">
                           <TimeAgo date={entry.updated_at} />

@@ -49,6 +49,20 @@ Check the status of an escalation. Returns status and resolver payload if resolv
 |-------|------|----------|-------------|
 | escalation_id | string | Yes | The escalation ID to check |
 
+### get_escalation_lookups
+
+Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with `missing: true`. Like the other tools on this server, the call carries no per-user identity — the MCP surface reads at service scope.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The escalation whose pinned knowledge lookups to resolve |
+
 ### get_available_work
 
 List available escalations for a role. Returns pending, unassigned escalations.

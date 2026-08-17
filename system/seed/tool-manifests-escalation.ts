@@ -31,6 +31,18 @@ export const HUMAN_QUEUE_TOOLS = [
     },
   },
   {
+    name: 'get_escalation_lookups',
+    description: 'Resolve the versioned knowledge lookups pinned on an escalation (envelope.lookups). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with missing: true.',
+    read_safe: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The escalation whose pinned knowledge lookups to resolve' },
+      },
+      required: ['escalation_id'],
+    },
+  },
+  {
     name: 'get_available_work',
     description: 'List available escalations for a role. Returns pending, unassigned escalations.',
     read_safe: true,

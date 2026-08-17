@@ -19,7 +19,21 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'get_knowledge',
-    description: 'Retrieve a single knowledge entry by domain and key.',
+    description: 'Retrieve a single knowledge entry by domain and key. Pass version to fetch a pinned immutable edition.',
+    read_safe: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'Knowledge domain' },
+        key: { type: 'string', description: 'Document key' },
+        version: { type: 'number', description: 'Fetch this immutable edition instead of the live entry' },
+      },
+      required: ['domain', 'key'],
+    },
+  },
+  {
+    name: 'list_knowledge_versions',
+    description: 'List every immutable edition of a knowledge entry, newest first, with the current one marked. Every data-changing write mints a new version.',
     read_safe: true,
     inputSchema: {
       type: 'object',

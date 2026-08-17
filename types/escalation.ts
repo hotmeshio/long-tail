@@ -3,7 +3,7 @@ import type { Types } from '@hotmeshio/hotmesh';
 /**
  * Resolution provenance delivered to a waiting workflow under the reserved
  * `$resolution` signal key — who resolved the escalation and which row
- * delivered it. Declare it in the `conditionLT` payload generic to consume it.
+ * delivered it. Declare it in the `conditional` payload generic to consume it.
  * Re-exported from the HotMesh SDK so workflow authors import one package.
  */
 export type EscalationResolution = Types.EscalationResolution;
@@ -18,18 +18,74 @@ export const ESCALATION_METADATA_KEYS = {
    * Pins the lt_role_schemas version this escalation was created against.
    * The resolver UI renders that exact snapshot even after the role's schema
    * moves on; absent, the latest role schema applies. Set ergonomically via
-   * `conditionLT`'s `schemaVersion` config field.
+   * `conditional`'s `schemaVersion` config field.
    */
   SCHEMA_VERSION: 'schema_version',
   /** Per-escalation resolver form override — a full JSON Schema embedded on the row. */
   FORM_SCHEMA: 'form_schema',
 } as const;
 
+/**
+ * Reserved keys inside the escalation `envelope` — the unindexed, render-only
+ * bag (like `formDefaults`). System form plumbing lives here, never on the
+ * GIN-indexed metadata facet surface.
+ */
+export const ESCALATION_ENVELOPE_KEYS = {
+  /**
+   * Versioned knowledge lookup refs: `EscalationLookupRef[]`. Each ref pins
+   * an immutable knowledge edition; its presence on the row grants the
+   * escalation's role the right to fetch that edition via
+   * GET /escalations/:id/lookups, and the resolved content addresses in
+   * forms as the `lookup.<as ?? key>` context domain. Set ergonomically via
+   * `conditional`'s `lookups` config field.
+   */
+  LOOKUPS: 'lookups',
+} as const;
+
+/**
+ * One versioned knowledge lookup reference. `version` is required by design:
+ * a ref names an immutable edition, never a moving target. Evolve the list by
+ * writing the entry (a new version mints automatically) and repinning here.
+ * `as` renames the ref's form-context address when the key alone is ambiguous.
+ */
+export interface EscalationLookupRef {
+  domain: string;
+  key: string;
+  version: number;
+  as?: string;
+}
+
+/**
+ * Fail-loud structural validation for lookup refs, run before the escalation
+ * row is written on every creation path. Dependency-free: the `conditional`
+ * fold runs workflow-side.
+ */
+export function assertLookupRefs(refs: unknown): asserts refs is EscalationLookupRef[] {
+  if (!Array.isArray(refs)) {
+    throw new Error('lookups must be an array of { domain, key, version } refs');
+  }
+  for (const ref of refs) {
+    const r = (ref ?? {}) as Record<string, unknown>;
+    if (typeof r.domain !== 'string' || r.domain.length === 0
+      || typeof r.key !== 'string' || r.key.length === 0) {
+      throw new Error('Each lookup ref requires a non-empty domain and key');
+    }
+    if (typeof r.version !== 'number' || !Number.isInteger(r.version) || r.version < 1) {
+      throw new Error(
+        `Lookup ref ${r.domain}/${r.key} requires a positive integer version — refs pin immutable editions`,
+      );
+    }
+    if (r.as !== undefined && (typeof r.as !== 'string' || r.as.length === 0)) {
+      throw new Error(`Lookup ref ${r.domain}/${r.key}: "as" must be a non-empty string when present`);
+    }
+  }
+}
+
 export type LTEscalationStatus =
   | 'pending'
   | 'resolved'
   | 'cancelled'
-  /** SLA timer on a `conditionLT`/`condition` wait fired first — the workflow resumed with `false`; the row is terminal */
+  /** SLA timer on a `conditional`/`condition` wait fired first — the workflow resumed with `false`; the row is terminal */
   | 'expired';
 
 export type LTEscalationPriority = 1 | 2 | 3 | 4;
@@ -58,7 +114,7 @@ export interface LTEscalationRecord {
 
   // efficient (atomic) escalation resume key — set when the row was written
   // inside a workflow's Leg1 checkpoint via `condition(signalId, config)` /
-  // `conditionLT(signalId, config)`. The value is the signal id used to resume
+  // `conditional(signalId, config)`. The value is the signal id used to resume
   // the waiting workflow in place. Null for service-created rows.
   signal_key: string | null;
 

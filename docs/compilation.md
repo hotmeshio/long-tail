@@ -141,7 +141,7 @@ The dynamic path remains for genuinely new problems. But the long tail gets shor
 
 The Pipeline Designer compiles from execution traces — the dynamic path. But there's a second entry point: compiling directly from source code.
 
-If you've written a durable workflow using the Temporal-like API (`proxyActivities`, `sleep`, `condition`, `startChild`), you can compile it to a YAML DAG without executing it first. The `ltc` CLI reads your TypeScript source, extracts the orchestration structure, and produces an equivalent DAG that runs without replay overhead.
+If you've written a durable workflow using the durable workflow API (`proxyActivities`, `sleep`, `condition`, `startChild`), you can compile it to a YAML DAG without executing it first. The `ltc` CLI reads your TypeScript source, extracts the orchestration structure, and produces an equivalent DAG that runs without replay overhead.
 
 ```bash
 ltc compile workflows/assembly-line.ts

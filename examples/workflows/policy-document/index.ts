@@ -3,7 +3,7 @@
  * LIST view.
  *
  * The workflow is a loop: it opens ONE policy-review escalation to the
- * `policy-document` role and parks on it (conditionLT). A member claims and
+ * `policy-document` role and parks on it (conditional). A member claims and
  * publishes a revision; the workflow folds that into the next revision's state
  * and opens the next escalation. At most 10 revisions run per workflow execution;
  * the 10th iteration spawns a fresh child workflow (fire-and-forget) carrying the
@@ -17,7 +17,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import { JOB_EXPIRE_SECS } from '../../../modules/defaults';
 import {
   POLICY_ROLE,
@@ -66,7 +66,7 @@ export async function policyDocument(envelope: LTEnvelope): Promise<any> {
     // Open the live policy escalation and park. Concise facts ride the metadata
     // so the list view reads them off the row; the document body lives in the
     // envelope where long text belongs.
-    const response = await conditionLT<PolicyResolverV1>(signalId, {
+    const response = await conditional<PolicyResolverV1>(signalId, {
       role,
       type: 'policy-review',
       subtype: 'revision',

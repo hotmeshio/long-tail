@@ -96,7 +96,7 @@ export function matchPatterns(
   // ── Pattern: normal_wait ──────────────────────────────────────────────────
   // Two paths reach here:
   // 1. Open signal in event stream (signal_wait_started) + pending escalation
-  // 2. No terminal event + pending escalation (conditionLT path — no signal_wait_started in export)
+  // 2. No terminal event + pending escalation (conditional path — no signal_wait_started in export)
   const isRunning = !events.some(e =>
     e.event_type === 'workflow_execution_completed' || e.event_type === 'workflow_execution_failed',
   );

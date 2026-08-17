@@ -125,6 +125,11 @@ escCmd.command('get <id>')
   .option('--json', 'JSON output')
   .action(wrap(esc.getEscalation));
 
+escCmd.command('lookups <id>')
+  .description('Resolve the versioned knowledge lookups pinned on an escalation')
+  .option('--json', 'JSON output')
+  .action(wrap(esc.getLookups));
+
 escCmd.command('claim <id>')
   .option('--duration <minutes>', 'Claim duration in minutes')
   .action(wrap(esc.claimEscalation));
@@ -300,8 +305,15 @@ kbCmd.command('list <domain>')
   .action(wrap(kb.listEntries));
 
 kbCmd.command('get <domain> <key>')
+  .option('--version <n>', 'Fetch this immutable edition instead of the live entry')
   .option('--json', 'JSON output')
   .action(wrap(kb.getEntry));
+
+kbCmd.command('versions <domain> <key>')
+  .description('List every immutable edition of an entry, newest first')
+  .option('--json', 'JSON output')
+  .option('-q, --quiet', 'Versions only')
+  .action(wrap(kb.listVersions));
 
 kbCmd.command('set <domain> <key> <path> <value>')
   .option('--json', 'JSON output')

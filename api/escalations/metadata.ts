@@ -114,7 +114,7 @@ export async function claimByMetadata(
  * Single atomic query with signal guard:
  * - No signal_id → claim + resolve atomically in SQL. One query. Done.
  * - signal_id present → SQL returns the signal info without resolving.
- *   Caller signals the workflow; conditionLT resolves durably inside
+ *   Caller signals the workflow; conditional resolves durably inside
  *   the workflow via ltResolveEscalation.
  *
  * Never does SELECT-then-UPDATE. The SQL CTE handles find + RBAC +
@@ -190,7 +190,7 @@ export async function resolveByMetadata(
       return { status: 200, data: { escalation: result.escalation } };
     }
 
-    // Atomic conditionLT escalation (signal_key set) — SDK resolve atomically marks
+    // Atomic conditional escalation (signal_key set) — SDK resolve atomically marks
     // resolved AND delivers the signal to the waiting condition(), resuming the workflow.
     if (result.signalKey) {
       const resolved = await escalationService.resolveEscalation(result.escalationId!, input.resolverPayload);
@@ -203,8 +203,8 @@ export async function resolveByMetadata(
       };
     }
 
-    // Legacy conditionLT escalation (metadata.signal_id set) — signal the workflow,
-    // conditionLT interceptor resolves durably via ltResolveEscalation.
+    // Legacy conditional escalation (metadata.signal_id set) — signal the workflow,
+    // conditional interceptor resolves durably via ltResolveEscalation.
     const { createClient } = await import('../../workers');
     const client = createClient();
     const handle = await client.workflow.getHandle(

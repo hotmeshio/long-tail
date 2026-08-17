@@ -1,6 +1,6 @@
 # The Workflow Compiler
 
-You wrote a durable workflow. It works. `proxyActivities`, `sleep`, `condition` — the Temporal-like API is productive and familiar. But under the hood, the durable engine replays the entire workflow function on every wake-up. Sleep three times in a ten-step workflow? Steps 1–3 replay on wake one. Steps 1–6 replay on wake two. Steps 1–9 replay on wake three. The replay is deterministic — it skips completed activities — but the function still executes from the top every time.
+You wrote a durable workflow. It works. `proxyActivities`, `sleep`, `condition` — the durable API is productive and familiar. But under the hood, the durable engine replays the entire workflow function on every wake-up. Sleep three times in a ten-step workflow? Steps 1–3 replay on wake one. Steps 1–6 replay on wake two. Steps 1–9 replay on wake three. The replay is deterministic — it skips completed activities — but the function still executes from the top every time.
 
 The compiled YAML DAG does the same work without replay. Each step fires exactly once. State flows explicitly between activities through input mappings. No function re-execution, no replay loop, no wasted cycles.
 
@@ -161,7 +161,7 @@ ltc compile examples/workflows/ --dry-run
   ● basic-signal/index.ts
     Function: basicSignal  ·  HotMesh Durable
     Activities: ltCreateEscalation, processApproval
-    Control flow: conditionLT
+    Control flow: conditional
 
   ● kitchen-sink/index.ts
     Function: kitchenSink  ·  HotMesh Durable

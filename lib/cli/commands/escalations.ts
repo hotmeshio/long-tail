@@ -47,6 +47,27 @@ export async function getEscalation(id: string, opts: { json?: boolean }): Promi
   console.log();
 }
 
+export async function getLookups(id: string, opts: { json?: boolean }): Promise<void> {
+  const data = await apiFetch<any>(`/escalations/${id}/lookups`);
+  if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
+  const lookups = data.lookups ?? [];
+  if (lookups.length === 0) {
+    console.log(pc.dim('\n  No lookup refs on this escalation.\n'));
+    return;
+  }
+  console.log();
+  for (const l of lookups) {
+    const label = `${l.domain}/${l.key} v${l.version}${l.as ? ` (as ${l.as})` : ''}`;
+    if (l.missing) {
+      console.log(`  ${pc.yellow('missing')} ${pc.bold(label)}`);
+    } else {
+      console.log(`  ${pc.green('✓')} ${pc.bold(label)}`);
+      console.log(`    ${JSON.stringify(l.data)}`);
+    }
+  }
+  console.log();
+}
+
 export async function claimEscalation(id: string, opts: { duration?: string }): Promise<void> {
   const body: any = {};
   if (opts.duration) body.durationMinutes = parseInt(opts.duration, 10);

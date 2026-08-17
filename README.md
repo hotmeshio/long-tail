@@ -2,9 +2,9 @@
 
 **The queue durable systems forgot.**
 
-Durable platforms are built around determinism — that is their strength and their blind spot. They give you rich, first-class queues for deterministic work (retry, timeout, `backoffCoefficient`, exactly-once) and an `await condition()` to park a workflow until a signal arrives. All of it assumes the thing you are waiting on will, eventually, behave.
+Durable platforms queue deterministic work well — retries, timeouts, exactly-once — and give you `await condition()` to park a workflow until a signal arrives. But the wait itself is invisible: nothing to find, claim, or measure while it sits there.
 
-Long Tail makes non-determinism a primitive. The same `condition()` wait — except the act of waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. Machines answer some rows, people answer others; the workflow resumes either way, exactly where it paused.
+Long Tail's `conditional` is that same wait made visible. Waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. A person or a machine answers it; the workflow resumes exactly where it paused.
 
 ```bash
 npm install @hotmeshio/long-tail
@@ -12,26 +12,26 @@ npm install @hotmeshio/long-tail
 
 ## How it works
 
-One workflow, both queues: `proxyActivities` for the deterministic one, `condition()` for non-determinism.
+One workflow, both queues: `proxyActivities` for the deterministic one, `conditional` for non-determinism.
 
 ```typescript
 import { Durable } from '@hotmeshio/hotmesh';
-import type { LTEnvelope } from '@hotmeshio/long-tail';
+import { conditional, type LTEnvelope } from '@hotmeshio/long-tail';
 import * as activities from './activities';
 
 const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function reviewContent(envelope: LTEnvelope) {
-  // method calls are checkpointed and crash safe
+  // activity calls are checkpointed and crash-safe
   const analysis = await analyzeContent(envelope.data.content);
 
   if (analysis.confidence >= 0.85) {
     return { data: { approved: true, analysis } };
   }
 
-  //role-based escalations are baked-in. create HITL escalations with one call
+  // low confidence: pause as a claimable, role-gated escalation
   const { workflowId } = Durable.workflow.workflowInfo();
-  const decision = await Durable.workflow.condition<{ approved: boolean; notes?: string }>(
+  const decision = await conditional<{ approved: boolean; notes?: string }>(
     `review-${workflowId}`,
     {
       role: 'reviewer',
@@ -40,14 +40,28 @@ export async function reviewContent(envelope: LTEnvelope) {
       description: `Confidence ${analysis.confidence} — needs a human`,
       metadata: { contentId: envelope.data.contentId },
       envelope: { data: envelope.data, analysis },
+      schemaVersion: 1,   // the reviewer form edition this code is written for
     },
   );
 
-  return { data: { approved: decision.approved, analysis } };
+  return { data: { approved: decision && decision.approved, analysis } };
 }
 ```
 
-Two surfaces, one model. A `proxyActivity` targets a machine: call it, get a result. `condition()` targets the external world — a reviewer, an operator, a factory cell. It suspends the workflow and writes a single escalation row carrying everything needed to route the work: the `role` that should act, its `type` and `priority`, and any `metadata` to display or filter on. People work that row through an RBAC-scoped surface — find it, claim it, resolve it — from the dashboard, the API, or MCP, and resolving it resumes the workflow exactly where it paused.
+The `reviewer` role owns a versioned form schema. The platform renders it as the resolver's UI, validates every submission against it, and `schemaVersion` pins the edition this code expects — evolve the form and the payload type together, and rows in flight keep the form they were minted for:
+
+```json
+{
+  "title": "Content Review",
+  "required": ["approved"],
+  "properties": {
+    "approved": { "type": "boolean", "description": "Approve this content?" },
+    "notes":    { "type": "string", "format": "textarea", "description": "What you saw" }
+  }
+}
+```
+
+Two surfaces, one model. A `proxyActivity` targets a machine: call it, get a result. `conditional` targets the external world — a reviewer, an operator, a factory cell. It suspends the workflow and writes a single escalation row carrying everything needed to route the work: the `role` that should act, its `type` and `priority`, and any `metadata` to display or filter on. People work that row through an RBAC-scoped surface — find it, claim it, resolve it — from the dashboard, the API, or MCP, and resolving it resumes the workflow exactly where it paused.
 
 Activities are plain functions:
 

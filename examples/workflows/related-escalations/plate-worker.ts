@@ -1,6 +1,6 @@
 /**
  * Plate child workflow — one lone waiter per plate, the fan-out shape for
- * parallel human work (each child runs a single inline `conditionLT`; the
+ * parallel human work (each child runs a single inline `conditional`; the
  * parent collects completion signals in one canonical `Promise.all` fan-in).
  *
  * The plate row carries the walk's `originId` facet — the rendezvous the
@@ -12,7 +12,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import {
   REL_PLATE_ROLE,
@@ -44,7 +44,7 @@ export async function relPlateWorkflow(envelope: LTEnvelope): Promise<any> {
 
   // One atomic wait: the plate row commits in this child's Leg1 checkpoint,
   // faceted with the walk's originId so the closeout form finds it.
-  const payload = await conditionLT<RelPlateResolverV1>(`rel-plate-${unit}-${originId}`, {
+  const payload = await conditional<RelPlateResolverV1>(`rel-plate-${unit}-${originId}`, {
     role: REL_PLATE_ROLE,
     type: 'walk',
     subtype: 'plate',

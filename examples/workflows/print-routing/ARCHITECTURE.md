@@ -96,7 +96,7 @@ means it survives crashes, replays cleanly, and is readable as a plain loop.
 
 **Role:** the assembly-line machine. One durable workflow per physical printer.
 
-**Pattern:** bounded `while` loop, `conditionLT` as the wait-for-work primitive.
+**Pattern:** bounded `while` loop, `conditional` as the wait-for-work primitive.
 
 ```typescript
 while (totalRuns < EOL_RUNS) {

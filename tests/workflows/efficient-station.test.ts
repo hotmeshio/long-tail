@@ -18,11 +18,11 @@ const { Connection, Client, Worker } = Durable;
 const TASK_QUEUE = 'test-efficient-station';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Efficient station (conditionLT atomic path) — the migration target for the
+// Efficient station (conditional atomic path) — the migration target for the
 // two-step station workers in the reference app and the boilerplate ortho pipeline.
 //
 // Proves the long-tail surface that makes the one-line opt-in work end-to-end:
-//   • conditionLT(signalId, config) writes the escalation in Leg1 (signal_key set);
+//   • conditional(signalId, config) writes the escalation in Leg1 (signal_key set);
 //   • the dashboard path (api.resolveEscalation by id → Path 0) resumes in place;
 //   • the webhook path (api.resolveBySignalKey) resumes in place;
 //   • created/resolved system events fire through the eventManager.
@@ -30,7 +30,7 @@ const TASK_QUEUE = 'test-efficient-station';
 // because that is exactly what the dashboard "Resolve" button calls.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('efficient station (conditionLT atomic path)', () => {
+describe('efficient station (conditional atomic path)', () => {
   let client: InstanceType<typeof Client>;
   let worker: Awaited<ReturnType<typeof Worker.create>>;
   let adapter: InMemoryEventAdapter;

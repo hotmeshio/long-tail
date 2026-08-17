@@ -2,7 +2,7 @@ import { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
 import { compileSchemaValidator, formatValidationErrors } from '../../services/role/schema-validator';
-import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
+import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
@@ -70,6 +70,25 @@ export async function createEscalation(
     // stamped here — omitting it means the resolve UI renders the role's latest
     // form at fetch time.
     const metadata = input.metadata ?? {};
+
+    // Lookup refs ride the envelope under a reserved key with a fixed
+    // contract: version required — a ref pins an immutable knowledge edition,
+    // never a moving target.
+    if (input.envelope) {
+      try {
+        const envelopeObj = JSON.parse(input.envelope);
+        if (envelopeObj && typeof envelopeObj === 'object'
+          && envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS] !== undefined) {
+          assertLookupRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+        }
+      } catch (refErr: any) {
+        if (refErr instanceof SyntaxError) {
+          return { status: 400, error: 'envelope must be valid JSON' };
+        }
+        return { status: 400, error: refErr.message };
+      }
+    }
+
     const metadataSchema = await roleService.getRoleMetadataSchema(role);
     if (metadataSchema) {
       let validate: ValidateFunction;

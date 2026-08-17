@@ -87,3 +87,50 @@ describe('x-lt-options membership enforcement', () => {
     expect(validateResolverPayload(SCHEMA, { left_quantity: 9 }, CTX)).toHaveLength(1);
   });
 });
+
+describe('x-lt-options cascading (interpolated paths)', () => {
+  // The lookup domain rides the ctx like any other; the region select's
+  // options follow the live country answer.
+  const LOOKUP_CTX = {
+    lookup: {
+      geo: {
+        countries: ['US', 'EU'],
+        regions: { US: ['CA', 'NY'], EU: ['DE', 'FR'] },
+      },
+    },
+  };
+  const CASCADE_SCHEMA = {
+    properties: {
+      country: { type: 'string', 'x-lt-options': 'lookup.geo.countries' },
+      region: { type: 'string', title: 'Region', 'x-lt-options': 'lookup.geo.regions.{{resolver.country}}' },
+    },
+  } as Record<string, unknown>;
+
+  it('a child value legal for the chosen parent passes; another parent\'s value fails', () => {
+    expect(validateResolverForm(CASCADE_SCHEMA, { country: 'US', region: 'NY' }, LOOKUP_CTX)).toEqual([]);
+    const errors = validateResolverForm(CASCADE_SCHEMA, { country: 'US', region: 'DE' }, LOOKUP_CTX);
+    expect(errors).toEqual([
+      { field: 'region', message: 'Must be one of: CA, NY' },
+    ]);
+  });
+
+  it('fails closed: a child value with no parent answer never submits', () => {
+    const errors = validateResolverForm(CASCADE_SCHEMA, { country: '', region: 'CA' }, LOOKUP_CTX);
+    expect(errors).toEqual([
+      { field: 'region', message: 'No valid options for this selection' },
+    ]);
+  });
+
+  it('an interpolated path yields [] on miss; a plain path keeps the legacy undefined', () => {
+    expect(resolveFieldOptions(
+      { 'x-lt-options': 'lookup.geo.regions.{{resolver.country}}' },
+      { ...LOOKUP_CTX, resolver: {} },
+    )).toEqual([]);
+    expect(resolveFieldOptions({ 'x-lt-options': 'lookup.geo.absent' }, LOOKUP_CTX)).toBeUndefined();
+  });
+
+  it('the API entry point enforces the cascade against the submitted values', () => {
+    expect(validateResolverPayload(CASCADE_SCHEMA, { country: 'EU', region: 'FR' }, LOOKUP_CTX)).toEqual([]);
+    expect(validateResolverPayload(CASCADE_SCHEMA, { country: 'EU', region: 'CA' }, LOOKUP_CTX)).toHaveLength(1);
+  });
+});

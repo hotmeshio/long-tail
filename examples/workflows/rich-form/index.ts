@@ -12,19 +12,19 @@
  * lookup. The workflow declares the exact interface it is written against with
  * two co-located literals: the type it expects back (`IntakeResolverV1`) and the
  * version number that produced it (`INTAKE_SCHEMA_VERSION`). Both are passed to a
- * single `conditionLT` call. `schemaVersion` folds into the escalation metadata
+ * single `conditional` call. `schemaVersion` folds into the escalation metadata
  * inside the same atomic Leg1 write the engine already performs — the cost of
  * this line is exactly the cost of `condition()`: one commit, no create activity,
  * no version query. When the human resolves, the pipeline validates the flat
  * submission against form_schema, maps it via x-lt-bind, validates the tree
- * against resolver_schema, and delivers it as the signal — so `conditionLT`
+ * against resolver_schema, and delivers it as the signal — so `conditional`
  * returns resolver-shaped, contract-checked `IntakeResolverV1`.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import { INTAKE_ROLE, INTAKE_SCHEMA_VERSION, type IntakeResolverV1 } from './forms';
 
@@ -53,7 +53,7 @@ export async function richForm(envelope: LTEnvelope): Promise<any> {
   // One atomic expression: write the escalation in Leg1 AND suspend. The version
   // the workflow is coded against is a literal — the returned shape is typed to
   // match it. No create activity, no version fetch; same cost as condition().
-  const response = await conditionLT<IntakeResolverV1>(signalId, {
+  const response = await conditional<IntakeResolverV1>(signalId, {
     role,
     type: 'intake',
     subtype: 'rich-form',

@@ -20,7 +20,7 @@ export const VERDICT_ROLE = 'verdict-reviewer';
 export const VERDICT_SCHEMA_VERSION = 1;
 
 /**
- * The payload shape the workflow receives from conditionLT after the human
+ * The payload shape the workflow receives from conditional after the human
  * completes the Sided Verdict form. Option membership and the min-sum guard
  * have already been enforced before submit.
  */

@@ -4,7 +4,7 @@
  * A three-step onboarding wizard. Step 1 is open to the pool; whoever resolves
  * it becomes the owner (identity via the reserved $resolution key). Steps 2 and
  * 3 are BORN ASSIGNED to that owner in one atomic commit
- * (`conditionLT({ assignee, durationMinutes, parentId })`, HotMesh 0.27.0) and
+ * (`conditional({ assignee, durationMinutes, parentId })`, HotMesh 0.27.0) and
  * parented to the step the owner just submitted. The dashboard hands the owner
  * straight from one step to the next, so the whole thing feels like a single
  * multi-page form — zero queue navigation.
@@ -21,7 +21,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, EscalationResolution } from '../../../types';
-import { conditionLT, type ConditionEscalationConfig } from '../../../services/orchestrator/condition';
+import { conditional, type ConditionEscalationConfig } from '../../../services/orchestrator/condition';
 import {
   TXN_STEP1_ROLE,
   TXN_STEP2_ROLE,
@@ -44,7 +44,7 @@ const HOLD_MINUTES = 30;
  */
 async function awaitStep<T>(signalBase: string, config: ConditionEscalationConfig): Promise<T> {
   for (let attempt = 0; ; attempt++) {
-    const result = await conditionLT<T>(
+    const result = await conditional<T>(
       attempt === 0 ? signalBase : `${signalBase}-r${attempt}`,
       config,
     );

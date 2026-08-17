@@ -1,4 +1,4 @@
-import { Brain, BookOpen } from 'lucide-react';
+import { Braces, BookOpen } from 'lucide-react';
 import { useListDomains } from '../../../api/knowledge';
 import { DateValue } from '../../../components/common/display/DateValue';
 import type { AgentFormState } from './agent-form-types';
@@ -51,7 +51,7 @@ export function KnowledgeStep({ form, set }: Props) {
                   form.knowledge_domain === d.domain ? 'border-l-2 border-l-accent bg-accent/5' : 'hover:bg-surface-hover border-l-2 border-l-transparent'
                 }`}
               >
-                <Brain className="w-3.5 h-3.5 text-text-quaternary shrink-0" strokeWidth={1.5} />
+                <Braces className="w-3.5 h-3.5 text-text-quaternary shrink-0" strokeWidth={1.5} />
                 <span className="text-sm text-text-primary flex-1">{d.domain}</span>
                 <span className="text-2xs text-text-quaternary">{d.count} entries</span>
                 <span className="text-2xs text-text-quaternary"><DateValue date={d.latest} /></span>

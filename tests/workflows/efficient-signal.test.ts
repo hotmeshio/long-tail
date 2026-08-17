@@ -18,7 +18,7 @@ const TASK_QUEUE = 'test-efficient-signal';
 // ─────────────────────────────────────────────────────────────────────────────
 // Efficient escalation (durable) — the atomic `condition(signalId, config)` path.
 //
-// Showcases the win over the legacy two-step (ltCreateEscalation + conditionLT):
+// Showcases the win over the legacy two-step (ltCreateEscalation + conditional):
 //   • the escalation row is written inside the workflow's Leg1 checkpoint
 //     (one atomic commit — no separate create activity);
 //   • `system.escalation.{id}.created` fires from the worker engine (0.22.5);

@@ -1,4 +1,5 @@
 import * as knowledgeActivity from '../system/activities/knowledge';
+import * as knowledgeService from '../services/knowledge';
 import type { LTApiResult } from '../types/sdk';
 
 export async function listDomains(): Promise<LTApiResult> {
@@ -32,6 +33,34 @@ export async function getEntry(input: {
   try {
     const result = await knowledgeActivity.getKnowledge(input);
     return { status: 200, data: result };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+export async function getEntryVersion(input: {
+  domain: string;
+  key: string;
+  version: number;
+}): Promise<LTApiResult> {
+  try {
+    const result = await knowledgeService.getKnowledgeVersion(input.domain, input.key, input.version);
+    if (!result) {
+      return { status: 404, error: `No version ${input.version} of ${input.domain}/${input.key}` };
+    }
+    return { status: 200, data: result };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+export async function listEntryVersions(input: {
+  domain: string;
+  key: string;
+}): Promise<LTApiResult> {
+  try {
+    const versions = await knowledgeService.listKnowledgeVersions(input.domain, input.key);
+    return { status: 200, data: { domain: input.domain, key: input.key, versions } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

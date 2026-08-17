@@ -2,7 +2,7 @@
 
 CRUD operations for the knowledge store — a domain-scoped key-value store backed by PostgreSQL JSONB. Each entry has a domain, key, arbitrary JSON data, and optional tags.
 
-All endpoints require authentication.
+All endpoints require authentication and builder access (superadmin or a user holding the `engineer` role). Members reach knowledge content only through escalation lookup refs — see [lookups](../../hitl/lookups.md) and `GET /api/escalations/:id/lookups`.
 
 ## List domains
 
@@ -64,12 +64,13 @@ Returns entries within a domain, ordered by last updated.
 GET /api/knowledge/entry?domain=screenshot&key=google
 ```
 
-Returns a single knowledge entry by domain and key. Returns `{ found: false }` if not found.
+Returns a single knowledge entry by domain and key. Returns `{ found: false }` if not found. With `version`, returns that immutable edition from the version history instead of the live entry.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `domain` | `string` | Yes | Domain |
 | `key` | `string` | Yes | Entry key |
+| `version` | `integer` | No | Fetch this immutable edition instead of the live entry |
 
 **Response 200:**
 
@@ -82,6 +83,27 @@ Returns a single knowledge entry by domain and key. Returns `{ found: false }` i
   "tags": [],
   "created_at": "2026-05-09T22:26:51.616Z",
   "updated_at": "2026-05-09T22:26:51.616Z"
+}
+```
+
+## List entry versions
+
+```
+GET /api/knowledge/entry/versions?domain=catalog&key=materials
+```
+
+Every data-changing write mints an immutable edition. Lists them newest first, with the current one marked.
+
+**Response 200:**
+
+```json
+{
+  "domain": "catalog",
+  "key": "materials",
+  "versions": [
+    { "version": 2, "change_summary": null, "created_at": "...", "is_current": true },
+    { "version": 1, "change_summary": null, "created_at": "...", "is_current": false }
+  ]
 }
 ```
 

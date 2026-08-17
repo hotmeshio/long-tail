@@ -11,7 +11,7 @@ export { midnightTheme } from './themes/midnight';
 export { registerLT, createLTInterceptor } from './services/interceptor';
 export { createLTActivityInterceptor } from './services/interceptor/activity-interceptor';
 export { executeLT } from './services/orchestrator';
-export { conditionLT } from './services/orchestrator/condition';
+export { conditional, conditionLT } from './services/orchestrator/condition';
 export type { ExecuteLTOptions } from './services/orchestrator/types';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken, setAuthAdapter } from './modules/auth';
 export * from './types';

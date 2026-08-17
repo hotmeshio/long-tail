@@ -21,7 +21,7 @@
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope } from '../../../types';
-import { conditionLT } from '../../../services/orchestrator/condition';
+import { conditional } from '../../../services/orchestrator/condition';
 import * as activities from './activities';
 import {
   ACME_ADDONS_ROLE,
@@ -116,7 +116,7 @@ export async function acmeWidget(envelope: LTEnvelope): Promise<any> {
     customChecks: Object.fromEntries(addons.map((item) => [item.id, false])),
   };
 
-  const addonsResult = await conditionLT<AcmeAddonsResolverV1>(`acme-addons-${ctx.workflowId}`, {
+  const addonsResult = await conditional<AcmeAddonsResolverV1>(`acme-addons-${ctx.workflowId}`, {
     role: ACME_ADDONS_ROLE,
     type: 'station',
     subtype: 'addons',
@@ -153,7 +153,7 @@ export async function acmeWidget(envelope: LTEnvelope): Promise<any> {
     checks: Object.fromEntries(QA_FIXED_ITEMS.map((item) => [item.id, false])),
   };
 
-  const qaResult = await conditionLT<AcmeQaResolverV1>(`acme-qa-${ctx.workflowId}`, {
+  const qaResult = await conditional<AcmeQaResolverV1>(`acme-qa-${ctx.workflowId}`, {
     role: ACME_QA_ROLE,
     type: 'station',
     subtype: 'final-qa',

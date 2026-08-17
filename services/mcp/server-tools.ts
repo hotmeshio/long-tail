@@ -3,6 +3,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as escalationService from '../escalation';
+import { resolveLookupRefs } from '../knowledge';
+import { readLookupRefs } from '../../api/escalations/lookups';
 
 // ── Schemas (extracted to break TS2589 deep-instantiation in registerTool generics) ──
 
@@ -18,6 +20,10 @@ const escalateSchema = z.object({
 
 const checkResolutionSchema = z.object({
   escalation_id: z.string().describe('The escalation ID to check'),
+});
+
+const getEscalationLookupsSchema = z.object({
+  escalation_id: z.string().describe('The escalation whose pinned knowledge lookups to resolve'),
 });
 
 const getAvailableWorkSchema = z.object({
@@ -135,6 +141,36 @@ export function registerHumanQueueTools(server: McpServer): void {
       }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+      };
+    },
+  );
+
+  // ── get_escalation_lookups ──────────────────────────────────────────
+  (server as any).registerTool(
+    'get_escalation_lookups',
+    {
+      title: 'Get Escalation Lookups',
+      description: 'Resolve the versioned knowledge lookups pinned on an escalation (envelope.lookups). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with missing: true.',
+      inputSchema: getEscalationLookupsSchema,
+    },
+    async (args: z.infer<typeof getEscalationLookupsSchema>) => {
+      const escalation = await escalationService.getEscalation(args.escalation_id);
+      if (!escalation) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: 'Escalation not found' }),
+          }],
+          isError: true,
+        };
+      }
+      const refs = readLookupRefs(escalation.envelope);
+      const lookups = refs.length > 0 ? await resolveLookupRefs(refs) : [];
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({ escalation_id: escalation.id, lookups }),
+        }],
       };
     },
   );

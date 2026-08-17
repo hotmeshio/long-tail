@@ -1,8 +1,16 @@
 import { Router } from 'express';
 
 import * as api from '../api/knowledge';
+import { requireBuilder } from '../modules/auth';
 
 const router = Router();
+
+// The knowledge store is a builder surface (superadmin or engineer) — the
+// same gate as the dashboard's Knowledge page. Members reach knowledge
+// content only through escalation lookup refs: an escalation's
+// envelope.lookups grants its readers exactly the pinned editions it names,
+// served by GET /api/escalations/:id/lookups.
+router.use(requireBuilder);
 
 /**
  * GET /api/knowledge/domains
@@ -37,8 +45,9 @@ router.get('/entries', async (req, res) => {
 
 /**
  * GET /api/knowledge/entry
- * Get a single knowledge entry.
- * Query: ?domain=...&key=...
+ * Get a single knowledge entry — the live edition, or an immutable snapshot
+ * when ?version=N is present.
+ * Query: ?domain=...&key=...&version=N
  */
 router.get('/entry', async (req, res) => {
   const domain = req.query.domain as string;
@@ -47,7 +56,33 @@ router.get('/entry', async (req, res) => {
     res.status(400).json({ error: 'domain and key are required' });
     return;
   }
+  if (req.query.version !== undefined) {
+    const version = Number(req.query.version);
+    if (!Number.isInteger(version) || version < 1) {
+      res.status(400).json({ error: 'version must be a positive integer' });
+      return;
+    }
+    const result = await api.getEntryVersion({ domain, key, version });
+    res.status(result.status).json(result.data ?? { error: result.error });
+    return;
+  }
   const result = await api.getEntry({ domain, key });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * GET /api/knowledge/entry/versions
+ * List every edition of an entry, newest first, with the current one marked.
+ * Query: ?domain=...&key=...
+ */
+router.get('/entry/versions', async (req, res) => {
+  const domain = req.query.domain as string;
+  const key = req.query.key as string;
+  if (!domain || !key) {
+    res.status(400).json({ error: 'domain and key are required' });
+    return;
+  }
+  const result = await api.listEntryVersions({ domain, key });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

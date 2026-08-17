@@ -247,7 +247,7 @@ describe('resolveEscalation — Path 0 (signal_key)', () => {
   });
 });
 
-// ── Path A: metadata.signal_id (conditionLT signal — legacy two-step) ─────────
+// ── Path A: metadata.signal_id (conditional signal — legacy two-step) ─────────
 
 describe('resolveEscalation — Path A (metadata.signal_id)', () => {
   it('calls handle.signal (not resolveEscalation) when metadata.signal_id is set', async () => {
@@ -267,7 +267,7 @@ describe('resolveEscalation — Path A (metadata.signal_id)', () => {
     expect(mockCreateClient).toHaveBeenCalled();
     expect(mockSignal).toHaveBeenCalledWith('sig-abc', expect.objectContaining({
       $escalation_id: 'esc-1',
-      // provenance rides the signal; conditionLT strips it from the stored payload
+      // provenance rides the signal; conditional strips it from the stored payload
       $resolution: { escalationId: 'esc-1', resolvedBy: 'user-1', resolvedByEmail: 'u1@example.com' },
       // resolved_by always merges into the outcome patch the workflow commits atomically
       $escalation_metadata: { resolved_by: 'user-1' },

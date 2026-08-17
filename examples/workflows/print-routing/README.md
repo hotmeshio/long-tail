@@ -50,7 +50,7 @@ query, not a hash.
 | Priority — what runs first | a pluggable ordered rule list composed into `orderBy` (see `priority.ts`) |
 | An order | one `origin_id` group, claimed all-or-nothing (`claimGroups`) |
 | A printer set | batch-locked by facet (`claimByFacets`, `SKIP LOCKED`); unplaced orders carried |
-| A printer advertises | `conditionLT` writes the advert and suspends the printer |
+| A printer advertises | `conditional` writes the advert and suspends the printer |
 | the broker hands off a job | resolving the advert wakes the printer (Path 0) with a callback key |
 | the printer reports done | it signals the broker's callback key; the broker settles the order |
 | run count / refill / EOL | printer-workflow state across a bounded `condition` loop |
@@ -78,7 +78,7 @@ while (outstanding.length && attempt < MAX_PRINT_ATTEMPTS) {
   const originId = attempt === 0 ? orderId : `${orderId}#a${attempt}`;   // own group per pass
   await enqueueOrderUnits({ order, originId, unitIndices: outstanding, role, orderSignal, workflowId });
   const done = await Durable.workflow.condition<OrderDoneSignal>(orderSignal);          // printed
-  const signoff = await conditionLT<SignoffPayload>(signoffKey, { role: farmerPond, ... }); // inspected
+  const signoff = await conditional<SignoffPayload>(signoffKey, { role: farmerPond, ... }); // inspected
   outstanding = signoff.failedUnits;                     // rejected units re-enter the funnel
   attempt += 1;
 }
@@ -96,16 +96,16 @@ machinery.
 One durable workflow per machine. Its life is bounded (`EOL_RUNS`), so it loops
 its advert/suspend cycle inside a single execution — the assembly-line idiom of
 repeated `condition` calls, not a `continueAsNew` loop. Each iteration advertises via
-`conditionLT`, suspends, wakes on the outcome, and advances state.
+`conditional`, suspends, wakes on the outcome, and advances state.
 
 ```typescript
 while (totalRuns < EOL_RUNS) {
   if (runsUntilRefill <= 0) {                                              // needs filament
-    await conditionLT(refillSignal, { role: printerPool, metadata: { ...facets, state: 'maintenance' } });
+    await conditional(refillSignal, { role: printerPool, metadata: { ...facets, state: 'maintenance' } });
     runsUntilRefill = REFILL_INTERVAL; refills += 1; continue;
   }
 
-  const job = await conditionLT(readySignal, { role: printerPool, metadata: { ...facets, state: 'ready' } });
+  const job = await conditional(readySignal, { role: printerPool, metadata: { ...facets, state: 'ready' } });
   if (job && job.callbackKey) {                                          // the broker handed off a job
     await runPrintJob({ job, printerId });                              // run it, signal the broker back
     totalRuns += 1; runsUntilRefill -= 1;                                // a real run consumes filament + a cycle

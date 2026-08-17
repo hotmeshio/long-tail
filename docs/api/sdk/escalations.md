@@ -197,6 +197,27 @@ const result = await lt.escalations.get({ id: 'esc_123' });
 
 ---
 
+## getLookups
+
+Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Enforces the same read scope as `get`; the refs on the row grant exactly the pinned editions they name. See [lookups](../../hitl/lookups.md).
+
+```typescript
+const result = await lt.escalations.getLookups({ id: 'esc_123' });
+// result.data.lookups → [{ domain, key, version, as?, data, missing? }]
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Escalation UUID |
+
+**Returns:** `LTApiResult<{ lookups }>` -- each entry is `{ domain, key, version, as?, data, missing? }`.
+
+**Auth:** Required
+
+---
+
 ## getByWorkflowId
 
 List all escalations for a given workflow ID.
@@ -342,13 +363,15 @@ The in-process library takes the same patch as a third argument:
 
 ---
 
-## conditionLT (workflow helper)
+## conditional (workflow helper)
 
-Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditionLT` wraps `condition` + escalation resolution.
+Wait for a signal and automatically resolve the associated escalation. This is the counterpart to `executeLT` — where `executeLT` wraps `startChild` + `condition`, `conditional` wraps `condition` + escalation resolution.
 
 ```typescript
-conditionLT<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T | false | null>
+conditional<T>(signalId: string, escalation?: ConditionQueueConfig): Promise<T | false | null>
 ```
+
+> `conditionLT` is a deprecated alias of `conditional`. Existing code continues to work.
 
 ### Two ways to pause on an escalation
 
@@ -356,15 +379,15 @@ There are two ways to make a workflow pause as a claimable escalation, and they 
 
 - **Native `condition(signalId, escalationConfig)` — the efficient primitive.** HotMesh's `condition` takes an optional escalation config as its second argument. The row is written inside the workflow's Leg1 checkpoint, with `signal_key = signalId`. Resolving it (`resolve` / `resolveBySignalKey`) marks the row resolved **and** delivers the signal in one guarded transaction, resuming the job in place. No create activity, no enrich step, and **no proxy-activity round-trip on the resume** — the resolve is the whole transaction. This is the path to prefer.
 
-- **`conditionLT(signalId, config?)` — long-tail sugar.** With a config it delegates to the native efficient `condition` above (same atomic behavior — use it freely). Without a config it also supports the older **two-step** pattern: an escalation created separately, where the resume injects `$escalation_id` and `conditionLT` resolves it through a durable `proxyActivity` (`ltResolveEscalation`). That extra activity round-trip is the cost of the two-step form; the efficient form (and native `condition`) avoid it.
+- **`conditional(signalId, config?)` — long-tail sugar.** With a config it delegates to the native efficient `condition` above (same atomic behavior — use it freely). Without a config it also supports the older **two-step** pattern: an escalation created separately, where the resume injects `$escalation_id` and `conditional` resolves it through a durable `proxyActivity` (`ltResolveEscalation`). That extra activity round-trip is the cost of the two-step form; the efficient form (and native `condition`) avoid it.
 
-Reach for native `condition(signalId, config)` when you want the leanest path; reach for `conditionLT` for the ergonomic wrapper or to support the legacy two-step flow. Both resume the same row, and both accept the resolve-time `metadata` patch (the efficient path merges it in the single guarded UPDATE; the two-step path forwards it through `ltResolveEscalation` into that same atomic resolve).
+Reach for native `condition(signalId, config)` when you want the leanest path; reach for `conditional` for the ergonomic wrapper or to support the legacy two-step flow. Both resume the same row, and both accept the resolve-time `metadata` patch (the efficient path merges it in the single guarded UPDATE; the two-step path forwards it through `ltResolveEscalation` into that same atomic resolve).
 
 ### Atomic form (recommended)
 
 Pass an escalation config as the second argument. The escalation row is written inside the workflow's Leg1 checkpoint — one commit, crash-safe: no separate `ltCreateEscalation` activity, no enrich step. `signal_key` is set to `signalId`, so the dashboard resolve endpoint (resolve-by-id → Path 0) and `POST /escalations/resolve-by-signal-key` resume *this* job in place, and `system.escalation.{role}.{id}.created` fires automatically.
 
-`conditionLT` returns `T | false | null`:
+`conditional` returns `T | false | null`:
 - `T` — the resolver's payload (normal resolution)
 - `false` — the SLA timer fired first (`config.timeout`); the row is now `status='expired'`
 - `null` — the escalation was cancelled (workflow terminated or explicit `POST /api/escalations/:id/cancel`)
@@ -372,13 +395,13 @@ Pass an escalation config as the second argument. The escalation row is written 
 Always guard for `null` and `false` before accessing the payload:
 
 ```typescript
-import { conditionLT } from '@hotmeshio/long-tail';
+import { conditional } from '@hotmeshio/long-tail';
 
 export async function stationWorker(envelope: LTEnvelope) {
   const ctx = Durable.workflow.workflowInfo();
   const signalId = `station-done-${ctx.workflowId}`;
 
-  const decision = await conditionLT<{ approved: boolean }>(signalId, {
+  const decision = await conditional<{ approved: boolean }>(signalId, {
     role: 'qc-inspector',
     type: 'orderPipeline',
     subtype: 'qc',
@@ -418,7 +441,7 @@ UPDATE, so operators can never resolve into a workflow that already moved on.
 Create the escalation first (e.g. to enrich routing metadata), then wait:
 
 ```typescript
-import { conditionLT } from '@hotmeshio/long-tail';
+import { conditional } from '@hotmeshio/long-tail';
 
 export async function myWorkflow(envelope: LTEnvelope) {
   const signalId = `approval-${Durable.workflow.workflowId}`;
@@ -443,7 +466,7 @@ export async function myWorkflow(envelope: LTEnvelope) {
   });
 
   // Pause — dashboard signals on resolve
-  const decision = await conditionLT<{ approved: boolean; notes: string }>(signalId);
+  const decision = await conditional<{ approved: boolean; notes: string }>(signalId);
 
   if (!decision) {
     // null = cancelled, false = timeout
@@ -457,10 +480,10 @@ export async function myWorkflow(envelope: LTEnvelope) {
 **How it works:**
 
 1. The workflow creates an escalation with `metadata.signal_id` pointing to its own signal key
-2. The workflow calls `conditionLT(signalId)` and pauses
+2. The workflow calls `conditional(signalId)` and pauses
 3. A reviewer claims and resolves the escalation in the dashboard
 4. The resolve API injects `$escalation_id` into the payload and signals the workflow
-5. `conditionLT` receives the signal, strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload
+5. `conditional` receives the signal, strips `$escalation_id`, calls `ltResolveEscalation` as a durable activity, and returns the clean payload
 
 The escalation resolution happens inside the workflow as a durable activity — crash-safe and transactional within the workflow's execution context.
 
@@ -472,7 +495,7 @@ If you use raw `Durable.workflow.condition()` instead, the `$escalation_id` fiel
 
 When a reviewer claims an escalation in the dashboard, a typed form is rendered instead of a raw JSON editor — if a schema is available. There are two ways to provide one:
 
-**Option 1 — Role `form_schema` (versioned):** The escalation form is owned by the target role as a versioned `form_schema`. A workflow pins a version through `conditionLT`'s `schemaVersion`; unpinned escalations resolve against the role's latest. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload. The deprecated workflow-config `resolver_schema` remains only as a legacy fallback.
+**Option 1 — Role `form_schema` (versioned):** The escalation form is owned by the target role as a versioned `form_schema`. A workflow pins a version through `conditional`'s `schemaVersion`; unpinned escalations resolve against the role's latest. Fields may carry `x-lt-bind` to map a form value to a path in the resolver payload. The deprecated workflow-config `resolver_schema` remains only as a legacy fallback.
 
 **Option 2 — Escalation metadata (dynamic):** Pass `form_schema` inside `metadata` when creating an escalation. This overrides any role-level schema.
 
@@ -659,7 +682,7 @@ const result = await lt.escalations.bulkTriage({
 
 ## cancel
 
-Permanently cancel a pending or claimed escalation. The workflow waiting on `conditionLT` receives `null`.
+Permanently cancel a pending or claimed escalation. The workflow waiting on `conditional` receives `null`.
 
 ```typescript
 const result = await lt.escalations.cancel({ id: 'esc_123' });
@@ -769,7 +792,7 @@ const result = await lt.escalations.claimByMetadata({
 
 Find and resolve an escalation by metadata key-value pair. Single atomic query with signal guard.
 
-If the escalation has `metadata.signal_id` (created by `conditionLT`), the endpoint signals the running workflow instead of resolving directly in the DB. `conditionLT` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
+If the escalation has `metadata.signal_id` (created by `conditional`), the endpoint signals the running workflow instead of resolving directly in the DB. `conditional` receives the signal and resolves the escalation durably inside the workflow. This preserves the same transactional integrity as the standard resolve-by-ID path.
 
 ```typescript
 // Non-signal escalation → resolved atomically

@@ -15,14 +15,14 @@ export const INTAKE_ROLE = 'intake-reviewer';
 /**
  * The form version this workflow is written against. The author pins this literal
  * — a role's first form is version 1, and you bump it in the same commit that
- * evolves the form below (and `IntakeResolverV1` → `V2`). Passed to `conditionLT`
+ * evolves the form below (and `IntakeResolverV1` → `V2`). Passed to `conditional`
  * as `schemaVersion`, it folds into the row's metadata with no query or activity;
  * omit it and the resolve UI renders the role's latest form at fetch time.
  */
 export const INTAKE_SCHEMA_VERSION = 1;
 
 /**
- * The payload shape the workflow gets back from `conditionLT` — the workflow's
+ * The payload shape the workflow gets back from `conditional` — the workflow's
  * own contract, produced by the form's `x-lt-bind` map. Declared once as a zod
  * schema: the TYPE derives from it (z.infer) and activities parse resolutions
  * through it via `parseResolverPayload` for runtime assurance. With
