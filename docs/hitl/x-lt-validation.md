@@ -93,6 +93,36 @@ When `envelope.min_score` is `60`, submitting a score of `45` blocks with "Minim
 
 ---
 
+## Dynamic Select Options (`x-lt-options`)
+
+A select's option list can ride the escalation instead of the schema. The field-level token names a `"domain.path"`; the array of strings or numbers at that path becomes the field's options — one static role form, per-row legal values:
+
+```json
+{
+  "properties": {
+    "left_quantity": {
+      "type": "number",
+      "default": 0,
+      "x-lt-options": "envelope.left_quantity_options"
+    },
+    "designation": {
+      "type": "string",
+      "x-lt-options": "envelope.return_stations"
+    }
+  }
+}
+```
+
+When the envelope carries `left_quantity_options: [0, 1, 2, 3]`, the field renders as a dropdown offering exactly those values — an out-of-range answer is structurally impossible. The workflow mints only the small per-row array; the form itself stays on the role.
+
+- A static `enum` takes precedence when both are present — the same static-over-dynamic rule as the bounds tokens.
+- The declared `type` governs the value: a number-typed field emits the picked option as a number, a string-typed field as a string.
+- While the current value is outside the option list (an empty init, options that shrank per-row), the select opens on an explicit disabled **Choose…** placeholder — never an implicit first option.
+- A path that resolves to nothing (missing, empty array, no scalar entries) yields no options: the field renders as the plain input for its type and membership is not enforced for that submission.
+- Membership is enforced on both sides of the wire: the dashboard constrains the choices, and an enforced role's server gate rejects a payload whose value is outside the row's resolved list with the canonical 422 (`Must be one of: 0, 1, 2, 3`).
+
+---
+
 ## Checklist Completion (`x-lt-require-all`)
 
 A checklist-widget field can require every item to be checked before submission:
@@ -143,6 +173,29 @@ The token is an array of groups; each group is an array of property names and en
 
 ---
 
+## Require a Combined Quantity (`x-lt-require-sum`)
+
+For a group of **quantity** fields, `x-lt-require-any` is the wrong guard: `0` is an answer there, so counts defaulting to `0` vacuously satisfy the group. `x-lt-require-sum` reads the members as numbers and demands their sum reach a minimum — a Left quantity and a Right quantity can both default to `0`, and an all-zero submission still blocks:
+
+```json
+{
+  "x-lt-require-sum": [{ "fields": ["left_quantity", "right_quantity"] }],
+  "properties": {
+    "left_quantity":  { "type": "number", "title": "Left Quantity", "default": 0 },
+    "right_quantity": { "type": "number", "title": "Right Quantity", "default": 0 }
+  }
+}
+```
+
+The token is an array of groups; each group is `{ "fields": [...], "minimum": N }` and enforces independently. `minimum` defaults to `1` — the plain "at least one side must be positive" reading. Numbers contribute their value, numeric strings coerce, and everything else (empty, missing, non-numeric) contributes `0`.
+
+- Visibility composes the same way as `x-lt-require-any`: a member hidden by `x-lt-showIf` (or naming no schema property) contributes nothing and is not demanded, and a group whose members are all hidden is waived.
+- An unsatisfied group yields one violation on the group's first visible field: `Combined value of Left Quantity, Right Quantity must be at least 1` (member titles, falling back to keys).
+- Composes with `required` and `x-lt-require-any` — each guard reports independently.
+- The same pass runs on both sides of the wire — the dashboard panel blocks the submit, and an enforced role's server gate rejects a violating payload with the canonical 422.
+
+---
+
 ## Pattern Guard
 
 Apply a regular expression guard with `pattern`. If the input does not match, the field blocks submission. Provide `x-lt-pattern-error` for a human-readable error message; otherwise the generic "Invalid format" is shown.
@@ -163,7 +216,7 @@ Apply a regular expression guard with `pattern`. If the input does not match, th
 
 ## Dynamic Bounds — `"domain.path"` Resolution
 
-`x-lt-minimum`, `x-lt-maximum`, `x-lt-min-length`, and `x-lt-max-length` all accept a `"domain.path"` string. The value is resolved from the escalation context at the moment of submission — the same domain/path convention as `x-lt-showIf` and `x-lt-help` tokens.
+`x-lt-minimum`, `x-lt-maximum`, `x-lt-min-length`, `x-lt-max-length`, and `x-lt-options` all accept a `"domain.path"` string. The value is resolved from the escalation context at the moment of submission — the same domain/path convention as `x-lt-showIf` and `x-lt-help` tokens.
 
 | Domain | Resolves against |
 |--------|-----------------|
@@ -216,3 +269,11 @@ The error panel updates in real-time as fields are corrected — fixing a field 
 - `checks` — checklist widget with `x-lt-source: 'envelope.checklist_items'`
 
 The `quality-reviewer` role is seeded with two test escalations that carry different `min_score` and `max_notes_length` values so every dynamic bound is exercisable without code changes.
+
+`examples/workflows/parameterized-form/` is the reference for per-row form parameterization:
+
+- `left_quantity` / `right_quantity` — number selects with `x-lt-options` from `envelope.left_quantity_options` / `envelope.right_quantity_options`, both defaulting to `0`
+- `designation` — string select with `x-lt-options` from `envelope.return_stations`
+- `x-lt-require-sum` — the quantity pair must total at least 1
+
+The `verdict-reviewer` role is seeded with two test escalations whose envelopes carry different quantity ranges and station lists, so the same role form offers different legal values per row.

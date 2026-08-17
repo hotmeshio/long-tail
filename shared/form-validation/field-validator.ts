@@ -1,3 +1,5 @@
+import { resolveFieldOptions } from './x-lt-options';
+
 export interface FieldError { field: string; message: string }
 
 interface ChecklistItem { id: string; label: string; required?: boolean }
@@ -100,11 +102,12 @@ export function validateFieldConstraints(
 ): string | undefined {
   if (!fieldSchema) return undefined;
 
-  // Enum membership — the form's select widget constrains choices; API-first
-  // callers are unconstrained, so the schema's enum is the contract.
-  const allowed = fieldSchema.enum;
+  // Option membership — the form's select widget constrains choices; API-first
+  // callers are unconstrained, so the effective option list is the contract:
+  // the static enum, or the x-lt-options list resolved from context.
+  const allowed = resolveFieldOptions(fieldSchema, ctx);
   if (
-    Array.isArray(allowed) && allowed.length > 0
+    allowed && allowed.length > 0
     && value !== undefined && value !== null && value !== ''
     && !allowed.includes(value as never)
   ) {

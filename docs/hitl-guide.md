@@ -103,6 +103,8 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
+| `x-lt-require-any` | schema | At-least-one guard — each `string[]` group needs a value in one visible member; `0`/`false` count as answers |
+| `x-lt-require-sum` | schema | Quantity-group guard — the numeric values of `{ fields, minimum? }` must total at least `minimum` (default 1) |
 | `x-lt-language` | field | Syntax hint for the `code-editor` widget |
 | `accept` | field | File-type filter for `file-upload` (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path in the resolver payload (e.g. `"customer.email"`) |
@@ -110,6 +112,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
+| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` to the field's option list; static `enum` wins |
 | `x-lt-minimum` | field | Dynamic lower bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-maximum` | field | Dynamic upper bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-min-length` | field | Dynamic minimum string length — resolves a `"domain.path"` |

@@ -17,6 +17,8 @@
  *
  * Root-level x-lt-require-any groups run after the per-field pass: each group
  * needs a value in at least one visible member (all-hidden groups are waived).
+ * x-lt-require-sum groups follow the same visibility rules but read members
+ * as numbers: the group's visible members must sum to at least its minimum.
  *
  * The showIf/`resolver.*` domain is always the FLAT form representation, so a
  * condition like `resolver.approved` reads the same on both sides.
@@ -25,6 +27,7 @@ import { type FieldError, validateField } from './field-validator';
 import { evaluateShowIf, type ShowIfContext } from './x-lt-show-if';
 import { mapPayloadToForm } from './x-lt-bind';
 import { readRequireAnyGroups, hasRequireAnyValue } from './x-lt-require-any';
+import { readRequireSumGroups, requireSumContribution } from './x-lt-require-sum';
 
 export type { FieldError } from './field-validator';
 
@@ -78,6 +81,23 @@ export function validateResolverForm(
     errors.push({
       field: visible[0],
       message: `Enter a value for at least one of: ${titles.join(', ')}`,
+    });
+  }
+
+  // Require-sum groups: the numeric values of VISIBLE members must total at
+  // least the group's minimum. A `0` is a real number here — unlike
+  // require-any, defaulted-zero quantities do not satisfy the group.
+  for (const group of readRequireSumGroups(schema)) {
+    const visible = group.fields.filter(
+      (k) => properties[k] && evaluateShowIf(properties[k]['x-lt-showIf'], liveCtx),
+    );
+    if (visible.length === 0) continue;
+    const total = visible.reduce((sum, k) => sum + requireSumContribution(formValues[k]), 0);
+    if (total >= group.minimum) continue;
+    const titles = visible.map((k) => (properties[k].title as string | undefined) ?? k);
+    errors.push({
+      field: visible[0],
+      message: `Combined value of ${titles.join(', ')} must be at least ${group.minimum}`,
     });
   }
   return errors;

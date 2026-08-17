@@ -1,5 +1,6 @@
 import { WIDGET_MAP } from '../widgets';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
+import { resolveFieldOptions } from '../../../lib/x-lt-options';
 import { deriveFieldLabel } from '../../../lib/derive-field-label';
 import { FieldLabel, FieldHelper, FieldError, inputClass, selectClass } from './FieldChrome';
 import { type JsonValue } from './form-cells';
@@ -105,6 +106,44 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     }
   }
 
+  // Select — the option list is the schema's static enum, or the x-lt-options
+  // list resolved from the escalation context (one static role form, per-row
+  // legal options). Dispatched by SCHEMA, not runtime value: a number-typed
+  // count seeded to its 0 default must render as a select, not a number input.
+  const selectOptions = resolveFieldOptions(fieldSchema, escalationContext as Record<string, unknown> | undefined);
+  if (selectOptions?.length && (value === null || typeof value === 'string' || typeof value === 'number')) {
+    const current = value === null ? '' : String(value);
+    // A value outside the option list (empty init, stale draft, options that
+    // shrank per-row) renders an explicit disabled "Choose…" placeholder: the
+    // decision is the user's, never an implicit first option. Once chosen
+    // there is no way back to unchosen.
+    const hasCurrent = selectOptions.some((opt) => String(opt) === current);
+    return (
+      <div>
+        <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
+        {helperText && <FieldHelper id={helpId}>{helperText}</FieldHelper>}
+        <select
+          value={hasCurrent ? current : ''}
+          onChange={(e) => {
+            // Emit the option's own value so a numeric option stays a number.
+            const picked = selectOptions.find((opt) => String(opt) === e.target.value);
+            onChange(picked ?? e.target.value);
+          }}
+          onBlur={onBlur}
+          data-field-key={fieldKey}
+          className={selectClass(!!error)}
+          {...ariaProps}
+        >
+          {!hasCurrent && <option value="" disabled>Choose…</option>}
+          {selectOptions.map((opt) => (
+            <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
+          ))}
+        </select>
+        <FieldError error={error} id={errorId} />
+      </div>
+    );
+  }
+
   // Boolean → checkbox
   if (typeof value === 'boolean') {
     return (
@@ -154,34 +193,6 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   // String
   if (typeof value === 'string') {
     const isPassword = fieldSchema?.format === 'password';
-    const enumValues = fieldSchema?.enum as string[] | undefined;
-
-    if (enumValues?.length) {
-      // An empty value on an enum whose options don't include '' renders an
-      // explicit "Choose…" placeholder: the decision is the user's, never an
-      // implicit first option. Once chosen there is no way back to unchosen.
-      const needsPlaceholder = value === '' && !enumValues.includes('');
-      return (
-        <div>
-          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-          {helperText && <FieldHelper id={helpId}>{helperText}</FieldHelper>}
-          <select
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={onBlur}
-            data-field-key={fieldKey}
-            className={selectClass(!!error)}
-            {...ariaProps}
-          >
-            {needsPlaceholder && <option value="" disabled>Choose…</option>}
-            {enumValues.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-          <FieldError error={error} id={errorId} />
-        </div>
-      );
-    }
 
     if (isPassword) {
       return (

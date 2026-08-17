@@ -14,5 +14,7 @@ export * from './x-lt-query';
 export * from './x-lt-submit-guard';
 export * from './x-lt-show-if';
 export * from './x-lt-require-any';
+export * from './x-lt-require-sum';
+export * from './x-lt-options';
 export * from './field-validator';
 export * from './validate-resolver-payload';
