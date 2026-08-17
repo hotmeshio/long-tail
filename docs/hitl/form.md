@@ -32,6 +32,7 @@ Declare `title` on every field whose key isn't already a readable label — it i
 | `number` | Number input |
 | `string` | Text input (default) |
 | `string` + `enum` | Dropdown select |
+| `string`/`number` + `x-lt-options` | Dropdown select — options resolved from the escalation context (see [x-lt-validation.md](x-lt-validation.md#dynamic-select-options-x-lt-options)) |
 | `null` | Read-only "null" display |
 | `array` | Tag display (read-only) |
 | `object` | Nested section with recursive fields, or a widget (see [x-lt-widget.md](x-lt-widget.md)) |

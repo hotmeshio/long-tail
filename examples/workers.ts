@@ -18,6 +18,8 @@ import * as transitionChainWorkflow from './workflows/transition-chain';
 import { TXN_STEP1_ROLE, TXN_STEP2_ROLE, TXN_STEP3_ROLE } from './workflows/transition-chain/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as constraintFormWorkflow from './workflows/constraint-form';
+import * as parameterizedFormWorkflow from './workflows/parameterized-form';
+import { VERDICT_ROLE } from './workflows/parameterized-form/forms';
 import * as policyDocumentWorkflow from './workflows/policy-document';
 import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
@@ -135,6 +137,21 @@ const checklistConfirmationConfig: LTWorkerConfig = {
   defaultRole: CHECKLIST_OPERATOR,
   envelopeSchema: {
     data: { count: 5 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const parameterizedFormConfig: LTWorkerConfig = {
+  description: 'Parameterized form — reference example for per-row form parameterization: one static role form whose quantity dropdowns (x-lt-options from envelope.left/right_quantity_options) and Return To station list (envelope.return_stations) carry different legal values per escalation, guarded by x-lt-require-sum (both quantities default to 0; their sum must reach 1). Invoke with different counts and stations to see the same form offer different options per row.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: VERDICT_ROLE,
+  envelopeSchema: {
+    data: {
+      left_count: 3,
+      right_count: 2,
+      return_stations: ['molding', 'finishing'],
+    },
     metadata: { source: 'dashboard' },
   },
 };
@@ -499,6 +516,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
+  { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },
   { taskQueue: 'long-tail-examples', workflow: richFormWorkflow.richForm, config: richFormConfig },
   { taskQueue: 'long-tail-examples', workflow: acmeStationsWorkflow.acmeWidget, config: acmeWidgetConfig },
   { taskQueue: 'long-tail-examples', workflow: relatedEscalationsWorkflow.relatedEscalationsWorkflow, config: relatedEscalationsConfig },
