@@ -16,6 +16,10 @@ const CTX = {
   envelope: {
     left_quantity_options: [0, 1, 2, 3],
     return_stations: ['molding', 'finishing'],
+    reject_reasons: [
+      { value: 'uuid-1', label: 'Delamination' },
+      { id: 'uuid-2', label: 'Warping' },
+    ],
   },
 };
 
@@ -82,6 +86,37 @@ describe('ResolverForm dynamic options (x-lt-options)', () => {
     });
     render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={CTX} />);
     expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('3');
+    expect(screen.queryByRole('option', { name: 'Choose…' })).not.toBeInTheDocument();
+  });
+
+  it('object options show the LABEL and emit the VALUE — a pick list storing its foreign key', () => {
+    const onChange = vi.fn();
+    const json = formJson({ reason: '' }, {
+      properties: {
+        reason: { type: 'string', 'x-lt-options': 'envelope.reject_reasons' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={onChange} escalationContext={CTX} />);
+    // The submitter reads labels; the uuid never renders as option text.
+    expect(screen.getByRole('option', { name: 'Delamination' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Warping' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'uuid-1' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'uuid-2' } });
+    const emitted = JSON.parse(onChange.mock.calls[0][0]);
+    expect(emitted.reason).toBe('uuid-2');
+  });
+
+  it('a stored value renders with its label selected', () => {
+    const json = formJson({ reason: 'uuid-1' }, {
+      properties: {
+        reason: { type: 'string', 'x-lt-options': 'envelope.reject_reasons' },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={CTX} />);
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('uuid-1');
+    expect(select.selectedOptions[0].text).toBe('Delamination');
     expect(screen.queryByRole('option', { name: 'Choose…' })).not.toBeInTheDocument();
   });
 

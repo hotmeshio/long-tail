@@ -105,7 +105,8 @@ export function validateFieldConstraints(
 
   // Option membership — the form's select widget constrains choices; API-first
   // callers are unconstrained, so the effective option list is the contract:
-  // the static enum, or the x-lt-options list resolved from context. An
+  // the static enum, or the x-lt-options list resolved from context. The
+  // submitted answer is the option VALUE (labels are presentation). An
   // interpolated list that currently offers nothing fails closed — a stale
   // cascade child value never submits.
   const allowed = resolveFieldOptions(fieldSchema, ctx);
@@ -113,8 +114,8 @@ export function validateFieldConstraints(
     if (allowed.length === 0) {
       return 'No valid options for this selection';
     }
-    if (!allowed.includes(value as never)) {
-      return `Must be one of: ${allowed.map((v) => String(v)).join(', ')}`;
+    if (!allowed.some((o) => o.value === value)) {
+      return `Must be one of: ${allowed.map((o) => String(o.value)).join(', ')}`;
     }
   }
 
