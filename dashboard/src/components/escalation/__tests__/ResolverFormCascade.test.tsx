@@ -16,7 +16,11 @@ const CTX = {
   lookup: {
     geo: {
       countries: ['US', 'EU'],
-      regions: { US: ['CA', 'NY'], EU: ['DE', 'FR'] },
+      regions: {
+        US: ['CA', 'NY'],
+        // Object options work at any cascade level: label shown, value emitted.
+        EU: [{ value: 'de-1', label: 'Germany' }, { id: 'fr-1', label: 'France' }],
+      },
     },
   },
 };
@@ -61,20 +65,25 @@ describe('ResolverForm cascading selects', () => {
     render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={CTX} />);
     const region = getSelect('region');
     expect(region.value).toBe('');
-    expect(Array.from(region.options).map((o) => o.text)).toEqual(['Choose…', 'DE', 'FR']);
+    expect(Array.from(region.options).map((o) => o.text)).toEqual(['Choose…', 'Germany', 'France']);
   });
 
-  it('choosing the parent emits, and the child options follow on the next render', () => {
+  it('choosing the parent emits, the child follows — object options show labels, emit values', () => {
     const onChange = vi.fn();
     const json = formJson({ country: '', region: '' }, SCHEMA);
     const { rerender } = render(
       <ResolverForm value={json} onChange={onChange} escalationContext={CTX} />,
     );
     fireEvent.change(getSelect('country'), { target: { value: 'EU' } });
-    const emitted = onChange.mock.calls[0][0] as string;
-    expect(JSON.parse(emitted).country).toBe('EU');
-    rerender(<ResolverForm value={emitted} onChange={onChange} escalationContext={CTX} />);
-    expect(getSelect('region').disabled).toBe(false);
-    expect(Array.from(getSelect('region').options).map((o) => o.text)).toEqual(['Choose…', 'DE', 'FR']);
+    const afterCountry = onChange.mock.calls[0][0] as string;
+    expect(JSON.parse(afterCountry).country).toBe('EU');
+    rerender(<ResolverForm value={afterCountry} onChange={onChange} escalationContext={CTX} />);
+    const region = getSelect('region');
+    expect(region.disabled).toBe(false);
+    expect(Array.from(region.options).map((o) => o.text)).toEqual(['Choose…', 'Germany', 'France']);
+
+    fireEvent.change(region, { target: { value: 'de-1' } });
+    const afterRegion = onChange.mock.calls[onChange.mock.calls.length - 1][0] as string;
+    expect(JSON.parse(afterRegion).region).toBe('de-1');
   });
 });

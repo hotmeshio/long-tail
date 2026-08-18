@@ -120,7 +120,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     // shrank per-row) renders an explicit disabled "Choose…" placeholder: the
     // decision is the user's, never an implicit first option. Once chosen
     // there is no way back to unchosen.
-    const hasCurrent = selectOptions.some((opt) => String(opt) === current);
+    const hasCurrent = selectOptions.some((opt) => String(opt.value) === current);
     return (
       <div>
         <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
@@ -129,9 +129,11 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
           value={hasCurrent ? current : ''}
           disabled={selectOptions.length === 0}
           onChange={(e) => {
-            // Emit the option's own value so a numeric option stays a number.
-            const picked = selectOptions.find((opt) => String(opt) === e.target.value);
-            onChange(picked ?? e.target.value);
+            // The submitted answer is the option VALUE (labels are
+            // presentation), emitted with its own type so a numeric option
+            // stays a number.
+            const picked = selectOptions.find((opt) => String(opt.value) === e.target.value);
+            onChange(picked ? picked.value : e.target.value);
           }}
           onBlur={onBlur}
           data-field-key={fieldKey}
@@ -140,7 +142,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
         >
           {!hasCurrent && <option value="" disabled>Choose…</option>}
           {selectOptions.map((opt) => (
-            <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
+            <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
           ))}
         </select>
         <FieldError error={error} id={errorId} />

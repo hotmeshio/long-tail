@@ -53,7 +53,13 @@ export async function seedLookupCascadeKnowledge(): Promise<void> {
         countries: ['US', 'EU'],
         regions: {
           US: ['CA', 'NY', 'TX'],
-          EU: ['DE', 'FR', 'ES'],
+          // Object options: the select shows the label, the payload stores
+          // the value — the shape for DB-backed pick lists.
+          EU: [
+            { value: 'de-1', label: 'Germany' },
+            { value: 'fr-1', label: 'France' },
+            { value: 'es-1', label: 'Spain' },
+          ],
         },
       },
       tags: ['lookup'],

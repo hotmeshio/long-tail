@@ -18,20 +18,36 @@ const CTX = {
     mixed: [1, 'two', { id: 3 }, null, [4]],
     empty: [],
     not_an_array: 'nope',
+    reasons: [
+      { value: 'uuid-1', label: 'Delamination' },
+      { id: 'uuid-2', label: 'Warping' },
+    ],
   },
 };
 
 describe('x-lt-options resolution', () => {
-  it('resolves a scalar array from the context path', () => {
+  it('resolves a scalar array from the context path — a scalar is both value and label', () => {
     expect(resolveFieldOptions({ 'x-lt-options': 'envelope.left_quantity_options' }, CTX))
-      .toEqual([0, 1, 2, 3]);
+      .toEqual([
+        { value: 0, label: '0' }, { value: 1, label: '1' },
+        { value: 2, label: '2' }, { value: 3, label: '3' },
+      ]);
     expect(resolveFieldOptions({ 'x-lt-options': 'envelope.nested.deep' }, CTX))
-      .toEqual(['a', 'b']);
+      .toEqual([{ value: 'a', label: 'a' }, { value: 'b', label: 'b' }]);
+  });
+
+  it('resolves { value, label } objects — id accepted as the value alias', () => {
+    expect(resolveFieldOptions({ 'x-lt-options': 'envelope.reasons' }, CTX)).toEqual([
+      { value: 'uuid-1', label: 'Delamination' },
+      { value: 'uuid-2', label: 'Warping' },
+    ]);
   });
 
   it('a static enum takes precedence over the dynamic path', () => {
     const fieldSchema = { enum: ['x', 'y'], 'x-lt-options': 'envelope.return_stations' };
-    expect(resolveFieldOptions(fieldSchema, CTX)).toEqual(['x', 'y']);
+    expect(resolveFieldOptions(fieldSchema, CTX)).toEqual([
+      { value: 'x', label: 'x' }, { value: 'y', label: 'y' },
+    ]);
   });
 
   it('unresolvable paths, empty arrays, and non-arrays yield no options', () => {
@@ -43,8 +59,11 @@ describe('x-lt-options resolution', () => {
     expect(resolveFieldOptions({ 'x-lt-options': 'envelope.left_quantity_options' }, undefined)).toBeUndefined();
   });
 
-  it('non-scalar entries are dropped', () => {
-    expect(resolveFieldOptions({ 'x-lt-options': 'envelope.mixed' }, CTX)).toEqual([1, 'two']);
+  it('a mixed array resolves each entry independently, dropping malformed ones', () => {
+    // { id: 3 } lacks a label; null and nested arrays are never options.
+    expect(resolveFieldOptions({ 'x-lt-options': 'envelope.mixed' }, CTX)).toEqual([
+      { value: 1, label: '1' }, { value: 'two', label: 'two' },
+    ]);
   });
 });
 
@@ -80,6 +99,17 @@ describe('x-lt-options membership enforcement', () => {
       properties: { pick: { type: 'string', 'x-lt-options': 'envelope.missing' } },
     };
     expect(validateResolverForm(schema, { pick: 'anything' }, CTX)).toEqual([]);
+  });
+
+  it('object options enforce membership on the VALUE — labels are presentation', () => {
+    const schema = {
+      properties: { reason: { type: 'string', 'x-lt-options': 'envelope.reasons' } },
+    } as Record<string, unknown>;
+    expect(validateResolverForm(schema, { reason: 'uuid-2' }, CTX)).toEqual([]);
+    // The displayed label is NOT a legal answer; the violation names the values.
+    expect(validateResolverForm(schema, { reason: 'Warping' }, CTX)).toEqual([
+      { field: 'reason', message: 'Must be one of: uuid-1, uuid-2' },
+    ]);
   });
 
   it('the API entry point enforces the same membership against the row context', () => {

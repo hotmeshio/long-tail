@@ -115,7 +115,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
-| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` to the field's option list; static `enum` wins; `{{domain.path}}` segments make cascading selects |
+| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` to the field's option list (scalars or `{ value, label }`); static `enum` wins; `{{domain.path}}` segments make cascading selects |
 | `x-lt-minimum` | field | Dynamic lower bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-maximum` | field | Dynamic upper bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-min-length` | field | Dynamic minimum string length — resolves a `"domain.path"` |

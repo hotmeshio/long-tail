@@ -81,6 +81,17 @@ The resolved refs form the `lookup` context domain, keyed by each ref's `as` (or
 
 The entry's `data` is addressed directly — a flat option list lives at `data.items`, so the token reads `lookup.<name>.items`. Everything the context domains offer works here: `x-lt-showIf` conditions, `{{lookup.materials.items}}` in `x-lt-help`, dynamic bounds.
 
+Option entries are scalars or `{ value, label }` objects (`{ id, label }` accepted as an alias). An object entry separates what the submitter sees from what the payload stores — a DB-backed pick list shows its text and stores its foreign key:
+
+```json
+{ "items": [
+  { "value": "3f6a…", "label": "Delamination" },
+  { "id": "9c2b…", "label": "Warping" }
+] }
+```
+
+The select renders the labels, the submitted answer is the value, and mixed arrays resolve each entry independently (a scalar is both).
+
 Membership is enforced on both sides of the wire: the dashboard constrains the choices, and an `enforce_schema` role's server gate re-resolves the same pinned editions and rejects an out-of-edition value with the canonical 422.
 
 ## Cascading Selects
