@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { Check } from 'lucide-react';
 
-import { getDeep } from '../../../lib/x-lt-bind';
 import { deriveFieldLabel } from '../../../lib/derive-field-label';
+import { resolveChecklistItems, resolveChecklistDefault } from '../../../lib/field-validator';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
 import type { WidgetProps } from './index';
@@ -35,6 +36,10 @@ const CHIP_LABEL_MAX = 28;
  * "x-lt-require-all": true — completion guard: every item must be checked
  *   before submission, except items whose definition carries required: false.
  *
+ * "x-lt-default-checked": true — first-load default: an unanswered field
+ *   initializes to every item checked (affirm-then-exception: the submitter
+ *   unchecks what failed). A saved answer map is never clobbered.
+ *
  * Value stored: Record<string, boolean> keyed by item id.
  */
 export function ChecklistWidget({
@@ -47,24 +52,29 @@ export function ChecklistWidget({
   submitAttempted,
   error,
 }: WidgetProps & { escalationContext?: ShowIfContext }) {
-  const sourcePath = schema?.['x-lt-source'] as string | undefined;
   const requireAll = schema?.['x-lt-require-all'] === true;
-  const items: ChecklistItem[] = [];
-
-  if (sourcePath && escalationContext) {
-    const dot = sourcePath.indexOf('.');
-    if (dot !== -1) {
-      const domain = sourcePath.slice(0, dot) as keyof ShowIfContext;
-      const path = sourcePath.slice(dot + 1);
-      try {
-        const raw = getDeep(escalationContext[domain] as unknown, path);
-        if (Array.isArray(raw)) items.push(...(raw as ChecklistItem[]));
-      } catch { /* ignore bad source path */ }
-    }
-  }
+  // The shared resolver serves render and enforcement alike — including
+  // {{domain.path}} interpolation in the source path.
+  const items: ChecklistItem[] = resolveChecklistItems(
+    schema?.['x-lt-source'],
+    escalationContext as Record<string, unknown> | undefined,
+  );
 
   let state: Record<string, boolean> = {};
   try { if (value) state = JSON.parse(value) as Record<string, boolean>; } catch { /* start empty */ }
+
+  // First-load default (x-lt-default-checked): the moment the source resolves
+  // (a lookup arrives async), an unanswered field initializes to every item
+  // checked. Keyed on the serialized default so it fires once per material
+  // change and never against a saved answer map.
+  const defaultJson = (() => {
+    const d = resolveChecklistDefault(schema, state, escalationContext as Record<string, unknown> | undefined);
+    return d ? JSON.stringify(d) : null;
+  })();
+  useEffect(() => {
+    if (defaultJson) onChange(defaultJson);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultJson]);
 
   const toggle = (id: string) => onChange(JSON.stringify({ ...state, [id]: !state[id] }));
 

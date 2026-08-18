@@ -142,10 +142,17 @@ The field type must be `"object"`. The submitted value is `Record<string, boolea
 }
 ```
 
-`x-lt-source` uses the `"domain.path"` convention (same as `x-lt-showIf` and `x-lt-help` tokens). The renderer expects an array of `{ id: string; label: string; required?: boolean }` objects at that path.
+`x-lt-source` uses the `"domain.path"` convention (same as `x-lt-showIf` and `x-lt-help` tokens), and may embed `{{domain.path}}` interpolation segments. The renderer expects an array of `{ id: string; label: string; required?: boolean }` objects at that path.
 
 - `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditional`'s `envelope` parameter.
+- `"lookup"` — for item sets shared by many rows: a version-pinned knowledge edition (see [lookups.md](lookups.md)).
 - `"metadata"` — only when items need to be GIN-indexed and searchable as facets. Adds index cost.
+
+### First-load default (`x-lt-default-checked`)
+
+`"x-lt-default-checked": true` initializes an unanswered checklist to every item **checked** — the affirm-then-exception flow: the submitter unchecks what failed instead of confirming what passed. The default applies once, the moment the source resolves; a record that already carries an answer map for the field (a re-opened draft, an edited state) renders that saved state untouched. Without the flag, items start unchecked.
+
+The flag lives on the widget because the item set is runtime-sourced: a workflow's escalation-minting step cannot enumerate a lookup edition's ids to seed `formDefaults`, and re-embedding the ids per row would defeat the shared list. Membership and completion guards are unaffected — the default is a subset of the resolved items by construction.
 
 ### Geometry (`x-lt-variant`)
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateField, validateFieldConstraints } from '../field-validator';
+import { validateField, validateFieldConstraints, resolveChecklistDefault } from '../field-validator';
 
 describe('validateFieldConstraints — strings', () => {
   it('passes when value is empty string (required is caller concern)', () => {
@@ -197,5 +197,36 @@ describe('validateField — x-lt-require-all (checklist completion guard)', () =
   it('is untouched-silent like every other guard', () => {
     const value = { doc: false, contact: false };
     expect(validateField(value, schema, false, false, ctx(ITEMS))).toBeUndefined();
+  });
+});
+
+describe('resolveChecklistDefault — x-lt-default-checked (first-load default)', () => {
+  const CTX = {
+    lookup: { checks: { items: [
+      { id: 'stock', label: 'Material is in stock', required: true },
+      { id: 'spec', label: 'Spec reviewed' },
+    ] } },
+  };
+  const FIELD = {
+    'x-lt-widget': 'checklist',
+    'x-lt-source': 'lookup.checks.items',
+    'x-lt-default-checked': true,
+  };
+
+  it('an unanswered field defaults to every resolved item checked', () => {
+    expect(resolveChecklistDefault(FIELD, {}, CTX)).toEqual({ stock: true, spec: true });
+    expect(resolveChecklistDefault(FIELD, undefined, CTX)).toEqual({ stock: true, spec: true });
+  });
+
+  it('a saved answer map is never clobbered — even all-false', () => {
+    expect(resolveChecklistDefault(FIELD, { stock: true }, CTX)).toBeNull();
+    expect(resolveChecklistDefault(FIELD, { stock: false, spec: false }, CTX)).toBeNull();
+  });
+
+  it('no flag, no items, or a non-checklist field yields no default', () => {
+    const { 'x-lt-default-checked': _flag, ...noFlag } = FIELD;
+    expect(resolveChecklistDefault(noFlag, {}, CTX)).toBeNull();
+    expect(resolveChecklistDefault(FIELD, {}, { lookup: { checks: { items: [] } } })).toBeNull();
+    expect(resolveChecklistDefault({ ...FIELD, 'x-lt-widget': 'markdown' }, {}, CTX)).toBeNull();
   });
 });

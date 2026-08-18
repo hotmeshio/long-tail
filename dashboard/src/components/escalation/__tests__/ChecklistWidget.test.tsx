@@ -421,4 +421,51 @@ describe('ChecklistWidget geometry', () => {
     const label = screen.getByText('What went wrong');
     expect(label.textContent).toContain('*');
   });
+
+  // ── x-lt-default-checked (first-load default) ──
+
+  it('with x-lt-default-checked, an unanswered field emits every item checked', () => {
+    const onChange = vi.fn();
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={onChange}
+        schema={{ 'x-lt-widget': 'checklist', 'x-lt-source': 'envelope.checklist_items', 'x-lt-default-checked': true }}
+        escalationContext={makeContext()}
+      />,
+    );
+    expect(JSON.parse(onChange.mock.calls[0][0])).toEqual({ item_0: true, item_1: true, item_2: true });
+  });
+
+  it('a saved answer map renders untouched — the flag is a first-load default only', () => {
+    const onChange = vi.fn();
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value={JSON.stringify({ item_0: true, item_1: false })}
+        onChange={onChange}
+        schema={{ 'x-lt-widget': 'checklist', 'x-lt-source': 'envelope.checklist_items', 'x-lt-default-checked': true }}
+        escalationContext={makeContext()}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('checklist-item-item_0')).toBeChecked();
+    expect(screen.getByTestId('checklist-item-item_1')).not.toBeChecked();
+  });
+
+  it('without the flag, items start unchecked and nothing is emitted', () => {
+    const onChange = vi.fn();
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={onChange}
+        schema={{ 'x-lt-source': 'envelope.checklist_items' }}
+        escalationContext={makeContext()}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('checklist-item-item_0')).not.toBeChecked();
+  });
 });

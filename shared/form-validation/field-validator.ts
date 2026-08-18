@@ -27,6 +27,36 @@ export function resolveChecklistItems(
   return Array.isArray(cur) ? (cur as ChecklistItem[]) : [];
 }
 
+export const X_LT_DEFAULT_CHECKED = 'x-lt-default-checked';
+
+/**
+ * The checklist's first-load default (`x-lt-default-checked`): every resolved
+ * item starts checked, for affirm-then-exception flows where the submitter
+ * unchecks what failed. Returns the all-checked answer map ONLY when the
+ * field carries no answer yet — a saved or drafted map (any key, even
+ * all-false) is never clobbered — and null otherwise: absent flag, existing
+ * answer, or a source that resolves to no items. Declared on the widget
+ * because the item set is runtime-sourced (envelope or lookup): a pure
+ * escalation-minting step cannot enumerate the ids to seed formDefaults.
+ */
+export function resolveChecklistDefault(
+  fieldSchema: Record<string, unknown> | null | undefined,
+  currentValue: unknown,
+  ctx?: Record<string, unknown>,
+): Record<string, boolean> | null {
+  if (fieldSchema?.['x-lt-widget'] !== 'checklist') return null;
+  if (fieldSchema[X_LT_DEFAULT_CHECKED] !== true) return null;
+  if (
+    currentValue && typeof currentValue === 'object' && !Array.isArray(currentValue)
+    && Object.keys(currentValue).length > 0
+  ) {
+    return null;
+  }
+  const items = resolveChecklistItems(fieldSchema['x-lt-source'], ctx);
+  if (items.length === 0) return null;
+  return Object.fromEntries(items.map((i) => [i.id, true]));
+}
+
 /**
  * The checklist completion guard (`x-lt-require-all`): every rendered item must
  * be checked, except items whose definition carries `required: false` (the

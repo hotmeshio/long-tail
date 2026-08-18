@@ -54,7 +54,8 @@ export const CASCADE_FORM_SCHEMA = {
     '**Region** follows your **Country** answer: it stays disabled until you',
     'choose a country, then offers only that country\'s regions.',
     '',
-    '**Checklist** — every item must be checked before you can submit.',
+    '**Checklist** — every item arrives checked; anything you uncheck must be',
+    'resolved before you can submit.',
   ].join('\n'),
   required: ['material', 'country', 'region', 'checks'],
   properties: {
@@ -86,8 +87,10 @@ export const CASCADE_FORM_SCHEMA = {
       default: {},
       description: 'Pre-submission checklist',
       'x-lt-widget': 'checklist',
-      // Items ride the pinned catalog/checks edition.
+      // Items ride the pinned catalog/checks edition; they arrive checked
+      // (affirm-then-exception) and every one must hold to submit.
       'x-lt-source': 'lookup.checks.items',
+      'x-lt-default-checked': true,
       'x-lt-require-all': true,
     },
     notes: {
