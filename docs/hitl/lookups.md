@@ -126,6 +126,8 @@ With a `catalog/geo` entry shaped as:
 
 Interpolation works in `x-lt-source` the same way, so checklist item sets can follow an answer too.
 
+A lookup-sourced checklist can declare `"x-lt-default-checked": true` to start every item checked (uncheck the exceptions). The widget applies the default when the edition resolves, so a pure escalation-minting step never needs to enumerate the item ids — see [x-lt-widget.md](x-lt-widget.md#first-load-default-x-lt-default-checked).
+
 ## Efficiency
 
 - **Refs, not content, ride the rows.** Thousands of escalations sharing one list each store a three-field ref; the list lives once per edition.
