@@ -64,32 +64,39 @@ export const CASCADE_FORM_SCHEMA = {
       title: 'Material',
       default: '',
       description: 'Material for this order',
-      // Options ride the pinned catalog/materials edition.
-      'x-lt-options': 'lookup.materials.items',
+      // Interchangeable sources: the pinned catalog/materials edition when
+      // the row carries a ref, else the list embedded in its envelope — one
+      // shared schema serves lookup-lean rows AND parked pre-migration rows.
+      'x-lt-options': ['lookup.materials.items', 'envelope.material_options'],
     },
     country: {
       type: 'string',
       title: 'Country',
       default: '',
       description: 'Destination country',
-      'x-lt-options': 'lookup.geo.countries',
+      'x-lt-options': ['lookup.geo.countries', 'envelope.geo.countries'],
     },
     region: {
       type: 'string',
       title: 'Region',
       default: '',
       description: 'Region within the chosen country',
-      // Cascade: options follow the live country answer.
-      'x-lt-options': 'lookup.geo.regions.{{resolver.country}}',
+      // Cascade per entry: options follow the live country answer against
+      // whichever domain the row actually carries.
+      'x-lt-options': [
+        'lookup.geo.regions.{{resolver.country}}',
+        'envelope.geo.regions.{{resolver.country}}',
+      ],
     },
     checks: {
       type: 'object',
       default: {},
       description: 'Pre-submission checklist',
       'x-lt-widget': 'checklist',
-      // Items ride the pinned catalog/checks edition; they arrive checked
-      // (affirm-then-exception) and every one must hold to submit.
-      'x-lt-source': 'lookup.checks.items',
+      // Items ride the pinned catalog/checks edition (or the row's embedded
+      // list); they arrive checked (affirm-then-exception) and every one
+      // must hold to submit.
+      'x-lt-source': ['lookup.checks.items', 'envelope.checklist_items'],
       'x-lt-default-checked': true,
       'x-lt-require-all': true,
     },

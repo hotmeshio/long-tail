@@ -6,25 +6,32 @@ export interface FieldError { field: string; message: string }
 interface ChecklistItem { id: string; label: string; required?: boolean }
 
 /**
- * Resolve a checklist widget's item definitions from its `x-lt-source`
- * "domain.path" against the escalation context. Paths may embed
- * `{{domain.path}}` interpolation segments (cascading sources). Missing
- * domain/path, an unresolved segment, or a non-array value yields an empty
- * list.
+ * Resolve a checklist widget's item definitions from its `x-lt-source` —
+ * a "domain.path" or an ORDERED array of paths — against the escalation
+ * context. With an array, the first entry that resolves to a non-empty item
+ * list wins, so lookup-backed and envelope-embedded rows render the same
+ * shared schema interchangeably. Paths may embed `{{domain.path}}`
+ * interpolation segments (cascading sources); an entry that cannot resolve
+ * falls through to the next. Nothing resolvable yields an empty list.
  */
 export function resolveChecklistItems(
-  sourcePath: unknown,
+  source: unknown,
   ctx: Record<string, unknown> | undefined,
 ): ChecklistItem[] {
-  if (typeof sourcePath !== 'string' || !ctx) return [];
-  let concrete = sourcePath;
-  if (hasInterpolation(sourcePath)) {
-    const resolved = interpolatePath(sourcePath, ctx);
-    if (resolved === null) return [];
-    concrete = resolved;
+  const paths = (typeof source === 'string' ? [source] : Array.isArray(source) ? source : [])
+    .filter((p): p is string => typeof p === 'string' && p.length > 0);
+  if (paths.length === 0 || !ctx) return [];
+  for (const sourcePath of paths) {
+    let concrete = sourcePath;
+    if (hasInterpolation(sourcePath)) {
+      const resolved = interpolatePath(sourcePath, ctx);
+      if (resolved === null) continue;
+      concrete = resolved;
+    }
+    const cur = resolveCtxPath(concrete, ctx);
+    if (Array.isArray(cur) && cur.length > 0) return cur as ChecklistItem[];
   }
-  const cur = resolveCtxPath(concrete, ctx);
-  return Array.isArray(cur) ? (cur as ChecklistItem[]) : [];
+  return [];
 }
 
 export const X_LT_DEFAULT_CHECKED = 'x-lt-default-checked';

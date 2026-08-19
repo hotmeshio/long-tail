@@ -142,7 +142,7 @@ The field type must be `"object"`. The submitted value is `Record<string, boolea
 }
 ```
 
-`x-lt-source` uses the `"domain.path"` convention (same as `x-lt-showIf` and `x-lt-help` tokens), and may embed `{{domain.path}}` interpolation segments. The renderer expects an array of `{ id: string; label: string; required?: boolean }` objects at that path.
+`x-lt-source` uses the `"domain.path"` convention (same as `x-lt-showIf` and `x-lt-help` tokens), and may embed `{{domain.path}}` interpolation segments. The token is a single path or an **ordered array of paths** — the first that resolves to items wins, so a lookup-backed row and an envelope-embedded row render the same shared schema interchangeably. The renderer expects an array of `{ id: string; label: string; required?: boolean }` objects at the resolved path.
 
 - `"envelope"` — for item definitions that are render data only (no query cost). The workflow puts them in `conditional`'s `envelope` parameter.
 - `"lookup"` — for item sets shared by many rows: a version-pinned knowledge edition (see [lookups.md](lookups.md)).

@@ -139,7 +139,7 @@ export async function seedLookupCascadeEscalations(): Promise<void> {
     await createEscalation({
       type: 'catalog',
       subtype: 'catalog-pick',
-      description: 'Catalog pick — materials edition v1 (three items)',
+      description: 'Catalog pick — materials edition v1 (three materials in the dropdown)',
       priority: 2,
       role: CASCADE_ROLE,
       envelope: JSON.stringify({
@@ -155,7 +155,7 @@ export async function seedLookupCascadeEscalations(): Promise<void> {
     await createEscalation({
       type: 'catalog',
       subtype: 'catalog-pick',
-      description: 'Catalog pick — materials edition v2 (five items)',
+      description: 'Catalog pick — materials edition v2 (five materials in the dropdown)',
       priority: 2,
       role: CASCADE_ROLE,
       envelope: JSON.stringify({
@@ -168,7 +168,40 @@ export async function seedLookupCascadeEscalations(): Promise<void> {
       escalation_payload: JSON.stringify({ orderId: 'ord-102' }),
     });
 
-    loggerRegistry.info('[examples] lookup-cascade test escalations seeded (2)');
+    // A parked pre-migration row: NO refs, every list embedded in its own
+    // envelope. The shared schema's ordered sources fall through to the
+    // envelope, so this row renders the identical form beside the ref-pinned
+    // rows — the strand-free migration the interchangeable sources exist for.
+    await createEscalation({
+      type: 'catalog',
+      subtype: 'catalog-pick',
+      description: 'Catalog pick — parked pre-migration row (embedded lists, no refs)',
+      priority: 3,
+      role: CASCADE_ROLE,
+      envelope: JSON.stringify({
+        formDefaults: { checks: {} },
+        material_options: ['aluminum', 'steel', 'copper'],
+        geo: {
+          countries: ['US', 'EU'],
+          regions: {
+            US: ['CA', 'NY', 'TX'],
+            EU: [
+              { value: 'de-1', label: 'Germany' },
+              { value: 'fr-1', label: 'France' },
+              { value: 'es-1', label: 'Spain' },
+            ],
+          },
+        },
+        checklist_items: [
+          { id: 'stock_confirmed', label: 'Material is in stock', required: true },
+          { id: 'spec_reviewed', label: 'Order spec has been reviewed', required: true },
+          { id: 'photos', label: 'Reference photos are attached', required: false },
+        ],
+      }),
+      escalation_payload: JSON.stringify({ orderId: 'ord-103' }),
+    });
+
+    loggerRegistry.info('[examples] lookup-cascade test escalations seeded (3)');
   } catch (err: any) {
     loggerRegistry.warn(`[examples] failed to seed lookup-cascade escalations: ${err.message}`);
   }

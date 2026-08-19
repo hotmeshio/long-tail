@@ -145,4 +145,46 @@ describe('ResolverForm dynamic options (x-lt-options)', () => {
     expect(container.querySelector('input[type="number"]')).toBeInTheDocument();
     expect(container.querySelector('input[type="text"]')).toBeInTheDocument();
   });
+
+  // ── Ordered sources (first-resolvable-wins) ──
+
+  it('an ordered token renders from the envelope fallback when the lookup is absent — a real dropdown', () => {
+    const json = formJson({ reason: '' }, {
+      properties: {
+        reason: { type: 'string', 'x-lt-options': ['lookup.reasons.items', 'envelope.reject_reasons'] },
+      },
+    });
+    const ctx = { envelope: { reject_reasons: [{ value: 'uuid-1', label: 'Delamination' }] } };
+    const { container } = render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Delamination' })).toBeInTheDocument();
+    expect(container.querySelector('input[type="text"]')).not.toBeInTheDocument();
+  });
+
+  it('an all-plain-path miss keeps the typed plain-input fallback', () => {
+    const json = formJson({ reason: '' }, {
+      properties: {
+        reason: { type: 'string', 'x-lt-options': ['lookup.reasons.items', 'envelope.reject_reasons'] },
+      },
+    });
+    const { container } = render(
+      <ResolverForm value={json} onChange={vi.fn()} escalationContext={{ envelope: {} }} />,
+    );
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(container.querySelector('input[type="text"]')).toBeInTheDocument();
+  });
+
+  it('an interpolated entry keeps the disabled-select contract when nothing resolves', () => {
+    const json = formJson({ region: '' }, {
+      properties: {
+        region: {
+          type: 'string',
+          'x-lt-options': ['lookup.geo.regions.{{resolver.country}}', 'envelope.geo.regions.{{resolver.country}}'],
+        },
+      },
+    });
+    render(<ResolverForm value={json} onChange={vi.fn()} escalationContext={{ envelope: {} }} />);
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+  });
 });
