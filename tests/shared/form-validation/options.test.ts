@@ -164,3 +164,84 @@ describe('x-lt-options cascading (interpolated paths)', () => {
     expect(validateResolverPayload(CASCADE_SCHEMA, { country: 'EU', region: 'CA' }, LOOKUP_CTX)).toHaveLength(1);
   });
 });
+
+describe('x-lt-options ordered sources (first-resolvable-wins)', () => {
+  // One shared schema; two kinds of rows. The lookup-backed row resolves the
+  // ref; the parked pre-migration row falls through to its embedded envelope.
+  const FIELD = {
+    'x-lt-options': ['lookup.reasons.items', 'envelope.reject_reason_items'],
+  } as Record<string, unknown>;
+  const LOOKUP_ROW = {
+    lookup: { reasons: { items: [{ value: 'uuid-1', label: 'Delamination' }] } },
+    envelope: { reject_reason_items: ['stale-a', 'stale-b'] },
+  };
+  const PARKED_ROW = {
+    envelope: { reject_reason_items: ['scratch', 'dent'] },
+  };
+
+  it('the first entry that resolves wins — the ref-backed row never reads the envelope', () => {
+    expect(resolveFieldOptions(FIELD, LOOKUP_ROW)).toEqual([
+      { value: 'uuid-1', label: 'Delamination' },
+    ]);
+  });
+
+  it('a parked row with no ref falls through to its embedded envelope list', () => {
+    expect(resolveFieldOptions(FIELD, PARKED_ROW)).toEqual([
+      { value: 'scratch', label: 'scratch' },
+      { value: 'dent', label: 'dent' },
+    ]);
+  });
+
+  it('all-plain-path misses keep the legacy free-input reading (undefined, unenforced)', () => {
+    expect(resolveFieldOptions(FIELD, { envelope: {} })).toBeUndefined();
+    const schema = { properties: { reason: { type: 'string', ...FIELD } } };
+    expect(validateResolverForm(schema, { reason: 'anything' }, { envelope: {} })).toEqual([]);
+  });
+
+  it('an interpolated entry keeps the fail-closed contract when nothing resolves', () => {
+    const cascade = {
+      'x-lt-options': [
+        'lookup.geo.regions.{{resolver.country}}',
+        'envelope.geo.regions.{{resolver.country}}',
+      ],
+    };
+    expect(resolveFieldOptions(cascade, { resolver: {} })).toEqual([]);
+  });
+
+  it('cascades resolve per entry against whichever domain the row carries', () => {
+    const cascade = {
+      'x-lt-options': [
+        'lookup.geo.regions.{{resolver.country}}',
+        'envelope.geo.regions.{{resolver.country}}',
+      ],
+    };
+    const parked = {
+      envelope: { geo: { regions: { US: ['CA', 'NY'] } } },
+      resolver: { country: 'US' },
+    };
+    expect(resolveFieldOptions(cascade, parked)).toEqual([
+      { value: 'CA', label: 'CA' }, { value: 'NY', label: 'NY' },
+    ]);
+  });
+
+  it('enforcement validates against the source that won, on both entry points', () => {
+    const schema = {
+      properties: { reason: { type: 'string', ...FIELD } },
+    } as Record<string, unknown>;
+    // Parked row: the envelope set is the contract.
+    expect(validateResolverForm(schema, { reason: 'dent' }, PARKED_ROW)).toEqual([]);
+    expect(validateResolverPayload(schema, { reason: 'uuid-1' }, PARKED_ROW)).toEqual([
+      { field: 'reason', message: 'Must be one of: scratch, dent' },
+    ]);
+    // Lookup row: the edition is the contract — the stale envelope list is unreachable.
+    expect(validateResolverPayload(schema, { reason: 'uuid-1' }, LOOKUP_ROW)).toEqual([]);
+    expect(validateResolverPayload(schema, { reason: 'stale-a' }, LOOKUP_ROW)).toHaveLength(1);
+  });
+
+  it('malformed entries drop; an all-malformed array reads as no token', () => {
+    expect(resolveFieldOptions({ 'x-lt-options': [42, null] } as any, PARKED_ROW)).toBeUndefined();
+    expect(resolveFieldOptions(
+      { 'x-lt-options': [42, 'envelope.reject_reason_items'] } as any, PARKED_ROW,
+    )).toHaveLength(2);
+  });
+});

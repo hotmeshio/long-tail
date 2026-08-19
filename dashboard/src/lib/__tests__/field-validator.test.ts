@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateField, validateFieldConstraints, resolveChecklistDefault } from '../field-validator';
+import { validateField, validateFieldConstraints, resolveChecklistDefault, resolveChecklistItems } from '../field-validator';
 
 describe('validateFieldConstraints — strings', () => {
   it('passes when value is empty string (required is caller concern)', () => {
@@ -228,5 +228,26 @@ describe('resolveChecklistDefault — x-lt-default-checked (first-load default)'
     expect(resolveChecklistDefault(noFlag, {}, CTX)).toBeNull();
     expect(resolveChecklistDefault(FIELD, {}, { lookup: { checks: { items: [] } } })).toBeNull();
     expect(resolveChecklistDefault({ ...FIELD, 'x-lt-widget': 'markdown' }, {}, CTX)).toBeNull();
+  });
+});
+
+describe('resolveChecklistItems — ordered sources', () => {
+  const ITEMS = [{ id: 'a', label: 'Check A' }];
+
+  it('the first source that resolves to items wins', () => {
+    const source = ['lookup.checks.items', 'envelope.checklist_items'];
+    expect(resolveChecklistItems(source, { lookup: { checks: { items: ITEMS } } })).toEqual(ITEMS);
+    expect(resolveChecklistItems(source, { envelope: { checklist_items: ITEMS } })).toEqual(ITEMS);
+    expect(resolveChecklistItems(source, { envelope: {} })).toEqual([]);
+  });
+
+  it('x-lt-default-checked pre-checks whichever source resolved', () => {
+    const field = {
+      'x-lt-widget': 'checklist',
+      'x-lt-source': ['lookup.checks.items', 'envelope.checklist_items'],
+      'x-lt-default-checked': true,
+    };
+    expect(resolveChecklistDefault(field, {}, { envelope: { checklist_items: ITEMS } }))
+      .toEqual({ a: true });
   });
 });

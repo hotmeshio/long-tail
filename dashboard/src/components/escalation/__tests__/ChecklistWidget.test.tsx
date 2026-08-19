@@ -468,4 +468,38 @@ describe('ChecklistWidget geometry', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByTestId('checklist-item-item_0')).not.toBeChecked();
   });
+
+  // ── Ordered sources (first-resolvable-wins) ──
+
+  it('an ordered x-lt-source renders items from the envelope fallback', () => {
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={vi.fn()}
+        schema={{ 'x-lt-source': ['lookup.checks.items', 'envelope.checklist_items'] }}
+        escalationContext={makeContext()}
+      />,
+    );
+    expect(screen.getByTestId('checklist-item-item_0')).toBeInTheDocument();
+    expect(screen.getByTestId('checklist-item-item_2')).toBeInTheDocument();
+  });
+
+  it('x-lt-default-checked composes: the fallback source arrives fully checked', () => {
+    const onChange = vi.fn();
+    render(
+      <ChecklistWidget
+        fieldKey="checks"
+        value=""
+        onChange={onChange}
+        schema={{
+          'x-lt-widget': 'checklist',
+          'x-lt-source': ['lookup.checks.items', 'envelope.checklist_items'],
+          'x-lt-default-checked': true,
+        }}
+        escalationContext={makeContext()}
+      />,
+    );
+    expect(JSON.parse(onChange.mock.calls[0][0])).toEqual({ item_0: true, item_1: true, item_2: true });
+  });
 });

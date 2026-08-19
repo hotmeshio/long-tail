@@ -115,11 +115,12 @@ A select's option list can ride the escalation instead of the schema. The field-
 
 When the envelope carries `left_quantity_options: [0, 1, 2, 3]`, the field renders as a dropdown offering exactly those values — an out-of-range answer is structurally impossible. The workflow mints only the small per-row array; the form itself stays on the role.
 
+- The token is a `"domain.path"` string or an **ordered array of paths** — `["lookup.reasons.items", "envelope.reject_reason_items"]`. With an array, the **first path that resolves to options wins**, so lookup-backed and envelope-embedded rows render the same shared schema interchangeably: migrate a field to a versioned lookup and rows parked before the migration fall through to the envelope they already carry. A plain string behaves exactly as a one-element array.
 - Entries are scalars or `{ value, label }` objects (`{ id, label }` accepted as an alias): the select shows the label and the submitted answer is the value — a pick list can display text while storing its foreign key. A scalar is both. Mixed arrays resolve each entry independently; malformed entries are dropped.
 - A static `enum` takes precedence when both are present — the same static-over-dynamic rule as the bounds tokens.
 - The declared `type` governs the value: a number-typed field emits the picked option as a number, a string-typed field as a string.
 - While the current value is outside the option list (an empty init, options that shrank per-row), the select opens on an explicit disabled **Choose…** placeholder — never an implicit first option.
-- A path that resolves to nothing (missing, empty array, no scalar entries) yields no options: the field renders as the plain input for its type and membership is not enforced for that submission.
+- When no path resolves (missing, empty array, no valid entries) the field renders as the plain input for its type and membership is not enforced for that submission — unless any path embeds `{{domain.path}}` interpolation, in which case the field stays a disabled select and a present value fails closed (a cascade child never becomes free text).
 - Membership is enforced on both sides of the wire — always on the option VALUE, never the label: the dashboard constrains the choices, and an enforced role's server gate rejects a payload whose value is outside the row's resolved list with the canonical 422 (`Must be one of: 0, 1, 2, 3`).
 - Option lists can also come from version-pinned knowledge entries (the `lookup` domain), and paths may embed `{{domain.path}}` interpolation segments for cascading selects — a dependent select whose parent is unanswered renders disabled and fails closed. See [lookups.md](lookups.md).
 

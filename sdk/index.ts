@@ -141,6 +141,7 @@ export function createClient(options: LTClientOptions = {}) {
     workflows: {
       invoke: bindAuth(workflowsApi.invokeWorkflow, auth),
       getStatus: workflowsApi.getWorkflowStatus,
+      getEnvelopes: exportsApi.getWorkflowEnvelopes,
       getResult: workflowsApi.getWorkflowResult,
       terminate: workflowsApi.terminateWorkflow,
       export: workflowsApi.exportWorkflow,

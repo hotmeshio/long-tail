@@ -6,10 +6,18 @@
  * offer a different legal set per escalation (e.g. `[1..N]` where N rides the
  * envelope, or a versioned knowledge lookup under the `lookup` domain).
  *
- *   x-lt-options   "domain.path" — e.g. "envelope.left_quantity_options"
- *                  paths may embed {{domain.path}} interpolation segments —
+ *   x-lt-options   "domain.path" or an ORDERED array of paths — e.g.
+ *                  "envelope.left_quantity_options" or
+ *                  ["lookup.reasons.items", "envelope.reject_reason_items"].
+ *                  With an array, the first entry that resolves to options
+ *                  wins, so lookup-backed and envelope-embedded rows render
+ *                  the same shared schema interchangeably (a parked row
+ *                  falls through to the envelope it already carries).
+ *                  Paths may embed {{domain.path}} interpolation segments —
  *                  e.g. "lookup.geo.regions.{{resolver.country}}" — making
- *                  the option list follow another answer (cascading selects)
+ *                  the option list follow another answer (cascading selects);
+ *                  an entry whose interpolation cannot resolve falls through
+ *                  to the next entry.
  *
  * Object entries separate what the submitter SEES from what the payload
  * STORES: the select renders the label and emits the value (a DB-backed pick
@@ -73,24 +81,28 @@ export function resolveFieldOptions(
     return staticEnum.map((v) => ({ value: v as OptionValue, label: String(v) }));
   }
 
-  const sourcePath = fieldSchema[X_LT_OPTIONS];
-  if (typeof sourcePath !== 'string') return undefined;
+  const token = fieldSchema[X_LT_OPTIONS];
+  const paths = (typeof token === 'string' ? [token] : Array.isArray(token) ? token : [])
+    .filter((p): p is string => typeof p === 'string' && p.length > 0);
+  if (paths.length === 0) return undefined;
 
-  // Interpolated tokens are a standing contract: even unresolvable, the field
-  // stays a (disabled) select and fails closed. Plain paths keep the legacy
-  // undefined-on-miss reading.
-  const dynamic = hasInterpolation(sourcePath);
-  const miss = dynamic ? ([] as ResolvedOption[]) : undefined;
+  // Interpolated entries are a standing contract: when nothing resolves, the
+  // field stays a (disabled) select and fails closed — a cascade child never
+  // becomes free text. All-plain-path tokens keep the legacy undefined-on-miss
+  // reading (the field falls back to its typed plain input).
+  const miss = paths.some(hasInterpolation) ? ([] as ResolvedOption[]) : undefined;
 
-  let concrete = sourcePath;
-  if (dynamic) {
-    const resolved = interpolatePath(sourcePath, ctx);
-    if (resolved === null) return miss;
-    concrete = resolved;
+  for (const sourcePath of paths) {
+    let concrete = sourcePath;
+    if (hasInterpolation(sourcePath)) {
+      const resolved = interpolatePath(sourcePath, ctx);
+      if (resolved === null) continue;
+      concrete = resolved;
+    }
+    const cur = resolveCtxPath(concrete, ctx);
+    if (!Array.isArray(cur)) continue;
+    const options = cur.map(toOption).filter((o): o is ResolvedOption => o !== null);
+    if (options.length > 0) return options;
   }
-
-  const cur = resolveCtxPath(concrete, ctx);
-  if (!Array.isArray(cur)) return miss;
-  const options = cur.map(toOption).filter((o): o is ResolvedOption => o !== null);
-  return options.length > 0 ? options : miss;
+  return miss;
 }

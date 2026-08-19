@@ -1531,6 +1531,20 @@ Export workflow state as a structured execution event history.
 | mode | string | No | Export mode |
 | maxDepth | integer | No | Max traversal depth |
 
+### get_workflow_envelopes
+
+The workflow's input and output envelopes — two narrow lookups, no event stream. Output is `null` with status `running` until the workflow completes; a failed run carries its error message. The token-cheap read when you only need what went in and what came out.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workflow_id | string | Yes | Workflow ID whose input/output envelopes to fetch |
+
 ### get_export_status
 
 Return the numeric status semaphore for a workflow.

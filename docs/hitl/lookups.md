@@ -126,6 +126,16 @@ With a `catalog/geo` entry shaped as:
 
 Interpolation works in `x-lt-source` the same way, so checklist item sets can follow an answer too.
 
+### Migrating a field to a lookup — strand-free
+
+`x-lt-options` and `x-lt-source` accept an **ordered array of paths**; the first that resolves wins. That makes an embedded list and a pinned lookup fully interchangeable behind one shared schema:
+
+```json
+"reasonId": { "type": "string", "x-lt-options": ["lookup.reasons.items", "envelope.reject_reason_items"] }
+```
+
+New escalations pin the ref and render from the edition; rows parked before the migration carry no ref and fall through to the envelope list they were minted with — the same select either way. Flip the shared role schema, deploy, and no in-flight row strands; the reverse migration is equally safe.
+
 A lookup-sourced checklist can declare `"x-lt-default-checked": true` to start every item checked (uncheck the exceptions). The widget applies the default when the edition resolves, so a pure escalation-minting step never needs to enumerate the item ids — see [x-lt-widget.md](x-lt-widget.md#first-load-default-x-lt-default-checked).
 
 ## Efficiency

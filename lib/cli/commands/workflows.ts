@@ -50,6 +50,24 @@ export async function getWorkflowResult(id: string, opts: { json?: boolean }): P
   }
 }
 
+export async function getWorkflowEnvelopes(id: string, opts: { json?: boolean }): Promise<void> {
+  const data = await apiFetch<any>(`/workflow-states/${id}/envelopes`);
+  if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
+  const status = data.status === 'completed' ? pc.green(data.status)
+    : data.status === 'failed' ? pc.red(data.status)
+    : pc.blue(data.status);
+  console.log(`\n  ${pc.dim(data.workflow_id)}  ${status}`);
+  console.log(`\n  ${pc.bold('Input')}`);
+  console.log(JSON.stringify(data.input, null, 2));
+  console.log(`\n  ${pc.bold('Output')}`);
+  if (data.error) {
+    console.log(pc.red(data.error));
+  } else {
+    console.log(data.output === null ? pc.dim('(not yet — still running)') : JSON.stringify(data.output, null, 2));
+  }
+  console.log();
+}
+
 export async function terminateWorkflow(id: string): Promise<void> {
   await apiFetch(`/workflows/terminate/${id}`, { method: 'POST' });
   console.log(`\n  ${pc.green('✓')} Terminated ${pc.dim(id)}\n`);

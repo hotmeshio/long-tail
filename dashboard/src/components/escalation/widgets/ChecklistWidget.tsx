@@ -18,7 +18,8 @@ const CHIP_LABEL_MAX = 28;
  *
  * Schema usage:
  *   "x-lt-widget": "checklist"
- *   "x-lt-source": "envelope.checklist_items"  (any domain.path works)
+ *   "x-lt-source": "envelope.checklist_items"  (any domain.path, or an
+ *                  ordered array of paths — first source that resolves wins)
  *   "x-lt-variant": "chips" | "rows"           (optional; see geometry below)
  *
  * Item definitions: Array<{ id: string; label: string; required?: boolean }>
@@ -85,7 +86,7 @@ export function ChecklistWidget({
     return (
       <>
         <p className="text-xs text-text-tertiary italic mt-1">
-          No checklist items. Provide checklist_items in the escalation envelope or metadata.
+          No checklist items. None of the field's x-lt-source paths resolved on this escalation.
         </p>
         {error && (
           <p className="text-2xs text-status-error mt-1 animate-[field-error-in_0.3s_ease-out]">

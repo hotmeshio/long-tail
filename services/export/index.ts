@@ -89,51 +89,84 @@ export async function exportWorkflowExecution(
 ): Promise<WorkflowExecution> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
-    const [execution, raw] = await Promise.all([
-      handle.exportExecution({ ...options, enrich_inputs: true }),
-      handle.export({ allow: ['state'], values: true }),
-    ]);
-    const processed = postProcessExecution(execution);
-
-    // Extract parent_workflow_id from the raw state metadata (HotMesh's `pj` field).
-    // The SDK's WorkflowExecution doesn't surface this yet; when it does,
-    // the SDK value takes precedence (defensive: only set if absent).
-    if (!(processed as any).parent_workflow_id) {
-      const pj = extractParentJobId(raw);
-      if (pj && pj !== workflowId) {
-        (processed as any).parent_workflow_id = pj;
-      }
-    }
-
-    return processed;
+    // include_lineage populates parent_workflow_id/origin_id from the jobs
+    // table in one indexed lookup — no second export call.
+    const execution = await handle.exportExecution({
+      ...options,
+      enrich_inputs: true,
+      include_lineage: true,
+    });
+    return postProcessExecution(execution);
   } catch (err: any) {
     if (err instanceof WorkflowNotFoundError) throw err;
     throw new WorkflowNotFoundError(workflowId);
   }
 }
 
+/** The input/output envelope pair plus the derived run status. */
+export interface WorkflowEnvelopes {
+  workflow_id: string;
+  status: 'running' | 'completed' | 'failed';
+  /** The workflow's input — the single LTEnvelope for one-arg workflows, else the args array. */
+  input: unknown;
+  /** The workflow's return envelope, or null while it is still running or when it failed. */
+  output: unknown;
+  /** The workflow's error message, present only when status is 'failed'. */
+  error?: string;
+}
+
 /**
- * Walk the raw export state looking for the `pj` (parent job ID) field.
- * HotMesh stores it at `state.output.metadata.pj` after symbol inflation.
- * Returns undefined if not found (workflow has no parent).
+ * The effortless read: what went in, what came out. Two narrow lookups —
+ * `handle.input()` (one field read, available for the life of the job) and
+ * `handle.output()` (one state read, never blocks) — no event stream, no
+ * full export. While the workflow runs, `output` is null and `status` says
+ * so, making this the natural polling body.
  */
-function extractParentJobId(raw: LTWorkflowExport | { state?: any }): string | undefined {
-  const state = raw?.state;
-  if (!state || typeof state !== 'object') return undefined;
-
-  // Typical path: state.output.metadata.pj
-  const output = state.output ?? state;
-  const metadata = output?.metadata;
-  if (metadata?.pj && typeof metadata.pj === 'string') {
-    return metadata.pj;
+export async function getWorkflowEnvelopes(
+  workflowId: string,
+  taskQueue: string,
+  workflowName: string,
+): Promise<WorkflowEnvelopes> {
+  let handle;
+  try {
+    handle = await getHandle(taskQueue, workflowName, workflowId);
+  } catch {
+    throw new WorkflowNotFoundError(workflowId);
   }
 
-  // Fallback: walk top-level state keys (older export shapes)
-  if (state.pj && typeof state.pj === 'string') {
-    return state.pj;
+  const [statusCode, args] = await Promise.all([
+    handle.status(),
+    handle.input<unknown[]>().catch(() => undefined),
+  ]).catch(() => {
+    throw new WorkflowNotFoundError(workflowId);
+  });
+
+  // Long-tail workflows take a single LTEnvelope argument — unwrap it;
+  // multi-arg workflows keep the args array verbatim.
+  const input = Array.isArray(args) && args.length === 1 ? args[0] : args ?? null;
+
+  if (statusCode > 0) {
+    return { workflow_id: workflowId, status: 'running', input, output: null };
   }
 
-  return undefined;
+  try {
+    const output = await handle.output<unknown>();
+    return {
+      workflow_id: workflowId,
+      status: statusCode === 0 ? 'completed' : 'failed',
+      input,
+      output: output ?? null,
+    };
+  } catch (err: any) {
+    // output() throws the workflow's own error for failed runs — that IS the outcome.
+    return {
+      workflow_id: workflowId,
+      status: 'failed',
+      input,
+      output: null,
+      error: err?.message ?? String(err),
+    };
+  }
 }
 
 /**

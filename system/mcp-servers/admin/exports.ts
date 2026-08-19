@@ -11,6 +11,7 @@ import {
   exportWorkflowStateSchema,
   exportWorkflowExecutionSchema,
   getExportStatusSchema,
+  getWorkflowEnvelopesSchema,
 } from './schemas';
 
 export function registerExportTools(server: McpServer): void {
@@ -81,6 +82,27 @@ export function registerExportTools(server: McpServer): void {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
       return { content: [{ type: 'text' as const, text: JSON.stringify(pickPaths(result.data, args.select)) }] };
+    },
+  );
+
+  // mirrors GET /api/workflow-states/:workflowId/envelopes
+  (server as any).registerTool(
+    'get_workflow_envelopes',
+    {
+      title: 'Get Workflow Envelopes',
+      description:
+        'The workflow\'s input and output envelopes — two narrow lookups, no event ' +
+        'stream. Output is null with status running until the workflow completes; a ' +
+        'failed run carries its error message. The token-cheap read when you only ' +
+        'need what went in and what came out.',
+      inputSchema: getWorkflowEnvelopesSchema,
+    },
+    async (args: z.infer<typeof getWorkflowEnvelopesSchema>) => {
+      const result = await api.getWorkflowEnvelopes({ workflowId: args.workflow_id });
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
     },
   );
 
