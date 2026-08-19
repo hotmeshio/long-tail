@@ -70,6 +70,18 @@ router.get('/:workflowId/execution', async (req, res) => {
 });
 
 /**
+ * GET /api/workflow-states/:workflowId/envelopes
+ * The workflow's input and output envelopes — two narrow lookups, no event
+ * stream. Output is null with status 'running' until the workflow completes.
+ */
+router.get('/:workflowId/envelopes', async (req, res) => {
+  const result = await api.getWorkflowEnvelopes({
+    workflowId: req.params.workflowId,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/workflow-states/:workflowId/status
  * Return only the numeric status semaphore.
  */

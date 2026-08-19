@@ -176,6 +176,47 @@ export async function getWorkflowStatus(input: {
 }
 
 /**
+ * Get a workflow's input and output envelopes — the effortless read.
+ *
+ * Two narrow lookups (no event stream, no full export): the input is
+ * available for the life of the job; the output is null with
+ * `status: 'running'` until the workflow completes, making this the natural
+ * polling body. A failed run answers `status: 'failed'` with the workflow's
+ * error message.
+ *
+ * @param input.workflowId — the workflow's unique identifier
+ * @returns `{ status: 200, data: { workflow_id, status, input, output, error? } }`
+ */
+export async function getWorkflowEnvelopes(input: {
+  workflowId: string;
+}): Promise<LTApiResult> {
+  try {
+    let resolved;
+    try {
+      resolved = await resolveWorkflowHandle(input.workflowId);
+    } catch {
+      return { status: 404, error: 'Workflow not found' };
+    }
+
+    const result = await exportService.getWorkflowEnvelopes(
+      input.workflowId,
+      resolved.taskQueue,
+      resolved.workflowName,
+    );
+
+    return { status: 200, data: result };
+  } catch (err: any) {
+    const status = err.status === 404 || err.message?.includes('Not Found') ? 404 : 500;
+    return {
+      status,
+      error: status === 404
+        ? 'Workflow data is no longer available (job may have expired)'
+        : err.message,
+    };
+  }
+}
+
+/**
  * Get the current state data of a workflow.
  *
  * Resolves the workflow handle, then retrieves its full state. Returns 404

@@ -258,6 +258,11 @@ wfCmd.command('result <id>')
   .option('--json', 'JSON output')
   .action(wrap(wf.getWorkflowResult));
 
+wfCmd.command('envelopes <id>')
+  .description('The workflow\'s input and output envelopes — light, never blocks')
+  .option('--json', 'JSON output')
+  .action(wrap(wf.getWorkflowEnvelopes));
+
 wfCmd.command('terminate <id>')
   .action(wrap(wf.terminateWorkflow));
 

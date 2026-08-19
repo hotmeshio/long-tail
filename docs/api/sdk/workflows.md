@@ -52,6 +52,27 @@ const result = await lt.workflows.getStatus({ workflowId: 'wf_abc' });
 
 ---
 
+## getEnvelopes
+
+The workflow's input and output envelopes — two narrow lookups, never blocking. `output` is `null` with `status: 'running'` while the run is in flight; a failed run answers `status: 'failed'` with the workflow's `error` message.
+
+```typescript
+const result = await lt.workflows.getEnvelopes({ workflowId: 'reviewContent-a1b2c3d4' });
+// result.data → { workflow_id, status, input, output, error? }
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workflowId` | `string` | Yes | The workflow's unique identifier |
+
+**Returns:** `LTApiResult<{ workflow_id, status: 'running' | 'completed' | 'failed', input, output, error? }>` — 404 when the workflow is unknown or expired.
+
+**Auth:** Not required
+
+---
+
 ## getResult
 
 Get the result of a completed workflow.

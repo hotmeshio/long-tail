@@ -471,6 +471,41 @@ Every event is faithfully reconstructed from the durable execution log — activ
 
 **Verbose mode** includes nested `children` arrays for orchestrator workflows, where each child contains its own full event sequence. Use `maxDepth` to limit recursion for deeply nested orchestrations.
 
+### Workflow envelopes — input and output
+
+```
+GET /api/workflow-states/:workflowId/envelopes
+```
+
+The effortless read: what went in, what came out. Two narrow lookups — the input is a single field read available for the life of the job; the output is a single state read that never blocks. No event stream, no full export, so the call stays cheap on the largest jobs.
+
+**Response 200 (running):**
+
+```json
+{
+  "workflow_id": "reviewContent-a1b2c3d4",
+  "status": "running",
+  "input": { "data": { "contentId": "c-1" }, "metadata": { "source": "dashboard" } },
+  "output": null
+}
+```
+
+**Response 200 (completed):**
+
+```json
+{
+  "workflow_id": "reviewContent-a1b2c3d4",
+  "status": "completed",
+  "input": { "data": { "contentId": "c-1" }, "metadata": { "source": "dashboard" } },
+  "output": { "type": "return", "data": { "approved": true } }
+}
+```
+
+- `input` — the workflow's input envelope, exactly as invoked. A one-argument workflow (the long-tail convention) answers the envelope itself; a multi-argument workflow answers the args array.
+- `output` — the workflow's return envelope, or `null` while the run is in flight (`status: "running"`) — this endpoint is the natural polling body. A failed run answers `status: "failed"`, `output: null`, and an `error` message.
+
+**Response 404:** the workflow does not exist or its data has expired.
+
 ### Workflow status semaphore
 
 ```

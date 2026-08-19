@@ -700,6 +700,10 @@ export const getExportStatusSchema = z.object({
   workflow_id: z.string().describe('Workflow ID to check export status'),
 });
 
+export const getWorkflowEnvelopesSchema = z.object({
+  workflow_id: z.string().describe('Workflow ID whose input/output envelopes to fetch'),
+});
+
 // ── Diagnostics ───────────────────────────────────────────────────────────────
 
 export const diagnoseJobSchema = z.object({
