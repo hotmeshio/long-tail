@@ -65,6 +65,39 @@ export const GET_USERS_BY_METADATA_VALUE =
 export const VERIFY_USER_BY_ID =
   'SELECT id FROM lt_users WHERE id = $1 LIMIT 1';
 
+/**
+ * Atomic per-key patch of the user's properties dictionary — ONE statement,
+ * never read-merge-write. Composition (later wins on key collision):
+ *
+ *   base minus ($2: removed keys ∪ rename old-names)
+ *   || renames ($3: [{prev,next}] — each carries the OLD value, skipped when
+ *      the source key is absent)
+ *   || sets ($4: typed JSON values)
+ *
+ * $5 is the identity-binding guard: {key: value} pairs that must not already
+ * belong to ANOTHER active user (the write-side counterpart of the
+ * resolver's ambiguity throw in GET_USERS_BY_METADATA_VALUE). Zero rows
+ * back means the user is missing OR the guard tripped — the caller
+ * distinguishes with VERIFY_USER_BY_ID.
+ */
+export const PATCH_USER_PROPERTIES = `
+  UPDATE lt_users SET metadata = (
+    (COALESCE(metadata, '{}'::jsonb) - $2::text[])
+    || COALESCE((
+      SELECT jsonb_object_agg(r.next, COALESCE(lt_users.metadata, '{}'::jsonb) -> r.prev)
+      FROM jsonb_to_recordset($3::jsonb) AS r(prev text, next text)
+      WHERE COALESCE(lt_users.metadata, '{}'::jsonb) ? r.prev
+    ), '{}'::jsonb)
+    || $4::jsonb
+  )
+  WHERE id = $1
+    AND NOT EXISTS (
+      SELECT 1
+      FROM lt_users u2, jsonb_each_text($5::jsonb) AS g(k, v)
+      WHERE u2.id <> $1 AND u2.status = 'active' AND u2.metadata ->> g.k = g.v
+    )
+  RETURNING *`;
+
 /** Fetch user + roles in a single query. Returns one row per role (or one row with nulls if no roles). */
 export const GET_USER_WITH_ROLES =
   `SELECT u.id, u.external_id, u.display_name, u.status, u.metadata,

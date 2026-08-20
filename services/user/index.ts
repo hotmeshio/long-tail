@@ -1,4 +1,4 @@
-export { CreateUserInput, UpdateUserInput, VALID_ROLE_TYPES } from './types';
+export { CreateUserInput, UpdateUserInput, UserPropertyOps, VALID_ROLE_TYPES } from './types';
 export {
   createUser,
   getUser,
@@ -6,6 +6,10 @@ export {
   getUserByEmail,
   getUserByMetadataValue,
   updateUser,
+  patchUserProperties,
+  getIdentityPropertyKeys,
+  UserPropertyConflictError,
+  UserPropertyValidationError,
   deleteUser,
   listUsers,
 } from './crud';

@@ -283,6 +283,13 @@ export const removeUserRoleSchema = z.object({
   role: z.string().describe('Role to remove'),
 });
 
+export const patchUserPropertiesSchema = z.object({
+  user_id: z.string().describe('User UUID'),
+  set: z.record(z.any()).optional().describe('Properties to set — typed JSON values'),
+  remove: z.array(z.string()).optional().describe('Property keys to delete'),
+  rename: z.record(z.string()).optional().describe('{ oldKey: newKey } renames — values preserved'),
+});
+
 // ── roles (routes/roles.ts) ─────────────────────────────────────────────────
 
 export const listRolesSchema = z.object({});

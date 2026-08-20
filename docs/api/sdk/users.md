@@ -117,6 +117,30 @@ const result = await lt.users.update({
 
 ---
 
+## patchProperties
+
+Atomically patch the user's properties dictionary — one statement, never read-merge-write. Deleting is explicit (`remove`); an absent key is kept; `rename` preserves the value. Identity-binding keys (badge scheme facets) assert uniqueness among active users (409 on conflict).
+
+```typescript
+const result = await lt.users.patchProperties({
+  id: 'user-uuid',
+  set: { badgeSlug: 'gluer-june', shift: 'night' },
+  remove: ['legacy_pin'],
+  rename: { station: 'station_affinity' },
+});
+```
+
+**Returns:** `LTApiResult<User>` — 400 malformed patch, 404 unknown user, 409 identity conflict.
+
+## getSystemPropertyKeys
+
+The property keys the platform resolves identities against (enabled identity scan schemes' target facets).
+
+```typescript
+const result = await lt.users.getSystemPropertyKeys();
+// result.data → { keys: ['badge_id'] }
+```
+
 ## delete
 
 Delete a user by ID.

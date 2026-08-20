@@ -54,6 +54,8 @@ vi.mock('../../../../api/users', () => ({
   useUpdateUser: () => mutationStub(),
   useAddUserRole: () => mutationStub(),
   useRemoveUserRole: () => mutationStub(),
+  usePatchUserProperties: () => mutationStub(),
+  useSystemPropertyKeys: () => ({ data: { keys: [] } }),
 }));
 
 vi.mock('../../../../api/roles', () => ({
@@ -189,7 +191,7 @@ describe('UsersPage', () => {
     // The role panel should show the selected user name and their roles
     const panel = screen.getByText('Role Membership').closest('div')!;
     expect(within(panel).getByText('Alice Smith')).toBeInTheDocument();
-    expect(within(panel).getByText('Member of:')).toBeInTheDocument();
+    expect(within(panel).getByText('Roles')).toBeInTheDocument();
   });
 
   it('shows "No roles assigned" for a user with empty roles', async () => {

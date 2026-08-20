@@ -149,7 +149,7 @@ Partial update — only the fields you include are changed.
 | `email` | `string` | New email address |
 | `display_name` | `string` | New display name |
 | `status` | `string` | `active`, `inactive`, or `suspended` |
-| `metadata` | `object` | Replacement metadata |
+| `metadata` | `object` | **Replaces the whole properties dictionary** — for per-key edits use `PATCH /:id/properties`, which never clobbers siblings |
 
 **Example request:**
 
@@ -166,6 +166,58 @@ Partial update — only the fields you include are changed.
 
 ```json
 { "error": "User not found" }
+```
+
+## Patch user properties
+
+```
+PATCH /api/users/:id/properties
+```
+
+Atomically patch the user's properties dictionary (`metadata`) — one statement, never read-merge-write. Editing one property can never clobber another; a rename preserves its value with no key-absent window. Builder only (the same gate as every other user write).
+
+**Request body:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `set` | `object` | Properties to set. Values are typed JSON — numbers, booleans, and objects round-trip intact |
+| `remove` | `string[]` | Property keys to delete. Deleting is explicit: a key absent from the patch is kept |
+| `rename` | `object` | `{ "oldKey": "newKey" }` renames, values preserved |
+
+Precedence on key collision: `set` > `rename` > existing.
+
+**Example request:**
+
+```json
+{
+  "set": { "badgeSlug": "gluer-june", "shift": "night" },
+  "remove": ["legacy_pin"],
+  "rename": { "station": "station_affinity" }
+}
+```
+
+**Response 200:** The updated user object.
+
+**Response 400:** malformed patch (empty key, a key both set and removed, self-rename).
+
+**Response 409:** an **identity-binding** value already belongs to another active user. Keys named as an enabled identity scan scheme's `target_facet` (e.g. `badge_id`) are how the platform resolves badge scans to people — the patch asserts, in the same statement, that no other active user carries the value, the write-side counterpart of the resolver's ambiguity error.
+
+```json
+{ "error": "\"badge_id\" value is already bound to another active user" }
+```
+
+## System property keys
+
+```
+GET /api/users/system-property-keys
+```
+
+The property keys the platform itself resolves identities against — every enabled identity scan scheme's `target_facet`. The dashboard marks these as system properties in the editor.
+
+**Response 200:**
+
+```json
+{ "keys": ["badge_id"] }
 ```
 
 ## Delete user

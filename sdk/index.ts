@@ -182,6 +182,8 @@ export function createClient(options: LTClientOptions = {}) {
       get: usersApi.getUser,
       create: usersApi.createUser,
       update: usersApi.updateUser,
+      patchProperties: usersApi.patchUserProperties,
+      getSystemPropertyKeys: usersApi.getSystemPropertyKeys,
       delete: usersApi.deleteUser,
       getRoles: usersApi.getUserRoles,
       addRole: usersApi.addUserRole,

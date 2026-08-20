@@ -286,4 +286,93 @@ describe('User routes', () => {
       expect(body.error).toContain('not found');
     });
   });
+
+  describe('PATCH /api/users/:id/properties (builder-only, atomic)', () => {
+    let uid: string;
+
+    beforeAll(async () => {
+      const res = await fetch(`${ctx.BASE}/users`, {
+        method: 'POST',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({
+          external_id: `props-route-${Date.now()}`,
+          metadata: { shift: 'day', badge_slug: 'gluer-1' },
+        }),
+      });
+      uid = ((await res.json()) as any).id;
+    });
+
+    afterAll(async () => {
+      if (uid) {
+        await fetch(`${ctx.BASE}/users/${uid}`, {
+          method: 'DELETE',
+          headers: authHeaders(ctx.builderToken),
+        });
+      }
+    });
+
+    it('returns 403 for member and admin (the existing user-write gate, unchanged)', async () => {
+      for (const token of [ctx.memberToken, ctx.adminToken]) {
+        const res = await fetch(`${ctx.BASE}/users/${uid}/properties`, {
+          method: 'PATCH',
+          headers: authHeaders(token),
+          body: JSON.stringify({ set: { shift: 'night' } }),
+        });
+        expect(res.status).toBe(403);
+      }
+    });
+
+    it('patches one key without clobbering siblings', async () => {
+      const res = await fetch(`${ctx.BASE}/users/${uid}/properties`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ set: { shift: 'night' } }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.metadata).toMatchObject({ shift: 'night', badge_slug: 'gluer-1' });
+    });
+
+    it('renames atomically and removes explicitly in one patch', async () => {
+      const res = await fetch(`${ctx.BASE}/users/${uid}/properties`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ rename: { badge_slug: 'slug' }, remove: ['shift'] }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.metadata.slug).toBe('gluer-1');
+      expect(body.metadata.badge_slug).toBeUndefined();
+      expect(body.metadata.shift).toBeUndefined();
+    });
+
+    it('rejects a malformed patch with 400', async () => {
+      const res = await fetch(`${ctx.BASE}/users/${uid}/properties`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('404s an unknown user', async () => {
+      const res = await fetch(`${ctx.BASE}/users/00000000-0000-0000-0000-000000000000/properties`, {
+        method: 'PATCH',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ set: { a: 1 } }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/users/system-property-keys', () => {
+    it('answers the identity scheme facets for any authenticated caller', async () => {
+      const res = await fetch(`${ctx.BASE}/users/system-property-keys`, {
+        headers: authHeaders(ctx.memberToken),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(Array.isArray(body.keys)).toBe(true);
+    });
+  });
 });
