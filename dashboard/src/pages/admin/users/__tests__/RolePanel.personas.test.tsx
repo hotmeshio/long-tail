@@ -9,6 +9,8 @@ const unassignMutate = vi.fn();
 vi.mock('../../../../api/users', () => ({
   useAddUserRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useRemoveUserRole: () => ({ mutate: vi.fn(), isPending: false }),
+  usePatchUserProperties: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useSystemPropertyKeys: () => ({ data: { keys: [] } }),
 }));
 vi.mock('../../../../api/roles', () => ({
   useRoles: () => ({ data: { roles: ['design', 'review'] } }),

@@ -12,9 +12,13 @@ import {
   GET_USER_BY_EXTERNAL_ID,
   GET_USER_BY_ID,
   GET_USERS_BY_METADATA_VALUE,
+  PATCH_USER_PROPERTIES,
+  VERIFY_USER_BY_ID,
 } from './sql';
+import { listScanSchemes } from '../scan-code';
+import { SCAN_SCHEME_KINDS } from '../../types/scan-code';
 import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
-import type { CreateUserInput, UpdateUserInput } from './types';
+import type { CreateUserInput, UpdateUserInput, UserPropertyOps } from './types';
 
 // ─── Private helpers (exported for internal use by auth.ts) ──────────────────
 
@@ -167,6 +171,119 @@ export async function updateUser(
   );
   if (!rows[0]) return null;
   return attachRoles(rows[0]);
+}
+
+/** A property write that would create an ambiguous identity binding. */
+export class UserPropertyConflictError extends Error {
+  status = 409;
+  constructor(key: string) {
+    super(`"${key}" value is already bound to another active user`);
+    this.name = 'UserPropertyConflictError';
+  }
+}
+
+/** A malformed property patch — rejected before any write. */
+export class UserPropertyValidationError extends Error {
+  status = 400;
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserPropertyValidationError';
+  }
+}
+
+/**
+ * The lt_users.metadata keys the platform itself resolves identities against:
+ * every enabled identity scan scheme's target_facet (e.g. badge_id). Writes
+ * to these keys carry a uniqueness guard; the dashboard marks them as system
+ * properties.
+ */
+export async function getIdentityPropertyKeys(): Promise<string[]> {
+  const schemes = await listScanSchemes();
+  return [...new Set(
+    schemes
+      .filter((s) => s.enabled && s.kind === SCAN_SCHEME_KINDS.IDENTITY)
+      .map((s) => s.target_facet),
+  )];
+}
+
+/**
+ * Atomic per-key patch of the user's properties dictionary (lt_users.metadata).
+ * One statement — never read-merge-write: concurrent patches of different
+ * keys both land, a rename never opens a key-absent window, and deleting is
+ * explicit (`remove`) — an absent key means keep. Precedence on collision:
+ * set > rename > existing. Values are raw JSON, so numbers/booleans/objects
+ * round-trip typed.
+ *
+ * Identity-binding keys (getIdentityPropertyKeys) additionally assert, in the
+ * same statement, that no OTHER active user carries the value — the
+ * write-side counterpart of getUserByMetadataValue's ambiguity throw.
+ * A tripped guard raises UserPropertyConflictError (409).
+ */
+export async function patchUserProperties(
+  id: string,
+  ops: UserPropertyOps,
+): Promise<LTUserRecord | null> {
+  const set = ops.set ?? {};
+  const remove = ops.remove ?? [];
+  const rename = ops.rename ?? {};
+
+  const setKeys = Object.keys(set);
+  const renameEntries = Object.entries(rename);
+  if (setKeys.length === 0 && remove.length === 0 && renameEntries.length === 0) {
+    throw new UserPropertyValidationError('A property patch requires at least one set, remove, or rename');
+  }
+  for (const key of [...setKeys, ...remove, ...renameEntries.flat()]) {
+    if (typeof key !== 'string' || key.trim().length === 0) {
+      throw new UserPropertyValidationError('Property keys must be non-empty strings');
+    }
+  }
+  for (const key of setKeys) {
+    if (remove.includes(key)) {
+      throw new UserPropertyValidationError(`"${key}" cannot be both set and removed in one patch`);
+    }
+  }
+  for (const [prev, next] of renameEntries) {
+    if (prev === next) {
+      throw new UserPropertyValidationError(`Renaming "${prev}" to itself is not a change`);
+    }
+  }
+  const renameTargets = renameEntries.map(([, next]) => next);
+  if (new Set(renameTargets).size !== renameTargets.length) {
+    throw new UserPropertyValidationError('Two properties cannot be renamed to the same key');
+  }
+
+  // Identity bindings resolve people — their values must be scalar and, for
+  // ACTIVE users, unique. The guard rides the same statement.
+  const identityKeys = await getIdentityPropertyKeys();
+  const guard: Record<string, string> = {};
+  for (const key of identityKeys) {
+    if (key in set) {
+      const value = set[key];
+      if (typeof value !== 'string' && typeof value !== 'number') {
+        throw new UserPropertyValidationError(`"${key}" is an identity binding — its value must be a string or number`);
+      }
+      guard[key] = String(value);
+    }
+  }
+
+  const removeAll = [...new Set([...remove, ...renameEntries.map(([prev]) => prev)])];
+  const renamePairs = renameEntries.map(([prev, next]) => ({ prev, next }));
+
+  const pool = getPool();
+  const { rows } = await pool.query(PATCH_USER_PROPERTIES, [
+    id,
+    removeAll,
+    JSON.stringify(renamePairs),
+    JSON.stringify(set),
+    JSON.stringify(guard),
+  ]);
+  if (rows[0]) return attachRoles(rows[0]);
+
+  const exists = await pool.query(VERIFY_USER_BY_ID, [id]);
+  if (!exists.rows[0]) return null;
+  // The user exists, so the identity guard is what blocked the write. Name
+  // the first guarded key for the caller; the row was not touched.
+  throw new UserPropertyConflictError(Object.keys(guard)[0] ?? 'identity binding');
 }
 
 export async function deleteUser(id: string): Promise<boolean> {

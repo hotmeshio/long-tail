@@ -740,6 +740,23 @@ Assign a role to a user. For a `member`, optional scope narrows the work surface
 | read_scope | string | No | Member search breadth: `self` or `all` (default `all`) |
 | write_scope | string | No | Member claim/ack/delete breadth: `none`, `self`, or `all` (default `all`) |
 
+### patch_user_properties
+
+Atomically patch a user's properties dictionary (`lt_users.metadata`) — set/remove/rename keys in one statement, never read-merge-write. Identity-binding keys (badge scheme target facets) assert uniqueness among active users.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | string | Yes | User UUID |
+| set | object | No | Properties to set — typed JSON values |
+| remove | array | No | Property keys to delete |
+| rename | object | No | `{ oldKey: newKey }` renames — values preserved |
+
 ### remove_user_role
 
 Remove a role from a user.

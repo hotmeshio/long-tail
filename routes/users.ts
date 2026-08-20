@@ -26,6 +26,17 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/users/system-property-keys
+ * The property keys the platform resolves identities against (enabled
+ * identity scan schemes' target facets) — marked as system properties in
+ * the dashboard editor. Registered before /:id so the literal wins.
+ */
+router.get('/system-property-keys', async (_req, res) => {
+  const result = await api.getSystemPropertyKeys();
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/users/:id
  * Get a single user by ID.
  */
@@ -51,6 +62,23 @@ router.post('/', requireBuilder, async (req, res) => {
  */
 router.put('/:id', requireBuilder, async (req, res) => {
   const result = await api.updateUser({ id: req.params.id as string, ...(req.body || {}) });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
+ * PATCH /api/users/:id/properties
+ * Atomically patch the user's properties dictionary. Builder only — the
+ * same gate as every other user write.
+ * Body: { set?: { key: value }, remove?: [key], rename?: { old: new } }
+ */
+router.patch('/:id/properties', requireBuilder, async (req, res) => {
+  const { set, remove, rename } = req.body || {};
+  const result = await api.patchUserProperties({
+    id: req.params.id as string,
+    set,
+    remove,
+    rename,
+  });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

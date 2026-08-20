@@ -81,6 +81,35 @@ export function useUpdateUser() {
   });
 }
 
+/** One atomic patch of the user's properties dictionary — deleting is explicit, absence means keep. */
+export interface UserPropertyOps {
+  set?: Record<string, unknown>;
+  remove?: string[];
+  rename?: Record<string, string>;
+}
+
+export function usePatchUserProperties() {
+  const queryClient = useQueryClient();
+  return useMutation<LTUserRecord, Error, { id: string; ops: UserPropertyOps }>({
+    mutationFn: ({ id, ops }) =>
+      apiFetch(`/users/${id}/properties`, {
+        method: 'PATCH',
+        body: JSON.stringify(ops),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+/** The property keys the platform resolves identities against (badge scheme facets). */
+export function useSystemPropertyKeys() {
+  return useQuery<{ keys: string[] }>({
+    queryKey: ['users', 'system-property-keys'],
+    queryFn: () => apiFetch('/users/system-property-keys'),
+  });
+}
+
 export function useDeleteUser() {
   const queryClient = useQueryClient();
   return useMutation({

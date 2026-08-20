@@ -360,6 +360,14 @@ usrCmd.command('get <id>')
   .option('--json', 'JSON output')
   .action(wrap(usr.getUser));
 
+usrCmd.command('props <id>')
+  .description('View or atomically patch the user\'s properties dictionary')
+  .option('--set <key=value...>', 'Set a property (repeatable; value JSON-parsed, string fallback)')
+  .option('--remove <key...>', 'Delete a property (repeatable)')
+  .option('--rename <old=new...>', 'Rename a property, value preserved (repeatable)')
+  .option('--json', 'JSON output')
+  .action(wrap(usr.userProps));
+
 // ── Roles ────────────────────────────────────────────────────────────────
 
 const rolesCmd = program.command('roles').description('Roles — the queue-backed work surfaces where workflows hand off to people');

@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-// Stable mutate spy so we can assert the payload the panel sends.
+// Stable mutate spies so we can assert the payloads the panel sends.
 const addMutate = vi.fn();
+const patchMutate = vi.fn();
 vi.mock('../../../../api/users', () => ({
   useAddUserRole: () => ({ mutate: addMutate, isPending: false, error: null }),
   useRemoveUserRole: () => ({ mutate: vi.fn(), isPending: false }),
+  usePatchUserProperties: () => ({ mutate: patchMutate, isPending: false, error: null }),
+  useSystemPropertyKeys: () => ({ data: { keys: ['badge_id'] } }),
 }));
 vi.mock('../../../../api/roles', () => ({
   useRoles: () => ({ data: { roles: ['reviewer', 'customer-triage'] } }),
@@ -65,5 +68,29 @@ describe('RolePanel — work-surface scope (Accounts page)', () => {
       }),
       expect.anything(),
     );
+  });
+});
+
+describe('RolePanel — properties dictionary', () => {
+  const withProps = { ...user, metadata: { badge_id: 'B-1001', shift: 'day' } };
+
+  it('renders the dictionary with the badge key marked as a system property', () => {
+    render(<RolePanel user={withProps} />);
+    expect(screen.getByText('Properties')).toBeInTheDocument();
+    expect(screen.getByText('badge_id')).toBeInTheDocument();
+    expect(screen.getByTitle('system')).toBeInTheDocument();
+    expect(screen.getByText('day')).toBeInTheDocument();
+  });
+
+  it('adding a property sends ONE atomic patch op for the user', async () => {
+    const u = userEvent.setup();
+    render(<RolePanel user={withProps} />);
+    await u.type(screen.getByLabelText('New property name'), 'badge_slug');
+    await u.type(screen.getByLabelText('New property value'), 'gluer-june');
+    await u.click(screen.getByRole('button', { name: /add property/i }));
+    expect(patchMutate).toHaveBeenCalledWith({
+      id: 'u1',
+      ops: { set: { badge_slug: 'gluer-june' } },
+    });
   });
 });

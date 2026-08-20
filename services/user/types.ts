@@ -30,5 +30,17 @@ export interface UpdateUserInput {
   display_name?: string;
   password?: string;
   status?: LTUserStatus;
+  /** Wholesale REPLACE of the properties dictionary — for per-key edits use patchUserProperties. */
   metadata?: Record<string, any>;
+}
+
+/**
+ * One atomic patch of the user's properties dictionary. Deleting is explicit
+ * (`remove`) — a key absent from the patch is kept. `rename` preserves the
+ * value. Precedence on collision: set > rename > existing.
+ */
+export interface UserPropertyOps {
+  set?: Record<string, unknown>;
+  remove?: string[];
+  rename?: Record<string, string>;
 }

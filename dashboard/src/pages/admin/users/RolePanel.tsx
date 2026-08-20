@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Drama } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useRoles } from '../../../api/roles';
-import { useAddUserRole, useRemoveUserRole } from '../../../api/users';
+import { useAddUserRole, useRemoveUserRole, usePatchUserProperties, useSystemPropertyKeys } from '../../../api/users';
+import { PropertiesEditor } from '../../../components/common/form/PropertiesEditor';
 import {
   usePersonas,
   useUserPersonas,
@@ -17,6 +18,43 @@ import {
   DEFAULT_SCOPE_VALUE,
   scopePreset,
 } from '../../../lib/roleScope';
+
+/**
+ * The panel's section surface — the same distinct-surface treatment the
+ * resolver form's SectionGroup uses, so the three blocks read as sections,
+ * not a run of text.
+ */
+function PanelSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="border border-surface-border bg-surface-sunken rounded-[var(--lt-radius-section)] p-4">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The user's properties dictionary (lt_users.metadata) as an editable
+ * key/value table. Every edit is ONE atomic patch — changing a property can
+ * never clobber its siblings, and a rename never opens a key-absent window.
+ * Identity-binding keys (badge scheme facets) are marked as system
+ * properties; a duplicate identity value answers a 409 shown inline.
+ */
+function PropertiesBlock({ user }: { user: LTUserRecord }) {
+  const patch = usePatchUserProperties();
+  const { data: systemKeys } = useSystemPropertyKeys();
+
+  return (
+    <PanelSection>
+      <PropertiesEditor
+        value={user.metadata ?? {}}
+        systemKeys={systemKeys?.keys ?? []}
+        pending={patch.isPending}
+        error={patch.error ? (patch.error as Error).message : null}
+        onPatch={(ops) => patch.mutate({ id: user.id, ops })}
+      />
+    </PanelSection>
+  );
+}
 
 /**
  * Persona assignment for the selected user. A persona is shorthand for scoped
@@ -40,6 +78,7 @@ function PersonaBlock({ user }: { user: LTUserRecord }) {
   if (heldPersonas.length === 0 && available.length === 0) return null;
 
   return (
+    <PanelSection>
     <div className="space-y-2">
       <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
         Personas
@@ -107,6 +146,7 @@ function PersonaBlock({ user }: { user: LTUserRecord }) {
         </p>
       )}
     </div>
+    </PanelSection>
   );
 }
 
@@ -148,7 +188,7 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
   };
 
   return (
-    <div className="border-l border-surface-border pl-6 pt-4 min-h-[300px]">
+    <div className="border-l border-surface-border pl-6 pt-4 pb-8 min-h-[300px]">
       <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-4">
         Role Membership
       </p>
@@ -158,14 +198,17 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
           Select a user to manage their roles.
         </p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
             <p className="text-sm text-text-primary">{user.display_name || user.external_id}</p>
           </div>
 
           <PersonaBlock user={user} />
 
-          <p className="text-2xs text-text-tertiary">Member of:</p>
+          {/* Roles section — membership list plus the add form. */}
+          <PanelSection>
+          <div className="space-y-4">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">Roles</p>
 
           {currentRoles.length === 0 ? (
             <p className="text-xs text-text-tertiary">No roles assigned.</p>
@@ -272,6 +315,10 @@ export function RolePanel({ user }: { user: LTUserRecord | null }) {
               )}
             </div>
           )}
+          </div>
+          </PanelSection>
+
+          <PropertiesBlock user={user} />
         </div>
       )}
     </div>

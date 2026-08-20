@@ -6,11 +6,13 @@ import { z } from 'zod';
 
 import * as userService from '../../../services/user';
 import * as roleService from '../../../services/role';
+import { patchUserProperties as patchUserPropertiesApi } from '../../../api/users';
 import {
   listUsersSchema,
   createUserSchema,
   addUserRoleSchema,
   removeUserRoleSchema,
+  patchUserPropertiesSchema,
   listRolesSchema,
   createRoleSchema,
   addEscalationChainSchema,
@@ -139,6 +141,37 @@ export function registerUserTools(server: McpServer): void {
       }
       return {
         content: [{ type: 'text' as const, text: JSON.stringify({ removed: true }) }],
+      };
+    },
+  );
+
+  // mirrors PATCH /api/users/:id/properties
+  (server as any).registerTool(
+    'patch_user_properties',
+    {
+      title: 'Patch User Properties',
+      description:
+        'Atomically patch a user\'s properties dictionary (lt_users.metadata) — one statement, ' +
+        'never read-merge-write. Deleting a key is explicit (remove); absent keys are kept; ' +
+        'rename preserves the value. Identity-binding keys (badge scheme target facets) assert ' +
+        'uniqueness among active users.',
+      inputSchema: patchUserPropertiesSchema,
+    },
+    async (args: z.infer<typeof patchUserPropertiesSchema>) => {
+      const result = await patchUserPropertiesApi({
+        id: args.user_id,
+        set: args.set,
+        remove: args.remove,
+        rename: args.rename,
+      });
+      if (result.error) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result.data) }],
       };
     },
   );

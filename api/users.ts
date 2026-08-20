@@ -121,7 +121,8 @@ export async function createUser(input: {
  * @param input.email — new email address
  * @param input.display_name — new display name
  * @param input.status — new user status
- * @param input.metadata — replacement metadata object
+ * @param input.metadata — REPLACES the whole properties dictionary; for
+ *   per-key edits use patchUserProperties (never clobbers siblings)
  * @returns `{ status: 200, data: User }` on success, or `{ status: 404 }` if not found
  */
 export async function updateUser(input: {
@@ -139,6 +140,61 @@ export async function updateUser(input: {
       return { status: 404, error: 'User not found' };
     }
     return { status: 200, data: user };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * Atomically patch the user's properties dictionary (lt_users.metadata) —
+ * one statement, never read-merge-write. Deleting a key is explicit
+ * (`remove`); a key absent from the patch is kept. `rename` preserves the
+ * value with no key-absent window. Identity-binding keys (badge scan
+ * scheme target facets) assert uniqueness among active users in the same
+ * statement.
+ *
+ * @param input.id — the user's unique identifier
+ * @param input.set — properties to set (typed JSON values)
+ * @param input.remove — property keys to delete
+ * @param input.rename — `{ oldKey: newKey }` renames, values preserved
+ * @returns `{ status: 200, data: User }`; 400 malformed patch; 404 unknown
+ *   user; 409 when an identity value already belongs to another active user
+ */
+export async function patchUserProperties(input: {
+  id: string;
+  set?: Record<string, unknown>;
+  remove?: string[];
+  rename?: Record<string, string>;
+}): Promise<LTApiResult> {
+  try {
+    const user = await userService.patchUserProperties(input.id, {
+      set: input.set,
+      remove: input.remove,
+      rename: input.rename,
+    });
+    if (!user) {
+      return { status: 404, error: 'User not found' };
+    }
+    return { status: 200, data: user };
+  } catch (err: any) {
+    if (err.status === 400 || err.status === 409) {
+      return { status: err.status, error: err.message };
+    }
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
+ * The property keys the platform itself resolves identities against — every
+ * enabled identity scan scheme's target facet. The dashboard marks these as
+ * system properties.
+ *
+ * @returns `{ status: 200, data: { keys: string[] } }`
+ */
+export async function getSystemPropertyKeys(): Promise<LTApiResult> {
+  try {
+    const keys = await userService.getIdentityPropertyKeys();
+    return { status: 200, data: { keys } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
