@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+import { REALTIME_REFRESH, getInvalidationScheduler } from '../../../lib/realtime-refresh';
 
 vi.mock('../../../hooks/useSidebar', () => ({ useSidebar: () => ({ collapsed: false }) }));
 vi.mock('../../../hooks/useAuth', () => ({
@@ -9,8 +11,16 @@ vi.mock('../../../hooks/useAuth', () => ({
     user: { userId: 'u1', roles: [{ role: 'print-farm' }, { role: 'gang-harvest' }, { role: 'harvest' }] },
   }),
 }));
-vi.mock('../../../hooks/useEventContext', () => ({ useEventSubscriptions: () => {} }));
-vi.mock('../../../hooks/useMemberEscalationPatterns', () => ({ useMemberEscalationPatterns: () => [] }));
+type Handler = (event: any) => void;
+const subscriptions: Array<{ pattern: string; handler: Handler }> = [];
+vi.mock('../../../hooks/useEventContext', () => ({
+  useEventSubscriptions: (patterns: string[], handler: Handler) => {
+    for (const pattern of patterns) subscriptions.push({ pattern, handler });
+  },
+}));
+vi.mock('../../../hooks/useMemberEscalationPatterns', () => ({
+  useMemberEscalationPatterns: () => ['lt.events.system.escalation.>'],
+}));
 vi.mock('../../../api/escalations', () => ({
   useEscalations: () => ({ data: undefined }),
   useAvailableEscalations: () => ({ data: { total: 7 } }),
@@ -48,15 +58,19 @@ vi.mock('../../../api/roles', () => ({
 
 import { PinnedViewsSidebar } from '../PinnedViewsSidebar';
 
-function renderSidebar() {
+function renderSidebar(qc: QueryClient = new QueryClient()) {
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={qc}>
       <MemoryRouter>
         <PinnedViewsSidebar />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
+
+beforeEach(() => {
+  subscriptions.length = 0;
+});
 
 describe('PinnedViewsSidebar — role-grouped pins', () => {
   it('groups role pins under their role display title (derived when unset)', () => {
@@ -101,5 +115,30 @@ describe('PinnedViewsSidebar — role-grouped pins', () => {
       'title',
       'Print Farm — pins from the print-farm role',
     );
+  });
+});
+
+describe('PinnedViewsSidebar — badge refresh discipline', () => {
+  it('an event burst never invalidates synchronously — one SUMMARY-tier flush', () => {
+    vi.useFakeTimers();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    try {
+      renderSidebar(qc);
+      const spy = vi.spyOn(qc, 'invalidateQueries');
+
+      act(() => {
+        for (let i = 0; i < 50; i++) subscriptions[0].handler({ type: 'system.escalation.x' });
+      });
+      expect(spy).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(REALTIME_REFRESH.SUMMARY.coalesceMs + 50);
+      });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    } finally {
+      getInvalidationScheduler(qc).dispose();
+      vi.useRealTimers();
+    }
   });
 });

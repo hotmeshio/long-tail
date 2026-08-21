@@ -8,6 +8,7 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { SEARCH_DEBOUNCE_MS } from '../../lib/realtime-refresh';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { FilterBar, FilterInput } from '../../components/common/data/FilterBar';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
@@ -37,7 +38,7 @@ export function FilesPage() {
       setDebouncedSearch(search);
       setCurrentToken(undefined);
       setTokenStack([]);
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [search]);
 

@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/common/display/EmptyState';
 import { DropZone } from '../../components/common/DropZone';
 import { TimeAgo } from '../../components/common/display/TimeAgo';
 import { useListDomains, useListKnowledge } from '../../api/knowledge';
+import { SEARCH_DEBOUNCE_MS } from '../../lib/realtime-refresh';
 import { KnowledgeEntryView } from './KnowledgeEntryView';
 import { CreateEntryModal } from './CreateEntryModal';
 
@@ -56,7 +57,7 @@ export function KnowledgePage() {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [search]);
 

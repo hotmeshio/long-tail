@@ -21,11 +21,12 @@ import {
   DEFAULT_PAGE_SIZE,
 } from './EntityColumns';
 import { entityValues, pivotEntities, totalDwell, rankSliceValues } from './entity-pivot';
+import { SEARCH_DEBOUNCE_MS } from '../../lib/realtime-refresh';
 
 // Shared shell-panel slot key — the entity timeline claims/releases this slot.
 const TIMELINE_PANEL_KEY = 'entity-timeline';
 // The find input debounces into the URL-backed find term.
-const FIND_DEBOUNCE_MS = 300;
+const FIND_DEBOUNCE_MS = SEARCH_DEBOUNCE_MS;
 // A slice with more discrete values than this is not really categorical — cap
 // the columns and say so, rather than sprawl.
 const SLICE_VALUE_CAP = 12;

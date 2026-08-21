@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { REALTIME_REFRESH } from '../../lib/realtime-refresh';
 import {
   useWorkflowListEvents,
   useWorkflowDetailEvents,
@@ -39,6 +40,11 @@ function createWrapper() {
     ),
   };
 }
+
+// Advance past a tier's coalesce window — tests tune with the knobs.
+const DETAIL_FLUSH_MS = REALTIME_REFRESH.DETAIL.coalesceMs + 50;
+const LIST_FLUSH_MS = REALTIME_REFRESH.LIST.coalesceMs + 50;
+const SUMMARY_FLUSH_MS = REALTIME_REFRESH.SUMMARY.coalesceMs + 50;
 
 function makeEvent(overrides: Record<string, unknown> = {}) {
   return {
@@ -83,7 +89,7 @@ describe('useWorkflowListEvents', () => {
 
     expect(spy).not.toHaveBeenCalled();
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['jobs'] });
   });
@@ -112,7 +118,7 @@ describe('useWorkflowDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.task.tsk-001.completed', workflowId: 'wf-123' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowExecution', 'wf-123'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowState', 'wf-123'] });
@@ -125,7 +131,7 @@ describe('useWorkflowDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-001.created', workflowId: 'wf-123' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
   });
@@ -137,7 +143,7 @@ describe('useWorkflowDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ workflowId: 'myTask-myOrch-abc123-2' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalled();
   });
@@ -149,7 +155,7 @@ describe('useWorkflowDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ workflowId: 'wf-other' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).not.toHaveBeenCalled();
   });
@@ -175,7 +181,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.workflow.wf-123.completed', workflowId: 'wf-123' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryResult', 'wf-123'] });
@@ -189,7 +195,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.task.tsk-001.started', workflowId: 'wf-123' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
   });
@@ -201,7 +207,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-001.created', workflowId: 'wf-123' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
   });
@@ -213,7 +219,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ workflowId: 'wf-other' }));
 
-    act(() => { vi.advanceTimersByTime(450); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).not.toHaveBeenCalled();
   });
@@ -247,7 +253,7 @@ describe('useProcessDetailEvents', () => {
     const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.system.task.>');
     taskSub!.handler(makeEvent({ type: 'system.task.tsk-001.completed', originId: 'proc-1' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['processes', 'proc-1'] });
   });
@@ -260,7 +266,7 @@ describe('useProcessDetailEvents', () => {
     const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.system.task.>');
     taskSub!.handler(makeEvent({ type: 'system.task.tsk-001.completed', originId: 'proc-other' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).not.toHaveBeenCalled();
   });
@@ -283,29 +289,30 @@ describe('useEscalationStatsEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-001.created' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(SUMMARY_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
   });
 
-  it('keeps flushing under a constant event stream — the window never starves', () => {
+  it("bounds a constant event stream to the tier's refractory rate — never starves, never exceeds", () => {
     const { qc, Wrapper } = createWrapper();
     const spy = vi.spyOn(qc, 'invalidateQueries');
     renderHook(() => useEscalationStatsEvents(), { wrapper: Wrapper });
 
-    // Events every 100ms for 3 seconds — always inside the 300ms window, so
-    // a timer-resetting debounce would never fire at all.
+    // Sustained stream spanning the coalesce window plus two full refractory
+    // intervals: exactly three flushes — the coalesced first, then one per
+    // cooldown boundary (the trailing flush is what prevents starvation).
+    const { coalesceMs, minIntervalMs } = REALTIME_REFRESH.SUMMARY;
+    const totalMs = coalesceMs + 2 * minIntervalMs;
     act(() => {
-      for (let i = 0; i < 30; i++) {
-        subscriptions[0].handler(makeEvent({ type: `system.escalation.qa.esc-${i}.claimed` }));
+      for (let elapsed = 0; elapsed < totalMs; elapsed += 100) {
+        subscriptions[0].handler(makeEvent({ type: `system.escalation.qa.esc-${elapsed}.claimed` }));
         vi.advanceTimersByTime(100);
       }
     });
 
-    // ~One flush per 300ms window across 3s of sustained load.
     const calls = spy.mock.calls.filter((c) => JSON.stringify(c[0]) === JSON.stringify({ queryKey: ['escalationStats'] }));
-    expect(calls.length).toBeGreaterThanOrEqual(8);
-    expect(calls.length).toBeLessThanOrEqual(11);
+    expect(calls.length).toBe(3);
   });
 });
 
@@ -351,7 +358,7 @@ describe('useEscalationListEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-001.resolved' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
   });
@@ -367,18 +374,18 @@ describe('useEscalationDetailEvents', () => {
     expect(subscriptions[0].pattern).toBe('lt.events.system.escalation.*.esc-1.>');
   });
 
-  it('invalidates detail + list + stats for matching escalationId', () => {
+  it("invalidates ONLY this record's key — list and stats have their own subscriptions", () => {
     const { qc, Wrapper } = createWrapper();
     const spy = vi.spyOn(qc, 'invalidateQueries');
     renderHook(() => useEscalationDetailEvents('esc-1'), { wrapper: Wrapper });
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-1.resolved', escalationId: 'esc-1' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'esc-1'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
   });
 
   it('ignores events for a different escalationId', () => {
@@ -388,7 +395,7 @@ describe('useEscalationDetailEvents', () => {
 
     subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-other.created', escalationId: 'esc-other' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
     expect(spy).not.toHaveBeenCalled();
   });
@@ -414,7 +421,7 @@ describe('useProcessListEvents', () => {
     const taskSub = subscriptions.find((s) => s.pattern === 'lt.events.system.task.>');
     taskSub!.handler(makeEvent({ type: 'system.task.tsk-001.started' }));
 
-    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: ['processes'] });
   });
