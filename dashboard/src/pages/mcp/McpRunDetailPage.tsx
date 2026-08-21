@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { useMcpRunExecution, useInterruptJob } from '../../api/pipelines';
 import { useSettings } from '../../api/settings';
 import { JsonViewer } from '../../components/common/data/JsonViewer';
@@ -8,6 +7,7 @@ import { PageHeader } from '../../components/common/layout/PageHeader';
 import { SegmentedTabs } from '../../components/common/layout/SegmentedTabs';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useEventSubscription } from '../../hooks/useEventContext';
+import { useThrottledInvalidation } from '../../hooks/useEventHooks';
 import { NATS_SUBJECT_PREFIX } from '../../lib/nats/config';
 import { ListToolbar } from '../../components/common/data/ListToolbar';
 import { PanelRightClose, PanelRightOpen, ChevronDown, Info, Activity, List } from 'lucide-react';
@@ -70,7 +70,6 @@ export function McpRunDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const namespace = searchParams.get('namespace') || '';
-  const queryClient = useQueryClient();
   const { data: execution, isLoading, error, refetch, isFetching } = useMcpRunExecution(jobId!, namespace);
   const interruptMutation = useInterruptJob();
   const { data: settings } = useSettings();
@@ -94,11 +93,13 @@ export function McpRunDetailPage() {
     try { localStorage.setItem(MCP_TAB_KEY, next); } catch { /* private mode */ }
   };
 
-  // Subscribe to activity events for this job — refetch execution on each step
+  // Subscribe to activity events for this job — refresh execution through the
+  // DETAIL tier so a step-dense run stays rate-bounded.
+  const invalidate = useThrottledInvalidation('DETAIL');
   const activityHandler = useCallback((event: any) => {
     if (!jobId || event.workflowId !== jobId) return;
-    queryClient.invalidateQueries({ queryKey: ['mcpRunExecution', jobId] });
-  }, [jobId, queryClient]);
+    invalidate([['mcpRunExecution', jobId]]);
+  }, [jobId, invalidate]);
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.>`, activityHandler);
 
   if (isLoading) {

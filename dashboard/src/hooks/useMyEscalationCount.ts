@@ -1,8 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import { useEscalations } from '../api/escalations';
 import { useEventSubscriptions } from './useEventContext';
 import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
+import { useThrottledInvalidation } from './useEventHooks';
 
 /**
  * Returns the number of active (non-expired) escalations assigned to the current user.
@@ -12,7 +12,7 @@ import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
 export function useMyEscalationCount(): number {
   const { user } = useAuth();
   const userId = user?.userId;
-  const qc = useQueryClient();
+  const invalidate = useThrottledInvalidation('SUMMARY');
 
   const { data } = useEscalations({
     assigned_to: userId,
@@ -21,10 +21,11 @@ export function useMyEscalationCount(): number {
   });
 
   // My count can only move inside queues I belong to — the subscription is
-  // the union of my member roles (global viewers span the family).
+  // the union of my member roles (global viewers span the family). A count is
+  // an aggregate surface: the SUMMARY tier bounds the refetch rate.
   useEventSubscriptions(useMemberEscalationPatterns(), () => {
     if (userId) {
-      qc.invalidateQueries({ queryKey: ['escalations'] });
+      invalidate([['escalations']]);
     }
   });
 

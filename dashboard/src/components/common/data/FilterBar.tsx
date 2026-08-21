@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
+import { SEARCH_DEBOUNCE_MS } from '../../../lib/realtime-refresh';
 import { useShellPanelOptional } from '../../../hooks/useShellPanel';
 
 /**
@@ -219,7 +220,7 @@ export function FilterInput({ label, value, onChange, placeholder }: FilterInput
   const handleChange = (v: string) => {
     setLocal(v);
     clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => onChange(v), 300);
+    timerRef.current = setTimeout(() => onChange(v), SEARCH_DEBOUNCE_MS);
   };
 
   // Flush on unmount

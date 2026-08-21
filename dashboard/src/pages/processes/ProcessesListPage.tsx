@@ -85,7 +85,7 @@ export function ProcessesListPage() {
     filters: { workflow_type: '', status: '', search: '' },
   });
 
-  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  const debouncedSearch = useDebouncedValue(filters.search);
 
   const { data: configs } = useWorkflowConfigs();
   const workflowTypes = [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();

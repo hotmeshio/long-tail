@@ -1,3 +1,4 @@
+import { SEARCH_DEBOUNCE_MS } from '../../../lib/realtime-refresh';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Eye, ShieldCheck } from 'lucide-react';
@@ -24,7 +25,7 @@ export function WorkersPage() {
 
   useEffect(() => {
     if (searchInput === filters.search) return;
-    const timer = setTimeout(() => setFilter('search', searchInput), 300);
+    const timer = setTimeout(() => setFilter('search', searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchInput, setFilter, filters.search]);
 

@@ -1,40 +1,23 @@
-import { useRef, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEventSubscription, useEventSubscriptions } from './useEventContext';
 import { getInvalidationKeys } from '../lib/events/invalidation';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 import { escalationPattern, escalationPatterns, type EscalationVerb } from '../lib/events/subjects';
+import { getInvalidationScheduler, type RefreshTier } from '../lib/realtime-refresh';
 
 /**
- * Throttled query invalidation. Collects query keys over a window and fires
- * a single batch invalidation per window — at most one refetch per delayMs,
- * and under a constant event stream at least one per delayMs too.
- *
- * The FIRST event opens the window; later events accumulate keys without
- * touching the timer. Resetting the timer per event (a trailing debounce)
- * would starve forever under sustained load — the flush would wait for a
- * quiet gap that high-throughput surfaces never produce.
+ * Tier-bounded query invalidation through the ONE shared scheduler
+ * (lib/realtime-refresh.ts): bursts coalesce into a single flush, a
+ * refractory floor caps the sustained refetch rate per tier, identical keys
+ * requested by several hooks invalidate once, and hidden tabs mark stale
+ * without touching the network.
  */
-function useDebouncedInvalidation(delayMs = 500) {
+export function useThrottledInvalidation(tier: RefreshTier) {
   const qc = useQueryClient();
-  const pendingKeys = useRef<Set<string>>(new Set());
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   return useCallback((keys: string[][]) => {
-    for (const key of keys) {
-      pendingKeys.current.add(JSON.stringify(key));
-    }
-
-    if (timer.current) return; // window open — the pending flush carries these
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      const batch = [...pendingKeys.current];
-      pendingKeys.current.clear();
-      for (const raw of batch) {
-        qc.invalidateQueries({ queryKey: JSON.parse(raw) });
-      }
-    }, delayMs);
-  }, [qc, delayMs]);
+    getInvalidationScheduler(qc).request(tier, keys);
+  }, [qc, tier]);
 }
 
 /**
@@ -60,7 +43,7 @@ function workflowDetailPatterns(workflowId: string | undefined): string[] {
  * Invalidate workflow list queries (WorkflowsDashboard) on task/workflow events.
  */
 export function useWorkflowListEvents(): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('LIST');
 
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.task.>`, () => {
     invalidate([['jobs']]);
@@ -75,10 +58,10 @@ export function useWorkflowListEvents(): void {
  * Invalidate queries for a specific workflow execution page (durable workflows).
  *
  * Uses the centralized `getInvalidationKeys` mapping plus escalation-specific
- * keys for the detail view. Events are debounced to prevent flurries of re-renders.
+ * keys for the detail view. Events flush through the DETAIL tier.
  */
 export function useWorkflowDetailEvents(workflowId: string | undefined): void {
-  const invalidate = useDebouncedInvalidation(400);
+  const invalidate = useThrottledInvalidation('DETAIL');
 
   useEventSubscriptions(workflowDetailPatterns(workflowId), (event) => {
     if (!workflowId) return;
@@ -106,7 +89,7 @@ export function useWorkflowDetailEvents(workflowId: string | undefined): void {
  * workflowState, and escalation keys. Replaces polling on these pages.
  */
 export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
-  const invalidate = useDebouncedInvalidation(400);
+  const invalidate = useThrottledInvalidation('DETAIL');
 
   useEventSubscriptions(workflowDetailPatterns(workflowId), (event) => {
     if (!workflowId) return;
@@ -132,7 +115,7 @@ export function useMcpQueryDetailEvents(workflowId: string | undefined): void {
  * Covers the planner workflow and all child builder workflows.
  */
 export function usePlanDetailEvents(plannerWorkflowId: string | undefined): void {
-  const invalidate = useDebouncedInvalidation(400);
+  const invalidate = useThrottledInvalidation('DETAIL');
 
   useEventSubscriptions(workflowDetailPatterns(plannerWorkflowId), (event) => {
     if (!plannerWorkflowId) return;
@@ -152,7 +135,7 @@ export function usePlanDetailEvents(plannerWorkflowId: string | undefined): void
  * Invalidate process detail queries on task/workflow events for a specific origin.
  */
 export function useProcessDetailEvents(originId: string | undefined): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('DETAIL');
 
   const handler = useCallback((event: any) => {
     if (!originId) return;
@@ -171,7 +154,7 @@ export function useProcessDetailEvents(originId: string | undefined): void {
  * honest scope here.
  */
 export function useEscalationStatsEvents(): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('SUMMARY');
 
   useEventSubscription(escalationPattern({}), () => {
     invalidate([['escalationStats']]);
@@ -182,11 +165,11 @@ export function useEscalationStatsEvents(): void {
  * Invalidate station metrics (Operations page + station detail) on escalation
  * events. Push-driven only: escalation lifecycle moments are the sole things
  * that move the numbers, so the event is the complete refresh signal. The
- * board is a summary surface, so the debounce is generous — a high-throughput
- * burst collapses into at most one refetch every 1.5s.
+ * board is a summary surface — the SUMMARY tier bounds a high-throughput
+ * stream to one refetch per refractory window.
  */
 export function useStationMetricsEvents(): void {
-  const invalidate = useDebouncedInvalidation(1500);
+  const invalidate = useThrottledInvalidation('SUMMARY');
 
   useEventSubscription(escalationPattern({}), () => {
     invalidate([['stationMetrics']]);
@@ -196,11 +179,11 @@ export function useStationMetricsEvents(): void {
 /**
  * Invalidate the analytics aggregates/timelines (mix bars, dwell sections,
  * entity timelines) on escalation events. Same summary-surface rationale and
- * generous debounce as the station metrics: lifecycle moments are the only
- * things that move an interval, so the event is the complete refresh signal.
+ * tier as the station metrics: lifecycle moments are the only things that
+ * move an interval, so the event is the complete refresh signal.
  */
 export function useEscalationAnalyticsEvents(): void {
-  const invalidate = useDebouncedInvalidation(1500);
+  const invalidate = useThrottledInvalidation('SUMMARY');
 
   useEventSubscription(escalationPattern({}), () => {
     invalidate([['escAggregate'], ['escTimeline']]);
@@ -219,7 +202,7 @@ export function useEscalationListEvents(scope?: {
   role?: string | null;
   verbs?: EscalationVerb[];
 }): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('LIST');
   const role = scope?.role ?? null;
   const verbsKey = (scope?.verbs ?? []).join(',');
 
@@ -241,7 +224,7 @@ export function useEscalationListEvents(scope?: {
  * lifecycle — across role hops (`system.escalation.*.{id}.>`).
  */
 export function useEscalationDetailEvents(escalationId: string | undefined): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('DETAIL');
 
   useEventSubscription(
     escalationId
@@ -249,7 +232,9 @@ export function useEscalationDetailEvents(escalationId: string | undefined): voi
       : escalationPattern({ id: '__none__' }),
     (event) => {
       if (!escalationId || event.escalationId !== escalationId) return;
-      invalidate([['escalations', escalationId], ['escalations'], ['escalationStats']]);
+      // Only THIS record's key: the list and stats surfaces carry their own
+      // subscriptions, so the detail view never re-invalidates them.
+      invalidate([['escalations', escalationId]]);
     },
   );
 }
@@ -258,7 +243,7 @@ export function useEscalationDetailEvents(escalationId: string | undefined): voi
  * Invalidate agent queries on agent lifecycle events.
  */
 export function useAgentEvents(): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('LIST');
 
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.agent.>`, () => {
     invalidate([['agents']]);
@@ -269,7 +254,7 @@ export function useAgentEvents(): void {
  * Invalidate knowledge queries on knowledge events.
  */
 export function useKnowledgeEvents(): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('LIST');
 
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.knowledge.>`, () => {
     invalidate([['knowledge']]);
@@ -280,7 +265,7 @@ export function useKnowledgeEvents(): void {
  * Invalidate process list (ProcessesListPage) on task/workflow events.
  */
 export function useProcessListEvents(): void {
-  const invalidate = useDebouncedInvalidation(300);
+  const invalidate = useThrottledInvalidation('LIST');
 
   useEventSubscription(`${NATS_SUBJECT_PREFIX}.system.task.>`, () => {
     invalidate([['processes']]);

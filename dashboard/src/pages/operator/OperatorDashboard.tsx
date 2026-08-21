@@ -32,7 +32,7 @@ export function OperatorDashboard() {
   // subject token; nothing else in the escalation space reaches this page.
   useEscalationListEvents({ role: filters.role || null, verbs: ['claimed', 'resolved'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
-  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  const debouncedSearch = useDebouncedValue(filters.search);
   const release = useReleaseEscalation();
   const { data: rolesData } = useRoles();
   const { data: typesData } = useEscalationTypes();

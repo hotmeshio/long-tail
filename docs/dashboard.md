@@ -445,6 +445,24 @@ Accessible via the user menu (or at `/credentials`). Manage OAuth provider conne
 
 Credentials flow through the system via the `_scope` identity context — workflows inherit the invoking user's credentials for authenticated tool calls.
 
+## Realtime Refresh Strategy
+
+The dashboard is push-driven: broker events (Socket.IO or NATS) invalidate React Query keys and the mounted queries refetch — never polling. Every event-driven refetch flows through one shared scheduler (`dashboard/src/lib/realtime-refresh.ts`), which bounds the rate a surface can hit the API however heavy the event stream runs:
+
+| Tier | Surfaces | Coalesce window | Minimum interval | Worst-case rate |
+|------|----------|-----------------|------------------|-----------------|
+| `DETAIL` | One record's page (escalation, workflow, process detail) | 300 ms | 2 s | 0.5 req/s |
+| `LIST` | Queues and job lists (escalations, workflows, processes, agents, knowledge) | 500 ms | 3 s | 0.33 req/s |
+| `SUMMARY` | Aggregates (pace board metrics, stats, mix and timeline analytics, header counts, pin badges) | 1 s | 10 s | 0.1 req/s |
+
+- **Coalesce**: the first event opens a window; a burst inside it lands as one flush.
+- **Minimum interval**: after a flush, the next waits at least this long — events during the cooldown collapse into exactly one trailing flush, so sustained load neither starves the surface nor exceeds the bound.
+- **One scheduler per client**: identical query keys requested by several hooks in a window invalidate once, and a key wanted by two tiers flushes on the snappier lane.
+- **Hidden tabs cost nothing**: a background tab's flushes mark queries stale without any network (`refetchType: 'none'`); one catch-up refetch runs when the tab becomes visible.
+- **Mutations stay immediate**: a user's own action (claim, resolve, bulk ops) invalidates directly in its `onSuccess` — the tiers govern only event-driven refresh.
+
+Every timing constant — the three tiers and the shared `SEARCH_DEBOUNCE_MS` input debounce — lives in `dashboard/src/lib/realtime-refresh.ts`. Tune there; nothing else in the event path carries a number.
+
 ## Global Features
 
 ### Announcements

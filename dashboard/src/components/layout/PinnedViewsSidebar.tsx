@@ -8,7 +8,7 @@ import { usePreferences, usePatchPreferences, type PinnedView } from '../../api/
 import { useEscalations, useAvailableEscalations } from '../../api/escalations';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
 import { useMemberEscalationPatterns } from '../../hooks/useMemberEscalationPatterns';
-import { useQueryClient } from '@tanstack/react-query';
+import { useThrottledInvalidation } from '../../hooks/useEventHooks';
 import { displayRoleTitle } from '../../lib/role-display';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
 
@@ -31,11 +31,11 @@ export function PinnedViewsSidebar() {
   const { data: roleData } = useRoleDetails({ enabled: memberRoles.size > 0 });
 
   // Badge queries key on ['escalations', ...]; the member-role union keeps
-  // every badge current (debounce rides React Query's dedupe) — pins can
-  // only point at queues the viewer can read.
-  const qc = useQueryClient();
+  // every badge current — pins can only point at queues the viewer can read.
+  // Badges are aggregate surfaces, so the SUMMARY tier bounds the rate.
+  const invalidate = useThrottledInvalidation('SUMMARY');
   useEventSubscriptions(useMemberEscalationPatterns(), () => {
-    qc.invalidateQueries({ queryKey: ['escalations'] });
+    invalidate([['escalations']]);
   });
 
   const prefs = prefsQ.data?.preferences;

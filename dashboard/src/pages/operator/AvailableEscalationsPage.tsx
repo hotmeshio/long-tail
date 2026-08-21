@@ -61,7 +61,7 @@ export function AvailableEscalationsPage() {
   // token. Manual refresh covers the long tail of other lifecycle moments.
   useEscalationListEvents({ role: filters.role || null, verbs: ['created', 'claimed'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
-  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  const debouncedSearch = useDebouncedValue(filters.search);
   const claimDurations = useClaimDurations();
   const [claimTarget, setClaimTarget] = useState<LTEscalationRecord | null>(null);
   const [claimDuration, setClaimDuration] = useState('30');

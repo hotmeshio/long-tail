@@ -24,7 +24,7 @@ export function UserCombobox({ selected, onSelect, excludeIds = [], placeholder 
   const [filter, setFilter] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const debounced = useDebouncedValue(filter, 300);
+  const debounced = useDebouncedValue(filter);
   const PAGE = 20;
   const { data, isFetching } = useUsers({
     search: debounced.trim() || undefined,
