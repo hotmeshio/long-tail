@@ -14,6 +14,9 @@ import { getAllThemes, registerThemes, getTheme, setTheme, type Theme } from '..
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { useScanEnabled } from '../../hooks/useScanInput';
 import { ScanPanel } from '../scan/ScanPanel';
+import { useKioskMode } from '../../hooks/useKioskMode';
+import { useRoleDetails } from '../../api/roles';
+import { displayRoleTitle } from '../../lib/role-display';
 
 const BOOKMARKS_KEY = 'lt:bookmarks';
 const SCAN_PANEL_KEY = 'scan';
@@ -43,6 +46,8 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
   usePersona();
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
+  const { role: kioskRole, targets: kioskTargets, selectable: kioskSelectable, selectRole: selectKioskRole } = useKioskMode();
+  const { data: roleDetails } = useRoleDetails({ enabled: kioskSelectable });
   const { setPanel, closePanel, open: panelOpen, ownerKey } = useShellPanel();
   const scanEnabled = useScanEnabled();
   const location = useLocation();
@@ -324,6 +329,44 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                       ))}
                     </div>
                   </div>
+                  {kioskSelectable && (
+                    <div className="px-3 py-2 border-t border-surface-border/60">
+                      <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Station queue</p>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            selectKioskRole(null);
+                            navigate('/');
+                          }}
+                          className={`flex items-center gap-2 -mx-1 px-1 py-1 text-xs text-left rounded hover:bg-surface-hover ${!kioskRole ? 'text-accent' : 'text-text-secondary'}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${!kioskRole ? 'bg-accent' : 'bg-surface-border'}`} />
+                          <span className="truncate">Full dashboard</span>
+                        </button>
+                        {kioskTargets.map((r) => {
+                          const detail = roleDetails?.roles?.find((d) => d.role === r);
+                          const active = r === kioskRole;
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => {
+                                setMenuOpen(false);
+                                selectKioskRole(r);
+                                navigate(`/escalations/available?role=${encodeURIComponent(r)}&status=available`);
+                              }}
+                              className={`flex items-center gap-2 -mx-1 px-1 py-1 text-xs text-left rounded hover:bg-surface-hover ${active ? 'text-accent' : 'text-text-secondary'}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-accent' : 'bg-surface-border'}`} />
+                              <span className="truncate">{displayRoleTitle({ role: r, title: detail?.title })}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <button
                     onClick={() => { setMenuOpen(false); logout(); }}
                     className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"

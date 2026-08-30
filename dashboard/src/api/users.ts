@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { LTUserRecord, LTRoleType, LTReadScope, LTWriteScope } from './types';
+import type { LTUserRecord, LTUserRole, LTRoleType, LTReadScope, LTWriteScope } from './types';
 
 interface UserListResponse {
   users: LTUserRecord[];
@@ -36,6 +36,22 @@ export function useUser(id: string) {
     queryKey: ['users', id],
     queryFn: () => apiFetch(`/users/${id}`),
     enabled: !!id,
+  });
+}
+
+/**
+ * The signed-in user's role memberships, each with its read/write scope. Sourced
+ * from the DB, so it reflects the same scope whatever the login method (password
+ * or SSO). Shared cache: the Shell gate and the header menu fetch once.
+ */
+export function useMyRoles(userId: string | null) {
+  return useQuery<LTUserRole[]>({
+    queryKey: ['users', userId, 'roles'],
+    queryFn: async () => {
+      const data = await apiFetch<{ roles: LTUserRole[] }>(`/users/${userId}/roles`);
+      return data.roles ?? [];
+    },
+    enabled: !!userId,
   });
 }
 
