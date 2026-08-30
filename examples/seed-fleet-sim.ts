@@ -70,6 +70,9 @@ interface PrinterRoleData {
   entity_state_source: 'role' | 'subtype';
   list_schema?: Record<string, any>;
   default_pins?: { label: string; url: string; badge?: boolean }[];
+  // Fronts a locked station viewport. The shared 'station' login is a read-only
+  // member of all three, so it picks which of these is its kiosk home.
+  kiosk?: boolean;
 }
 
 const PRINTER_ROLE_DATA: PrinterRoleData[] = [
@@ -82,6 +85,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     entity_state_source: 'subtype',
     list_schema: FLEET_LIST_SCHEMA,
     default_pins: FLEET_DEFAULT_PINS,
+    kiosk: true,
   },
   {
     role: PRINTER_HARVEST_ROLE,
@@ -90,6 +94,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     parent_role: PRINTER_FLEET_ROLE,
     sla_minutes: 15,
     entity_state_source: 'role',
+    kiosk: true,
   },
   {
     role: PRINTER_SERVICE_ROLE,
@@ -98,6 +103,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     parent_role: PRINTER_FLEET_ROLE,
     sla_minutes: 45,
     entity_state_source: 'role',
+    kiosk: true,
   },
 ];
 
@@ -140,6 +146,20 @@ export async function seedPrinterFleetRoles(): Promise<void> {
       loggerRegistry.warn(`[examples] failed to update printer role ${data.role}: ${err.message}`);
     }
   }
+  // Flag the station queues as kiosk homes, merging so an operator's other
+  // properties survive. Idempotent: skips a role that already carries the flag.
+  const details = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
+  for (const data of PRINTER_ROLE_DATA) {
+    if (!data.kiosk) continue;
+    const props = (details.get(data.role)?.properties ?? {}) as Record<string, unknown>;
+    if (props.kiosk === true) continue;
+    try {
+      await updateRoleMetadata(data.role, { properties: { ...props, kiosk: true } });
+    } catch (err: any) {
+      loggerRegistry.warn(`[examples] failed to flag kiosk on ${data.role}: ${err.message}`);
+    }
+  }
+
   loggerRegistry.info(
     `[examples] printer roles verified (${PRINTER_ROLE_DATA.map((d) => d.role).join(', ')})`,
   );
