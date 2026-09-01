@@ -125,6 +125,34 @@ function toEngineConfig(
  * }
  * ```
  *
+ * **Batch accumulation — one wait, N contributions (hotmesh 0.28.0+).** Declare
+ * `batch` item keys and the escalation resolves only when every declared item
+ * has been submitted via `resolveBatchItem` (HTTP: POST
+ * /:id/resolve-batch-item or /resolve-batch-item-by-metadata). Interim
+ * submissions are cheap atomic fills — the row stays pending,
+ * `metadata.batch_pending`/`batch_count` track progress as queryable facets,
+ * and payloads accumulate in `envelope.batch_items`. The LAST item resolves
+ * the row and resumes this wait with the full collection, all in one
+ * statement. Each item validates against the SAME versioned role form a
+ * single-item resolver gets (`schemaVersion` pins apply per item). Type the
+ * generic as the collection:
+ *
+ * ```typescript
+ * const parts = await conditional<Record<'cut' | 'weld' | 'paint', StationResultV1>>(signalId, {
+ *   role: 'assembly',
+ *   description: instructions,
+ *   metadata: { orderId },
+ *   batch: ['cut', 'weld', 'paint'],
+ *   timeout: '24h',                       // SLA covers the whole collection
+ * });
+ * if (parts === false) { /* expired — partial items audit on the row *​/ }
+ * if (parts === null) { /* cancelled *​/ }
+ * ```
+ *
+ * `timeout`/cancel semantics are unchanged (`false`/`null`); partially filled
+ * items persist on the terminal row for audit. A plain resolve on a batch row
+ * remains an admin override that resolves the whole row with its payload.
+ *
  * **Resolution provenance — the reserved `$resolution` key.** When the resolve
  * carries the resolver's identity (the API layer supplies it for interactive
  * and webhook resolves), the payload delivered here includes

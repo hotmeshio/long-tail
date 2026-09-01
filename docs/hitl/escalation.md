@@ -76,6 +76,35 @@ if (decision && decision.$resolution) {
 
 `$resolution` carries `escalationId`, `resolvedBy` (user id), and `resolvedByEmail` when known. It rides the signal only — the stored `resolver_payload` audit column receives the form payload untouched. The same resolve also merges `resolved_by` into the row's GIN-indexed `metadata`, so "who resolved it" is `@>`-queryable without a follow-up read. The `$`-prefixed key namespace is reserved for control data; consumer form fields never collide with it.
 
+### Batch accumulation — one escalation, N contributions
+
+Declare `batch` item keys and the escalation becomes an accumulator: it resolves only when every declared item has been submitted, and the wait resumes with the full collection. Interim submissions are cheap atomic row fills — the workflow never wakes per item, and the collation happens at the escalation boundary.
+
+```typescript
+const parts = await conditional<Record<'cut' | 'weld' | 'paint', StationResultV1>>(signalId, {
+  role: 'assembly',
+  description: 'Each station submits its result',
+  metadata: { orderId },
+  batch: ['cut', 'weld', 'paint'],
+  timeout: '24h',   // one SLA covers the whole collection
+});
+if (parts === false) { /* expired — partially filled items remain on the row for audit */ }
+if (parts === null) { /* cancelled */ }
+parts.weld; // typed item payload
+```
+
+The declaration folds into the row at creation, inside the same Leg1 commit:
+
+- `metadata.batch_pending` — item keys still awaiting submission (`@>`-queryable: `{"batch_pending":["weld"]}` finds rows still missing `weld`)
+- `metadata.batch_count` — the remaining count, recomputed from `batch_pending` on every fill
+- `metadata.batch_keys` — the immutable declared list (progress = `batch_keys` minus `batch_pending`)
+- `envelope.batch_items` — the accumulated `Record<itemKey, payload>` map (payloads are plumbing, so they live on the unindexed envelope; payload keys are caller-owned)
+- `envelope.batch_filled_at` — `Record<itemKey, iso8601>`, stamped by the database clock inside each fill statement — the collection timeline as row truth
+
+Items are submitted via `POST /api/escalations/:id/resolve-batch-item`, `POST /api/escalations/resolve-batch-item-by-signal-key` (the deterministic home signal id — no UUID lookup, no facet duplication), or `POST /api/escalations/resolve-batch-item-by-metadata` (see [Resolution — Batch items](resolution.md)). Each item validates against the same versioned role form a single-item resolver gets, `schemaVersion` pins included. Each fill is one guarded statement: the payload lands only while its key is still pending (duplicates return `duplicate-item` untouched), and the LAST fill resolves the row, stores the assembled collection as `resolver_payload`, and wakes this wait — atomically. The completing submission's `$resolution` rides the delivered collection.
+
+`timeout` and cancellation keep their standard semantics (`false` / `null`); a plain resolve on a batch row remains an admin override that resolves the whole row with the payload given.
+
 ### Row completeness guarantee
 
 Every field of the config — including all `metadata` facets — commits inside the Leg1 checkpoint. A claim-by-metadata router or a version-pinned facet reads a complete row from its first visible moment; there is no window where a row is visible but its metadata is still en route.

@@ -14,12 +14,14 @@ export type {
   LTEscalationPriority,
   LTEscalationRecord,
   EscalationResolution,
+  BatchItemOutcome,
 } from './escalation';
 
 export {
   isEffectivelyClaimed,
   isAvailable,
   ESCALATION_METADATA_KEYS,
+  ESCALATION_BATCH_KEYS,
 } from './escalation';
 
 export type {

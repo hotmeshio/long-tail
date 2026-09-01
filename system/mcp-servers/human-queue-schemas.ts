@@ -43,6 +43,12 @@ export const resolveEscalationSchema = z.object({
   payload: z.record(z.any()).describe(RESOLVER_PAYLOAD_DESC),
 });
 
+export const resolveBatchItemSchema = z.object({
+  escalation_id: z.string().describe('The batch escalation ID'),
+  item_key: z.string().describe('The declared batch item key this submission fills'),
+  payload: z.record(z.any()).describe(RESOLVER_PAYLOAD_DESC),
+});
+
 export const escalateAndWaitSchema = z.object({
   role: z.string().describe('Target role for the escalation (e.g., "reviewer")'),
   message: z.string().describe('Description of what input is needed from the human'),

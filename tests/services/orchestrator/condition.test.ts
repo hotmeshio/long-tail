@@ -158,4 +158,32 @@ describe('conditional', () => {
     ).rejects.toThrow(/positive integer version/);
     expect(mockCondition).not.toHaveBeenCalled();
   });
+
+  // ── Batch accumulation (hotmesh 0.28.0) ─────────────────────────────────────
+
+  it('forwards batch to the SDK verbatim — the SDK owns the accumulator fold', async () => {
+    mockCondition.mockResolvedValue({ cut: { ok: true }, weld: { ok: true } });
+    const config = {
+      role: 'assembly',
+      metadata: { orderId: 'ORD-1' },
+      batch: ['cut', 'weld'],
+    };
+    const result = await conditional<Record<'cut' | 'weld', { ok: boolean }>>('sig-batch', config);
+    expect(mockCondition).toHaveBeenCalledWith('sig-batch', config);
+    expect(result).toEqual({ cut: { ok: true }, weld: { ok: true } });
+  });
+
+  it('folds long-tail sugar alongside batch without touching it', async () => {
+    mockCondition.mockResolvedValue({ cut: { ok: true } });
+    await conditional('sig-batch-pin', {
+      role: 'assembly',
+      batch: ['cut'],
+      schemaVersion: 2,
+    });
+    expect(mockCondition).toHaveBeenCalledWith('sig-batch-pin', {
+      role: 'assembly',
+      batch: ['cut'],
+      metadata: { schema_version: 2 },
+    });
+  });
 });

@@ -581,7 +581,7 @@ async function resolveViaRerun(
  * best-effort (one indexed read, tolerated failure) — the id alone satisfies
  * the provenance contract.
  */
-async function resolverIdentity(auth: LTApiAuth): Promise<{ id: string; email?: string }> {
+export async function resolverIdentity(auth: LTApiAuth): Promise<{ id: string; email?: string }> {
   try {
     const user = await userService.getUser(auth.userId);
     return { id: auth.userId, ...(user?.email ? { email: user.email } : {}) };
@@ -641,7 +641,7 @@ function bulkValidationFailure(
 
 
 /** Replace password fields with ephemeral tokens so plaintext never enters the signal store. */
-async function redactPasswords(
+export async function redactPasswords(
   payload: Record<string, any>,
   formSchema: any,
 ): Promise<Record<string, any>> {

@@ -20,7 +20,7 @@ import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
  * aggregates — the event triggers a dashboard refetch, which must observe the
  * write rather than a pre-change aggregate held for up to a cache TTL.
  */
-function publishEscalationChange(
+export function publishEscalationChange(
   ...args: Parameters<typeof publishEscalationEvent>
 ): Promise<void> {
   invalidateEscalationAggregates();

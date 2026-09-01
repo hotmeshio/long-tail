@@ -128,6 +128,9 @@ export function createClient(options: LTClientOptions = {}) {
       findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),
       claimByMetadata: bindAuth(escalationsApi.claimByMetadata, auth),
       resolveByMetadata: bindAuth(escalationsApi.resolveByMetadata, auth),
+      resolveBatchItem: bindAuth(escalationsApi.resolveBatchItem, auth),
+      resolveBatchItemBySignalKey: bindAuth(escalationsApi.resolveBatchItemBySignalKey, auth),
+      resolveBatchItemByMetadata: bindAuth(escalationsApi.resolveBatchItemByMetadata, auth),
       // Faceted-routing surface (pond search + batch claim), RBAC-scoped to the caller's role.
       searchByFacets: bindAuth(escalationsApi.searchByFacets, auth),
       claimGroups: bindAuth(escalationsApi.claimGroups, auth),

@@ -76,6 +76,39 @@ await lt.escalations.resolveBySignalKey({
 });
 ```
 
+### Batch items
+
+A batch escalation (a `conditional` wait declared with `batch: [...]` — see [Creating Escalations](escalation.md)) collects one submission per declared item key. Submit each item by id or by metadata facet:
+
+```typescript
+const first = await lt.escalations.resolveBatchItem({
+  id: escalationId,
+  itemKey: 'weld',
+  resolverPayload: { ok: true, notes: 'weld complete' },
+});
+// → { outcome: 'accepted', remaining: 2, escalationId }
+
+const second = await lt.escalations.resolveBatchItemBySignalKey({
+  signalKey: homeSignalId,           // the deterministic id the parent parked on
+  itemKey: 'weld',
+  resolverPayload: { ok: true },
+});
+
+const last = await lt.escalations.resolveBatchItemByMetadata({
+  key: 'orderId',
+  value: orderId,
+  itemKey: 'paint',
+  resolverPayload: { ok: true },
+});
+// → { outcome: 'completed', remaining: 0, signaled: true, workflowId }
+```
+
+Interim items return `accepted` with the remaining count and publish `escalation.updated` (progress rides `metadata.batch_pending`/`batch_count`); the LAST item returns `completed` — the row resolved with the assembled collection as `resolver_payload` and the workflow woke with it, in the same statement. Duplicate submissions return 409 (`duplicate-item`, safe under webhook retries); undeclared keys return 400.
+
+Each item validates against the same versioned role form a single-item resolve uses, canonical 422 included. Batch fills are claim-agnostic — a batch collects contributions from multiple principals, the same rationale as the signal-key path — while `assertClaim: true` (by-id form) opts into the caller's own live-claim assertion inside the guarded statement.
+
+Item keys are non-empty strings up to 128 characters; prefer URL-friendly names (`u1-L`). Payload keys inside each item are caller-owned — the platform reserves no names inside `batch_items` values. Every fill stamps `envelope.batch_filled_at[itemKey]` with the database clock in the same statement, so the row carries the collection timeline as row truth. After an SLA expiry (`conditional` returns `false`) the terminal row retains the partial `batch_items` and their timestamps — read them back with `GET /api/escalations/:id` or `getEscalationBySignalKey` from an activity.
+
 ### Resolving a set atomically
 
 When one decision settles a set of waits — each with its own payload — use `resolveAllOrNone`:

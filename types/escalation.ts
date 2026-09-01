@@ -9,6 +9,32 @@ import type { Types } from '@hotmeshio/hotmesh';
 export type EscalationResolution = Types.EscalationResolution;
 
 /**
+ * Outcome vocabulary for batch-item submissions (`resolveBatchItem`).
+ * `completed` = this was the last declared item: the row resolved and the
+ * waiting workflow was woken with the full collection. `accepted` = interim
+ * fill; the row stays pending. Re-exported from the HotMesh SDK.
+ */
+export type BatchItemOutcome = Types.BatchItemOutcome;
+
+/**
+ * Reserved batch-accumulator keys, written by the SDK's `batch` fold at
+ * escalation creation. Facets (`batch_pending`, `batch_count`, `batch_keys`)
+ * live on the GIN-indexed metadata surface; the payload accumulator
+ * (`batch_items`) lives on the unindexed envelope — payloads are plumbing,
+ * not facets.
+ */
+export const ESCALATION_BATCH_KEYS = {
+  /** Metadata: item keys still awaiting submission (queryable via `@>`). */
+  PENDING: 'batch_pending',
+  /** Metadata: count of items still awaiting submission. */
+  COUNT: 'batch_count',
+  /** Metadata: the immutable declared item-key list. */
+  KEYS: 'batch_keys',
+  /** Envelope: the accumulated `Record<itemKey, payload>` map. */
+  ITEMS: 'batch_items',
+} as const;
+
+/**
  * Reserved keys inside `lt_escalations.metadata`. Everything else in the bag
  * is caller-owned. These ride the GIN-indexed surface so they survive the
  * engine's atomic Leg1 write untouched and are queryable like any facet.

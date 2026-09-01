@@ -13,6 +13,7 @@ import {
   getAvailableWorkSchema,
   claimAndResolveSchema,
   resolveEscalationSchema,
+  resolveBatchItemSchema,
   escalateAndWaitSchema,
 } from './human-queue-schemas';
 
@@ -47,11 +48,13 @@ async function checkResolveToolPayload(
 /**
  * Create the Long Tail Human Queue MCP server.
  *
- * Registers five tools that expose the escalation API:
+ * Registers the tools that expose the escalation API:
  * - escalate_to_human — create a new escalation (fire-and-forget)
  * - check_resolution — check escalation status
  * - get_available_work — list available escalations by role
  * - claim_and_resolve — claim + resolve in one step
+ * - resolve_escalation — resolve an already-claimed escalation
+ * - resolve_batch_item — submit one declared item of a batch escalation
  * - escalate_and_wait — create escalation and return signal for durable wait
  *
  * The server is created with tools registered but no transport
@@ -273,6 +276,50 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
+  // ── resolve_batch_item ─────────────────────────────────────────────
+  (server as any).registerTool(
+    'resolve_batch_item',
+    {
+      title: 'Resolve Batch Item',
+      description: 'Submit ONE declared item of a batch escalation (a wait created with batch item keys). '
+        + 'Interim items return outcome "accepted" with the count remaining; the LAST item completes the '
+        + 'escalation and wakes the waiting workflow with the full item collection. Duplicate or undeclared '
+        + 'item keys are rejected. The payload validates against the same form_schema a single-item resolve uses.',
+      inputSchema: resolveBatchItemSchema,
+    },
+    async (args: z.infer<typeof resolveBatchItemSchema>) => {
+      const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+      if (rejected) return rejected;
+
+      const result = await escalationService.resolveBatchItem(
+        args.escalation_id,
+        args.item_key,
+        args.payload,
+        { source: 'mcp_server' },
+      );
+      if (result.outcome !== 'accepted' && result.outcome !== 'completed') {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `Batch item not accepted: ${result.outcome}`, outcome: result.outcome }),
+          }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            escalation_id: args.escalation_id,
+            outcome: result.outcome,
+            remaining: result.remaining,
+            status: result.escalation?.status,
+          }),
+        }],
+      };
+    },
+  );
+
   // ── escalate_and_wait ──────────────────────────────────────────────
   (server as any).registerTool(
     'escalate_and_wait',
@@ -335,7 +382,7 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:server] ${name} ready (5 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:server] ${name} ready (7 tools registered)`);
   return server;
 }
 
