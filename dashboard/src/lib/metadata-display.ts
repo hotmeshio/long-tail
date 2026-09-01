@@ -1,5 +1,6 @@
-/** Metadata keys that are plumbing, not information for the person working the item. */
-const HIDDEN_METADATA_KEYS = new Set(['form_schema']);
+/** Metadata keys that are plumbing, not information for the person working the item.
+ * batch_pending/batch_count stay visible — they are the batch progress facets. */
+const HIDDEN_METADATA_KEYS = new Set(['form_schema', 'batch_keys']);
 
 /**
  * The metadata entries a person should see: platform plumbing (the embedded

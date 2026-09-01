@@ -894,6 +894,93 @@ const result = await lt.escalations.resolveBySignalKey({
 
 **Returns:** `LTApiResult<{ signaled: true; escalationId; workflowId }>`.
 
+## resolveBatchItem
+
+Submit ONE declared item of a batch escalation (a `conditional` wait created with `batch: [...]` — see [conditional](#conditional-workflow-helper)). One atomic statement: the payload lands in the row's `envelope.batch_items` only while the item key is still pending, the `batch_pending`/`batch_count` facets recompute, and the LAST item resolves the row and wakes the waiting workflow with the full collection.
+
+```typescript
+const first = await lt.escalations.resolveBatchItem({
+  id: 'esc_123',
+  itemKey: 'weld',
+  resolverPayload: { ok: true, notes: 'weld complete' },
+});
+// first.data → { outcome: 'accepted', remaining: 2, escalationId }
+
+const last = await lt.escalations.resolveBatchItem({
+  id: 'esc_123',
+  itemKey: 'paint',
+  resolverPayload: { ok: true },
+});
+// last.data → { outcome: 'completed', remaining: 0, signaled: true, workflowId }
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Escalation UUID |
+| `itemKey` | `string` | Yes | The declared batch key this submission fills |
+| `resolverPayload` | `Record<string, any>` | Yes | The item's payload — validated against the same versioned role form as a single-item resolve |
+| `metadata` | `Record<string, any>` | No | Outcome patch merged into the row's GIN-indexed metadata in the same fill |
+| `assertClaim` | `boolean` | No | Require the caller's own live claim, asserted inside the guarded statement. Fills are claim-agnostic without it — a batch collects contributions from multiple principals |
+
+**Returns:** `LTApiResult<{ outcome: 'accepted', remaining, escalationId }>` on an interim fill, `LTApiResult<{ outcome: 'completed', remaining: 0, signaled, escalationId, workflowId }>` on the completing fill. 409 `duplicate-item` for an already-filled key (safe under webhook retries), 400 for an undeclared key or a non-batch row, 404 if not found, 422 on schema violations.
+
+**Auth:** Required
+
+## resolveBatchItemBySignalKey
+
+Submit one batch item selecting the escalation by its `signal_key` — the deterministic home signal id the waiting workflow parked on. For callers that already own that identity (a child workflow calling home, a webhook): no UUID lookup, no facet duplication. Claim-agnostic and write-scope gated with 404 non-disclosure, mirroring `resolveBySignalKey`.
+
+```typescript
+const result = await lt.escalations.resolveBatchItemBySignalKey({
+  signalKey: `fanout-home-${parentWorkflowId}`,
+  itemKey: 'u1-L',
+  resolverPayload: { ok: true },
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signalKey` | `string` | Yes | The accumulator's `signal_key` (the id passed to `conditional`) |
+| `itemKey` | `string` | Yes | The declared batch key this submission fills |
+| `resolverPayload` | `Record<string, any>` | Yes | The item's payload |
+| `metadata` | `Record<string, any>` | No | Outcome patch merged in the same fill |
+
+**Returns:** same outcome vocabulary as `resolveBatchItem`.
+
+**Auth:** Required
+
+## resolveBatchItemByMetadata
+
+Submit one batch item selecting the escalation by metadata facet — the faceted sibling of `resolveBatchItem`, mirroring `resolveByMetadata`'s selector (highest-priority pending match, RBAC folded into the SQL filter). Roles with `enforce_schema` validate the item against the selected row's own pinned schema before the fill.
+
+```typescript
+const result = await lt.escalations.resolveBatchItemByMetadata({
+  key: 'orderId',
+  value: 'order-123',
+  itemKey: 'cut',
+  resolverPayload: { ok: true },
+});
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `string` | Yes | Metadata field name |
+| `value` | `string` | Yes | Metadata field value |
+| `itemKey` | `string` | Yes | The declared batch key this submission fills |
+| `resolverPayload` | `Record<string, any>` | Yes | The item's payload |
+| `metadata` | `Record<string, any>` | No | Outcome patch merged in the same fill |
+| `restrictRoles` | `string[]` | No | Intersect the caller's write scope with these roles inside the SQL filter |
+
+**Returns:** same outcome vocabulary as `resolveBatchItem`; 404 when no scoped pending row matches; 409 when the selected row went terminal to a concurrent resolution.
+
+**Auth:** Required
+
 ## searchByFacets
 
 Item-level faceted search over a single pond `role`, scoped to the caller's role. The faceted-routing read primitive.

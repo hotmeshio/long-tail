@@ -1,5 +1,6 @@
 export * from './types';
 export * from './crud';
+export * from './batch';
 export * from './bulk';
 export * from './queries';
 export * from './resolver-validation';

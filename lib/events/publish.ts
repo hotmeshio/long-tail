@@ -85,7 +85,7 @@ export function publishTaskEvent(params: {
  * role hops (`system.escalation.*.{id}.>`).
  */
 export function publishEscalationEvent(params: {
-  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released' | 'escalation.cancelled' | 'escalation.reassigned';
+  type: 'escalation.created' | 'escalation.resolved' | 'escalation.claimed' | 'escalation.released' | 'escalation.cancelled' | 'escalation.reassigned' | 'escalation.updated';
   source: string;
   workflowId: string;
   workflowName: string;

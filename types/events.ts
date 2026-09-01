@@ -32,6 +32,7 @@ export type LTSystemEventPattern =
   | `system.escalation.${string}.${string}.cancelled`
   | `system.escalation.${string}.${string}.reassigned`
   | `system.escalation.${string}.${string}.expired`
+  | `system.escalation.${string}.${string}.updated`
   | `system.workflow.${string}.started`
   | `system.workflow.${string}.completed`
   | `system.workflow.${string}.failed`

@@ -65,6 +65,54 @@ export function registerResolveRoutes(router: Router): void {
   });
 
   /**
+   * POST /api/escalations/resolve-batch-item-by-signal-key
+   * Submit ONE declared item of a batch escalation by its signal_key — the
+   * deterministic home signal id the waiting workflow parked on. For callers
+   * that already own that identity (a child calling home, a webhook).
+   * Literal single-segment path — registered before /:id routes.
+   * Body: { signalKey: string, itemKey: string, resolverPayload: Record<string, any>,
+   *         metadata?: Record<string, any> }
+   */
+  router.post('/resolve-batch-item-by-signal-key', async (req, res) => {
+    const result = await api.resolveBatchItemBySignalKey(
+      {
+        signalKey: req.body?.signalKey,
+        itemKey: req.body?.itemKey,
+        resolverPayload: req.body?.resolverPayload,
+        metadata: req.body?.metadata,
+      },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
+   * POST /api/escalations/:id/resolve-batch-item
+   * Submit ONE declared item of a batch escalation. Interim items return
+   * { outcome: 'accepted', remaining }; the LAST item completes the
+   * escalation and wakes the waiting workflow with the full collection.
+   * Claim-agnostic by default; assertClaim: true requires the caller's own
+   * live claim, asserted atomically.
+   * Body: { itemKey: string, resolverPayload: Record<string, any>,
+   *         metadata?: Record<string, any>, assertClaim?: boolean }
+   */
+  router.post('/:id/resolve-batch-item', async (req, res) => {
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
+    const result = await api.resolveBatchItem(
+      {
+        id: req.params.id,
+        itemKey: req.body?.itemKey,
+        resolverPayload: req.body?.resolverPayload,
+        metadata: req.body?.metadata,
+        assertClaim: req.body?.assertClaim,
+      },
+      auth,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * POST /api/escalations/:id/resolve
    * Resolve a pending escalation with a human-provided payload. Routes by
    * escalation shape: efficient (signal_key) resumes the job in place; legacy

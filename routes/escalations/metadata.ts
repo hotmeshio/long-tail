@@ -55,4 +55,24 @@ export function registerMetadataRoutes(router: Router): void {
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
+
+  /**
+   * POST /api/escalations/resolve-batch-item-by-metadata
+   * Submit one declared item of a batch escalation selected by metadata facet.
+   * Interim items return { outcome: 'accepted', remaining }; the LAST item
+   * completes the escalation and wakes the waiting workflow with the full
+   * collection.
+   * Body: { key, value, itemKey, resolverPayload, metadata?, restrictRoles? }
+   */
+  router.post('/resolve-batch-item-by-metadata', async (req, res) => {
+    const result = await api.resolveBatchItemByMetadata({
+      key: req.body?.key,
+      value: req.body?.value,
+      itemKey: req.body?.itemKey,
+      resolverPayload: req.body?.resolverPayload,
+      metadata: req.body?.metadata,
+      restrictRoles: req.body?.restrictRoles,
+    }, req.auth!);
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
 }

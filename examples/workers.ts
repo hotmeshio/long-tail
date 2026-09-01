@@ -9,6 +9,8 @@ import * as stepIteratorWorkflow from './workflows/assembly-line/iterator';
 import * as reverterWorkflow from './workflows/assembly-line/reverter';
 import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
+import * as batchSignalWorkflow from './workflows/batch-signal';
+import * as batchFanoutWorkflow from './workflows/batch-fanout';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as acmeStationsWorkflow from './workflows/acme-stations';
 import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
@@ -128,6 +130,46 @@ const efficientSignalConfig: LTWorkerConfig = {
     properties: {
       approved: { type: 'boolean', default: false, description: 'Approve this deployment?' },
       notes: { type: 'string', default: '', description: 'Reviewer notes — visible to the workflow author' },
+    },
+  },
+};
+
+const batchSignalConfig: LTWorkerConfig = {
+  description: 'Batch accumulator escalation — ONE escalation declares N item keys (batch: [...]); each contributor submits their item via resolve-batch-item, and only the LAST submission resolves the row and resumes the workflow with the full collection. Interim fills are cheap row updates; the workflow never wakes per item.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  envelopeSchema: {
+    data: { message: 'Submit each station result for the order', role: REVIEWER, orderId: 'order-123' },
+    metadata: { source: 'dashboard' },
+  },
+  resolverSchema: {
+    properties: {
+      ok: { type: 'boolean', default: false, description: 'Did this station complete its item?' },
+      notes: { type: 'string', default: '', description: 'Station notes — visible to the workflow author' },
+    },
+  },
+};
+
+const batchFanoutConfig: LTWorkerConfig = {
+  description: 'Batch fanout — a parent spawns three children with startChild (fire-and-forget) and parks ONE batch accumulator. Each child parks its own escalation; resolving a child calls home and fills that child\'s batch item. The LAST fill resolves the accumulator and resumes the parent with the full collection — one wait for the whole fan-out, no executeChild coupling.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  envelopeSchema: {
+    data: { orderId: 'order-123', role: REVIEWER, message: 'Resolve all three child items; the parent resumes on the last one' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const batchFanoutChildConfig: LTWorkerConfig = {
+  description: 'Batch fanout child — parks one escalation; on resolution, calls home to the parent accumulator via resolve-batch-item (as the resolving person, with retry until the parent has parked).',
+  invocable: false,
+  defaultRole: REVIEWER,
+  resolverSchema: {
+    properties: {
+      ok: { type: 'boolean', default: false, description: 'Did this item complete successfully?' },
+      notes: { type: 'string', default: '', description: 'Notes — delivered to the parent inside the collection' },
     },
   },
 };
@@ -527,6 +569,9 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: reverterWorkflow.reverter, config: reverterConfig },
   { taskQueue: 'long-tail-examples', workflow: basicSignalWorkflow.basicSignal, config: basicSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: efficientSignalWorkflow.efficientSignal, config: efficientSignalConfig },
+  { taskQueue: 'long-tail-examples', workflow: batchSignalWorkflow.batchSignal, config: batchSignalConfig },
+  { taskQueue: 'long-tail-examples', workflow: batchFanoutWorkflow.batchFanout, config: batchFanoutConfig },
+  { taskQueue: 'long-tail-examples', workflow: batchFanoutWorkflow.batchFanoutChild, config: batchFanoutChildConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },
