@@ -165,7 +165,7 @@ describe('reviewContent workflow', () => {
     expect(escalations.length).toBe(1);
     expect(escalations[0].status).toBe('pending');
     expect(escalations[0].role).toBe('reviewer');
-    expect(escalations[0].description).toContain('confidence');
+    expect(escalations[0].description).toContain('Content review');
 
     // Resolve by starting a new workflow with resolver data
     const rerunId = await resolveEscalation(escalations[0].id, {
