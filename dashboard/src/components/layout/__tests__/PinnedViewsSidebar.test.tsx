@@ -9,6 +9,8 @@ vi.mock('../../../hooks/useSidebar', () => ({ useSidebar: () => ({ collapsed: fa
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { userId: 'u1', roles: [{ role: 'print-farm' }, { role: 'gang-harvest' }, { role: 'harvest' }] },
+    isSuperAdmin: false,
+    hasRoleType: () => false,
   }),
 }));
 type Handler = (event: any) => void;

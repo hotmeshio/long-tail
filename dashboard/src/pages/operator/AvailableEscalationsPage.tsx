@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { parseFacetParams, writeFacetParams, facetCount } from '../../lib/facet-url';
+import { useResolveLinkVarUrl } from '../../hooks/useResolveLinkVarUrl';
 import { useAccess } from '../../hooks/useAccess';
 import { useAuth } from '../../hooks/useAuth';
 import { useKioskMode } from '../../hooks/useKioskMode';
@@ -52,6 +53,9 @@ import { EscalationTimeline } from '../../components/escalation/EscalationTimeli
 import type { LTEscalationRecord } from '../../api/types';
 
 export function AvailableEscalationsPage() {
+  // Shared/bookmarked URLs may still carry raw {lt:name} placeholders —
+  // resolve them against this device before the facets reach any query.
+  useResolveLinkVarUrl();
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { role: '', type: '', priority: '', status: 'available', search: '' },

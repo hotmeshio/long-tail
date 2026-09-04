@@ -11,6 +11,7 @@ import { useMemberEscalationPatterns } from '../../hooks/useMemberEscalationPatt
 import { useThrottledInvalidation } from '../../hooks/useEventHooks';
 import { displayRoleTitle } from '../../lib/role-display';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
+import { useLinkVariables } from '../../hooks/useLinkVariables';
 
 /**
  * "Pinned" — the persona's exact queries, one click away. The user's own pins
@@ -45,7 +46,18 @@ export function PinnedViewsSidebar() {
       .map((r) => ({ role: r.role, pins: r.default_pins as PinnedView[] })),
     [roleData, memberRoles],
   );
-  const pins = useMemo(() => resolvePins(prefs, roleDefaults), [prefs, roleDefaults]);
+  // Link variables substitute at render time: every href in the DOM is
+  // already concrete, so navigation/copy/back-forward carry real values.
+  // A binding change re-renders here (store subscription) — the pins and
+  // their badges follow the new URL automatically. Promotion copies the RAW
+  // template so a promoted pin keeps following the device's bindings.
+  const { resolveUrl } = useLinkVariables();
+  const rawPins = useMemo(() => resolvePins(prefs, roleDefaults), [prefs, roleDefaults]);
+  const rawUrlById = useMemo(() => new Map(rawPins.map((p) => [p.id, p.url])), [rawPins]);
+  const pins = useMemo(
+    () => rawPins.map((p) => ({ ...p, url: resolveUrl(p.url) })),
+    [rawPins, resolveUrl],
+  );
 
   // Role pins group under their role's display title, in role order. Only
   // groups with visible pins render — hidden/promoted pins never leave an
@@ -72,7 +84,12 @@ export function PinnedViewsSidebar() {
   const saveOwn = (next: PinnedView[]) => patch.mutate({ pinnedViews: next });
   const removeOwn = (id: string) => saveOwn(ownPins.filter((p) => p.id !== id));
   const promote = (pin: ResolvedPin) =>
-    saveOwn([...ownPins, { id: newPinId(), label: pin.label, url: pin.url, badge: pin.badge }]);
+    saveOwn([...ownPins, {
+      id: newPinId(),
+      label: pin.label,
+      url: rawUrlById.get(pin.id) ?? pin.url,
+      badge: pin.badge,
+    }]);
   const hideRolePin = (label: string) =>
     patch.mutate({ hiddenRolePins: [...(prefs?.hiddenRolePins ?? []), label] });
   const reorder = (from: number, to: number) => {

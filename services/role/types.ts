@@ -17,13 +17,32 @@ export interface EscalationChain {
  *    MEMBER of exactly this one role, the dashboard drops the left nav, the
  *    role's escalation list becomes home, and navigation is held to the list,
  *    the detail page, and the scan screens. Multi-role users get full chrome.
+ *  - LINK_VARIABLES: RoleLinkVariable[] — metadata facet names members bind
+ *    per device. Pins may reference `{lt:name}` as a whole facet value
+ *    (e.g. `facets={"facility":"{lt:facility}"}`); the dashboard substitutes
+ *    the device's bound value at render time, falls back to the declared
+ *    default, and drops the facet entirely when both are unset.
  */
 export const ROLE_PROPERTY_KEYS = {
   ON_CANCEL: 'on_cancel',
   ON_TIMEOUT: 'on_timeout',
   WORKED_BY: 'worked_by',
   KIOSK: 'kiosk',
+  LINK_VARIABLES: 'link_variables',
 } as const;
+
+/**
+ * One link-variable declaration inside `properties.link_variables`. `name` is
+ * the metadata facet key (facet-key charset); `label` is the human annotation
+ * the binding modal shows; `default` is the value used when the device has no
+ * binding. Values are strings — jsonb containment is type-sensitive, so
+ * numeric facets are not templatable.
+ */
+export interface RoleLinkVariable {
+  name: string;
+  label?: string;
+  default?: string;
+}
 
 export interface RoleDetail {
   role: string;

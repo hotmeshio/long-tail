@@ -91,6 +91,40 @@ const groups = await searchGroups(query, { sizeFacet: 'orderSize', limit: 10 });
 const inFlight = await countByFacets({ role: 'print-farm-diabetic', available: false });
 ```
 
+## Link variables
+
+A role may declare **link variables** — facet names its members bind per
+device — in `properties.link_variables`:
+
+```json
+{ "link_variables": [ { "name": "facility", "label": "Facility", "default": "main" } ] }
+```
+
+A pinned URL references a variable as the ENTIRE value of a facet inside the
+`facets` param:
+
+```
+/escalations/available?role=gluer&facets={"facility":"{lt:facility}"}&status=available
+```
+
+The dashboard substitutes at render time, so every link in the DOM is already
+concrete. Resolution order per variable: the device's bound value → the
+declared `default` → **drop the facet** (unbound means no filter, never an
+empty-string match). Members bind values from the user menu ("Link
+variables"); bindings live in device localStorage (`lt:station:link-vars:{userId}`),
+so a shared workstation keeps its scope across reloads and account switches.
+A shared URL still carrying a raw `{lt:name}` placeholder is resolved against
+the opening device the moment the list page mounts (address bar rewritten in
+place).
+
+Values are strings — jsonb containment is type-sensitive, so numeric facets
+are not templatable. Link variables are a view convenience: RBAC read scope
+still governs what any query can return.
+
+The dashboard's [global search bar](dashboard.md#global-search) is the
+one-gesture sibling of this surface: a configured facet name plus a value
+lands on the same all-status faceted list a deep link produces.
+
 ## Atomic claims
 
 Two claim primitives, both `FOR UPDATE SKIP LOCKED` so many consumers run without

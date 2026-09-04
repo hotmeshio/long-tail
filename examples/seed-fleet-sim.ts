@@ -59,6 +59,14 @@ const FLEET_DEFAULT_PINS = [
   { label: 'Fleet board', url: `/escalations/available?role=${PRINTER_FLEET_ROLE}&view=rich` },
   { label: 'Harvest queue', url: `/escalations/available?role=${PRINTER_HARVEST_ROLE}&view=table`, badge: true },
   { label: 'In jeopardy', url: `/escalations/available?role=${PRINTER_FLEET_ROLE}&jeopardy=1&view=table`, badge: true },
+  // Templated: {lt:facility} substitutes with the device's bound value
+  // (user menu → Link variables); unbound, the facet drops and the pin
+  // spans both facilities.
+  {
+    label: 'My facility',
+    url: `/escalations/available?role=${PRINTER_FLEET_ROLE}&facets=${encodeURIComponent('{"facility":"{lt:facility}"}')}&view=table`,
+    badge: true,
+  },
 ];
 
 interface PrinterRoleData {
@@ -146,17 +154,22 @@ export async function seedPrinterFleetRoles(): Promise<void> {
       loggerRegistry.warn(`[examples] failed to update printer role ${data.role}: ${err.message}`);
     }
   }
-  // Flag the station queues as kiosk homes, merging so an operator's other
-  // properties survive. Idempotent: skips a role that already carries the flag.
+  // Flag the station queues as kiosk homes and declare the fleet role's
+  // link variable, merging so an operator's other properties survive.
+  // Idempotent: skips a role that already carries the key.
   const details = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
   for (const data of PRINTER_ROLE_DATA) {
-    if (!data.kiosk) continue;
     const props = (details.get(data.role)?.properties ?? {}) as Record<string, unknown>;
-    if (props.kiosk === true) continue;
+    const patch: Record<string, unknown> = {};
+    if (data.kiosk && props.kiosk !== true) patch.kiosk = true;
+    if (data.role === PRINTER_FLEET_ROLE && !Array.isArray(props.link_variables)) {
+      patch.link_variables = [{ name: 'facility', label: 'Facility' }];
+    }
+    if (Object.keys(patch).length === 0) continue;
     try {
-      await updateRoleMetadata(data.role, { properties: { ...props, kiosk: true } });
+      await updateRoleMetadata(data.role, { properties: { ...props, ...patch } });
     } catch (err: any) {
-      loggerRegistry.warn(`[examples] failed to flag kiosk on ${data.role}: ${err.message}`);
+      loggerRegistry.warn(`[examples] failed to update properties on ${data.role}: ${err.message}`);
     }
   }
 
@@ -168,12 +181,12 @@ export async function seedPrinterFleetRoles(): Promise<void> {
 // ── The fleet and its history ─────────────────────────────────────────────────
 
 const PRINTERS = [
-  { serialNumber: 'PRN-001', model: 'p1s', pdac: true, foaming: false },
-  { serialNumber: 'PRN-002', model: 'p1s', pdac: false, foaming: true },
-  { serialNumber: 'PRN-003', model: 'p1s', pdac: false, foaming: false },
-  { serialNumber: 'PRN-004', model: 'h2s', pdac: true, foaming: true },
-  { serialNumber: 'PRN-005', model: 'h2s', pdac: true, foaming: false },
-  { serialNumber: 'PRN-006', model: 'h2s', pdac: false, foaming: false },
+  { serialNumber: 'PRN-001', model: 'p1s', pdac: true, foaming: false, facility: 'north' },
+  { serialNumber: 'PRN-002', model: 'p1s', pdac: false, foaming: true, facility: 'north' },
+  { serialNumber: 'PRN-003', model: 'p1s', pdac: false, foaming: false, facility: 'north' },
+  { serialNumber: 'PRN-004', model: 'h2s', pdac: true, foaming: true, facility: 'south' },
+  { serialNumber: 'PRN-005', model: 'h2s', pdac: true, foaming: false, facility: 'south' },
+  { serialNumber: 'PRN-006', model: 'h2s', pdac: false, foaming: false, facility: 'south' },
 ];
 
 /** One printer state as (role, subtype) — the row vocabulary of §"the contract". */
