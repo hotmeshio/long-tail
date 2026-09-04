@@ -7,6 +7,7 @@ import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { deriveWsUrlFromRequest } from '../lib/events/nats-ws-proxy';
 import { config } from '../modules/config';
 import { getFeatureFlags } from '../modules/features';
+import { getSearchConfig } from '../modules/search';
 import { getBranding } from '../modules/branding';
 import { LONG_TAIL_VERSION, HOTMESH_VERSION } from '../modules/version';
 import { isSSOEnabled, getSSOConfig } from '../modules/sso';
@@ -82,6 +83,7 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
           enabled: hasLLMApiKey(),
         },
         features: getFeatureFlags(),
+        search: getSearchConfig(),
         branding: getBranding(),
         environment: {
           longTailVersion: LONG_TAIL_VERSION,

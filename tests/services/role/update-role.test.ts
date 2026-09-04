@@ -141,6 +141,32 @@ describe('role service — updateRoleMetadata PATCH semantics', () => {
   });
 });
 
+describe('role service — link_variables round-trip', () => {
+  const LV_ROLE = `lv-role-${Date.now()}`;
+
+  afterAll(async () => {
+    const { getPool } = await import('../../../lib/db');
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [LV_ROLE]);
+  });
+
+  it('persists the reserved key unmolested beside other bag keys', async () => {
+    await roleService.createRole(LV_ROLE);
+    const declared = [
+      { name: 'facility', label: 'Facility', default: 'main' },
+      { name: 'bench' },
+    ];
+    const updated = await roleService.updateRoleMetadata(LV_ROLE, {
+      properties: { color: 'blue', link_variables: declared },
+    });
+    expect(updated!.properties.link_variables).toEqual(declared);
+    expect(updated!.properties.color).toBe('blue');
+
+    // A later PATCH of an unrelated field leaves the declarations intact.
+    const renamed = await roleService.updateRoleMetadata(LV_ROLE, { title: 'Gluer' });
+    expect(renamed!.properties.link_variables).toEqual(declared);
+  });
+});
+
 describe('role service — createRole reports creation', () => {
   const FRESH = `create-role-${Date.now()}`;
 

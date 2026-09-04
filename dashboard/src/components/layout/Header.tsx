@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Inbox, User, BookOpen, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight, ScanBarcode } from 'lucide-react';
+import { Inbox, User, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
@@ -15,6 +15,9 @@ import { useShellPanel } from '../../hooks/useShellPanel';
 import { useScanEnabled } from '../../hooks/useScanInput';
 import { ScanPanel } from '../scan/ScanPanel';
 import { useKioskMode } from '../../hooks/useKioskMode';
+import { useLinkVariables } from '../../hooks/useLinkVariables';
+import { LinkVariablesModal } from './LinkVariablesModal';
+import { GlobalSearchBar } from './GlobalSearchBar';
 import { useRoleDetails } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 
@@ -47,6 +50,8 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
   const { connected } = useEventStatus();
   const { data: settings } = useSettings();
   const { role: kioskRole, targets: kioskTargets, selectable: kioskSelectable, selectRole: selectKioskRole } = useKioskMode();
+  const { declarations: linkVarDeclarations, values: linkVarValues } = useLinkVariables();
+  const [linkVarsOpen, setLinkVarsOpen] = useState(false);
   const { data: roleDetails } = useRoleDetails({ enabled: kioskSelectable });
   const { setPanel, closePanel, open: panelOpen, ownerKey } = useShellPanel();
   const scanEnabled = useScanEnabled();
@@ -167,6 +172,8 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           </button>
         </div>
 
+        {settings?.search?.enabled && <GlobalSearchBar />}
+
         <div className="flex items-center gap-5">
           {/* Escalations: all */}
           <Link
@@ -196,22 +203,6 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
 
           <div className="hidden lg:block w-px h-4 bg-surface-border" />
 
-          {/* Scan — manual code entry + wedge capture settings. Every persona
-              sees it when the deployment opts in (features.scanCodes, easter
-              egg override for testing). Hardware scans work from any page;
-              this opens the panel that reports them. */}
-          {scanEnabled && (
-            <button
-              type="button"
-              onClick={toggleScanPanel}
-              className="flex items-center gap-1.5 text-xs text-text-quaternary hover:text-text-secondary transition-colors"
-              title="Scan a code"
-            >
-              <ScanBarcode className="w-4 h-4" strokeWidth={1.5} />
-              <span className="hidden lg:inline">scan</span>
-            </button>
-          )}
-
           {/* Events — every login watches the floor live; the stream itself is
               role-scoped server-side, so members simply receive fewer events. */}
           <button
@@ -231,20 +222,6 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
             <Radio className="w-4 h-4" strokeWidth={1.5} />
             events
           </button>
-
-          {realIsBuilder && (
-            <>
-              {/* Docs */}
-              <button
-                onClick={onToggleDocs}
-                className="hidden lg:flex items-center gap-1.5 text-xs text-text-quaternary hover:text-text-secondary transition-colors"
-                title="Documentation"
-              >
-                <BookOpen className="w-4 h-4" strokeWidth={1.5} />
-                docs
-              </button>
-            </>
-          )}
 
           {/* View-as indicator — visible when simulating a lower role */}
           {viewAs && (
@@ -289,6 +266,15 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                   >
                     Credentials
                   </Link>
+                  {scanEnabled && (
+                    <button
+                      onClick={() => { setMenuOpen(false); toggleScanPanel(); }}
+                      className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                      data-testid="menu-scan"
+                    >
+                      Scan a code
+                    </button>
+                  )}
                   <button
                     onClick={() => { setMenuOpen(false); if (!connected) window.location.reload(); else onToggleEventFeed?.(); }}
                     className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
@@ -298,7 +284,8 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                   {realIsBuilder && (
                     <button
                       onClick={() => { setMenuOpen(false); onToggleDocs?.(); }}
-                      className="lg:hidden block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                      className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                      data-testid="menu-docs"
                     >
                       Docs
                     </button>
@@ -367,6 +354,24 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                       </div>
                     </div>
                   )}
+                  {linkVarDeclarations.length > 0 && (
+                    <div className="px-3 py-2 border-t border-surface-border/60">
+                      <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Link variables</p>
+                      <button
+                        type="button"
+                        onClick={() => { setMenuOpen(false); setLinkVarsOpen(true); }}
+                        className="flex items-center gap-2 -mx-1 px-1 py-1 w-full text-xs text-left rounded text-text-secondary hover:bg-surface-hover"
+                        data-testid="link-vars-menu-entry"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${Object.keys(linkVarValues).length > 0 ? 'bg-accent' : 'bg-surface-border'}`} />
+                        <span className="truncate">
+                          {Object.keys(linkVarValues).length > 0
+                            ? Object.entries(linkVarValues).map(([k, v]) => `${k} = ${v}`).join(', ')
+                            : 'Set values for this device'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={() => { setMenuOpen(false); logout(); }}
                     className="block w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
@@ -416,6 +421,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
       {settingsPanelOpen && (
         <EasterEggPanel onClose={() => setSettingsPanelOpen(false)} />
       )}
+      <LinkVariablesModal open={linkVarsOpen} onClose={() => setLinkVarsOpen(false)} />
     </>
   );
 }
