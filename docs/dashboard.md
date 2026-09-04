@@ -257,7 +257,7 @@ Accessible at `/admin/roles/:role`. One page per role — a quiet header carryin
 
 **Members** — who holds the role: admins manage it; members work its queue according to their read/write work-surface scope (read = which items appear; write = which they can claim and resolve). A `member` grant carries a scope chosen from five named profiles: full worker (`all`/`all`, default), see-all-act-own (`all`/`self`), own-items-only (`self`/`self`), read-only auditor (`all`/`none`), and read-only own (`self`/`none`). The picker enforces **write ⊆ read**. `admin` and `superadmin` grants always work the whole queue.
 
-**Pins** — the pinned-view seeds this role hands its members (`default_pins`): label, dashboard-relative URL, optional badge. Members see them in their Pinned nav section from first login (marked role-provided) and may promote, hide, or reorder them via preferences. Live-save.
+**Pins** — two live-save groups. **Link Variables** leads: the facet names members bind per device (`properties.link_variables` — name, optional label, optional default). A pin below may reference a variable as a facet value, `facets={"facility":"{lt:facility}"}`; each member device opens it scoped to its own binding (set from the user menu → Link variables), falling back to the declared default or, unbound, applying no filter. A caption under each templated pin previews the binding on the viewing device (`facility = 'soleful'` / `facility = <empty>`). **Default Pins** follows — the pinned-view seeds this role hands its members (`default_pins`): label, dashboard-relative URL, optional badge. Members see them in their Pinned nav section from first login (marked role-provided) and may promote, hide, or reorder them via preferences; promoting a templated pin copies the template, so it keeps following the device's bindings. See [Faceted Routing — Link variables](faceted-routing.md#link-variables).
 
 **API:** `PATCH /api/roles/:role` updates identity, Pace Board dials, placement, schemas, and pins.
 
@@ -479,6 +479,28 @@ markdown body. Each user dismisses per-browser.
 
 Role targeting scopes display, never access: the live event reaches every
 authenticated subscriber, so announcement bodies must never carry secrets.
+
+### Global search
+
+An opt-in header search bar for one-gesture lookups across every escalation
+of any status. Configure it in the `start()` config —
+`search: { enabled: true, facets: ['orderId', 'po'] }` — or by env
+(`LT_SEARCH_BAR=true`, `LT_SEARCH_FACETS=orderId,po`; env wins). The picklist
+always offers `escalationId` and `workflowId` (long-tail-owned lookups) ahead
+of the configured metadata facets, and remembers the last-used facet per
+device.
+
+- A metadata facet lands on the escalation list filtered by that facet across
+  all statuses, newest first (the same deep link as clicking a facet value).
+- `escalationId` opens the escalation detail directly; an unknown id shows an
+  inline notice without navigating.
+- `workflowId` opens the workflow's single escalation, lists several to pick
+  from, or links straight to the workflow execution when none exist.
+
+Kiosk sessions see the bar too — a station can dump a PO or order id and jump
+straight to it; RBAC read scope bounds what any search can return. See
+[Faceted Routing](faceted-routing.md) — a search is a one-gesture facet deep
+link.
 
 ### Inbox
 

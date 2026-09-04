@@ -310,3 +310,19 @@ describe('getSettings — SSO', () => {
     expect(result.data.auth.ssoKeepaliveIdleTimeoutSeconds).toBe(900);
   });
 });
+
+describe('getSettings — search block', () => {
+  it('reports the configured search surface', async () => {
+    const { configureSearch } = await import('../../modules/search');
+    configureSearch({ enabled: true, facets: ['orderId'] });
+    const result = await getSettings();
+    expect((result.data as any).search).toEqual({ enabled: true, facets: ['orderId'] });
+  });
+
+  it('defaults to disabled with no facets', async () => {
+    const { configureSearch } = await import('../../modules/search');
+    configureSearch();
+    const result = await getSettings();
+    expect((result.data as any).search).toEqual({ enabled: false, facets: [] });
+  });
+});

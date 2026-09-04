@@ -20,6 +20,12 @@ export interface AppSettings {
     /** Pause the keepalive after this much inactivity; null/absent = no idle gate. */
     ssoKeepaliveIdleTimeoutSeconds?: number | null;
   };
+  search?: {
+    /** Global search bar in the header. Default: off. */
+    enabled: boolean;
+    /** Metadata facet names the picklist offers, beyond the always-present escalationId/workflowId. */
+    facets: string[];
+  };
   features?: {
     /** DB Maintenance admin page is shown. Default: true (omitted treated as true). */
     dbMaintenance?: boolean;

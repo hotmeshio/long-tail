@@ -87,6 +87,12 @@ async function main() {
       // The examples ship the full scan demo (schemes 10/11); surface it.
       scanCodes: true,
     },
+    search: {
+      // The examples surface the global search bar with the seed data's
+      // primary facet; escalationId/workflowId are always present.
+      enabled: true,
+      facets: ['orderId'],
+    },
     mcp: {
       server: { enabled: true },
     },

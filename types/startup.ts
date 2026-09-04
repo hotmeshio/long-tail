@@ -195,7 +195,9 @@ export interface LTRoleConfig {
   metadata_schema?: Record<string, any>;
   /** x-lt-* contract formatting the role-scoped escalation list page (independently versioned). */
   list_schema?: Record<string, any>;
-  /** Free-form bag plus the reserved keys (on_cancel, on_timeout, worked_by, kiosk). */
+  /** Free-form bag plus the reserved keys (on_cancel, on_timeout, worked_by,
+   *  kiosk, link_variables — the last declares `{ name, label?, default? }`
+   *  facet variables that members bind per device for templated pins). */
   properties?: Record<string, any>;
   ops_visible?: boolean;
   /** Make this role's sequence the home Pace Board's default segment (single-holder). */
@@ -393,6 +395,12 @@ export interface LTStartConfig {
      */
     scanCodes?: boolean;
   };
+  /**
+   * Global search bar (dashboard header). Opt-in. `facets` lists the metadata
+   * facet names the picklist offers; `escalationId` and `workflowId` are
+   * always present. Env overrides: LT_SEARCH_BAR, LT_SEARCH_FACETS (csv).
+   */
+  search?: { enabled?: boolean; facets?: string[] };
 
   /**
    * White-label branding. The `appName` replaces "LongTail" in the dashboard
