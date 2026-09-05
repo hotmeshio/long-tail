@@ -116,7 +116,9 @@ interface FormSectionProps {
   esc: LTEscalationRecord;
   resolverPayload: unknown;
   isTerminal: boolean;
-  claimedByMe: boolean;
+  /** The form is editable: the caller owns the claim, or (at a scan station)
+   *  the item is under a live claim and the badge moves to submit. */
+  editable: boolean;
   activeView: ActiveView;
   metadataFormSchema: unknown;
   /** The resolved form schema (metadata-embedded, role-owned, or workflow fallback). */
@@ -153,7 +155,7 @@ export function EscalationFormSection({
   esc,
   resolverPayload,
   isTerminal,
-  claimedByMe,
+  editable,
   activeView,
   metadataFormSchema,
   effectiveSchema,
@@ -208,7 +210,7 @@ export function EscalationFormSection({
   const viewport = schema?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
   const isIframeViewport = viewport?.type === 'iframe' && !!viewport.src && onResolve && onEscalate;
 
-  if (isIframeViewport && !claimedByMe) {
+  if (isIframeViewport && !editable) {
     return (
       <button
         onClick={() => onClaim?.()}
@@ -242,7 +244,7 @@ export function EscalationFormSection({
           onRequestTriageChange={onRequestTriageChange}
           triageNotes={triageNotes}
           onTriageNotesChange={onTriageNotesChange}
-          disabled={!claimedByMe}
+          disabled={!editable}
           submitAttempted={submitAttempted}
           showTriage={!!isCertified && !!hasAI}
           escalationContext={showIfCtx}

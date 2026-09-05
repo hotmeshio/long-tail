@@ -254,7 +254,7 @@ export async function seedBadgeScheme(): Promise<void> {
       delimiter: ':',
       kind: SCAN_SCHEME_KINDS.IDENTITY,
       grant_ttl_seconds: 300,
-      grant_max_uses: 0,
+      grant_max_uses: 1,
     });
     await seedScanRule({
       scheme_version: BADGE_SCHEME_VERSION,

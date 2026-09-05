@@ -56,8 +56,9 @@ export interface EscalationActionBarProps {
   submitBlockedMessage?: string;
   /** The badged person's name when the claim is theirs (acting identity primed). */
   actingName?: string | null;
-  /** True when a badge scan could turn claimed-by-other into claimed-by-you. */
-  badgePrompt?: boolean;
+  /** At a scan station, the submit will require a badge scan as the claimant.
+   *  Shows the up-front warning in place of the "Claimed by you" note. */
+  submitNeedsBadge?: boolean;
   /** Admin/superadmin — surfaces the claim-override actions on claimed_by_other. */
   canManage?: boolean;
   /** Hand this claim to another user (opens the assign modal, takeover implied). */

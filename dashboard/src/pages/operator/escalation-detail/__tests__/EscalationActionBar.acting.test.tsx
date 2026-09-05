@@ -60,30 +60,37 @@ describe('EscalationActionBar — acting identity', () => {
     expect(screen.getByText('Submit')).toBeInTheDocument();
   });
 
-  it('shows the quiet badge line when the claim could be the viewer badged out', () => {
-    renderBar({ mode: 'claimed_by_other', assignedTo: 'user-abc', badgePrompt: true });
-    expect(screen.getByTestId('badge-prompt')).toHaveTextContent(
-      'If this is your claim, scan your badge.',
+  it('warns up front that the submit needs a badge on a station working surface', () => {
+    renderBar({ mode: 'claimed_by_me', assignedTo: 'user-abc', submitNeedsBadge: true });
+    expect(screen.getByTestId('submit-badge-warning')).toHaveTextContent(
+      "When you submit, you'll scan your badge to confirm you're",
     );
+    expect(screen.queryByTestId('acting-claim-note')).not.toBeInTheDocument();
+    expect(screen.getByText('Submit')).toBeInTheDocument();
   });
 
-  it('keeps the claimed-by-other bar quiet when no badge could help', () => {
-    renderBar({ mode: 'claimed_by_other', assignedTo: 'user-abc', badgePrompt: false });
+  it('shows no submit warning on a plain self-claim', () => {
+    renderBar({ mode: 'claimed_by_me', actingName: 'Dana Reviewer' });
+    expect(screen.queryByTestId('submit-badge-warning')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acting-claim-note')).toBeInTheDocument();
+  });
+
+  it('keeps the claimed-by-other bar free of any badge line', () => {
+    renderBar({ mode: 'claimed_by_other', assignedTo: 'user-abc' });
+    expect(screen.queryByTestId('submit-badge-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('badge-prompt')).not.toBeInTheDocument();
   });
 
-  it('surfaces the expired-grant error beside the claimed-by-other copy', () => {
-    // After an acting-401 the grant clears, the mode flips to claimed_by_other,
-    // and the server's answer plus the badge line point at the recovery.
+  it('surfaces the expired-grant error on the station working bar', () => {
     renderBar({
-      mode: 'claimed_by_other',
+      mode: 'claimed_by_me',
       assignedTo: 'badge-user-1',
-      badgePrompt: true,
+      submitNeedsBadge: true,
       resolveError: new Error('acting identity expired — scan your badge again'),
     });
     expect(
       screen.getByText('acting identity expired — scan your badge again'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('badge-prompt')).toBeInTheDocument();
+    expect(screen.getByTestId('submit-badge-warning')).toBeInTheDocument();
   });
 });

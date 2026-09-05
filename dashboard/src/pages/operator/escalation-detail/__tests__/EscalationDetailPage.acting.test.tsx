@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { renderWithProviders } from '../../../../test/render';
@@ -20,6 +20,7 @@ const state = vi.hoisted(() => {
     resolve: idleMutation(),
     acting: null as null | { actingToken: string; actorId: string; displayName: string; expiresAt: string | null },
     scanEnabled: true,
+    listeners: new Set<() => void>(),
   };
 });
 
@@ -60,14 +61,25 @@ vi.mock('../../../../hooks/useEventHooks', async (importOriginal) => ({
   useEscalationDetailEvents: () => {},
 }));
 
-vi.mock('../../../../hooks/useActingIdentity', () => ({
-  useActingIdentity: () => ({
-    identity: state.acting,
-    prime: () => null,
-    clear: () => { state.acting = null; },
-    remainingSeconds: () => 600,
-  }),
-}));
+vi.mock('../../../../hooks/useActingIdentity', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  return {
+    useActingIdentity: () => {
+      const [, force] = React.useState(0);
+      React.useEffect(() => {
+        const l = () => force((n) => n + 1);
+        state.listeners.add(l);
+        return () => { state.listeners.delete(l); };
+      }, []);
+      return {
+        identity: state.acting,
+        prime: () => null,
+        clear: () => { setActing(null); },
+        remainingSeconds: () => 600,
+      };
+    },
+  };
+});
 
 vi.mock('../../../../hooks/useScanInput', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -106,6 +118,11 @@ function makeEsc(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function setActing(v: typeof state.acting) {
+  state.acting = v;
+  state.listeners.forEach((l) => l());
+}
+
 function primedAs(actorId: string, displayName: string) {
   state.acting = {
     actingToken: 'eph:v1:acting_identity:live',
@@ -115,12 +132,23 @@ function primedAs(actorId: string, displayName: string) {
   };
 }
 
+function primeLive(actorId: string, displayName: string) {
+  act(() => {
+    setActing({
+      actingToken: 'eph:v1:acting_identity:live',
+      actorId,
+      displayName,
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    });
+  });
+}
+
 function renderPage() {
   const router = createMemoryRouter(
     [{ path: '/escalations/detail/:id', element: <EscalationDetailPage /> }],
     { initialEntries: [`/escalations/detail/${ESC_ID}`] },
   );
-  return renderWithProviders(<RouterProvider router={router} />);
+  return { router, ...renderWithProviders(<RouterProvider router={router} />) };
 }
 
 describe('EscalationDetailPage — acting identity on the work surface', () => {
@@ -130,26 +158,19 @@ describe('EscalationDetailPage — acting identity on the work surface', () => {
     state.resolve = state.idleMutation();
     state.acting = null;
     state.scanEnabled = true;
+    state.listeners.clear();
   });
 
-  it('recognizes the badged person\'s own claim under the station session', async () => {
-    primedAs('badge-user-1', 'Dana Reviewer');
-    renderPage();
-
-    const note = await screen.findByTestId('acting-claim-note');
-    expect(note).toHaveTextContent('Claimed by you');
-    expect(note).toHaveTextContent('(Dana Reviewer)');
-    // The full self-claim surface: unlocked form + Submit, no claimed-by-other bar.
-    expect(screen.getByText('Submit')).toBeInTheDocument();
-    expect(screen.queryByTestId('claimed-other-bar')).not.toBeInTheDocument();
-  });
-
-  it('submits the form as the badged person (resolve fires normally)', async () => {
+  it('single-use: a held grant does not skip the submit challenge', async () => {
     primedAs('badge-user-1', 'Dana Reviewer');
     renderPage();
 
     await screen.findByText('Plate check');
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByTestId('station-write-challenge')).toBeInTheDocument();
+    expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
+
+    primeLive('badge-user-1', 'Dana Reviewer');
     await waitFor(() =>
       expect(state.resolve.mutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({ id: ESC_ID }),
@@ -157,30 +178,70 @@ describe('EscalationDetailPage — acting identity on the work surface', () => {
     );
   });
 
-  it('keeps claimed-by-other for a genuinely different claimant while primed', async () => {
-    primedAs('badge-user-2', 'Sam Fitter');
+  it('at a station, a live-claimed item is workable and warns of the submit badge', async () => {
     renderPage();
 
-    expect(await screen.findByTestId('claimed-other-bar')).toBeInTheDocument();
-    expect(screen.queryByTestId('acting-claim-note')).not.toBeInTheDocument();
-    // A badge is already primed — the quiet line would be noise.
-    expect(screen.queryByTestId('badge-prompt')).not.toBeInTheDocument();
+    await screen.findByText('Plate check');
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
+    expect(screen.getByTestId('submit-badge-warning')).toHaveTextContent(
+      "When you submit, you'll scan your badge to confirm you're",
+    );
+    expect(screen.queryByTestId('claimed-other-bar')).not.toBeInTheDocument();
   });
 
-  it('offers the quiet badge line when unprimed, scan-enabled, and claimed by another', async () => {
+  it('defers the badge to submit: opens the challenge, no premature resolve', async () => {
     renderPage();
 
-    expect(await screen.findByTestId('claimed-other-bar')).toBeInTheDocument();
-    expect(screen.getByTestId('badge-prompt')).toHaveTextContent(
-      'If this is your claim, scan your badge.',
+    await screen.findByText('Plate check');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByTestId('station-write-challenge')).toBeInTheDocument();
+    expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('fires the stashed submit once the claimant badge primes', async () => {
+    renderPage();
+    await screen.findByText('Plate check');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    await screen.findByTestId('station-write-challenge');
+
+    primeLive('badge-user-1', 'Dana Reviewer');
+
+    await waitFor(() =>
+      expect(state.resolve.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ESC_ID }),
+      ),
     );
   });
 
-  it('stays quiet when scan capture is disabled', async () => {
+  it('names a wrong badge and holds the submit', async () => {
+    renderPage();
+
+    await screen.findByText('Plate check');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    await screen.findByTestId('station-write-challenge');
+
+    primeLive('badge-user-2', 'Sam Fitter');
+    expect(await screen.findByTestId('wrong-badge')).toHaveTextContent('Sam Fitter');
+    expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('guards Release behind the badge challenge too (every write owes a tap)', async () => {
+    renderPage();
+
+    await screen.findByText('Plate check');
+    fireEvent.click(screen.getByRole('button', { name: 'Release' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Release' }));
+
+    const challenge = await screen.findByTestId('station-write-challenge');
+    expect(challenge).toHaveTextContent('release');
+  });
+
+  it('off-station: an item claimed by another stays a read-only claimed-by-other bar', async () => {
     state.scanEnabled = false;
     renderPage();
 
     expect(await screen.findByTestId('claimed-other-bar')).toBeInTheDocument();
-    expect(screen.queryByTestId('badge-prompt')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('submit-badge-warning')).not.toBeInTheDocument();
   });
 });

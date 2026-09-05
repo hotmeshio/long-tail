@@ -240,6 +240,24 @@ Pair kiosk with `x-lt-transition-done` on the role's form schema
 resolve lands back on the list rather than walking browser history — see
 [x-lt-transition](./hitl/x-lt-transition.md).
 
+### The work surface — edit freely, badge at submit
+
+On the work form, the badge belongs to the submission, not the editing. Once
+an item is claimed, anyone at the bench edits the form freely: a grant is not
+required to type. The submit is the state-changing act, so that is where the
+badge is asked for. The form warns up front who the submit will act as — "When
+you submit, you'll scan your badge to confirm you're <claimant>" — and the
+submit opens a badge prompt naming that claimant. The resolve fires the moment
+a matching badge primes; a badge that is not the claimant's is named and the
+submit is held.
+
+The gate is on **use**, not on grant lifetime. Acting grants are single-use:
+the claim already spent the grant it was minted with, so the submit owes a
+fresh tap — every write consumes its own grant. A held token proves nothing
+about whether a submit can succeed, so the surface never lets one skip the
+badge. Editing persists nothing locally, so the identity gate sits at the one
+place a record actually changes, once per change.
+
 Mutations attribute to the badged person (`assigned_to`, `resolved_by`)
 with the device recorded beside them (`scanStation` in the scan
 provenance) — every action individually owned and geographically placed.
