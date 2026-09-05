@@ -1,17 +1,18 @@
 import type { AggregateRow } from '../../api/escalation-analytics';
 import { totalDwell } from './entity-pivot';
-import { formatDurationCompact } from '../../lib/format';
 
 /** One stacked band of state dwell. */
 export function StateBand({
   groups,
   colors,
   height,
+  rounded = 'rounded-sm',
   className = '',
 }: {
   groups: AggregateRow[];
   colors: Map<string, string>;
   height: string;
+  rounded?: string;
   className?: string;
 }) {
   const total = totalDwell(groups);
@@ -24,14 +25,17 @@ export function StateBand({
     (a, b) => (rank.get(a.state ?? '—') ?? Infinity) - (rank.get(b.state ?? '—') ?? Infinity),
   );
   return (
-    <div className={`${height} flex rounded-full overflow-hidden bg-surface-sunken ${className}`}>
-      {ordered.map((g) => (
-        <div
-          key={g.state ?? '—'}
-          title={`${g.state ?? '—'} · ${formatDurationCompact((g.dwellSeconds ?? 0) * 1000)}`}
-          style={{ width: `${((g.dwellSeconds ?? 0) / total) * 100}%`, backgroundColor: colors.get(g.state ?? '—') }}
-        />
-      ))}
+    <div className={`${height} flex ${rounded} overflow-hidden bg-surface-sunken ${className}`}>
+      {ordered.map((g) => {
+        const pct = total > 0 ? Math.round(((g.dwellSeconds ?? 0) / total) * 100) : 0;
+        return (
+          <div
+            key={g.state ?? '—'}
+            title={`${g.state ?? '—'} · ${pct}%`}
+            style={{ width: `${((g.dwellSeconds ?? 0) / total) * 100}%`, backgroundColor: colors.get(g.state ?? '—') }}
+          />
+        );
+      })}
     </div>
   );
 }

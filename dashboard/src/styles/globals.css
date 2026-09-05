@@ -70,6 +70,21 @@
     --lt-status-queued-graphic: 14 165 233;   /* #0EA5E9 */
     --lt-status-claimed-graphic: 249 115 22;  /* #F97316 */
 
+    /* Categorical palette — muted, maximally distinct hues for the state-mix
+       timelines. Softer than the -graphic status tokens and ten wide so stages
+       never repeat a color; mid-tone, so they read on paper and the Midnight
+       shade alike. */
+    --lt-cat-1: 88 128 176;    /* blue */
+    --lt-cat-2: 224 146 78;    /* orange */
+    --lt-cat-3: 104 168 104;   /* green */
+    --lt-cat-4: 204 100 100;   /* red */
+    --lt-cat-5: 150 126 194;   /* violet */
+    --lt-cat-6: 82 170 168;    /* teal */
+    --lt-cat-7: 200 172 84;    /* gold */
+    --lt-cat-8: 156 120 96;    /* brown */
+    --lt-cat-9: 202 118 162;   /* magenta */
+    --lt-cat-10: 168 178 90;   /* lime */
+
     /* The universal field: a well a shade DARKER than the white surface it
        sits on, carrying the THEME'S hue at whisper saturation (each theme
        overrides). The resting border is a light, clearly-tinted step of the

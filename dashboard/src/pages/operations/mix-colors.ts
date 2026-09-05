@@ -1,17 +1,20 @@
 // ---------------------------------------------------------------------------
-// State-mix color assignment — a small ordered palette of the -graphic status
-// tokens (chart-grade contrast) assigned to subtypes by dwell rank. The null
-// subtype is a REAL group (rows created without one): it gets a key, a color,
-// and a label — dropping it would misstate the total tracked time.
+// State-mix color assignment — the muted categorical palette (--lt-cat-*)
+// assigned to subtypes by dwell rank. Ten distinct hues so a ten-stage system
+// never repeats a color. The null subtype is a REAL group and gets a color.
 // ---------------------------------------------------------------------------
 
 export const MIX_PALETTE = [
-  'rgb(var(--lt-status-queued-graphic))',   // sky
-  'rgb(var(--lt-status-claimed-graphic))',  // orange
-  'rgb(var(--lt-status-success-graphic))',  // green
-  'rgb(var(--lt-status-pending-graphic))',  // amber
-  'rgb(var(--lt-status-error))',            // red
-  'rgb(var(--lt-accent))',
+  'rgb(var(--lt-cat-1))',
+  'rgb(var(--lt-cat-2))',
+  'rgb(var(--lt-cat-3))',
+  'rgb(var(--lt-cat-4))',
+  'rgb(var(--lt-cat-5))',
+  'rgb(var(--lt-cat-6))',
+  'rgb(var(--lt-cat-7))',
+  'rgb(var(--lt-cat-8))',
+  'rgb(var(--lt-cat-9))',
+  'rgb(var(--lt-cat-10))',
 ] as const;
 
 export const NO_SUBTYPE_KEY = '∅';
