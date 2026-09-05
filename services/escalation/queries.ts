@@ -42,7 +42,7 @@ function buildSearchOrderBy(sortBy?: string, order?: string): string {
   return 'priority ASC, created_at ASC';
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE, isUuid } from '../../lib/uuid';
 
 /**
  * The id arm of the correlation search binds a uuid param only when the term
@@ -198,6 +198,8 @@ export async function searchEscalationsFaceted(opts: {
 export async function getEscalationWithFormSchema(
   id: string,
 ): Promise<{ escalation: LTEscalationRecord; form_schema: Record<string, any> | null } | null> {
+  // A non-UUID is definitionally not-found — it must never reach the uuid cast.
+  if (!isUuid(id)) return null;
   await ensureEscalationCompatView();
   const pool = getPool();
   const { rows } = await pool.query(

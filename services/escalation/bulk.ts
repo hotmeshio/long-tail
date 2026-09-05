@@ -1,3 +1,4 @@
+import { onlyUuids } from '../../lib/uuid';
 import type { LTEscalationRecord } from '../../types';
 
 import { getPool } from '../../lib/db';
@@ -21,6 +22,7 @@ export async function bulkClaimEscalations(
   userId: string,
   durationMinutes: number = 30,
 ): Promise<{ claimed: number; skipped: number }> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return { claimed: 0, skipped: 0 };
   const client = await escalations();
   return client.claimMany({ ids, assignee: userId, durationMinutes });
@@ -35,6 +37,7 @@ export async function bulkAssignEscalations(
   targetUserId: string,
   durationMinutes: number = 30,
 ): Promise<{ assigned: number; skipped: number }> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return { assigned: 0, skipped: 0 };
   const client = await escalations();
   const { claimed, skipped } = await client.claimMany({
@@ -77,6 +80,7 @@ export async function bulkReassignEscalations(
   targetUserId: string,
   durationMinutes: number = 30,
 ): Promise<{ assigned: number; skipped: number; changes: AssignmentChange[] }> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return { assigned: 0, skipped: 0, changes: [] };
   await ensureEscalationCompatView();
   const { rows } = await getPool().query(BULK_REASSIGN, [ids, targetUserId, durationMinutes]);
@@ -96,6 +100,7 @@ export async function bulkReassignEscalations(
 export async function bulkUnassignEscalations(
   ids: string[],
 ): Promise<{ unassigned: number; skipped: number; changes: AssignmentChange[] }> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return { unassigned: 0, skipped: 0, changes: [] };
   await ensureEscalationCompatView();
   const { rows } = await getPool().query(BULK_UNASSIGN, [ids]);
@@ -115,6 +120,7 @@ export async function bulkEscalateToRole(
   ids: string[],
   targetRole: string,
 ): Promise<number> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return 0;
   const client = await escalations();
   return client.escalateManyToRole({ ids, targetRole });
@@ -128,6 +134,7 @@ export async function bulkEscalateToRole(
 export async function bulkCancelEscalations(
   ids: string[],
 ): Promise<{ cancelled: number; skipped: number }> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return { cancelled: 0, skipped: 0 };
   const client = await escalations();
   let cancelled = 0;
@@ -153,6 +160,7 @@ export async function bulkResolveForTriage(
   ids: string[],
   hint?: string,
 ): Promise<LTEscalationRecord[]> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return [];
   const client = await escalations();
   const resolved = await client.resolveMany({

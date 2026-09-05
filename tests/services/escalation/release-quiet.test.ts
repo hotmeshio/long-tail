@@ -12,6 +12,9 @@ import { releaseEscalation } from '../../../services/escalation/crud';
 import { escalations } from '../../../services/escalation/client';
 import { publishEscalationEvent } from '../../../lib/events/publish';
 
+// Guarded surfaces reject non-UUID ids before any store call — fixtures must be real UUIDs.
+const ESC_ID = '11111111-1111-4111-8111-111111111111';
+
 const mockEscalations = escalations as ReturnType<typeof vi.fn>;
 const mockPublish = vi.mocked(publishEscalationEvent);
 
@@ -21,7 +24,7 @@ const mockPublish = vi.mocked(publishEscalationEvent);
 
 function makeEntry(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'esc-1',
+    id: ESC_ID,
     type: 'printer',
     subtype: 'printing',
     status: 'pending',
@@ -48,31 +51,31 @@ describe('releaseEscalation — quiet option', () => {
   });
 
   it('default release publishes the released event', async () => {
-    const result = await releaseEscalation('esc-1', 'broker-1');
-    expect(result?.id).toBe('esc-1');
+    const result = await releaseEscalation(ESC_ID, 'broker-1');
+    expect(result?.id).toBe(ESC_ID);
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'escalation.released', escalationId: 'esc-1' }),
+      expect.objectContaining({ type: 'escalation.released', escalationId: ESC_ID }),
     );
   });
 
   it('quiet release performs the identical release with no event', async () => {
-    const result = await releaseEscalation('esc-1', 'broker-1', { quiet: true });
-    expect(mockRelease).toHaveBeenCalledWith({ id: 'esc-1', assignee: 'broker-1' });
-    expect(result?.id).toBe('esc-1');
+    const result = await releaseEscalation(ESC_ID, 'broker-1', { quiet: true });
+    expect(mockRelease).toHaveBeenCalledWith({ id: ESC_ID, assignee: 'broker-1' });
+    expect(result?.id).toBe(ESC_ID);
     expect(result?.assigned_to).toBeNull();
     expect(mockPublish).not.toHaveBeenCalled();
   });
 
   it('an explicit quiet: false stays loud', async () => {
-    await releaseEscalation('esc-1', 'broker-1', { quiet: false });
+    await releaseEscalation(ESC_ID, 'broker-1', { quiet: false });
     expect(mockPublish).toHaveBeenCalledTimes(1);
   });
 
   it('a failed release returns null and never publishes, quiet or loud', async () => {
     mockRelease.mockResolvedValue({ ok: false });
-    expect(await releaseEscalation('esc-1', 'broker-1')).toBeNull();
-    expect(await releaseEscalation('esc-1', 'broker-1', { quiet: true })).toBeNull();
+    expect(await releaseEscalation(ESC_ID, 'broker-1')).toBeNull();
+    expect(await releaseEscalation(ESC_ID, 'broker-1', { quiet: true })).toBeNull();
     expect(mockPublish).not.toHaveBeenCalled();
   });
 });
