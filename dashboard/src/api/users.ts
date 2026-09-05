@@ -19,7 +19,7 @@ interface UserFilters {
   offset?: number;
 }
 
-export function useUsers(filters: UserFilters = {}) {
+export function useUsers(filters: UserFilters = {}, options: { enabled?: boolean } = {}) {
   const params = new URLSearchParams();
   if (filters.role) params.set('role', filters.role);
   if (filters.roleType) params.set('roleType', filters.roleType);
@@ -31,6 +31,7 @@ export function useUsers(filters: UserFilters = {}) {
   return useQuery<UserListResponse>({
     queryKey: ['users', filters],
     queryFn: () => apiFetch(`/users?${params}`),
+    enabled: options.enabled ?? true,
     ...USER_QUERY_OPTIONS,
   });
 }

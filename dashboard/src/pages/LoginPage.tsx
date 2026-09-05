@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { AppLogo } from '../components/common/display/AppLogo';
 import { OAuthIcon } from '../components/common/OAuthIcon';
 import { fetchOAuthProviders, type OAuthProvider } from '../api/oauth';
+import { loadSettings } from '../api/settings';
 import { LT_BASE } from '../lib/base-path';
 
 export function LoginPage() {
@@ -43,10 +44,8 @@ export function LoginPage() {
 
     (async () => {
       try {
-        const settingsRes = await fetch(`${LT_BASE}/api/settings`);
-        if (!settingsRes.ok) return;
-        const settings = await settingsRes.json();
-        if (!settings.auth?.sso) return;
+        const settings = await loadSettings().catch(() => null);
+        if (!settings?.auth?.sso) return;
 
         // SSO enabled — exchange host cookies for LT JWT
         const ssoRes = await fetch(`${LT_BASE}/api/auth/sso`, { method: 'POST' });

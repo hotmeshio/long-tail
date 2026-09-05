@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { getToken } from '../api/client';
+import { loadSettings } from '../api/settings';
 import { LT_BASE } from '../lib/base-path';
 import { NatsProvider } from './useNats';
 import { SocketIOProvider } from './useSocketIO';
@@ -30,13 +31,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
     async function detect() {
       try {
         console.log('[lt-transport] detecting event transport...');
-        const res = await fetch(`${LT_BASE}/api/settings`);
-        if (!res.ok) {
-          console.warn('[lt-transport] settings fetch failed, falling back to socketio');
-          if (!cancelled) setTransport('socketio');
-          return;
-        }
-        const data = await res.json();
+        const data = await loadSettings() as any;
         const value = data?.events?.transport;
         console.log('[lt-transport] server reports:', value);
         if (!cancelled) {

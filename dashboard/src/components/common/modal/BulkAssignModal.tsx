@@ -56,7 +56,7 @@ export function BulkAssignModal({
     status: 'active',
     search: debouncedSearch.trim() || undefined,
     limit: 200,
-  });
+  }, { enabled: open });
 
   const users = usersData?.users ?? [];
 
