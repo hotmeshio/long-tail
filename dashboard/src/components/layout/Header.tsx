@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Inbox, User, Menu, Radio, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Inbox, User, Menu, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
@@ -200,28 +200,6 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
             <span className="hidden lg:inline">mine</span>
             {mine > 0 && <sup className="tabular-nums font-medium text-[0.5em]">{mine}</sup>}
           </Link>
-
-          <div className="hidden lg:block w-px h-4 bg-surface-border" />
-
-          {/* Events — every login watches the floor live; the stream itself is
-              role-scoped server-side, so members simply receive fewer events. */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!connected) {
-                window.location.reload();
-              } else {
-                onToggleEventFeed?.();
-              }
-            }}
-            className={`hidden lg:flex items-center gap-1.5 text-xs transition-colors ${
-              connected ? 'text-status-success hover:text-status-success/80' : 'text-text-quaternary hover:text-text-secondary'
-            }`}
-            title={connected ? 'Live events — click to toggle feed' : 'Events disconnected — click to reconnect'}
-          >
-            <Radio className="w-4 h-4" strokeWidth={1.5} />
-            events
-          </button>
 
           {/* View-as indicator — visible when simulating a lower role */}
           {viewAs && (
