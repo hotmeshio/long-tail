@@ -1,6 +1,7 @@
 import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { BatchItemOutcome, LTEscalationRecord } from '../../types';
 
+import { isUuid } from '../../lib/uuid';
 import { escalations } from './client';
 import { publishEscalationChange } from './crud';
 import { toEscalationRecord } from './map';
@@ -28,6 +29,7 @@ export async function resolveBatchItem(
   assertClaim?: string,
   resolvedBy?: { id: string; email?: string },
 ): Promise<ResolveBatchItemOutcome> {
+  if (!isUuid(id)) return { outcome: 'not-found', remaining: -1, escalation: null };
   const client = await escalations();
   const result = await client.resolveBatchItem({
     id,

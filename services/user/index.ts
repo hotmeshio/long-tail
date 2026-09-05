@@ -2,6 +2,8 @@ export { CreateUserInput, UpdateUserInput, UserPropertyOps, VALID_ROLE_TYPES } f
 export {
   createUser,
   getUser,
+  getUserNames,
+  UserNameRecord,
   getUserByExternalId,
   getUserByEmail,
   getUserByMetadataValue,

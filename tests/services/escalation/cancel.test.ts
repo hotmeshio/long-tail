@@ -12,11 +12,14 @@ vi.mock('../../../lib/events/publish', () => ({
 import { cancelEscalation } from '../../../services/escalation/crud';
 import { escalations } from '../../../services/escalation/client';
 
+// Guarded surfaces reject non-UUID ids before any store call — fixtures must be real UUIDs.
+const ESC_ID = '11111111-1111-4111-8111-111111111111';
+
 const mockEscalations = escalations as ReturnType<typeof vi.fn>;
 
 function makeEntry(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'esc-1',
+    id: ESC_ID,
     namespace: 'hmsh',
     app_id: 'hmsh',
     type: 'approval',
@@ -43,36 +46,37 @@ describe('cancelEscalation', () => {
 
   it('returns null when SDK reports already-terminal', async () => {
     mockCancel.mockResolvedValue({ ok: false, reason: 'already-terminal' });
-    const result = await cancelEscalation('esc-1');
+    const result = await cancelEscalation(ESC_ID);
     expect(result).toBeNull();
   });
 
   it('returns null when SDK reports not-found', async () => {
     mockCancel.mockResolvedValue({ ok: false, reason: 'not-found' });
-    const result = await cancelEscalation('esc-1');
+    const result = await cancelEscalation(ESC_ID);
     expect(result).toBeNull();
   });
 
   it('returns the cancelled record on success', async () => {
     const entry = makeEntry({ status: 'cancelled' });
     mockCancel.mockResolvedValue({ ok: true, entry });
-    const result = await cancelEscalation('esc-1');
+    const result = await cancelEscalation(ESC_ID);
     expect(result).not.toBeNull();
-    expect(result!.id).toBe('esc-1');
+    expect(result!.id).toBe(ESC_ID);
   });
 
   it('calls SDK cancel with the provided id', async () => {
     const entry = makeEntry({ status: 'cancelled' });
     mockCancel.mockResolvedValue({ ok: true, entry });
-    await cancelEscalation('esc-42');
-    expect(mockCancel).toHaveBeenCalledWith('esc-42');
+    const otherId = '22222222-2222-4222-8222-222222222222';
+    await cancelEscalation(otherId);
+    expect(mockCancel).toHaveBeenCalledWith(otherId);
   });
 
   it('publishes escalation.cancelled event on success', async () => {
     const { publishEscalationEvent } = await import('../../../lib/events/publish');
     const entry = makeEntry({ status: 'cancelled', workflow_id: 'wf-test', workflow_type: 'basicSignal', task_queue: 'q1' });
     mockCancel.mockResolvedValue({ ok: true, entry });
-    await cancelEscalation('esc-1');
+    await cancelEscalation(ESC_ID);
     expect(publishEscalationEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'escalation.cancelled', status: 'cancelled' }),
     );

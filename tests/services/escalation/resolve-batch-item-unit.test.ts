@@ -21,11 +21,14 @@ import {
 } from '../../../services/escalation/batch';
 import { publishEscalationChange } from '../../../services/escalation/crud';
 
+// Guarded surfaces reject non-UUID ids before any store call — fixtures must be real UUIDs.
+const ESC_ID = '11111111-1111-4111-8111-111111111111';
+
 const mockPublish = vi.mocked(publishEscalationChange);
 
 function makeEntry(overrides: Record<string, any> = {}): any {
   return {
-    id: 'esc-1',
+    id: ESC_ID,
     status: 'pending',
     role: 'assembly',
     type: 'batch-order',
@@ -55,10 +58,10 @@ describe('resolveBatchItem (service)', () => {
     mockClient.resolveBatchItem.mockResolvedValue({
       ok: true, outcome: 'accepted', remaining: 1, entry: makeEntry(),
     });
-    await resolveBatchItem('esc-1', 'cut', { ok: true }, { station: 's1' }, 'me', { id: 'me' });
+    await resolveBatchItem(ESC_ID, 'cut', { ok: true }, { station: 's1' }, 'me', { id: 'me' });
     expect(mockClient.resolveBatchItem).toHaveBeenCalledOnce();
     expect(mockClient.resolveBatchItem).toHaveBeenCalledWith({
-      id: 'esc-1',
+      id: ESC_ID,
       itemKey: 'cut',
       payload: { ok: true },
       metadata: { station: 's1' },
@@ -71,10 +74,10 @@ describe('resolveBatchItem (service)', () => {
     mockClient.resolveBatchItem.mockResolvedValue({
       ok: true, outcome: 'accepted', remaining: 1, entry: makeEntry(),
     });
-    const result = await resolveBatchItem('esc-1', 'cut', { ok: true });
+    const result = await resolveBatchItem(ESC_ID, 'cut', { ok: true });
     expect(result.outcome).toBe('accepted');
     expect(result.remaining).toBe(1);
-    expect(result.escalation?.id).toBe('esc-1');
+    expect(result.escalation?.id).toBe(ESC_ID);
     expect(mockPublish).toHaveBeenCalledOnce();
     const event = mockPublish.mock.calls[0][0];
     expect(event.type).toBe('escalation.updated');
@@ -87,7 +90,7 @@ describe('resolveBatchItem (service)', () => {
     mockClient.resolveBatchItem.mockResolvedValue({
       ok: true, outcome: 'completed', remaining: 0, entry: makeEntry({ status: 'resolved' }),
     });
-    const result = await resolveBatchItem('esc-1', 'weld', { ok: true });
+    const result = await resolveBatchItem(ESC_ID, 'weld', { ok: true });
     expect(result.outcome).toBe('completed');
     const event = mockPublish.mock.calls[0][0];
     expect(event.type).toBe('escalation.resolved');
@@ -96,7 +99,7 @@ describe('resolveBatchItem (service)', () => {
 
   it('publishes nothing on a failure outcome — the row was untouched', async () => {
     mockClient.resolveBatchItem.mockResolvedValue({ ok: false, outcome: 'duplicate-item' });
-    const result = await resolveBatchItem('esc-1', 'cut', { ok: true });
+    const result = await resolveBatchItem(ESC_ID, 'cut', { ok: true });
     expect(result.outcome).toBe('duplicate-item');
     expect(result.escalation).toBeNull();
     expect(mockPublish).not.toHaveBeenCalled();

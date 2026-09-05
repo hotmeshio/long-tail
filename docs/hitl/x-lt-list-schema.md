@@ -23,6 +23,8 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 
 `format: "age"` on a `facet-table` column or `facet-board` field renders a timestamp as a compact age (`12m`, `3h`, `2d`) with the absolute time as its tooltip, repainted each minute — aging interim states are scannable at a glance.
 
+`format: "user"` resolves a user-id token — `{{escalation.assigned_to}}` — to that person's display name. Resolution is batched: every id on a page is coalesced into one `POST /api/users/names` request returning display fields only (no secrets, scopes, or metadata), cached by id for the session and not refetched on window focus; a user edit invalidates the cache. It truncates with an ellipsis and carries the full name on hover; an unassigned row shows a quiet em dash. `assigned_to` is the claimant while the item is worked and stays as the resolver once it is resolved, so one column reads correctly across the row's whole life. The built-in table and timeline views carry this user column by default; authored templates opt in per column.
+
 The **active** item is the first non-terminal escalation. The **history** column is lazy-loaded — a "Load full history" link fetches resolved items on demand (`status` defaults to `"resolved"`, `limit` to 25). Unknown or absent `x-lt-layout` is a safe no-op that falls back to the table.
 
 ### Row action (`x-lt-row-action`)
@@ -94,6 +96,7 @@ Use when the queue contains many concurrent rows and the role's context is best 
     { "label": "Heel cup", "value": "{{metadata.heelCup}}" },
     { "label": "PDAC",     "value": "{{metadata.pdac}}" },
     { "label": "Station",  "value": "{{metadata.station}}" },
+    { "label": "Assignee", "value": "{{escalation.assigned_to}}", "format": "user" },
     { "label": "Priority", "value": "{{escalation.priority}}" },
     { "label": "Created",  "value": "{{escalation.created_at}}" }
   ]

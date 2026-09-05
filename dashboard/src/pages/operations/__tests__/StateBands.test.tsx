@@ -39,4 +39,12 @@ describe('StateBand segment order', () => {
     );
     expect(titles).toEqual(['idle', 'mystery']);
   });
+
+  it('shows each segment as a percent of its peers, not an aggregate', () => {
+    const { container } = render(
+      <StateBand groups={[row('idle', 750), row('printing', 250)]} colors={colors} height="h-2" />,
+    );
+    const titles = [...container.querySelectorAll('[title]')].map((el) => el.getAttribute('title'));
+    expect(titles).toEqual(['idle · 75%', 'printing · 25%']);
+  });
 });

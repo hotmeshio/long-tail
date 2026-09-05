@@ -14,6 +14,7 @@ vi.mock('../../../api/settings', () => ({
 vi.mock('../../../api/users', () => ({
   useUsers: vi.fn().mockReturnValue({ data: [] }),
   useUser: vi.fn().mockReturnValue({ data: null }),
+  useUserName: vi.fn().mockReturnValue({ data: null }),
 }));
 
 import { ProcessDetailPage } from '../ProcessDetailPage';

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { LT_BASE } from '../lib/base-path';
 
 export interface AppSettings {
   telemetry: {
@@ -61,8 +61,24 @@ export interface AppSettings {
 
 const AI_OVERRIDE_KEY = 'lt_ai_override';
 
-function fetchSettings(): Promise<AppSettings> {
-  return apiFetch<AppSettings>('/settings');
+let settingsPromise: Promise<AppSettings> | null = null;
+
+/**
+ * Deployment settings are user-agnostic and static per page load, so /api/settings
+ * is fetched once and the promise shared across every consumer — the transport
+ * bootstrap, the login screen, and useSettings. A failed fetch clears the memo so
+ * the next caller retries.
+ */
+export function loadSettings(): Promise<AppSettings> {
+  if (!settingsPromise) {
+    settingsPromise = fetch(`${LT_BASE}/api/settings`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`settings ${res.status}`);
+        return res.json() as Promise<AppSettings>;
+      })
+      .catch((err) => { settingsPromise = null; throw err; });
+  }
+  return settingsPromise;
 }
 
 function readAIOverride(): boolean | null {
@@ -76,7 +92,7 @@ function readAIOverride(): boolean | null {
 export function useSettings() {
   const query = useQuery({
     queryKey: ['settings'],
-    queryFn: fetchSettings,
+    queryFn: loadSettings,
     staleTime: Infinity,
   });
 

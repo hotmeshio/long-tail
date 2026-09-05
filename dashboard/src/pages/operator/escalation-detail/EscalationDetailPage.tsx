@@ -48,6 +48,7 @@ import { useSubmitGuard } from '../../../hooks/useSubmitGuard';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
+import { StationWriteChallenge } from '../../../components/scan/station/StationWriteChallenge';
 import { apiFetch } from '../../../api/client';
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const { user, isSuperAdmin, hasRoleType } = useAuth();
   // Claim overrides (reassign / return to queue) are management verbs.
   const canManage = isSuperAdmin || hasRoleType('admin');
-  const { identity: acting } = useActingIdentity();
+  const { identity: acting, clear: clearActing } = useActingIdentity();
   const scanEnabled = useScanEnabled();
   // The badge grant outranks the session: whoever badged in owns the claim
   // comparisons here, and the mutations they fire ride the acting header so
@@ -178,6 +179,8 @@ function EscalationDetailView({ id }: { id: string }) {
   // (the guard query is socket-invalidated, so it refetches with no polling).
   const autoResolveFiredRef = useRef(false);
   const autoResolveActionRef = useRef<(() => void) | null>(null);
+
+  const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -352,6 +355,15 @@ function EscalationDetailView({ id }: { id: string }) {
     autoResolveActionRef.current?.();
   }, [submitGuard.confirmedEmpty, submitGuardDef, esc, json, effectiveActorId]);
 
+  useEffect(() => {
+    if (!pendingWrite || !esc) return;
+    if (acting && acting.actorId === esc.assigned_to) {
+      const { run } = pendingWrite;
+      setPendingWrite(null);
+      void run();
+    }
+  }, [acting, pendingWrite, esc?.assigned_to]);
+
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
   if (isLoading) {
@@ -372,8 +384,12 @@ function EscalationDetailView({ id }: { id: string }) {
   const claimedByOther = claimed && !claimedByMe;
   const isTerminal = esc.status === 'resolved' || esc.status === 'cancelled';
 
+  const stationWorkable = scanEnabled && claimed && !isTerminal;
+  const editable = claimedByMe || stationWorkable;
+  const writeNeedsBadge = stationWorkable && esc.assigned_to !== user?.userId;
+
   const iframeViewport = (effectiveSchema as any)?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
-  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && claimedByMe && !isTerminal;
+  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && editable && !isTerminal;
 
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
@@ -392,7 +408,7 @@ function EscalationDetailView({ id }: { id: string }) {
 
   const actionBarMode: ActionBarMode = isTerminal
     ? 'terminal'
-    : claimedByMe
+    : claimedByMe || stationWorkable
       ? 'claimed_by_me'
       : claimedByOther
         ? 'claimed_by_other'
@@ -442,7 +458,7 @@ function EscalationDetailView({ id }: { id: string }) {
     else window.location.assign(dest);
   };
 
-  const handleResolve = async (payload: Record<string, unknown>) => {
+  const submitResolve = async (payload: Record<string, unknown>) => {
     try {
       await resolve.mutateAsync({ id, resolverPayload: payload });
     } catch (err) {
@@ -476,6 +492,19 @@ function EscalationDetailView({ id }: { id: string }) {
       return;
     }
     goBack();
+  };
+
+  const guardStationWrite = (verb: string, run: () => void | Promise<void>) => {
+    if (writeNeedsBadge) {
+      clearActing();
+      setPendingWrite({ verb, run });
+      return;
+    }
+    void run();
+  };
+
+  const handleResolve = async (payload: Record<string, unknown>) => {
+    guardStationWrite('submit', () => submitResolve(payload));
   };
 
   // x-lt-submit-on-claim: claim, then immediately resolve with whatever the form
@@ -529,10 +558,12 @@ function EscalationDetailView({ id }: { id: string }) {
     handleResolve(result.payload!);
   };
 
-  const handleEscalate = async (targetRole: string) => {
+  const handleEscalate = (targetRole: string) => {
     if (!targetRole) return;
-    await escalate.mutateAsync({ id, targetRole });
-    goBack();
+    guardStationWrite('escalate', async () => {
+      await escalate.mutateAsync({ id, targetRole });
+      goBack();
+    });
   };
 
   const handleRetryTriage = async () => {
@@ -547,16 +578,20 @@ function EscalationDetailView({ id }: { id: string }) {
     goBack();
   };
 
-  const handleRelease = async () => {
-    await claim.mutateAsync({ id, durationMinutes: 0 });
-    goBack();
+  const handleRelease = () => {
+    guardStationWrite('release', async () => {
+      await claim.mutateAsync({ id, durationMinutes: 0 });
+      goBack();
+    });
   };
 
-  const handleConfirmCancel = async () => {
-    await cancel.mutateAsync(id);
-    clearDraft(id);
+  const handleConfirmCancel = () => {
     setCancelModalOpen(false);
-    goBack();
+    guardStationWrite('cancel', async () => {
+      await cancel.mutateAsync(id);
+      clearDraft(id);
+      goBack();
+    });
   };
 
   // One panel entry in the header: the toggle. Authored help stays reachable
@@ -666,7 +701,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 esc={esc}
                 resolverPayload={resolverPayload}
                 isTerminal={isTerminal}
-                claimedByMe={claimedByMe}
+                editable={editable}
                 activeView={activeView}
                 lookup={lookupCtx}
                 metadataFormSchema={metadataFormSchema}
@@ -718,7 +753,7 @@ function EscalationDetailView({ id }: { id: string }) {
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
           actingName={acting && claimedByMe ? acting.displayName : null}
-          badgePrompt={scanEnabled && !acting && claimedByOther}
+          submitNeedsBadge={writeNeedsBadge}
           onSubmitAttempt={() => setSubmitAttempted(true)}
           onValidationErrors={(errors) => {
             setFormErrors(errors);
@@ -782,6 +817,14 @@ function EscalationDetailView({ id }: { id: string }) {
       {/* Scan hand-off: a scanned confirm-step lands here with the pending
           action in route state; the modal asks the rule's prompt. */}
       <ScanConfirmModal escalationId={id} />
+
+      <StationWriteChallenge
+        open={!!pendingWrite}
+        verb={pendingWrite?.verb ?? 'submit'}
+        claimantId={esc.assigned_to}
+        wrongBadgeName={acting && acting.actorId !== esc.assigned_to ? acting.displayName : null}
+        onCancel={() => setPendingWrite(null)}
+      />
 
       {/* Transition hand-off: shown after a resolve on an x-lt-transition form,
           bridging the brief gap until the born-assigned follow-on arrives. */}

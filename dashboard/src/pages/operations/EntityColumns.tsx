@@ -59,7 +59,7 @@ export function EntityRowItem({
       tabIndex={0}
       onClick={activate}
       onKeyDown={(e) => { if (e.key === 'Enter') activate(e); }}
-      className={`${ROW_GRID} text-2xs cursor-pointer group py-0.5`}
+      className={`${ROW_GRID} text-2xs cursor-pointer group`}
     >
       <span
         className="w-2 h-2 rounded-full justify-self-center"
@@ -70,7 +70,7 @@ export function EntityRowItem({
         text={row.value}
         className="font-mono text-text-secondary group-hover:text-accent transition-colors"
       />
-      <StateBand groups={row.groups} colors={colors} height="h-1.5" className="min-w-[2rem]" />
+      <StateBand groups={row.groups} colors={colors} height="h-4" className="min-w-[2rem]" />
       <button
         className="icon-link justify-self-center"
         title={`${formatDurationCompact(row.total * 1000)} tracked · open timeline · ⌘-click row searches every queue`}
@@ -111,7 +111,7 @@ function EntityColumnView({
   emptyText?: string;
 }) {
   return (
-    <div className={sliced ? 'w-72 shrink-0' : 'flex-1 max-w-3xl'}>
+    <div className={sliced ? 'w-72 shrink-0' : 'flex-1'}>
       {header && (
         <button
           type="button"
@@ -137,7 +137,7 @@ function EntityColumnView({
       {rows.length === 0 ? (
         <p className="text-2xs text-text-quaternary">{emptyText ?? 'No entities on this page.'}</p>
       ) : (
-        <div className="space-y-0.5">
+        <div className="space-y-px">
           {rows.map((row) => (
             <EntityRowItem key={row.value} facetKey={facetKey} row={row} colors={colors} stateLabel={stateLabel} onOpen={onOpen} />
           ))}

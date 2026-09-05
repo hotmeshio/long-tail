@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { IdCard } from 'lucide-react';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { CountdownTimer } from '../../../components/common/display/CountdownTimer';
 import { UserName } from '../../../components/common/display/UserName';
@@ -28,7 +29,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
     submitBlocked,
     submitBlockedMessage,
     actingName,
-    badgePrompt,
+    submitNeedsBadge,
     canManage,
     onReassign,
     onUnassign,
@@ -158,14 +159,7 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
               Claimed by <span className="font-medium text-text-primary">{assignedTo ? <UserName userId={assignedTo} /> : 'unknown'}</span>
             </p>
             {assignedUntil && <CountdownTimer until={assignedUntil} />}
-            {/* An expired badge grant on submit lands here: the acting state
-                cleared, the server's answer surfaces, and a fresh scan retries. */}
             {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}
-            {badgePrompt && (
-              <p className="text-xs text-text-tertiary" data-testid="badge-prompt">
-                If this is your claim, scan your badge.
-              </p>
-            )}
             {canManage && (
               <>
                 <div className="flex-1" />
@@ -219,13 +213,20 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
             {/* ── Resolve controls ── */}
             {activeView === 'resolve' && (
               <div className="flex items-center gap-4">
-                {/* The badged person's claim: name the identity the submit acts as. */}
-                {actingName && (
+                {submitNeedsBadge ? (
+                  <p className="flex items-center gap-1.5 text-sm text-text-secondary" data-testid="submit-badge-warning">
+                    <IdCard className="w-4 h-4 text-accent-muted shrink-0" strokeWidth={1.5} />
+                    When you submit, you'll scan your badge to confirm you're{' '}
+                    <span className="font-medium text-text-primary">
+                      {assignedTo ? <UserName userId={assignedTo} /> : 'the claimant'}
+                    </span>.
+                  </p>
+                ) : actingName && (
                   <p className="text-sm text-text-secondary" data-testid="acting-claim-note">
                     Claimed by you <span className="font-medium text-text-primary">({actingName})</span>
                   </p>
                 )}
-                {actingName && assignedUntil && <CountdownTimer until={assignedUntil} />}
+                {!submitNeedsBadge && actingName && assignedUntil && <CountdownTimer until={assignedUntil} />}
                 <div className="flex-1" />
                 {parseError && <span className="text-xs text-status-error">{parseError}</span>}
                 {resolveError && <span className="text-xs text-status-error">{resolveError.message}</span>}

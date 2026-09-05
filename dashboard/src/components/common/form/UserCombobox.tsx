@@ -29,7 +29,7 @@ export function UserCombobox({ selected, onSelect, excludeIds = [], placeholder 
   const { data, isFetching } = useUsers({
     search: debounced.trim() || undefined,
     limit: PAGE,
-  });
+  }, { enabled: open });
 
   // Close on outside click
   useEffect(() => {

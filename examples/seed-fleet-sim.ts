@@ -34,6 +34,21 @@ export const PRINTER_HARVEST_ROLE = 'printer-harvest';
 export const PRINTER_SERVICE_ROLE = 'printer-service';
 export const PRINTER_ENTITY_FACET = 'serialNumber';
 
+// The work form for a scanned printer: a checkbox, a required note, and a
+// return-to-list transition after resolve.
+const PRINTER_FORM_SCHEMA = {
+  'x-lt-transition-done': `/escalations/available?role={{escalation.role}}`,
+  properties: {
+    inspected: { type: 'boolean', title: 'Machine inspected', default: false },
+    condition_note: {
+      type: 'string',
+      title: 'Condition note',
+      'x-lt-widget': 'textarea',
+    },
+  },
+  required: ['condition_note'],
+};
+
 const FLEET_LIST_SCHEMA = {
   'x-lt-layout': 'facet-board',
   'x-lt-group-by': `metadata.${PRINTER_ENTITY_FACET}`,
@@ -77,6 +92,7 @@ interface PrinterRoleData {
   sla_minutes: number;
   entity_state_source: 'role' | 'subtype';
   list_schema?: Record<string, any>;
+  form_schema?: Record<string, any>;
   default_pins?: { label: string; url: string; badge?: boolean }[];
   // Fronts a locked station viewport. The shared 'station' login is a read-only
   // member of all three, so it picks which of these is its kiosk home.
@@ -92,6 +108,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     sla_minutes: 60,
     entity_state_source: 'subtype',
     list_schema: FLEET_LIST_SCHEMA,
+    form_schema: PRINTER_FORM_SCHEMA,
     default_pins: FLEET_DEFAULT_PINS,
     kiosk: true,
   },
@@ -102,6 +119,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     parent_role: PRINTER_FLEET_ROLE,
     sla_minutes: 15,
     entity_state_source: 'role',
+    form_schema: PRINTER_FORM_SCHEMA,
     kiosk: true,
   },
   {
@@ -111,6 +129,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     parent_role: PRINTER_FLEET_ROLE,
     sla_minutes: 45,
     entity_state_source: 'role',
+    form_schema: PRINTER_FORM_SCHEMA,
     kiosk: true,
   },
 ];
@@ -140,6 +159,7 @@ export async function seedPrinterFleetRoles(): Promise<void> {
           entity_facet: PRINTER_ENTITY_FACET,
           entity_state_source: data.entity_state_source,
           ...(data.list_schema ? { list_schema: data.list_schema } : {}),
+          ...(data.form_schema ? { form_schema: data.form_schema } : {}),
           ...(data.default_pins ? { default_pins: data.default_pins } : {}),
         });
       } else if (row != null && row.entity_facet == null) {

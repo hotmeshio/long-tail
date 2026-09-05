@@ -21,11 +21,16 @@ export async function orthoPipeline(envelope: LTEnvelope): Promise<unknown> {
   const {
     order_id = 'ORDER-001',
     item_type = 'insole-standard',
+    facility,
     stages = [...ORTHO_STAGES],
     metadata: orderMetadata = {},
   } = (envelope.data ?? {}) as {
     order_id?: string;
     item_type?: string;
+    /** The site this order is manufactured at — stamped once on the envelope
+     *  and applied to every stage escalation as a queryable facet, so the
+     *  Pace Board (and pins) can scope to it. */
+    facility?: string;
     stages?: string[];
     metadata?: Record<string, unknown>;
   };
@@ -41,7 +46,7 @@ export async function orthoPipeline(envelope: LTEnvelope): Promise<unknown> {
       subtype: stage,
       role: stage,
       description: `${stage} — order ${order_id} (${item_type})`,
-      metadata: { order_id, item_type, stage, ...orderMetadata },
+      metadata: { order_id, item_type, stage, ...(facility ? { facility } : {}), ...orderMetadata },
     });
 
     // Replay-deterministic timestamp: the resolver stamps completed_at into

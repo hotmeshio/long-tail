@@ -51,6 +51,7 @@ export function EntityLensView({
   entityKey,
   periodHours,
   roles,
+  scopeFacets,
   find,
   onFindChange,
   entityValue,
@@ -63,6 +64,8 @@ export function EntityLensView({
   entityKey: string;
   periodHours: number;
   roles: RoleDetail[];
+  /** Device-bound facet scope — narrows every lens query, like the board. */
+  scopeFacets?: Record<string, unknown>;
   /** Debounced find term (?find=) — a case-insensitive prefix on the entity key. */
   find: string | null;
   onFindChange: (term: string | null) => void;
@@ -78,6 +81,13 @@ export function EntityLensView({
 }) {
   const window = useAnalyticsWindow(periodHours);
   const shell = useShellPanelOptional();
+
+  // Merge the device-bound facet scope into any query — every lens read is
+  // narrowed to the same facets that scope the board and the pins.
+  const scoped = <Q extends object>(q: Q): Q & { facets?: Record<string, unknown> } =>
+    scopeFacets
+      ? { ...q, facets: { ...((q as { facets?: Record<string, unknown> }).facets ?? {}), ...scopeFacets } }
+      : q;
   const sliceKey = sliceKeyProp ?? '';
   const sliced = !!sliceKey;
   const focused = sliced && !!sliceValue;
@@ -115,18 +125,18 @@ export function EntityLensView({
 
   // Counts-only (public under the board flag): the system's state bands.
   const stateDwell = useAggregateByFacets({
-    query: { entity: entityKey },
+    query: scoped({ entity: entityKey }),
     groupBy: { state: true },
     measure: { kind: 'dwell', window },
     orderBy: [{ field: 'dwellSeconds', direction: 'desc' }],
   });
   const stateNow = useAggregateByFacets({
-    query: { entity: entityKey },
+    query: scoped({ entity: entityKey }),
     groupBy: { state: true },
     measure: { kind: 'membership' },
   });
   const entityCount = useAggregateByFacets({
-    query: { entity: entityKey },
+    query: scoped({ entity: entityKey }),
     groupBy: {},
     measure: { kind: 'membership' },
     distinctBy: entityKey,
@@ -137,7 +147,7 @@ export function EntityLensView({
   const slice = useAggregateByFacets(
     sliced
       ? {
-          query: { entity: entityKey },
+          query: scoped({ entity: entityKey }),
           groupBy: { state: true, facets: [sliceKey] },
           measure: { kind: 'dwell', window },
           limit: 200,
@@ -151,13 +161,13 @@ export function EntityLensView({
   const perEntity = useAggregateByFacets(
     pagedActive
       ? {
-          query: {
+          query: scoped({
             entity: entityKey,
             // Focus scopes to the targeted value by exact text match (the value
             // came from the aggregate as text; equals round-trips every scalar).
             ...(focused ? { equals: { [sliceKey]: sliceValue as string } } : {}),
             ...(find ? { prefix: { [entityKey]: find } } : {}),
-          },
+          }),
           groupBy: { facets: [entityKey] },
           measure: { kind: 'dwell', window },
           orderBy: [{ field: 'dwellSeconds', direction: 'desc' }],
@@ -176,7 +186,7 @@ export function EntityLensView({
   const perEntityStates = useAggregateByFacets(
     pageScope
       ? {
-          query: pageScope,
+          query: scoped(pageScope),
           groupBy: { state: true, facets: [entityKey] },
           measure: { kind: 'dwell', window },
           limit: pageSize * 10,
@@ -185,7 +195,7 @@ export function EntityLensView({
   );
   const perEntityNow = useAggregateByFacets(
     pageScope
-      ? { query: pageScope, groupBy: { state: true, facets: [entityKey] }, measure: { kind: 'membership' } }
+      ? { query: scoped(pageScope), groupBy: { state: true, facets: [entityKey] }, measure: { kind: 'membership' } }
       : null,
   );
   const entityRows = useMemo(

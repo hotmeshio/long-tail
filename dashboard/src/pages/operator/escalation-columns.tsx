@@ -8,6 +8,7 @@ import { FilterBar, FilterSelect, FilterInput, FilterDivider } from '../../compo
 import { PriorityBadge } from '../../components/common/display/PriorityBadge';
 import { RolePill } from '../../components/common/display/RolePill';
 import { WorkflowPill } from '../../components/common/display/WorkflowPill';
+import { UserName } from '../../components/common/display/UserName';
 import { CountdownTimer } from '../../components/common/display/CountdownTimer';
 import { formatAgoCompact } from '../../lib/format';
 import { isEffectivelyClaimed, isAckEscalation } from '../../lib/escalation';
@@ -176,6 +177,15 @@ export function makeEscalationColumns(opts: EscalationColumnOpts = {}): Column<L
     // The manufacturing-floor column budget: identity, owner, urgency, age.
     // Everything else (workflow type, metadata, exact timestamps) lives in
     // the facet drawer and the detail page — never as a scrolling column.
+    {
+      key: 'assigned_to',
+      label: 'Assignee',
+      priority: 2,
+      render: (row) => (row.assigned_to
+        ? <UserName userId={row.assigned_to} className={`block truncate text-xs ${CELL_TEXT}`} />
+        : <span className="text-xs text-text-quaternary">—</span>),
+      className: 'w-36 max-w-[9rem]',
+    },
     {
       key: 'role',
       label: 'Role',

@@ -50,6 +50,7 @@ const ORTHO_ROLE_DATA = [
       'x-lt-columns': [
         { label: 'Order', value: '{{metadata.order_id}}' },
         { label: 'Item', value: '{{metadata.item_type}}', priority: 2 },
+        { label: 'Assignee', value: '{{escalation.assigned_to}}', format: 'user', priority: 2 },
         { label: 'Waiting', value: '{{escalation.created_at}}', format: 'age', priority: 2 },
         { label: 'Stage', value: '{{metadata.stage}}', priority: 3 },
       ],
@@ -226,6 +227,23 @@ export async function seedOrthoRoles(): Promise<void> {
       } catch (err: any) {
         loggerRegistry.warn(`[examples] failed to update ortho role ${data.role}: ${err.message}`);
       }
+    }
+  }
+
+  // Declare the `facility` link variable on every ortho stage — so an ortho
+  // operator gets the Pace Board scope pill (bind facility = north|south) and
+  // the value picker recognizes the facet. Merge-safe and idempotent: skips a
+  // role that already carries the declaration, never disturbs other properties.
+  const detailsByRole = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
+  for (const data of ORTHO_ROLE_DATA) {
+    const props = (detailsByRole.get(data.role)?.properties ?? {}) as Record<string, unknown>;
+    if (Array.isArray(props.link_variables)) continue;
+    try {
+      await updateRoleMetadata(data.role, {
+        properties: { ...props, link_variables: [{ name: 'facility', label: 'Facility' }] },
+      });
+    } catch (err: any) {
+      loggerRegistry.warn(`[examples] failed to declare facility on ortho role ${data.role}: ${err.message}`);
     }
   }
 

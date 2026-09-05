@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Search, ListFilter, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, ListFilter, ChevronDown, ChevronUp, User } from 'lucide-react';
 import type { LTEscalationRecord } from '../../api/types';
+import { UserName } from '../common/display/UserName';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 
@@ -226,6 +227,12 @@ function TimelineCard({
       )}
 
       <LifecycleBar e={e} />
+      {e.assigned_to && (
+        <div className="mt-1 flex items-center justify-end gap-1 text-2xs text-text-tertiary">
+          <User className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+          <UserName userId={e.assigned_to} className="truncate max-w-[70%]" />
+        </div>
+      )}
     </div>
   );
 }

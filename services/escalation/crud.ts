@@ -4,6 +4,7 @@ import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 import { ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
 
+import { isUuid, onlyUuids } from '../../lib/uuid';
 import { escalations, ensureEscalationCompatView } from './client';
 import { listEscalations, invalidateEscalationAggregates } from './queries';
 import {
@@ -91,6 +92,7 @@ export async function claimEscalation(
   userId: string,
   durationMinutes: number = 30,
 ): Promise<ClaimResult | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   const result = await client.claim({ id, assignee: userId, durationMinutes });
   if (!result.ok) return null;
@@ -136,6 +138,7 @@ export async function resolveEscalation(
   assertClaim?: string,
   resolvedBy?: { id: string; email?: string },
 ): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   // `assertClaim` rides the SDK's guarded UPDATE: no active claim lock may
   // stand against this assignee, or the resolve blocks (claim-expired /
@@ -179,6 +182,7 @@ export async function resolveEscalationsByIds(
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,
 ): Promise<LTEscalationRecord[]> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return [];
   const client = await escalations();
   const rows = await client.resolveMany({ ids, resolverPayload, metadata });
@@ -226,6 +230,12 @@ export async function resolveEscalationsAllOrNone(
   | { ok: false; failed: Array<{ id: string; reason: string }> }
 > {
   if (items.length === 0) return { ok: true, escalations: [] };
+  // A malformed id blocks the batch exactly like a well-formed missing one —
+  // and never reaches the uuid cast.
+  const malformed = items.filter((i) => !isUuid(i.id));
+  if (malformed.length > 0) {
+    return { ok: false, failed: malformed.map((i) => ({ id: i.id, reason: 'not-found' })) };
+  }
   const client = await escalations();
   const result = await client.resolveAllOrNone({ items, metadata, assertAssignee, resolvedBy });
   if (!result.ok) return { ok: false, failed: result.failed };
@@ -255,6 +265,7 @@ export async function resolveEscalationsAllOrNone(
 export async function getEscalationsByIds(
   ids: string[],
 ): Promise<LTEscalationRecord[]> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return [];
   const client = await escalations();
   const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
@@ -307,6 +318,7 @@ export async function resolveEscalationBySignalKey(
 export async function cancelEscalation(
   id: string,
 ): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   const result = await client.cancel(id);
   if (!result.ok) return null;
@@ -334,6 +346,7 @@ export async function updateEscalationsPriority(
   ids: string[],
   priority: 1 | 2 | 3 | 4,
 ): Promise<number> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return 0;
   const client = await escalations();
   return client.updateManyPriority({ ids, priority });
@@ -344,6 +357,7 @@ export async function updateEscalationsPriority(
  * Used for permission validation before bulk operations.
  */
 export async function getEscalationRoles(ids: string[]): Promise<string[]> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return [];
   const client = await escalations();
   const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
@@ -358,6 +372,7 @@ export async function getEscalationRoles(ids: string[]): Promise<string[]> {
 export async function getEscalationScopeRows(
   ids: string[],
 ): Promise<{ id: string; role: string; assigned_to: string | null }[]> {
+  ids = onlyUuids(ids);
   if (ids.length === 0) return [];
   const client = await escalations();
   const rows = await client.list({ ids, limit: LOOKUP_LIMIT });
@@ -383,6 +398,7 @@ export async function releaseEscalation(
   userId: string,
   opts?: { quiet?: boolean },
 ): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   const result = await client.release({ id, assignee: userId });
   if (!result.ok) return null;
@@ -425,6 +441,7 @@ export async function escalateToRole(
   id: string,
   targetRole: string,
 ): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   // The departing role is read before the move: the returned entry already
   // carries the target role, and role-scoped subscribers of the OLD queue
@@ -459,6 +476,7 @@ export async function escalateToRole(
 }
 
 export async function getEscalation(id: string): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   const entry = await client.get(id);
   return entry ? toEscalationRecord(entry) : null;
@@ -542,6 +560,7 @@ export async function enrichEscalationRouting(
     taskId?: string;
   },
 ): Promise<LTEscalationRecord | null> {
+  if (!isUuid(id)) return null;
   const client = await escalations();
   const entry = await client.update({
     id,

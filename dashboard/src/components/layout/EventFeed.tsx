@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useContext } from 'react';
-import { ChevronUp, ChevronDown, Eraser, Maximize2, Minimize2, Settings2, X, Plus } from 'lucide-react';
-import { EventContext } from '../../hooks/useEventContext';
+import { ChevronUp, ChevronDown, Eraser, Maximize2, Minimize2, Settings2, X, Plus, Radio } from 'lucide-react';
+import { EventContext, useEventStatus } from '../../hooks/useEventContext';
 import { useEventFeedPatterns } from '../../hooks/useEventFeedPatterns';
 import { JsonViewer } from '../common/data/JsonViewer';
 import { Collapsible } from '../common/layout/Collapsible';
@@ -107,6 +107,7 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
   const scrollRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<Map<string, number>>(new Map());
   const { subscribe } = useContext(EventContext);
+  const { connected } = useEventStatus();
   const { patterns, pagePattern, userPatterns, addPattern, removePattern } = useEventFeedPatterns();
 
   const handler = useCallback((raw: any) => {
@@ -180,6 +181,13 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
           </span>
         )}
         <span className="ml-auto flex items-center gap-1">
+          <span
+            className={`p-0.5 ${connected ? 'text-status-success' : 'text-text-quaternary hover:text-text-secondary cursor-pointer'}`}
+            title={connected ? 'Live events connected' : 'Events disconnected — click to reconnect'}
+            onClick={(e) => { e.stopPropagation(); if (!connected) window.location.reload(); }}
+          >
+            <Radio className="w-3 h-3" />
+          </span>
           <span
             className={`p-0.5 cursor-pointer ${configOpen ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'}`}
             title="Subscription config"

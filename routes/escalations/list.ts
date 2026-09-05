@@ -135,6 +135,16 @@ export function registerListRoutes(router: Router): void {
   });
 
   /**
+   * GET /api/escalations/facet-values?key=<facet>
+   * Distinct VALUES for one metadata facet key, visible to the caller
+   * (role-scoped). Powers the facet value picker (e.g. facility → north|south).
+   */
+  router.get('/facet-values', async (req, res) => {
+    const result = await api.listFacetValues({ key: req.query.key as string | undefined }, req.auth!);
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations/station-metrics
    * Per-role P99/P50/avg/max wait + work times, resolved count, and in-arrears
    * count. Drives the Operations station pace chart.
@@ -142,7 +152,7 @@ export function registerListRoutes(router: Router): void {
    */
   router.get('/station-metrics', async (req, res) => {
     const result = await api.getStationMetrics(
-      { period: (req.query.period as string) || undefined },
+      { period: (req.query.period as string) || undefined, facets: jsonParam(req.query.facets) },
       req.auth!,
     );
     res.status(result.status).json(result.data ?? { error: result.error });

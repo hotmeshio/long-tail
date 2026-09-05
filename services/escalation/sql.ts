@@ -275,6 +275,7 @@ LEFT JOIN written ON written.id = target.id`;
  * Live counts — pending, active claims, and priority (past-threshold) per role.
  *
  * $1 TEXT[] — role filter (NULL = all roles / superadmin).
+ * $2 JSONB  — metadata facet scope (NULL = no filter; `metadata @>`, GIN-served).
  *
  * Hits idx_hmsh_esc_pending_role_created (role, created_at DESC) WHERE
  * status='pending'. The pending working set is bounded by real backlog depth,
@@ -321,6 +322,7 @@ live_counts AS (
   FROM hmsh_escalations e
   JOIN role_targets rt ON rt.role = e.role
   WHERE e.status = 'pending'
+    AND ($2::jsonb IS NULL OR e.metadata @> $2::jsonb)
   GROUP BY e.role
 )
 SELECT
@@ -339,6 +341,7 @@ ORDER BY rt.role
  *
  * $1 TEXT[]   — role filter (NULL = all roles / superadmin).
  * $2 INTERVAL — time window (e.g. '24 hours', '15 minutes').
+ * $3 JSONB    — metadata facet scope (NULL = no filter; `metadata @>`, GIN-served).
  *
  * Hits idx_hmsh_esc_resolved_cover (role, resolved_at DESC, claimed_at,
  * created_at) WHERE status='resolved' — a covering index, so the percentile
@@ -383,6 +386,7 @@ period_metrics AS (
   WHERE e.status = 'resolved'
     AND e.resolved_at >= NOW() - $2::interval
     AND ($1::text[] IS NULL OR e.role = ANY($1::text[]))
+    AND ($3::jsonb IS NULL OR e.metadata @> $3::jsonb)
   GROUP BY e.role
 )
 SELECT

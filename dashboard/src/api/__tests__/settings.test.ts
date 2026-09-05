@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const AI_OVERRIDE_KEY = 'lt_ai_override';
 
@@ -92,5 +92,34 @@ describe('useSettings AI override integration', () => {
       telemetry: { traceUrl: null },
     };
     expect(settings.branding).toBeUndefined();
+  });
+});
+
+describe('loadSettings coalescing', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fetches /api/settings once and shares the promise across callers', async () => {
+    vi.resetModules();
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ telemetry: { traceUrl: null } }) });
+    vi.stubGlobal('fetch', fetchSpy);
+    const { loadSettings } = await import('../settings');
+
+    const [a, b] = await Promise.all([loadSettings(), loadSettings()]);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(a).toBe(b);
+  });
+
+  it('clears the memo on failure so the next call retries', async () => {
+    vi.resetModules();
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ telemetry: { traceUrl: null } }) });
+    vi.stubGlobal('fetch', fetchSpy);
+    const { loadSettings } = await import('../settings');
+
+    await expect(loadSettings()).rejects.toThrow();
+    await expect(loadSettings()).resolves.toBeTruthy();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

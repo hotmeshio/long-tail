@@ -38,7 +38,7 @@ describe('user service', () => {
     await migrate();
 
     // Clean up stale data from previous interrupted runs
-    for (const extId of ['ext-rbac-1', 'ext-rbac-2', 'sa-rbac', 'ga-rbac', 'm-rbac']) {
+    for (const extId of ['ext-rbac-1', 'ext-rbac-2', 'sa-rbac', 'ga-rbac', 'm-rbac', 'sec-user']) {
       const stale = await userService.getUserByExternalId(extId);
       if (stale) await userService.deleteUser(stale.id);
     }
@@ -124,6 +124,30 @@ describe('user service', () => {
         { display_name: 'Ghost' },
       );
       expect(result).toBeNull();
+    });
+
+    it('never exposes password_hash or oauth_provider_id, yet still verifies the password', async () => {
+      const secret = await userService.createUser({
+        external_id: 'sec-user',
+        password: 'hunter2!',
+        oauth_provider: 'google',
+        oauth_provider_id: 'goog-123',
+      });
+
+      const noSecrets = (u: any) => {
+        expect(u).toBeTruthy();
+        expect(u.password_hash).toBeUndefined();
+        expect(u.oauth_provider_id).toBeUndefined();
+      };
+
+      noSecrets(secret);
+      noSecrets(await userService.getUser(secret.id));
+      noSecrets(await userService.getUserByExternalId('sec-user'));
+      const listed = (await userService.listUsers({ search: 'sec-user' })).users.find((u) => u.id === secret.id);
+      noSecrets(listed);
+
+      expect(await userService.verifyPassword('sec-user', 'hunter2!')).toBeTruthy();
+      expect(await userService.verifyPassword('sec-user', 'wrong')).toBeNull();
     });
   });
 

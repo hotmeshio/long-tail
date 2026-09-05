@@ -4,7 +4,7 @@
  * A role declares variable names in `properties.link_variables`
  * (`{ name, label?, default? }[]`). Pinned URLs reference a variable as the
  * ENTIRE value of a facet inside the `facets` JSON param:
- * `facets={"facility":"{lt:facility}"}`. At render time the placeholder is
+ * `facets={"region":"{lt:region}"}`. At render time the placeholder is
  * replaced with the device's bound value, falling back to the declared
  * default; when both are unset the facet is dropped (no filter). Bindings
  * live in localStorage keyed by userId (one key, whole map) so a shared

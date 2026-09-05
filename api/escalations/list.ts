@@ -269,6 +269,33 @@ export async function listFacetKeys(_input: unknown, auth: LTApiAuth): Promise<L
 }
 
 /**
+ * Distinct VALUES for one metadata facet key, role-scoped — powers the facet
+ * value picker (e.g. facility → north|south). A missing/malformed key returns
+ * an empty list, never an error.
+ *
+ * @returns `{ status: 200, data: { values: string[] } }`
+ */
+export async function listFacetValues(input: { key?: string }, auth: LTApiAuth): Promise<LTApiResult> {
+  try {
+    const key = input?.key;
+    if (!key) return { status: 200, data: { values: [] } };
+    const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
+      return { status: 200, data: { values: [] } };
+    }
+    const values = await escalationService.listFacetValues(key, {
+      global: scope.global,
+      visibleRoles: scope.global ? undefined : scope.allRoles,
+      selfRoles: scope.global ? undefined : scope.selfRoles,
+      meUserId: auth.userId,
+    });
+    return { status: 200, data: { values } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
  * List all distinct escalation type values.
  *
  * @returns `{ status: 200, data: { types: string[] } }`
@@ -322,7 +349,7 @@ export async function getEscalationStats(
 }
 
 export async function getStationMetrics(
-  input: { period?: string },
+  input: { period?: string; facets?: Record<string, unknown> },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -335,7 +362,7 @@ export async function getStationMetrics(
     // elsewhere) — without the selfRoles union, a self-scoped operator would
     // see an empty board on their own lanes.
     if (getFeatureFlags().publicPaceBoard) {
-      const stations = await escalationService.getStationMetrics(undefined, input.period);
+      const stations = await escalationService.getStationMetrics(undefined, input.period, input.facets);
       return { status: 200, data: { stations } };
     }
     const scope = await getEscalationReadScope(auth.userId);
@@ -346,6 +373,7 @@ export async function getStationMetrics(
     const stations = await escalationService.getStationMetrics(
       scope.global ? undefined : memberRoles,
       input.period,
+      input.facets,
     );
     return { status: 200, data: { stations } };
   } catch (err: any) {

@@ -66,16 +66,25 @@ describe('GlobalSearchBar', () => {
   });
 
   it('escalationId: found → detail', async () => {
-    mockFetch.mockResolvedValue({ id: 'esc-1' });
+    const id = '3f216994-7704-4e7a-9702-62130afaf9b0';
+    mockFetch.mockResolvedValue({ id });
     renderBar();
-    await search('escalationId', 'esc-1');
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/escalations/detail/esc-1'));
+    await search('escalationId', id);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(`/escalations/detail/${id}`));
+  });
+
+  it('escalationId: a non-UUID never costs a request — inline shape error', async () => {
+    renderBar();
+    await search('escalationId', 'Sample1 Jill Prinsen');
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not a valid escalation id/));
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('escalationId: not found → inline error, no navigation', async () => {
     mockFetch.mockRejectedValue(new Error('404'));
     renderBar();
-    await search('escalationId', 'nope');
+    await search('escalationId', '00000000-0000-4000-8000-000000000000');
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/No escalation/));
     expect(navigate).not.toHaveBeenCalled();
   });

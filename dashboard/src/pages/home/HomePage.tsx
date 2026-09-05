@@ -12,6 +12,7 @@ import { useControlPlaneApps } from '../../api/controlplane';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
+import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { useEscalationStatsEvents, useWorkflowListEvents, useStationMetricsEvents } from '../../hooks/useEventHooks';
 import { DateValue } from '../../components/common/display/DateValue';
 import { RolePill } from '../../components/common/display/RolePill';
@@ -220,7 +221,14 @@ export function HomePage() {
   const builderHome = !persona.showTaskQueueCards;
   const showWorkflowColumns = persona.canSeeWorkflows && !persona.canSeePaceBoard;
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
-  const stationQ = useStationMetrics('1h', { enabled: persona.canSeePaceBoard });
+  // The device's link-variable bindings scope the home board too — same as the
+  // full Pace Board and the pins. (opts is the THIRD arg; facets is the second.)
+  const { values: scopeValues } = useLinkVariables();
+  const scopeFacets = useMemo(
+    () => (Object.keys(scopeValues).length ? scopeValues : undefined),
+    [scopeValues],
+  );
+  const stationQ = useStationMetrics('1h', scopeFacets, { enabled: persona.canSeePaceBoard });
   const jobsQ = useJobs({ limit: 5, sort_by: 'updated_at', order: 'desc', namespace: durableNs }, { enabled: showWorkflowColumns });
   const durableAppIds = allAppIds;
   const pipelineAppIds = allAppIds;
