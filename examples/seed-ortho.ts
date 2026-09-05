@@ -229,6 +229,23 @@ export async function seedOrthoRoles(): Promise<void> {
     }
   }
 
+  // Declare the `facility` link variable on every ortho stage — so an ortho
+  // operator gets the Pace Board scope pill (bind facility = north|south) and
+  // the value picker recognizes the facet. Merge-safe and idempotent: skips a
+  // role that already carries the declaration, never disturbs other properties.
+  const detailsByRole = new Map((await listRolesWithDetails()).map((r) => [r.role, r]));
+  for (const data of ORTHO_ROLE_DATA) {
+    const props = (detailsByRole.get(data.role)?.properties ?? {}) as Record<string, unknown>;
+    if (Array.isArray(props.link_variables)) continue;
+    try {
+      await updateRoleMetadata(data.role, {
+        properties: { ...props, link_variables: [{ name: 'facility', label: 'Facility' }] },
+      });
+    } catch (err: any) {
+      loggerRegistry.warn(`[examples] failed to declare facility on ortho role ${data.role}: ${err.message}`);
+    }
+  }
+
   // The process sequence lives entirely in parent_role + ops_visible — that
   // pair is what the Operations view renders as the station graph. Escalation
   // chains are a separate runtime RBAC construct (which roles an operator may

@@ -192,6 +192,7 @@ async function createSideEscalation(
   runId: string,
   description: string,
   authorizedAt: string,
+  facility?: string,
 ): Promise<boolean> {
   try {
     await api('POST', '/api/escalations', {
@@ -200,8 +201,8 @@ async function createSideEscalation(
       role,
       description,
       workflow_id: workflowId,
-      envelope: JSON.stringify({ order_id: orderId }),
-      metadata: { order_id: orderId, source: 'populate', run_id: runId, authorized_at: authorizedAt },
+      envelope: JSON.stringify({ order_id: orderId, ...(facility ? { facility } : {}) }),
+      metadata: { order_id: orderId, source: 'populate', run_id: runId, authorized_at: authorizedAt, ...(facility ? { facility } : {}) },
     });
     return true;
   } catch (err: any) {
@@ -280,6 +281,7 @@ async function resolveBatch(batchTag: string, runId: string): Promise<number> {
             'inserting', esc.workflow_id, orderId, runId,
             `Stuff inserts into shoes for ${orderId}`,
             esc.metadata?.authorized_at ?? new Date().toISOString(),
+            esc.metadata?.facility,
           );
         }
       } catch (err: any) {
@@ -295,7 +297,12 @@ async function resolveBatch(batchTag: string, runId: string): Promise<number> {
 
 // ── Run: enqueue at arrival rate + claim + resolve + watchdog, concurrently ──
 
-interface PlannedOrder { index: number; wfId: string; orderId: string; shoes: boolean; }
+interface PlannedOrder { index: number; wfId: string; orderId: string; shoes: boolean; facility: string; }
+
+// Two manufacturing sites — each order is assigned one at arrival and every
+// escalation it spawns carries it, so the Pace Board's facet scope
+// (facility = north|south) has real data to narrow.
+const FACILITIES = ['north', 'south'] as const;
 
 async function runOrders(
   batchTag: string,
@@ -322,6 +329,9 @@ async function runOrders(
           data: {
             order_id: order.orderId,
             item_type: 'insole-standard',
+            // Stamped on the envelope; the workflow applies it to every stage
+            // escalation's metadata as the facility facet.
+            facility: order.facility,
             metadata: { source: 'populate', run_id: runId, authorized_at: authorizedAt },
           },
           metadata: { source: 'populate', run_id: runId, shoes: order.shoes },
@@ -338,6 +348,7 @@ async function runOrders(
           'ordering', `${order.wfId}-shoes`, order.orderId, runId,
           `Order shoes for ${order.orderId}`,
           authorizedAt,
+          order.facility,
         );
         if (!ok) target.value -= 2;
       }
@@ -401,6 +412,9 @@ async function main() {
     wfId: `${batchTag}-${i}`,
     orderId: `ORD-${runId}-${i}`,
     shoes: hasShoes(i),
+    // Pseudo-random per order (hashed on the workflow id): reproducible across
+    // re-runs, roughly balanced across both sites.
+    facility: FACILITIES[Math.floor(jitter(`${batchTag}-${i}`, 'facility') * FACILITIES.length)],
   }));
   const shoeCount = plan.filter((o) => o.shoes).length;
   // Each order resolves 8 manufacturing stages; a shoe order adds
