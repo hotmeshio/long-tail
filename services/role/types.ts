@@ -19,7 +19,7 @@ export interface EscalationChain {
  *    the detail page, and the scan screens. Multi-role users get full chrome.
  *  - LINK_VARIABLES: RoleLinkVariable[] — metadata facet names members bind
  *    per device. Pins may reference `{lt:name}` as a whole facet value
- *    (e.g. `facets={"facility":"{lt:facility}"}`); the dashboard substitutes
+ *    (e.g. `facets={"region":"{lt:region}"}`); the dashboard substitutes
  *    the device's bound value at render time, falls back to the declared
  *    default, and drops the facet entirely when both are unset.
  */

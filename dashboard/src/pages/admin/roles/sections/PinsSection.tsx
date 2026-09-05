@@ -78,7 +78,7 @@ function LinkVariablesEditor({ role }: { role: RoleDetail }) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="facet name — e.g. facility"
+          placeholder="facet name — e.g. region"
           className="input text-xs font-mono w-40 shrink-0"
         />
         <input
@@ -113,8 +113,8 @@ function LinkVariablesEditor({ role }: { role: RoleDetail }) {
       {vars.length === 0 ? (
         <p className="text-2xs text-text-tertiary leading-relaxed">
           Facet names members bind per device. A pin below can then carry
-          <span className="font-mono"> facets=&#123;"facility":"{'{lt:facility}'}"&#125; </span>
-          and each station opens it scoped to its own value.
+          <span className="font-mono"> facets=&#123;"region":"{'{lt:region}'}"&#125; </span>
+          and each device opens it scoped to its own value.
         </p>
       ) : (
         <div className="space-y-1">
@@ -177,7 +177,7 @@ function DefaultPinsEditor({ role }: { role: RoleDetail }) {
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder={'/escalations/available?role=… or …facets={"facility":"{lt:facility}"}'}
+          placeholder={'/escalations/available?role=… or …facets={"region":"{lt:region}"}'}
           className="input text-xs font-mono flex-1"
         />
         <label className="flex items-center gap-1 text-2xs text-text-tertiary shrink-0" title="Show a live count beside the label">
