@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../../../api/roles', () => ({ useRoleDetails: vi.fn() }));
+vi.mock('../../../api/escalations', () => ({
+  useFacetValues: vi.fn(() => ({ data: { values: ['north', 'south'] } })),
+}));
 
 import { useAuth } from '../../../hooks/useAuth';
 import { useRoleDetails } from '../../../api/roles';
@@ -42,6 +45,13 @@ describe('LinkVariablesModal', () => {
     expect(rows).toHaveLength(2);
     expect(screen.getByPlaceholderText('main (default)')).toBeTruthy();
     expect(screen.getByPlaceholderText('no filter')).toBeTruthy();
+  });
+
+  it('offers the facet\'s distinct values as datalist options', () => {
+    render(<LinkVariablesModal open onClose={() => {}} />);
+    const opts = Array.from(document.querySelectorAll('datalist option')).map((o) => (o as HTMLOptionElement).value);
+    expect(opts).toContain('north');
+    expect(opts).toContain('south');
   });
 
   it('typing sets the device binding live', () => {

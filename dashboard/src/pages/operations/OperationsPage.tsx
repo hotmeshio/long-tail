@@ -11,6 +11,8 @@ import { StationMixBar } from './StationMixBar';
 import { EntityLensView } from './EntityLensView';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { ViewMenu } from './ViewMenu';
+import { useLinkVariables } from '../../hooks/useLinkVariables';
+import { LinkVariablesModal } from '../../components/layout/LinkVariablesModal';
 import {
   PaceChart,
   ACTIVE_COLOR,
@@ -575,11 +577,23 @@ export function OperationsPage() {
   useEscalationAnalyticsEvents();
 
   const { data: roleData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleDetails();
+
+  // Device-bound link-variable scope: whatever facets this device has bound
+  // (avatar menu → Link variables) narrow the ENTIRE board — station counts,
+  // the time-in-state mix, and every entity timeline — exactly as they scope
+  // the role pins. One binding, one scope, everywhere.
+  const { declarations: scopeDeclarations, values: scopeValues } = useLinkVariables();
+  const scopeFacets = useMemo(
+    () => (Object.keys(scopeValues).length ? scopeValues : undefined),
+    [scopeValues],
+  );
+  const [scopeModalOpen, setScopeModalOpen] = useState(false);
+
   const {
     data: metricsData,
     isLoading: metricsLoading,
     refetch: refetchMetrics,
-  } = useStationMetrics(period);
+  } = useStationMetrics(period, scopeFacets);
 
   const roles = roleData?.roles ?? [];
   const metrics = metricsData?.stations ?? [];
@@ -635,7 +649,7 @@ export function OperationsPage() {
   const { data: mixData } = useAggregateByFacets(
     visibleRoles.length
       ? {
-          query: { roles: visibleRoles },
+          query: { roles: visibleRoles, ...(scopeFacets ? { facets: scopeFacets } : {}) },
           groupBy: { columns: ['role', 'subtype'] },
           measure: { kind: 'dwell', window: analyticsWindow },
         }
@@ -820,13 +834,34 @@ export function OperationsPage() {
         docsHash="#docs:dashboard.md:pace-board"
         center={periodSelector}
         actions={
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="icon-link disabled:opacity-40"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-3">
+            {scopeDeclarations.length > 0 && (
+              <button
+                onClick={() => setScopeModalOpen(true)}
+                title="Scope this board — bind facets for this device"
+                data-testid="board-scope-pill"
+                className={`flex items-center gap-1.5 px-2 py-0.5 text-2xs rounded-full border transition-colors ${
+                  scopeFacets
+                    ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
+                    : 'border-surface-border bg-surface-sunken text-text-tertiary hover:text-text-secondary'
+                }`}
+              >
+                <Eye className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+                <span className="truncate max-w-48 font-mono">
+                  {scopeFacets
+                    ? Object.entries(scopeValues).map(([k, v]) => `${k} = ${v}`).join(', ')
+                    : 'All'}
+                </span>
+              </button>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="icon-link disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         }
       />
 
@@ -888,6 +923,7 @@ export function OperationsPage() {
               entityKey={activeLens}
               periodHours={PERIOD_HOURS[period]}
               roles={roles}
+              scopeFacets={scopeFacets}
               find={findParam}
               onFindChange={setFindParam}
               entityValue={entityParam}
@@ -940,6 +976,7 @@ export function OperationsPage() {
                   allMetrics={fragmentMetrics}
                   orderedRoles={ordered.map((o) => o.role)}
                   globalPeriod={period}
+                  scopeFacets={scopeFacets}
                   mixGroups={mixData?.groups}
                   onClose={() => setSelectedRole(null)}
                 />
@@ -973,6 +1010,7 @@ export function OperationsPage() {
 
         </div>
       )}
+      <LinkVariablesModal open={scopeModalOpen} onClose={() => setScopeModalOpen(false)} />
     </div>
   );
 }

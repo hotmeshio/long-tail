@@ -121,6 +121,10 @@ Values are strings — jsonb containment is type-sensitive, so numeric facets
 are not templatable. Link variables are a view convenience: RBAC read scope
 still governs what any query can return.
 
+A bound link variable also **scopes the Pace Board** — the same device value
+narrows the board's station counts, time-in-state mix, and entity timelines,
+not just the pins. See [Operations — Scoping the board](operations.md#scoping-the-board).
+
 The dashboard's [global search bar](dashboard.md#global-search) is the
 one-gesture sibling of this surface: a configured facet name plus a value
 lands on the same all-status faceted list a deep link produces.

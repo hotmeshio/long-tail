@@ -93,11 +93,19 @@ export interface StationMetric {
   work: StationMetricPeriod;
 }
 
-export function useStationMetrics(period?: string, opts?: { enabled?: boolean }) {
+export function useStationMetrics(
+  period?: string,
+  facets?: Record<string, unknown>,
+  opts?: { enabled?: boolean },
+) {
   const p = period ?? '24h';
+  // A device-bound facet scope (link variables) narrows every station count.
+  const facetJson = facets && Object.keys(facets).length ? JSON.stringify(facets) : null;
   return useQuery<{ stations: StationMetric[] }>({
-    queryKey: ['stationMetrics', p],
-    queryFn: () => apiFetch(`/escalations/station-metrics?period=${p}`),
+    queryKey: ['stationMetrics', p, facetJson],
+    queryFn: () => apiFetch(
+      `/escalations/station-metrics?period=${p}${facetJson ? `&facets=${encodeURIComponent(facetJson)}` : ''}`,
+    ),
     staleTime: 5_000,
     enabled: opts?.enabled ?? true,
   });
@@ -124,6 +132,16 @@ export function useFacetKeys(enabled = true) {
     queryKey: ['escalationFacetKeys'],
     queryFn: () => apiFetch('/escalations/facet-keys'),
     enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** Distinct VALUES for one facet key (role-scoped) — the value picker's choices. */
+export function useFacetValues(key: string | null | undefined) {
+  return useQuery<{ values: string[] }>({
+    queryKey: ['escalationFacetValues', key],
+    queryFn: () => apiFetch(`/escalations/facet-values?key=${encodeURIComponent(key as string)}`),
+    enabled: !!key,
     staleTime: 60_000,
   });
 }

@@ -119,6 +119,12 @@ The global period toggle in the page header controls the chart and table simulta
 
 Period options: `15m`, `1h`, `24h`, `7d`, `30d`.
 
+## Scoping the board
+
+When your roles declare [link variables](faceted-routing.md#link-variables), a scope pill sits in the board header. Its value is your **device binding** — the same one that scopes your role pins — so binding `facility = north` once (avatar menu → Link variables, or the pill itself) narrows the whole board to that facet: the station counts, the "where the time went" mix, and every entity timeline all reflect only matching rows. The pill shows the active scope (`facility = north`) or `All` when nothing is bound; clearing the binding restores the full board.
+
+The scope is a metadata `@>` filter (`GET /api/escalations/station-metrics?...&facets={"facility":"north"}`), applied on top of role scope — it narrows within what you may already see, never widens it. The value picker's choices come from `GET /api/escalations/facet-values?key=<facet>` (the distinct values present in your visible rows).
+
 ## Configuring a station
 
 1. Go to `/admin/roles` and click the role.

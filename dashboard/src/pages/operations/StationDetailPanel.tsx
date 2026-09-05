@@ -19,6 +19,8 @@ interface StationDetailPanelProps {
   allMetrics: StationMetric[];
   orderedRoles: RoleDetail[];
   globalPeriod: string;
+  /** Device-bound facet scope — a drill-down on a scoped board stays scoped. */
+  scopeFacets?: Record<string, unknown>;
   /** The page's shared role+subtype dwell groups — the sequence bands derive
    *  from them with zero extra requests. */
   mixGroups?: AggregateRow[];
@@ -81,11 +83,11 @@ function PeriodSelector({ period, onChange }: { period: Period; onChange: (p: Pe
   );
 }
 
-function RoleView({ role, globalPeriod, onClose }: { role: RoleDetail; globalPeriod: string; onClose: () => void }) {
+function RoleView({ role, globalPeriod, scopeFacets, onClose }: { role: RoleDetail; globalPeriod: string; scopeFacets?: Record<string, unknown>; onClose: () => void }) {
   // Open on the chart's selected window so the panel's numbers agree with the
   // chart beside it; the local selector still lets the viewer drill around.
   const [period, setPeriod] = useState<Period>(isPeriod(globalPeriod) ? globalPeriod : '24h');
-  const { data } = useStationMetrics(period);
+  const { data } = useStationMetrics(period, scopeFacets);
   const metric = data?.stations.find((s) => s.role === role.role);
   const slaMinutes = role.sla_minutes ?? undefined;
   const targetPerHour = role.target_per_hour ?? undefined;
@@ -337,13 +339,14 @@ export function StationDetailPanel({
   allMetrics,
   orderedRoles,
   globalPeriod,
+  scopeFacets,
   mixGroups,
   onClose,
 }: StationDetailPanelProps) {
   return (
     <div className="w-[280px] shrink-0 px-7 py-10 flex flex-col overflow-y-auto min-h-0">
       {role ? (
-        <RoleView role={role} globalPeriod={globalPeriod} onClose={onClose} />
+        <RoleView role={role} globalPeriod={globalPeriod} scopeFacets={scopeFacets} onClose={onClose} />
       ) : (
         <>
           <OverviewPanel allMetrics={allMetrics} orderedRoles={orderedRoles} period={globalPeriod} />
