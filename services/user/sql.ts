@@ -51,6 +51,10 @@ export const GET_USER_BY_EMAIL =
 export const GET_USER_BY_ID =
   'SELECT * FROM lt_users WHERE id = $1';
 
+/** Thin identity projection for batch name resolution — display fields only, never secrets, scopes, or metadata. */
+export const GET_NAMES_BY_IDS =
+  'SELECT id, display_name, external_id, email FROM lt_users WHERE id = ANY($1)';
+
 /**
  * Lookup by a caller-named metadata key (e.g. a badge binding). LIMIT 2 so an
  * ambiguous binding — two users carrying the same value — is detectable and

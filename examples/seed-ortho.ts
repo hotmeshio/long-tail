@@ -50,6 +50,7 @@ const ORTHO_ROLE_DATA = [
       'x-lt-columns': [
         { label: 'Order', value: '{{metadata.order_id}}' },
         { label: 'Item', value: '{{metadata.item_type}}', priority: 2 },
+        { label: 'Assignee', value: '{{escalation.assigned_to}}', format: 'user', priority: 2 },
         { label: 'Waiting', value: '{{escalation.created_at}}', format: 'age', priority: 2 },
         { label: 'Stage', value: '{{metadata.stage}}', priority: 3 },
       ],

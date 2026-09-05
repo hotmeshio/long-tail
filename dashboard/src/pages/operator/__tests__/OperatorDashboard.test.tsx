@@ -38,6 +38,11 @@ vi.mock('../../../api/preferences', async (importOriginal) => ({
   usePatchPreferences: () => ({ mutate: state.patchPrefs }),
 }));
 
+vi.mock('../../../api/users', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUserName: () => ({ data: undefined }),
+}));
+
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { userId: 'resolver-1', roles: [{ role: 'walk-role' }] },

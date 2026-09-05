@@ -4,10 +4,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { UserName } from '../display/UserName';
 
 vi.mock('../../../api/users', () => ({
-  useUser: vi.fn(),
+  useUserName: vi.fn(),
 }));
 
-import { useUser } from '../../../api/users';
+import { useUserName } from '../../../api/users';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -21,7 +21,7 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe('UserName', () => {
   it('shows display_name when resolved', () => {
-    vi.mocked(useUser).mockReturnValue({
+    vi.mocked(useUserName).mockReturnValue({
       data: {
         id: 'u-1',
         external_id: 'ext-1',
@@ -41,7 +41,7 @@ describe('UserName', () => {
   });
 
   it('falls back to email when no display_name', () => {
-    vi.mocked(useUser).mockReturnValue({
+    vi.mocked(useUserName).mockReturnValue({
       data: {
         id: 'u-2',
         external_id: 'ext-2',
@@ -61,7 +61,7 @@ describe('UserName', () => {
   });
 
   it('falls back to external_id when no display_name or email', () => {
-    vi.mocked(useUser).mockReturnValue({
+    vi.mocked(useUserName).mockReturnValue({
       data: {
         id: 'u-3',
         external_id: 'ext-3',
@@ -81,7 +81,7 @@ describe('UserName', () => {
   });
 
   it('shows truncated ID while loading', () => {
-    vi.mocked(useUser).mockReturnValue({
+    vi.mocked(useUserName).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as any);
@@ -91,12 +91,28 @@ describe('UserName', () => {
   });
 
   it('uses custom fallback when provided', () => {
-    vi.mocked(useUser).mockReturnValue({
+    vi.mocked(useUserName).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as any);
 
     renderWithProviders(<UserName userId="u-1" fallback="Unknown" />);
     expect(screen.getByText('Unknown')).toBeInTheDocument();
+  });
+
+  it('renders a truncating span carrying the full name in its title when a className is given', () => {
+    vi.mocked(useUserName).mockReturnValue({
+      data: {
+        id: 'u-1', external_id: 'ext-1', email: null, display_name: 'Alexandra Featherstone',
+        status: 'active', metadata: null, roles: [], created_at: '', updated_at: '',
+      },
+      isLoading: false,
+    } as any);
+
+    renderWithProviders(<UserName userId="u-1" className="block truncate" />);
+    const el = screen.getByText('Alexandra Featherstone');
+    expect(el.tagName).toBe('SPAN');
+    expect(el).toHaveClass('truncate');
+    expect(el).toHaveAttribute('title', 'Alexandra Featherstone');
   });
 });

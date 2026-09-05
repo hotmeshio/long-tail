@@ -30,6 +30,24 @@ export async function listUsers(input: {
 }
 
 /**
+ * Resolve many user ids to display fields (id, display_name, external_id, email)
+ * in one call. Thin projection only — no secrets, scopes, or metadata. Non-UUID
+ * ids are dropped, ids deduped, and the batch capped by the service.
+ *
+ * @param input.ids — the user ids to resolve
+ * @returns `{ status: 200, data: { users: [{ id, display_name, external_id, email }] } }`
+ */
+export async function getUserNames(input: { ids?: string[] }): Promise<LTApiResult> {
+  try {
+    const ids = Array.isArray(input.ids) ? input.ids : [];
+    const users = await userService.getUserNames(ids);
+    return { status: 200, data: { users } };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
+/**
  * Retrieve a single user by ID.
  *
  * @param input.id — the user's unique identifier

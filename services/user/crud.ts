@@ -6,6 +6,7 @@ import type { LTUserRecord, LTUserRole, LTRoleType, LTUserStatus } from '../../t
 import {
   CREATE_USER_WITH_ROLES,
   DELETE_USER_BY_ID,
+  GET_NAMES_BY_IDS,
   GET_ROLES_BY_USER_ID,
   GET_ROLES_BY_USER_IDS,
   GET_USER_BY_EMAIL,
@@ -15,6 +16,7 @@ import {
   PATCH_USER_PROPERTIES,
   VERIFY_USER_BY_ID,
 } from './sql';
+import { onlyUuids } from '../../lib/uuid';
 import { listScanSchemes } from '../scan-code';
 import { SCAN_SCHEME_KINDS } from '../../types/scan-code';
 import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
@@ -96,6 +98,29 @@ export async function getUser(id: string): Promise<LTUserRecord | null> {
   const { rows } = await pool.query(GET_USER_BY_ID, [id]);
   if (!rows[0]) return null;
   return attachRoles(rows[0]);
+}
+
+export interface UserNameRecord {
+  id: string;
+  display_name: string | null;
+  external_id: string;
+  email: string | null;
+}
+
+const MAX_NAME_LOOKUP = 200;
+
+/**
+ * Resolve many user ids to display fields in one query. Non-UUID input is
+ * dropped before the SQL (a bad id is not-found, never a 500), ids are deduped,
+ * and the batch is capped. Returns display fields only — never secrets, scopes,
+ * or metadata.
+ */
+export async function getUserNames(ids: string[]): Promise<UserNameRecord[]> {
+  const clean = [...new Set(onlyUuids(ids))].slice(0, MAX_NAME_LOOKUP);
+  if (clean.length === 0) return [];
+  const pool = getPool();
+  const { rows } = await pool.query(GET_NAMES_BY_IDS, [clean]);
+  return rows;
 }
 
 export async function getUserByExternalId(externalId: string): Promise<LTUserRecord | null> {

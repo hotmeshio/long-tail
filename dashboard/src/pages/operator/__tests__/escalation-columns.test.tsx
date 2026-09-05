@@ -1,6 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
+vi.mock('../../../api/users', () => ({
+  useUserName: (id: string) => ({
+    data: id === 'u-42' ? { display_name: 'Dana Lee', email: null, external_id: 'u-42' } : undefined,
+  }),
+}));
+
 import { ESCALATION_COLUMNS, TIME_LEFT_COLUMN, EscalationFilterBar, STATUS_OPTIONS, MetadataCell } from '../escalation-columns';
 import { ShellPanelProvider, useShellPanel } from '../../../hooks/useShellPanel';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -54,16 +60,26 @@ describe('ESCALATION_COLUMNS', () => {
 
   // ── The column budget: identity, owner, urgency, age — nothing else ──
   it('holds the floor budget with enrichment columns gated behind room', () => {
-    expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'role', 'priority', 'workflow_type', 'metadata', 'created_at']);
+    expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'assigned_to', 'role', 'priority', 'workflow_type', 'metadata', 'created_at']);
     const byKey = Object.fromEntries(ESCALATION_COLUMNS.map((c) => [c.key, c]));
     // The always-on floor: identity, owner, urgency, age.
     expect(byKey.description.showFrom).toBeUndefined();
+    expect(byKey.assigned_to.showFrom).toBeUndefined();
     expect(byKey.role.showFrom).toBeUndefined();
     expect(byKey.priority.showFrom).toBeUndefined();
     expect(byKey.created_at.showFrom).toBeUndefined();
     // Enrichment returns with room.
     expect(byKey.workflow_type.showFrom).toBe('split');
     expect(byKey.metadata.showFrom).toBe('wall');
+  });
+
+  // ── Assignee column ──
+  it('renders the claimant name, an em dash when unassigned', () => {
+    const { unmount } = renderColumn('assigned_to', makeEscalation({ assigned_to: null }));
+    expect(screen.getByText('—')).toBeInTheDocument();
+    unmount();
+    renderColumn('assigned_to', makeEscalation({ assigned_to: 'u-42' }));
+    expect(screen.getByText('Dana Lee')).toBeInTheDocument();
   });
 
   // ── Role column ──

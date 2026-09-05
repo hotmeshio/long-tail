@@ -6,6 +6,7 @@ import { Search } from 'lucide-react';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
+import { UserName } from '../common/display/UserName';
 import { StickyPagination } from '../common/data/StickyPagination';
 import { useEscalations, useClaimEscalation } from '../../api/escalations';
 import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
@@ -161,12 +162,14 @@ const EM_DASH = '—';
 /**
  * Render an interpolated field value with a little care: `format: "age"` turns
  * a timestamp into a compact age ("12m", "3h") with the absolute time as its
- * tooltip; a full ISO datetime becomes a friendly, hoverable date; an empty
- * value a quiet em dash; anything else plain text. Authors bind tokens; we
- * make the common shapes look right.
+ * tooltip; `format: "user"` resolves a user-id token to a display name; a full
+ * ISO datetime becomes a friendly, hoverable date; an empty value a quiet em
+ * dash; anything else plain text. Authors bind tokens; we make the common
+ * shapes look right.
  */
 function FieldValue({ raw, format }: { raw: string; format?: string }) {
   if (!raw || raw === EM_DASH) return <span className="text-text-quaternary">{EM_DASH}</span>;
+  if (format === 'user') return <UserName userId={raw} className="block truncate" />;
   if (format === 'age') {
     const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) {

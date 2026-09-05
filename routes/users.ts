@@ -26,6 +26,16 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * POST /api/users/names
+ * Batch-resolve user ids to display fields. Body: { ids: string[] }.
+ * Any authenticated user — display names carry no secrets.
+ */
+router.post('/names', async (req, res) => {
+  const result = await api.getUserNames({ ids: req.body?.ids });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/users/system-property-keys
  * The property keys the platform resolves identities against (enabled
  * identity scan schemes' target facets) — marked as system properties in

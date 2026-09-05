@@ -11,6 +11,15 @@ const render = (ui: React.ReactElement, options?: RenderOptions) => {
   return rtlRender(ui, { ...options, wrapper: Composed });
 };
 import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('../../../api/users', () => ({
+  useUserName: (id: string) => ({
+    data: id === 'alice'
+      ? { display_name: 'Alice Anderson', email: null, external_id: 'alice' }
+      : undefined,
+  }),
+}));
+
 import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EscalationListView, rowContext } from '../EscalationListView';
@@ -181,6 +190,18 @@ describe('EscalationListView — facet-table layout', () => {
       { wrapper: wrapper() },
     );
     expect(screen.getByText(/No pending items/)).toBeInTheDocument();
+  });
+
+  it('format:"user" resolves an assigned_to token to the display name', () => {
+    render(
+      <EscalationListView
+        role="policy-document"
+        listSchema={{ 'x-lt-layout': 'facet-table', 'x-lt-columns': [{ label: 'Assignee', value: '{{escalation.assigned_to}}', format: 'user' }] }}
+        activeEscalations={[ROW]}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(screen.getByText('Alice Anderson')).toBeInTheDocument();
   });
 
   it('renders em dash for unresolvable token values', () => {
