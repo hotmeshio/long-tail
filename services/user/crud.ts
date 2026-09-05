@@ -14,6 +14,7 @@ import {
   GET_USER_BY_ID,
   GET_USERS_BY_METADATA_VALUE,
   PATCH_USER_PROPERTIES,
+  USER_SAFE_COLUMNS_U,
   VERIFY_USER_BY_ID,
 } from './sql';
 import { onlyUuids } from '../../lib/uuid';
@@ -24,10 +25,17 @@ import type { CreateUserInput, UpdateUserInput, UserPropertyOps } from './types'
 
 // ─── Private helpers (exported for internal use by auth.ts) ──────────────────
 
+/** Last-line guard: strip credentials before any user record leaves the service, so a stray SELECT * can never leak them. */
+function stripUserSecrets<T extends Record<string, any>>(user: T): T {
+  delete (user as any).password_hash;
+  delete (user as any).oauth_provider_id;
+  return user;
+}
+
 export async function attachRoles(user: any): Promise<LTUserRecord> {
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLES_BY_USER_ID, [user.id]);
-  return { ...user, roles: rows };
+  return stripUserSecrets({ ...user, roles: rows });
 }
 
 async function attachRolesToMany(users: any[]): Promise<LTUserRecord[]> {
@@ -47,7 +55,7 @@ async function attachRolesToMany(users: any[]): Promise<LTUserRecord[]> {
     });
     roleMap.set(row.user_id, list);
   }
-  return users.map((u) => ({ ...u, roles: roleMap.get(u.id) || [] }));
+  return users.map((u) => stripUserSecrets({ ...u, roles: roleMap.get(u.id) || [] }));
 }
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
@@ -362,7 +370,7 @@ export async function listUsers(filters: {
   const [countResult, dataResult] = await Promise.all([
     pool.query(`SELECT COUNT(DISTINCT u.id) FROM lt_users u ${join} ${where}`, values),
     pool.query(
-      `SELECT DISTINCT u.* FROM lt_users u ${join} ${where} ORDER BY u.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT DISTINCT ${USER_SAFE_COLUMNS_U} FROM lt_users u ${join} ${where} ORDER BY u.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
       [...values, limit, offset],
     ),
   ]);

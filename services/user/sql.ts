@@ -1,5 +1,14 @@
 // ─── Shared queries (used by multiple modules) ──────────────────────────────
 
+/**
+ * Every lt_users column a client may see. password_hash and oauth_provider_id
+ * are credentials and never appear here — no user read path selects them (the
+ * password check has its own GET_USER_FOR_AUTH). `U` prefixes for a joined list.
+ */
+const USER_COLS = ['id', 'external_id', 'email', 'display_name', 'status', 'account_type', 'oauth_provider', 'metadata', 'created_at', 'updated_at', 'preferences'];
+export const USER_SAFE_COLUMNS = USER_COLS.join(', ');
+export const USER_SAFE_COLUMNS_U = USER_COLS.map((c) => `u.${c}`).join(', ');
+
 /** Ensure a role name exists in the lt_roles lookup table (FK target). */
 export const ENSURE_ROLE_EXISTS =
   'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING';
@@ -14,7 +23,11 @@ export const GET_ROLES_BY_USER_ID =
 
 /** Fetch a user row by external_id. */
 export const GET_USER_BY_EXTERNAL_ID =
-  'SELECT * FROM lt_users WHERE external_id = $1';
+  `SELECT ${USER_SAFE_COLUMNS} FROM lt_users WHERE external_id = $1`;
+
+/** Password-check only: the one query that reads the hash, never returned to a client. */
+export const GET_USER_FOR_AUTH =
+  'SELECT id, password_hash FROM lt_users WHERE external_id = $1';
 
 // ─── User CRUD ───────────────────────────────────────────────────────────────
 
@@ -43,13 +56,13 @@ export const CREATE_USER_WITH_ROLES =
      FROM unnest($9::text[], $10::text[], $11::text[], $12::text[]) AS x(role, type, read_scope, write_scope)
      ON CONFLICT DO NOTHING
    )
-   SELECT * FROM new_user`;
+   SELECT ${USER_SAFE_COLUMNS} FROM new_user`;
 
 export const GET_USER_BY_EMAIL =
-  `SELECT * FROM lt_users WHERE email = $1 LIMIT 1`;
+  `SELECT ${USER_SAFE_COLUMNS} FROM lt_users WHERE email = $1 LIMIT 1`;
 
 export const GET_USER_BY_ID =
-  'SELECT * FROM lt_users WHERE id = $1';
+  `SELECT ${USER_SAFE_COLUMNS} FROM lt_users WHERE id = $1`;
 
 /** Thin identity projection for batch name resolution — display fields only, never secrets, scopes, or metadata. */
 export const GET_NAMES_BY_IDS =
@@ -63,7 +76,7 @@ export const GET_NAMES_BY_IDS =
  * deployment ever holds tens of thousands of users.
  */
 export const GET_USERS_BY_METADATA_VALUE =
-  `SELECT * FROM lt_users WHERE metadata->>$1 = $2 AND status = 'active' LIMIT 2`;
+  `SELECT ${USER_SAFE_COLUMNS} FROM lt_users WHERE metadata->>$1 = $2 AND status = 'active' LIMIT 2`;
 
 /** Check if a user exists by id. Lightweight — returns only the id column. */
 export const VERIFY_USER_BY_ID =
