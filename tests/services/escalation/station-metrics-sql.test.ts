@@ -143,6 +143,37 @@ describe('station metrics SQL (integration)', () => {
     expect(s.wait.max).toBeCloseTo(30, 1);
   }, 30_000);
 
+  it('a metadata facet scope narrows live counts to matching rows only', async () => {
+    const facetRole = `${ROLE}-facet`;
+    await roleService.createRole(facetRole);
+    await roleService.updateRoleMetadata(facetRole, { sla_minutes: 5, target_per_hour: 60 });
+    const ids: string[] = [];
+    try {
+      // Two pending rows at 'north', one at 'south'.
+      for (const facility of ['north', 'north', 'south']) {
+        const rec = await escalationService.createEscalation({
+          type: 'facet-scope-case', role: facetRole, description: 'facet scope row',
+          metadata: { facility },
+        });
+        ids.push(rec.id);
+      }
+      resetStationMetricsCache();
+      const all = await escalationService.getStationMetrics([facetRole], '1h');
+      expect(all[0].pending).toBe(3);
+
+      resetStationMetricsCache();
+      const north = await escalationService.getStationMetrics([facetRole], '1h', { facility: 'north' });
+      expect(north[0].pending).toBe(2);
+
+      resetStationMetricsCache();
+      const south = await escalationService.getStationMetrics([facetRole], '1h', { facility: 'south' });
+      expect(south[0].pending).toBe(1);
+    } finally {
+      if (ids.length) await getPool().query('DELETE FROM public.hmsh_escalations WHERE id = ANY($1::uuid[])', [ids]);
+      await getPool().query('DELETE FROM lt_roles WHERE role = $1', [facetRole]);
+    }
+  }, 30_000);
+
   it('an idle configured role still appears, with zeroed counts and null latencies', async () => {
     const idleRole = `${ROLE}-idle`;
     await roleService.createRole(idleRole);

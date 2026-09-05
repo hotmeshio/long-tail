@@ -283,6 +283,55 @@ export async function listFacetKeys(opts: {
   return [...actualKeys].sort();
 }
 
+// Mirrors the server-side facet key rule — metadata keys become a JSON path,
+// so a lookup key is strictly validated before it reaches SQL.
+const FACET_KEY_RE = /^[a-zA-Z0-9_]+$/;
+
+/**
+ * Distinct VALUES for one metadata facet key, visible to the caller — feeds
+ * the value picker (e.g. facility → [north, south]) so a bound scope offers
+ * real choices. Role-scoped with the same predicate as {@link listFacetKeys};
+ * the key is parameterized (never interpolated) and charset-validated, so a
+ * malformed key returns [] rather than reaching an unguarded path.
+ */
+export async function listFacetValues(
+  key: string,
+  opts: {
+    global?: boolean;
+    visibleRoles?: string[];
+    selfRoles?: string[];
+    meUserId?: string;
+  },
+): Promise<string[]> {
+  if (!FACET_KEY_RE.test(key)) return [];
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const params: unknown[] = [key];
+  const clauses: string[] = ["jsonb_typeof(metadata) = 'object'", 'metadata ? $1'];
+
+  if (!opts.global) {
+    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
+    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
+    const mi = params.push(opts.meUserId || null);
+    clauses.push(
+      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
+        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
+        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
+    );
+  }
+
+  const { rows } = await pool.query(
+    `SELECT DISTINCT metadata->>$1 AS value
+       FROM public.lt_escalations
+      WHERE ${clauses.join('\n        AND ')}
+        AND metadata->>$1 IS NOT NULL
+      ORDER BY value
+      LIMIT 200`,
+    params,
+  );
+  return rows.map((r: any) => r.value as string);
+}
+
 // Escalation stats back the home + overview surfaces and refresh on every
 // escalation event. As of hotmesh 0.25.0 the SDK stats query reads three
 // bounded, index-only sources (pending backlog, created window, resolved
@@ -509,6 +558,7 @@ const toNum = (v: unknown): number | null => (v != null ? Number(v) : null);
 export async function getStationMetrics(
   visibleRoles: string[] | undefined,
   period?: string,
+  facets?: Record<string, unknown>,
 ): Promise<StationMetric[]> {
   await ensureEscalationCompatView();
   // hasOwnProperty: a caller-supplied period like 'constructor' must fall back
@@ -517,16 +567,21 @@ export async function getStationMetrics(
     ? VALID_PERIODS[period]
     : '24 hours';
   const roles = visibleRoles ?? null;
+  // Facet scope rides both queries as a GIN-served `metadata @>` arm; null = no
+  // filter. It never widens role scope — it only narrows within it.
+  const facetJson = facets && Object.keys(facets).length ? JSON.stringify(facets) : null;
   const pool = getPool();
 
   // Live counts: always fresh (cheap — bounded pending working set).
-  // Period metrics: cached ~30s, single-flight (expensive percentile sort).
-  const cacheKey = `${period ?? '24h'}::${roles ? [...roles].sort().join(',') : 'ALL'}`;
+  // Period metrics: cached ~30s, single-flight (expensive percentile sort). The
+  // facet scope is part of the cache key — a scoped board never reads unscoped
+  // rows, and vice versa.
+  const cacheKey = `${period ?? '24h'}::${roles ? [...roles].sort().join(',') : 'ALL'}::${facetJson ?? ''}`;
   const [countsResult, periodRows] = await Promise.all([
-    pool.query(STATION_LIVE_COUNTS_SQL, [roles]),
+    pool.query(STATION_LIVE_COUNTS_SQL, [roles, facetJson]),
     stationPeriodCache.resolve(
       cacheKey,
-      async () => (await pool.query(STATION_PERIOD_METRICS_SQL, [roles, intervalStr])).rows,
+      async () => (await pool.query(STATION_PERIOD_METRICS_SQL, [roles, intervalStr, facetJson])).rows,
     ),
   ]);
 

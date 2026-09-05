@@ -210,7 +210,7 @@ describe('getStationMetrics', () => {
     configureFeatureFlags();
     mockStations.mockResolvedValue([stationRow]);
     await getStationMetrics({ period: '24h' }, AUTH);
-    expect(mockStations).toHaveBeenCalledWith(undefined, '24h');
+    expect(mockStations).toHaveBeenCalledWith(undefined, '24h', undefined);
     expect(mockScope).not.toHaveBeenCalled();
   });
 
@@ -225,14 +225,14 @@ describe('getStationMetrics', () => {
     mockScope.mockResolvedValue(GLOBAL);
     mockStations.mockResolvedValue([stationRow]);
     await getStationMetrics({ period: '24h' }, AUTH);
-    expect(mockStations).toHaveBeenCalledWith(undefined, '24h');
+    expect(mockStations).toHaveBeenCalledWith(undefined, '24h', undefined);
   });
 
   it('passes scoped roles to service', async () => {
     mockScope.mockResolvedValue(SCOPED);
     mockStations.mockResolvedValue([stationRow]);
     await getStationMetrics({ period: '1h' }, AUTH);
-    expect(mockStations).toHaveBeenCalledWith(['reviewer', 'grinder'], '1h');
+    expect(mockStations).toHaveBeenCalledWith(['reviewer', 'grinder'], '1h', undefined);
   });
 
   it('includes self-scope roles — queue shape is role-wide, so a self-scoped member sees their lane', async () => {
@@ -241,14 +241,14 @@ describe('getStationMetrics', () => {
     mockScope.mockResolvedValue(SELF);
     mockStations.mockResolvedValue([stationRow]);
     await getStationMetrics({ period: '24h' }, AUTH);
-    expect(mockStations).toHaveBeenCalledWith(['reviewer'], '24h');
+    expect(mockStations).toHaveBeenCalledWith(['reviewer'], '24h', undefined);
   });
 
   it('unions allRoles and selfRoles for a mixed-scope member', async () => {
     mockScope.mockResolvedValue({ global: false, allRoles: ['grinder'], selfRoles: ['reviewer'] });
     mockStations.mockResolvedValue([stationRow]);
     await getStationMetrics({ period: '24h' }, AUTH);
-    expect(mockStations).toHaveBeenCalledWith(['grinder', 'reviewer'], '24h');
+    expect(mockStations).toHaveBeenCalledWith(['grinder', 'reviewer'], '24h', undefined);
   });
 
   it('includes throughput_pct in returned stations', async () => {

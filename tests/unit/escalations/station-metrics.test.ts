@@ -113,22 +113,59 @@ describe('getStationMetrics', () => {
     );
   });
 
-  it('passes role filter as first param when visibleRoles is given', async () => {
+  it('passes role filter as first param when visibleRoles is given (facet param null)', async () => {
     mockQuery.mockResolvedValue({ rows: [] });
     await getStationMetrics(['reviewer', 'grinder'], '24h');
     expect(mockQuery).toHaveBeenCalledWith(
       expect.any(String),
-      [['reviewer', 'grinder'], '24 hours'],
+      [['reviewer', 'grinder'], '24 hours', null],
     );
   });
 
-  it('passes null as first param for global (unrestricted) access', async () => {
+  it('passes null as first param for global (unrestricted) access (facet param null)', async () => {
     mockQuery.mockResolvedValue({ rows: [] });
     await getStationMetrics(undefined, '24h');
     expect(mockQuery).toHaveBeenCalledWith(
       expect.any(String),
-      [null, '24 hours'],
+      [null, '24 hours', null],
     );
+  });
+
+  it('threads a facet scope into both queries as serialized JSON', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+    await getStationMetrics(undefined, '24h', { facility: 'north' });
+    // live counts: [roles, facetJson]
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.any(String),
+      [null, JSON.stringify({ facility: 'north' })],
+    );
+    // period metrics: [roles, interval, facetJson]
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.any(String),
+      [null, '24 hours', JSON.stringify({ facility: 'north' })],
+    );
+  });
+
+  it('treats an empty facet object as no filter (null)', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+    await getStationMetrics(undefined, '24h', {});
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.any(String),
+      [null, null],
+    );
+  });
+
+  it('facet scope is part of the period cache key (scoped never reads unscoped)', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [mockRow({ resolved: 10 })] })  // live, unscoped
+      .mockResolvedValueOnce({ rows: [mockRow({ resolved: 10 })] })          // period, unscoped
+      .mockResolvedValueOnce({ rows: [mockRow({ resolved: 3 })] })           // live, scoped
+      .mockResolvedValueOnce({ rows: [mockRow({ resolved: 3 })] });          // period, scoped
+    const unscoped = await getStationMetrics(undefined, '24h');
+    const scoped = await getStationMetrics(undefined, '24h', { facility: 'north' });
+    expect(unscoped[0].resolved).toBe(10);
+    expect(scoped[0].resolved).toBe(3);
+    // 4 queries fired — the scoped period metrics did NOT hit the unscoped cache entry.
+    expect(mockQuery).toHaveBeenCalledTimes(4);
   });
 
   it('returns an empty array when no rows match', async () => {
