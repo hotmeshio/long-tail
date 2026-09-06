@@ -58,6 +58,13 @@ describe('ESCALATION_COLUMNS', () => {
     expect(screen.queryByText('quality-check')).not.toBeInTheDocument();
   });
 
+  it('colors the expired status dot tertiary (gray), never the pending blue', () => {
+    const { container } = renderColumn('description', makeEscalation({ status: 'expired', assigned_to: null }));
+    const dot = container.querySelector('svg');
+    expect(dot?.getAttribute('class')).toContain('text-text-tertiary');
+    expect(dot?.getAttribute('class')).not.toContain('text-status-active');
+  });
+
   // ── The column budget: identity, owner, urgency, age — nothing else ──
   it('holds the floor budget with enrichment columns gated behind room', () => {
     expect(ESCALATION_COLUMNS.map((c) => c.key)).toEqual(['description', 'assigned_to', 'role', 'priority', 'workflow_type', 'metadata', 'created_at']);
