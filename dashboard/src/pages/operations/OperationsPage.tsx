@@ -28,16 +28,16 @@ import { useAccess } from '../../hooks/useAccess';
 import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — same hues as the chart bands. Two sets: the slate
-// configuration trio (target, SLA, workers) and the vivid status trio.
-// Status bands carry ~15% of their bright -graphic hues so they hold up on
-// light surfaces without overpowering midnight.
+// configuration trio (target, SLA, workers) and the vivid status trio. The
+// status bands carry enough of their bright -graphic hues to sit level with
+// the saturated Trend Board timelines without overpowering midnight.
 const SLA_COLOR     = TARGET_COLOR;
-const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
+const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.12);
 const SLA_BAND      = TARGET_BAND;
 const WORKERS_BAND  = TARGET_BAND;
-const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.15);
-const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.15);
-const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.15);
+const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.24);
+const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.24);
+const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.24);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
