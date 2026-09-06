@@ -40,11 +40,12 @@ describe('ChoreographySidebar — builders', () => {
     expect(screen.getByText('Capabilities')).toBeInTheDocument();
   });
 
-  it('shows Pace Board first for a builder that can see it (superadmin)', () => {
+  it('shows Pace Board then Trend Board first for a builder that can see them', () => {
     render(<ChoreographySidebar isBuilder canSeePaceBoard />, { wrapper });
     const items = screen.getAllByRole('link');
     const labels = items.map((el) => el.textContent?.trim());
     expect(labels[0]).toContain('Pace Board');
+    expect(labels[1]).toContain('Trend Board');
   });
 
   it('engineer builder sees everything but the Pace Board', () => {
@@ -62,9 +63,12 @@ describe('ChoreographySidebar — builders', () => {
 });
 
 describe('ChoreographySidebar — ops role (admin, not builder)', () => {
-  it('shows Pace Board for admins (can see it)', () => {
+  it('shows Pace Board and Trend Board for admins (can see them)', () => {
     render(<ChoreographySidebar isOps canSeePaceBoard />, { wrapper });
     expect(screen.getByText('Pace Board')).toBeInTheDocument();
+    expect(screen.getByText('Trend Board')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Pace Board/ })).toHaveAttribute('href', '/pace');
+    expect(screen.getByRole('link', { name: /Trend Board/ })).toHaveAttribute('href', '/trends');
   });
 
   it('does NOT show Event Topics or Capabilities for isOps-only users', () => {

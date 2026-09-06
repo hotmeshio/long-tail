@@ -143,11 +143,13 @@ function Row({ label, note, jeopardy = 0, active, mono, onClick }: {
       {note && (
         <span className={`ml-auto text-2xs font-mono tabular-nums shrink-0 ${active ? 'text-accent/70' : 'text-text-quaternary'}`}>{note}</span>
       )}
-      {jeopardy > 0 && (
-        <span className="flex items-center gap-0.5 text-2xs font-mono text-status-warning shrink-0" title={`${jeopardy} in jeopardy`}>
-          <TriangleAlert className="w-3 h-3" strokeWidth={2} />{jeopardy}
-        </span>
-      )}
+      {/* Fixed-width jeopardy column: reserved whether or not a warning shows, so the pending counts stay column-aligned down the menu. */}
+      <span
+        className="w-9 shrink-0 flex items-center justify-end gap-0.5 text-2xs font-mono tabular-nums text-status-warning"
+        title={jeopardy > 0 ? `${jeopardy} in jeopardy` : undefined}
+      >
+        {jeopardy > 0 && <><TriangleAlert className="w-3 h-3 shrink-0" strokeWidth={2} />{jeopardy}</>}
+      </span>
     </button>
   );
 }

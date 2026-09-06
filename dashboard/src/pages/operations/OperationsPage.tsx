@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { GitMerge, RefreshCw, Eye, Settings, TriangleAlert } from 'lucide-react';
 import { useRoleDetails, useUpdateRole, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
@@ -450,9 +450,6 @@ function TableHead() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OperationsPage() {
-  // 1h default: long enough to show a whole simulation shift's shape,
-  // short enough that stale history doesn't drown the current run.
-  const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Log default: station volumes span orders of magnitude; log keeps every
@@ -478,6 +475,27 @@ export function OperationsPage() {
     [scopeValues],
   );
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isTrends = location.pathname === '/trends';
+
+  // 1h default: a whole shift's shape without stale history drowning the run.
+  // Deep-linked as ?period=; the default stays out of the URL for clean links.
+  const periodParam = searchParams.get('period');
+  const period: Period = PERIODS.includes(periodParam as Period) ? (periodParam as Period) : '1h';
+  const setPeriod = useCallback(
+    (p: Period) => {
+      setSearchParams((prev) => {
+        const q = new URLSearchParams(prev);
+        if (p === '1h') q.delete('period');
+        else q.set('period', p);
+        return q;
+      });
+    },
+    [setSearchParams],
+  );
 
   const {
     data: metricsData,
@@ -509,20 +527,19 @@ export function OperationsPage() {
   // DEEP-LINKED (?fragment=<origin role>) and each switch is a history entry,
   // so a shared link opens the same sequence and back/forward walks them.
   const fragments = useMemo((): SequenceFragment[] => buildFragments(roles), [roles]);
-  const [searchParams, setSearchParams] = useSearchParams();
   const fragmentParam = searchParams.get('fragment');
   const activeFragment =
     fragments.find((f) => f.origin.role === fragmentParam) ?? fragments[0] ?? null;
   const selectFragment = useCallback(
     (origin: string) => {
       setSelectedRole(null);
-      setSearchParams((prev) => {
-        const p = new URLSearchParams(prev);
-        p.set('fragment', origin);
-        return p;
-      });
+      const q = new URLSearchParams();
+      if (origin) q.set('fragment', origin);
+      if (period !== '1h') q.set('period', period);
+      const qs = q.toString();
+      navigate(qs ? `/pace?${qs}` : '/pace');
     },
-    [setSearchParams],
+    [navigate, period],
   );
 
   const ordered = activeFragment?.stations ?? [];
@@ -590,8 +607,6 @@ export function OperationsPage() {
     [fragments, selectFragment],
   );
 
-  const navigate = useNavigate();
-
   const selectedRoleDetail =
     ordered.find(({ role }) => role.role === selectedRole)?.role ?? null;
 
@@ -606,23 +621,20 @@ export function OperationsPage() {
     return [...keys].sort();
   }, [roles]);
   const lensParam = searchParams.get('lens');
-  const activeLens = lensParam && entityLenses.includes(lensParam) ? lensParam : null;
+  const activeLens = isTrends
+    ? (lensParam && entityLenses.includes(lensParam) ? lensParam : entityLenses[0] ?? null)
+    : null;
+  // A fresh URL drops the prior lens's entity-scoped params (entity/find/slice).
   const selectLens = useCallback(
     (lens: string | null) => {
       setSelectedRole(null);
-      setSearchParams((prev) => {
-        const p = new URLSearchParams(prev);
-        if (lens) p.set('lens', lens);
-        else p.delete('lens');
-        // Entity-scoped params belong to one lens — a switch resets them.
-        p.delete('entity');
-        p.delete('find');
-        p.delete('slice');
-        p.delete('sliceValue');
-        return p;
-      });
+      const q = new URLSearchParams();
+      if (lens) q.set('lens', lens);
+      if (period !== '1h') q.set('period', period);
+      const qs = q.toString();
+      navigate(qs ? `/trends?${qs}` : '/trends');
     },
-    [setSearchParams],
+    [navigate, period],
   );
 
   // Lens deep-link companions: ?entity= (the open timeline panel) and ?find=

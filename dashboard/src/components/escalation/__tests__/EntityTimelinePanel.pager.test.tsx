@@ -161,7 +161,7 @@ describe('EntityTimelinePanel pager + copy link', () => {
     await userEvent.click(screen.getByTitle('Copy link to this timeline'));
 
     expect(writeText).toHaveBeenCalledWith(
-      `${window.location.origin}/operations?lens=serialNumber&entity=SN-100`,
+      `${window.location.origin}/trends?lens=serialNumber&entity=SN-100`,
     );
     await waitFor(() => expect(screen.getByText('copied')).toBeInTheDocument());
   });

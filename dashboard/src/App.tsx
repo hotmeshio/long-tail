@@ -351,9 +351,12 @@ const router = createBrowserRouter([
 
       // Operations: overview of active work across stations. Open to every
       // login — the board is aggregate counts and trends, readonly by nature.
-      // Station metrics narrow server-side to role membership when the
-      // deployment turns publicPaceBoard off, so the route needs no role gate.
-      { path: 'operations', element: <Lazy><OperationsPage /></Lazy> },
+      // The two boards share one component; the route picks pace vs trend.
+      // Metrics narrow server-side to role membership when publicPaceBoard is
+      // off, so these need no role gate. /operations is the legacy redirect.
+      { path: 'pace', element: <Lazy><OperationsPage /></Lazy> },
+      { path: 'trends', element: <Lazy><OperationsPage /></Lazy> },
+      { path: 'operations', element: <Navigate to="/pace" replace /> },
 
       // Admin: Accounts (admin type, superadmin, or engineer — scoped view for non-builders)
       {
