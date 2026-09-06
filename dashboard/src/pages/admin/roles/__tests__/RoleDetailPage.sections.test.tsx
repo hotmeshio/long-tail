@@ -98,7 +98,7 @@ describe('RoleDetailPage — section sub-nav', () => {
 
   it('deep-links straight to a section via ?section=', () => {
     renderPage('/admin/roles/print-station?section=pace-board');
-    expect(screen.getByText('Show as a station on the Pace Board')).toBeInTheDocument();
+    expect(screen.getByText('Show this role on the Pace Board')).toBeInTheDocument();
   });
 
   it('falls back to Identity for an unknown ?section= value', () => {
@@ -111,9 +111,9 @@ describe('RoleDetailPage — section sub-nav', () => {
     // Entity facet text input, seeded from the role.
     const facetInput = screen.getByPlaceholderText('serialNumber');
     expect(facetInput).toHaveValue('serialNumber');
-    // State-source choice: role (Station) vs subtype (Subtypes).
+    // State-source choice: role (Role) vs subtype (Subtypes).
     expect(screen.getByText('States from')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Station' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Role' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Subtypes' })).toBeInTheDocument();
   });
 
@@ -127,15 +127,15 @@ describe('RoleDetailPage — section sub-nav', () => {
 describe('Members section — the kiosk toggle', () => {
   it('renders the Station Kiosk group with an unchecked toggle for a plain role', () => {
     renderPage('/admin/roles/print-station?section=members');
-    expect(screen.getByText('Station Kiosk')).toBeInTheDocument();
+    expect(screen.getByText("Kiosk")).toBeInTheDocument();
     expect(screen.getByText('Lock single-role members to this queue')).toBeInTheDocument();
-    const toggle = screen.getByTitle('Kiosk station viewport');
+    const toggle = screen.getByTitle('Kiosk viewport');
     expect(toggle.className).not.toContain('bg-accent');
   });
 
   it('flipping the toggle arms the draft (Save changes) and reads as on', () => {
     renderPage('/admin/roles/print-station?section=members');
-    const toggle = screen.getByTitle('Kiosk station viewport');
+    const toggle = screen.getByTitle('Kiosk viewport');
     fireEvent.click(toggle);
     expect(toggle.className).toContain('bg-accent');
     expect(screen.getByText('Save changes')).toBeInTheDocument();

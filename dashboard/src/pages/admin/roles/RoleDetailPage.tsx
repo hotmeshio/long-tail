@@ -263,7 +263,7 @@ export function RoleDetailPage() {
               {/* Kiosk — how single-role members experience the dashboard */}
               <SectionGroup
                 icon={MonitorSmartphone}
-                label="Station Kiosk"
+                label="Kiosk"
                 annotation="the locked viewport for single-role logins"
               >
                 <div className="flex items-center justify-between gap-4">
@@ -282,7 +282,7 @@ export function RoleDetailPage() {
                       const next = toggleKioskFlag(draft.properties);
                       if (next !== null) update({ properties: next });
                     }}
-                    title="Kiosk station viewport"
+                    title="Kiosk viewport"
                   />
                 </div>
               </SectionGroup>
