@@ -1,23 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, TriangleAlert } from 'lucide-react';
 import { useAggregateByFacets } from '../../api/escalation-analytics';
 
+export interface FragmentOption {
+  /** The segment's origin role id — its selection key. */
+  origin: string;
+  title: string;
+  roleCount: number;
+  pending: number;
+  jeopardy: number;
+}
+
 /**
- * The board's view selector — the station view and every declared entity
- * system behind ONE compact menu (the sequence-menu pattern), never one
- * piece of chrome per system: a deployment declaring a dozen entity facets
- * gets a twelve-row list, not a twelve-chip strip.
- *
- * Each lens row carries its live distinct-entity count, fetched lazily only
- * while the menu is open (counts-only — the station-metrics data class, so
- * the rows render under the public board flag too).
+ * The one board selector: the Pace Board's role segments and the Trend Board's
+ * by-facet lenses under a single menu, grouped by board. Selecting a segment
+ * paces a set of roles; selecting a lens reads a metadata facet's trend. Lens
+ * counts load lazily while the menu is open.
  */
-export function ViewMenu({ lenses, activeLens, stationCount, onSelect }: {
+export function ViewMenu({
+  fragments,
+  activeFragment,
+  lenses,
+  activeLens,
+  onSelectFragment,
+  onSelectLens,
+}: {
+  fragments: FragmentOption[];
+  /** The active segment origin when on the Pace Board (activeLens === null). */
+  activeFragment: string | null;
   lenses: string[];
-  /** null = the station view. */
+  /** The active trend facet, or null when on the Pace Board. */
   activeLens: string | null;
-  stationCount: number;
-  onSelect: (lens: string | null) => void;
+  onSelectFragment: (origin: string) => void;
+  onSelectLens: (lens: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -36,17 +51,11 @@ export function ViewMenu({ lenses, activeLens, stationCount, onSelect }: {
     };
   }, [open]);
 
-  const choose = (lens: string | null) => {
-    onSelect(lens);
-    setOpen(false);
-  };
+  const activeSegment = fragments.find((f) => f.origin === activeFragment) ?? fragments[0];
+  const activeSegmentKey = activeLens ? null : activeSegment?.origin ?? null;
 
   return (
-    <div
-      ref={ref}
-      className="relative"
-      title="View: the board station-first, or an entity system (roles sharing an entity facet) entity-first"
-    >
+    <div ref={ref} className="relative" title="Board: pace a segment of roles, or read a metadata facet's trend">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -56,8 +65,8 @@ export function ViewMenu({ lenses, activeLens, stationCount, onSelect }: {
         aria-label="Board view"
       >
         <span className="text-2xs uppercase tracking-widest text-text-quaternary">View</span>
-        <span className="text-xs font-medium text-text-primary group-hover:text-accent transition-colors">
-          {activeLens ? <>by <span className="font-mono">{activeLens}</span></> : 'Stations'}
+        <span className="text-xs font-medium text-accent">
+          {activeLens ? <>by <span className="font-mono">{activeLens}</span></> : (activeSegment?.title ?? 'Pace Board')}
         </span>
         <ChevronDown
           className={`w-3 h-3 self-center shrink-0 text-text-tertiary group-hover:text-accent transition-transform ${open ? 'rotate-180' : ''}`}
@@ -68,35 +77,55 @@ export function ViewMenu({ lenses, activeLens, stationCount, onSelect }: {
       {open && (
         <div
           role="listbox"
-          className="absolute z-[100] top-full right-0 mt-1.5 min-w-[16rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1"
+          className="absolute z-[100] top-full right-0 mt-1.5 min-w-[19rem] max-h-96 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1"
         >
-          <ViewOption
-            label="Stations"
-            note={`${stationCount} station${stationCount === 1 ? '' : 's'}`}
-            active={activeLens === null}
-            onClick={() => choose(null)}
-          />
-          {lenses.map((lens) => (
-            <LensOption
-              key={lens}
-              lens={lens}
-              active={activeLens === lens}
-              fetchCount={open}
-              onClick={() => choose(lens)}
+          <SectionLabel>Pace Board</SectionLabel>
+          {fragments.map((f) => (
+            <Row
+              key={f.origin}
+              label={f.title}
+              note={`${f.roleCount} role${f.roleCount === 1 ? '' : 's'} · ${f.pending} pending`}
+              jeopardy={f.jeopardy}
+              active={f.origin === activeSegmentKey}
+              onClick={() => { onSelectFragment(f.origin); setOpen(false); }}
             />
           ))}
+
+          {lenses.length > 0 && (
+            <>
+              <SectionLabel>Trend Board</SectionLabel>
+              {lenses.map((lens) => (
+                <LensRow
+                  key={lens}
+                  lens={lens}
+                  active={activeLens === lens}
+                  fetchCount={open}
+                  onClick={() => { onSelectLens(lens); setOpen(false); }}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ViewOption({ label, note, active, onClick, mono }: {
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pt-2 pb-1 text-2xs font-semibold uppercase tracking-widest text-text-quaternary first:pt-1">
+      {children}
+    </p>
+  );
+}
+
+function Row({ label, note, jeopardy = 0, active, mono, onClick }: {
   label: string;
   note: string | null;
+  jeopardy?: number;
   active: boolean;
-  onClick: () => void;
   mono?: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -104,37 +133,41 @@ function ViewOption({ label, note, active, onClick, mono }: {
       role="option"
       aria-selected={active}
       onClick={onClick}
-      className={`w-full text-left px-3 py-1.5 flex items-baseline gap-2.5 transition-colors ${
-        active ? 'text-accent bg-accent/5' : 'text-text-primary hover:bg-surface-hover'
+      className={`w-full text-left pl-3 pr-2.5 py-1.5 flex items-baseline gap-2.5 border-l-2 transition-colors ${
+        active
+          ? 'border-accent bg-accent/10 text-accent'
+          : 'border-transparent text-text-primary hover:bg-surface-hover'
       }`}
     >
       <span className={`text-xs font-medium truncate ${mono ? 'font-mono' : ''}`}>{label}</span>
       {note && (
-        <span className="ml-auto text-2xs font-mono text-text-quaternary tabular-nums shrink-0">{note}</span>
+        <span className={`ml-auto text-2xs font-mono tabular-nums shrink-0 ${active ? 'text-accent/70' : 'text-text-quaternary'}`}>{note}</span>
       )}
+      {/* Fixed-width jeopardy column: reserved whether or not a warning shows, so the pending counts stay column-aligned down the menu. */}
+      <span
+        className="w-9 shrink-0 flex items-center justify-end gap-0.5 text-2xs font-mono tabular-nums text-status-warning"
+        title={jeopardy > 0 ? `${jeopardy} in jeopardy` : undefined}
+      >
+        {jeopardy > 0 && <><TriangleAlert className="w-3 h-3 shrink-0" strokeWidth={2} />{jeopardy}</>}
+      </span>
     </button>
   );
 }
 
-/** One lens row — its live distinct-entity count loads only while the menu is open. */
-function LensOption({ lens, active, fetchCount, onClick }: {
+/** One trend row — its live distinct-entity count loads only while the menu is open. */
+function LensRow({ lens, active, fetchCount, onClick }: {
   lens: string;
   active: boolean;
   fetchCount: boolean;
   onClick: () => void;
 }) {
   const count = useAggregateByFacets(
-    {
-      query: { entity: lens },
-      groupBy: {},
-      measure: { kind: 'membership' },
-      distinctBy: lens,
-    },
+    { query: { entity: lens }, groupBy: {}, measure: { kind: 'membership' }, distinctBy: lens },
     { enabled: fetchCount },
   );
   const n = count.data?.groups[0]?.count;
   return (
-    <ViewOption
+    <Row
       label={`by ${lens}`}
       mono
       note={n != null ? `${n} in queue` : null}

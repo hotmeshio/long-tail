@@ -285,7 +285,7 @@ function CopyLinkButton({ entity, value }: { entity: string; value: string }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const copy = async () => {
-    const url = `${window.location.origin}/operations?lens=${encodeURIComponent(entity)}&entity=${encodeURIComponent(value)}`;
+    const url = `${window.location.origin}/trends?lens=${encodeURIComponent(entity)}&entity=${encodeURIComponent(value)}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     clearTimeout(timer.current);

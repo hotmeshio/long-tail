@@ -54,19 +54,19 @@ export function PaceBoardSection({
   return (
     <div className="space-y-14">
       {/* Station visibility leads — the section's headline decision */}
-      <SectionGroup icon={LayoutDashboard} label="Station" annotation="this role on the Pace Board" accent>
+      <SectionGroup icon={LayoutDashboard} label="Pace Board" annotation="this role on the Pace Board" accent>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs text-text-secondary">Show as a station on the Pace Board</p>
+            <p className="text-xs text-text-secondary">Show this role on the Pace Board</p>
             <p className="text-2xs text-text-tertiary leading-relaxed mt-1">
-              Stations appear on the Operations chart and table with live counts,
+              Roles appear on the Operations chart and table with live counts,
               pace, and the time-in-state mix.
             </p>
           </div>
           <Toggle
             checked={draft.ops_visible}
             onChange={() => update({ ops_visible: !draft.ops_visible })}
-            title="Show as a station on the Pace Board"
+            title="Show this role on the Pace Board"
           />
         </div>
       </SectionGroup>
@@ -151,7 +151,7 @@ export function PaceBoardSection({
       </SectionGroup>
 
       {/* Entity — the analytics unlock, given the room it earns */}
-      <SectionGroup icon={Fingerprint} label="Entity" annotation="what moves through this station" accent>
+      <SectionGroup icon={Fingerprint} label="Entity" annotation="what moves through this role" accent>
         <input
           type="text"
           value={draft.entity_facet}
@@ -163,7 +163,7 @@ export function PaceBoardSection({
           <p className="text-2xs text-status-error mt-0.5">{errors.entity_facet}</p>
         )}
         <p className="text-2xs text-text-tertiary leading-relaxed mt-3">
-          The metadata key naming the entity that moves through this station —{' '}
+          The metadata key naming the entity that moves through this role —{' '}
           <code className="font-mono">serialNumber</code>,{' '}
           <code className="font-mono">orderId</code>. Roles sharing a key form
           that entity's system: its state mix, per-entity dwell, and timelines
@@ -177,7 +177,7 @@ export function PaceBoardSection({
             </label>
             <div className="flex items-center gap-1">
               {([
-                { value: 'role' as const, label: 'Station' },
+                { value: 'role' as const, label: 'Role' },
                 { value: 'subtype' as const, label: 'Subtypes' },
               ]).map(({ value, label }) => (
                 <button
@@ -194,7 +194,7 @@ export function PaceBoardSection({
               ))}
             </div>
             <p className="text-2xs text-text-tertiary leading-relaxed mt-1.5">
-              How this station names the entity's state. <strong>Station</strong>:
+              How this role names the entity's state. <strong>Role</strong>:
               being here is one state (a servicing or harvesting queue).{' '}
               <strong>Subtypes</strong>: this one role holds several states,
               named by each escalation's subtype (a fleet role parking{' '}
@@ -212,7 +212,7 @@ export function PaceBoardSection({
         }`}
         aria-hidden={!draft.ops_visible}
       >
-        <SectionGroup icon={GitBranch} label="Sequence" annotation="where this station sits on the floor">
+        <SectionGroup icon={GitBranch} label="Sequence" annotation="where this role sits in its segment">
           <div className="space-y-8">
             <div>
               <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
@@ -316,7 +316,7 @@ function UpstreamSection({ role, allRoles }: { role: RoleDetail; allRoles: RoleD
       )}
       <PillWell
         items={upstreams}
-        empty="Roles from other sequences this station draws input from. Add one above and it lands here."
+        empty="Roles from other sequences this role draws input from. Add one above and it lands here."
         onRemove={(u) => save(upstreams.filter((x) => x !== u))}
       />
       {updateRole.error && (

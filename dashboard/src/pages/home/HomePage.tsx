@@ -304,17 +304,17 @@ export function HomePage() {
                 </span>
               )}
             </div>
-            <NavIcon to="/operations" icon={ExternalLink} title="Open the full Pace Board" />
+            <NavIcon to="/pace" icon={ExternalLink} title="Open the full Pace Board" />
           </div>
-          <div className="flex-1 min-h-0 cursor-pointer" onClick={() => navigate('/operations')}>
+          <div className="flex-1 min-h-0 cursor-pointer" onClick={() => navigate('/pace')}>
             {paceStations.length === 0 ? (
-              <EmptyPanel icon={LayoutDashboard} text="No stations yet — mark roles visible in Operations" />
+              <EmptyPanel icon={LayoutDashboard} text="No roles yet — mark roles visible on the Pace Board" />
             ) : (
               <PaceChart
                 stations={paceStations}
                 selectedRole={null}
-                onSelect={() => navigate('/operations')}
-                onUpstreamSelect={() => navigate('/operations')}
+                onSelect={() => navigate('/pace')}
+                onUpstreamSelect={() => navigate('/pace')}
                 periodHours={1}
                 logScale
                 fill

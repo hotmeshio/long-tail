@@ -14,6 +14,7 @@ import { assignLabelColors } from './mix-colors';
 import { displayRoleTitle } from '../../lib/role-display';
 import { formatDurationCompact } from '../../lib/format';
 import { StateBand } from './StateBands';
+import { MixSummary } from './MixSummary';
 import {
   SliceColumnLoader,
   SingleColumn,
@@ -311,45 +312,24 @@ export function EntityLensView({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      {/* ── Top bar: the system band shares the row with the slice + find controls ── */}
-      <div className="shrink-0 px-2 pt-4 pb-3 flex items-start gap-6 border-b border-surface-border/40">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-4 mb-2.5">
-            <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary">
-              Where the time went · <span className="normal-case font-mono">{entityKey}</span> system
-            </p>
-            {tracked != null && (
-              <p className="text-2xs text-text-quaternary whitespace-nowrap">
-                <span className="text-xs font-mono font-semibold text-text-primary tabular-nums">{tracked}</span>{' '}
-                <span className="font-mono">{entityKey}</span> in queue now
-              </p>
-            )}
-          </div>
-          {dwellGroups.length > 0 ? (
-            <>
-              <StateBand groups={dwellGroups} colors={colors} height="h-3" />
-              {/* Dot + label only — the proportions are the band; specifics live on hover. */}
-              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2.5">
-                {dwellGroups.map((g) => {
-                  const now = nowByState.get(g.state ?? '—') ?? 0;
-                  const pct = Math.round(((g.dwellSeconds ?? 0) / totalDwell(dwellGroups)) * 100);
-                  const detail = `${formatDurationCompact((g.dwellSeconds ?? 0) * 1000)} · ${pct}%${now > 0 ? ` · ${now} now` : ''}`;
-                  return (
-                    <span key={g.state} className="flex items-center gap-1.5 text-2xs" title={detail}>
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors.get(g.state ?? '—') }} />
-                      <span className="font-mono text-text-secondary">{stateLabel(g.state)}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <p className="text-2xs text-text-quaternary">No tracked time in this window.</p>
-          )}
-        </div>
+      {/* ── Top region: ranked-bar legend · headline insight · controls ── */}
+      <div className="shrink-0 px-2 pt-4 pb-4 flex items-stretch gap-6 border-b border-surface-border/40">
+        {dwellGroups.length > 0 ? (
+          <MixSummary
+            groups={dwellGroups}
+            colors={colors}
+            stateLabel={stateLabel}
+            nowByState={nowByState}
+            periodHours={periodHours}
+            tracked={tracked}
+            entityKey={entityKey}
+          />
+        ) : (
+          <p className="flex-1 text-2xs text-text-quaternary self-center">No tracked time in this window.</p>
+        )}
 
-        {/* Slice + find — the band no longer runs full width. */}
-        <div className="shrink-0 w-56 space-y-2.5">
+        {/* Slice + find — the controls hold the right rail. */}
+        <div className="shrink-0 w-56 space-y-2.5 self-center">
           <label className="block">
             <span className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Slice by</span>
             <select

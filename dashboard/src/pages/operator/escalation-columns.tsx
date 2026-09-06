@@ -36,6 +36,9 @@ function StatusDot({ row }: { row: LTEscalationRecord }) {
   if (row.status === 'cancelled') {
     return <Circle className="w-2.5 h-2.5 shrink-0 text-status-error" strokeWidth={2.5} />;
   }
+  if (row.status === 'expired') {
+    return <Circle className="w-2.5 h-2.5 shrink-0 text-text-tertiary" strokeWidth={2.5} />;
+  }
   if (isEffectivelyClaimed(row)) {
     return <Circle className="w-2.5 h-2.5 shrink-0 text-status-warning" strokeWidth={2.5} />;
   }

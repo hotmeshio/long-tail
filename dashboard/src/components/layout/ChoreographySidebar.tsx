@@ -1,4 +1,4 @@
-import { Zap, Bot, Radio, LayoutDashboard } from 'lucide-react';
+import { Zap, Bot, Radio, Gauge, TrendingUp } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import type { ViewAsRole } from '../../lib/view-as';
 
@@ -31,23 +31,26 @@ export function ChoreographySidebar({
   // are builders and see everything else here, but not this.
   canSeePaceBoard?: boolean;
 }) {
-  const paceEntry: NavEntry = { to: '/operations', label: 'Pace Board', icon: LayoutDashboard };
+  const boardEntries: NavEntry[] = [
+    { to: '/pace', label: 'Pace Board', icon: Gauge },
+    { to: '/trends', label: 'Trend Board', icon: TrendingUp },
+  ];
 
   // Operator or engineer view: their work lives in the Task Queues section
   // (shell) and the home Claimed card — but the Pace Board, when public,
   // reaches every login.
   if (!isBuilder && (!isOps || viewAs === 'engineer' || viewAs === 'operator')) {
-    return canSeePaceBoard ? <SidebarNav heading="Monitor" entries={[paceEntry]} /> : null;
+    return canSeePaceBoard ? <SidebarNav heading="Monitor" entries={boardEntries} /> : null;
   }
 
   if (!isBuilder) {
     // Admin/ops only (not builder) — pace board
-    return <SidebarNav heading="Monitor" entries={canSeePaceBoard ? [paceEntry] : []} />;
+    return <SidebarNav heading="Monitor" entries={canSeePaceBoard ? boardEntries : []} />;
   }
 
   // Full builder view — the Pace Board only for tiers that can read it.
   const entries: NavEntry[] = [
-    ...(canSeePaceBoard ? [paceEntry] : []),
+    ...(canSeePaceBoard ? boardEntries : []),
     { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },

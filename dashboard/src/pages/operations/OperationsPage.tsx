@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { GitMerge, RefreshCw, Eye, Settings, TriangleAlert, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { GitMerge, RefreshCw, Eye, Settings, TriangleAlert } from 'lucide-react';
 import { useRoleDetails, useUpdateRole, type RoleDetail } from '../../api/roles';
 import { useStationMetrics } from '../../api/escalations';
 import type { StationMetric } from '../../api/escalations';
@@ -10,7 +10,7 @@ import { assignMixColors } from './mix-colors';
 import { StationMixBar } from './StationMixBar';
 import { EntityLensView } from './EntityLensView';
 import { PageHeader } from '../../components/common/layout/PageHeader';
-import { ViewMenu } from './ViewMenu';
+import { ViewMenu, type FragmentOption } from './ViewMenu';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { LinkVariablesModal } from '../../components/layout/LinkVariablesModal';
 import {
@@ -19,7 +19,6 @@ import {
   QUEUED_COLOR,
   RESOLVED_COLOR,
   TARGET_COLOR,
-  PRIORITY_TEXT_COLOR,
   withAlpha,
   type ChartStation,
 } from './PaceChart';
@@ -29,16 +28,16 @@ import { useAccess } from '../../hooks/useAccess';
 import { displayRoleTitle } from '../../lib/role-display';
 
 // Column band tints — same hues as the chart bands. Two sets: the slate
-// configuration trio (target, SLA, workers) and the vivid status trio.
-// Status bands carry ~15% of their bright -graphic hues so they hold up on
-// light surfaces without overpowering midnight.
+// configuration trio (target, SLA, workers) and the vivid status trio. The
+// status bands carry enough of their bright -graphic hues to sit level with
+// the saturated Trend Board timelines without overpowering midnight.
 const SLA_COLOR     = TARGET_COLOR;
-const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.09);
+const TARGET_BAND   = withAlpha(TARGET_COLOR, 0.12);
 const SLA_BAND      = TARGET_BAND;
 const WORKERS_BAND  = TARGET_BAND;
-const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.15);
-const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.15);
-const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.15);
+const PENDING_BAND  = withAlpha(QUEUED_COLOR, 0.24);
+const ACTIVE_BAND   = withAlpha(ACTIVE_COLOR, 0.24);
+const RESOLVED_BAND = withAlpha(RESOLVED_COLOR, 0.24);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -343,7 +342,7 @@ function StationRow({
               <Link
                 to={`/admin/roles/${encodeURIComponent(role.role)}?section=pace-board`}
                 className="icon-link"
-                title="Configure this station"
+                title="Configure this role"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -377,115 +376,6 @@ interface SequenceAggregate {
   jeopardy: number;
 }
 
-/** Red jeopardy count, capped at 9+ — the same shorthand as the queue pills. */
-function JeopardyCount({ n }: { n: number }) {
-  if (n <= 0) return null;
-  return (
-    <span
-      className="inline-flex items-center gap-0.5 font-semibold tabular-nums"
-      style={{ color: PRIORITY_TEXT_COLOR }}
-      title={`${n} in jeopardy`}
-    >
-      <TriangleAlert className="w-3 h-3" strokeWidth={2.25} />
-      {n > 9 ? '9+' : n}
-    </span>
-  );
-}
-
-/**
- * The segment selector for the 30k-foot view — compact at any segment count.
- * Collapsed, it names the ACTIVE sequence large with its aggregate story
- * (stations · pending · jeopardy) and a caret; expanded, it lists every
- * sequence with the same breakdown so trouble in an unselected segment is
- * visible from here and one click away. Metrics span every visible role, so
- * the numbers are live for all segments, not just the chosen one.
- */
-function SequenceMenu({ fragments, aggregates, activeOrigin, onSelect }: {
-  fragments: SequenceFragment[];
-  aggregates: Map<string, SequenceAggregate>;
-  activeOrigin: string | null;
-  onSelect: (origin: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  const active = fragments.find((f) => f.origin.role === activeOrigin) ?? fragments[0];
-  if (!active) return null;
-  const agg = aggregates.get(active.origin.role);
-
-  return (
-    <div ref={ref} className="relative px-4 pt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="group flex items-baseline gap-2.5"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
-        <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
-          {displayRoleTitle(active.origin)}
-        </span>
-        <span className="text-2xs font-mono text-text-quaternary tabular-nums">
-          {agg?.stations ?? active.stations.length} station{(agg?.stations ?? active.stations.length) === 1 ? '' : 's'} · {agg?.pending ?? 0} pending
-        </span>
-        <JeopardyCount n={agg?.jeopardy ?? 0} />
-        <ChevronDown
-          className={`w-3.5 h-3.5 self-center shrink-0 text-text-tertiary group-hover:text-accent transition-transform ${open ? 'rotate-180' : ''}`}
-          strokeWidth={1.5}
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          className="absolute z-[100] top-full left-4 mt-1.5 min-w-[20rem] max-h-80 overflow-y-auto bg-surface-raised border border-surface-border rounded-md shadow-lg py-1"
-        >
-          {fragments.map((f) => {
-            const a = aggregates.get(f.origin.role);
-            const isActive = f.origin.role === active.origin.role;
-            return (
-              <button
-                key={f.origin.role}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                onClick={() => { onSelect(f.origin.role); setOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 flex items-baseline gap-2.5 transition-colors ${
-                  isActive ? 'text-accent bg-accent/5' : 'text-text-primary hover:bg-surface-hover'
-                }`}
-              >
-                <span className="text-xs font-medium truncate">{displayRoleTitle(f.origin)}</span>
-                <span className="ml-auto text-2xs font-mono text-text-quaternary tabular-nums shrink-0">
-                  {a?.stations ?? f.stations.length} st · {a?.pending ?? 0} pending
-                </span>
-                {/* Fixed-width, left-aligned jeopardy column: every ⚠ starts at
-                    the same x, so the icons stack vertically whether the count
-                    is 1 or 9+. */}
-                <span className="w-12 shrink-0 text-left text-2xs">
-                  <JeopardyCount n={a?.jeopardy ?? 0} />
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Colored column specs — bands shared by header and rows ───────────────────
 // Percentage widths: under `table-fixed` the header row's widths govern every
@@ -560,9 +450,6 @@ function TableHead() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OperationsPage() {
-  // 1h default: long enough to show a whole simulation shift's shape,
-  // short enough that stale history doesn't drown the current run.
-  const [period, setPeriod] = useState<Period>('1h');
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Log default: station volumes span orders of magnitude; log keeps every
@@ -588,6 +475,27 @@ export function OperationsPage() {
     [scopeValues],
   );
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isTrends = location.pathname === '/trends';
+
+  // 1h default: a whole shift's shape without stale history drowning the run.
+  // Deep-linked as ?period=; the default stays out of the URL for clean links.
+  const periodParam = searchParams.get('period');
+  const period: Period = PERIODS.includes(periodParam as Period) ? (periodParam as Period) : '1h';
+  const setPeriod = useCallback(
+    (p: Period) => {
+      setSearchParams((prev) => {
+        const q = new URLSearchParams(prev);
+        if (p === '1h') q.delete('period');
+        else q.set('period', p);
+        return q;
+      });
+    },
+    [setSearchParams],
+  );
 
   const {
     data: metricsData,
@@ -619,20 +527,19 @@ export function OperationsPage() {
   // DEEP-LINKED (?fragment=<origin role>) and each switch is a history entry,
   // so a shared link opens the same sequence and back/forward walks them.
   const fragments = useMemo((): SequenceFragment[] => buildFragments(roles), [roles]);
-  const [searchParams, setSearchParams] = useSearchParams();
   const fragmentParam = searchParams.get('fragment');
   const activeFragment =
     fragments.find((f) => f.origin.role === fragmentParam) ?? fragments[0] ?? null;
   const selectFragment = useCallback(
     (origin: string) => {
       setSelectedRole(null);
-      setSearchParams((prev) => {
-        const p = new URLSearchParams(prev);
-        p.set('fragment', origin);
-        return p;
-      });
+      const q = new URLSearchParams();
+      if (origin) q.set('fragment', origin);
+      if (period !== '1h') q.set('period', period);
+      const qs = q.toString();
+      navigate(qs ? `/pace?${qs}` : '/pace');
     },
-    [setSearchParams],
+    [navigate, period],
   );
 
   const ordered = activeFragment?.stations ?? [];
@@ -700,8 +607,6 @@ export function OperationsPage() {
     [fragments, selectFragment],
   );
 
-  const navigate = useNavigate();
-
   const selectedRoleDetail =
     ordered.find(({ role }) => role.role === selectedRole)?.role ?? null;
 
@@ -716,23 +621,20 @@ export function OperationsPage() {
     return [...keys].sort();
   }, [roles]);
   const lensParam = searchParams.get('lens');
-  const activeLens = lensParam && entityLenses.includes(lensParam) ? lensParam : null;
+  const activeLens = isTrends
+    ? (lensParam && entityLenses.includes(lensParam) ? lensParam : entityLenses[0] ?? null)
+    : null;
+  // A fresh URL drops the prior lens's entity-scoped params (entity/find/slice).
   const selectLens = useCallback(
     (lens: string | null) => {
       setSelectedRole(null);
-      setSearchParams((prev) => {
-        const p = new URLSearchParams(prev);
-        if (lens) p.set('lens', lens);
-        else p.delete('lens');
-        // Entity-scoped params belong to one lens — a switch resets them.
-        p.delete('entity');
-        p.delete('find');
-        p.delete('slice');
-        p.delete('sliceValue');
-        return p;
-      });
+      const q = new URLSearchParams();
+      if (lens) q.set('lens', lens);
+      if (period !== '1h') q.set('period', period);
+      const qs = q.toString();
+      navigate(qs ? `/trends?${qs}` : '/trends');
     },
-    [setSearchParams],
+    [navigate, period],
   );
 
   // Lens deep-link companions: ?entity= (the open timeline panel) and ?find=
@@ -809,6 +711,21 @@ export function OperationsPage() {
   const handleSelect = (role: string) =>
     setSelectedRole((prev) => (prev === role ? null : role));
 
+  const fragmentOptions = useMemo<FragmentOption[]>(
+    () =>
+      fragments.map((f) => {
+        const a = fragmentAggregates.get(f.origin.role);
+        return {
+          origin: f.origin.role,
+          title: displayRoleTitle(f.origin),
+          roleCount: a?.stations ?? f.stations.length,
+          pending: a?.pending ?? 0,
+          jeopardy: a?.jeopardy ?? 0,
+        };
+      }),
+    [fragments, fragmentAggregates],
+  );
+
   const periodSelector = (
     <div className="flex items-center gap-0.5">
       {PERIODS.map((p) => (
@@ -830,7 +747,7 @@ export function OperationsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title="Pace Board"
+        title={activeLens ? 'Trend Board' : 'Pace Board'}
         docsHash="#docs:dashboard.md:pace-board"
         center={periodSelector}
         actions={
@@ -877,43 +794,34 @@ export function OperationsPage() {
         </div>
       ) : fragments.length === 0 ? (
         <div className="mt-8">
-          <p className="text-sm text-text-secondary mb-2">Stations appear here once roles are marked visible in Operations.</p>
+          <p className="text-sm text-text-secondary mb-2">Roles appear here once they are marked visible in Operations.</p>
           <p className="text-xs text-text-tertiary">
             Go to{' '}
             <Link to="/admin/roles" className="text-accent hover:underline">
               Roles
             </Link>{' '}
-            and enable <strong>Visible in Operations</strong> on roles that represent pipeline
-            stations.
+            and enable <strong>Visible in Operations</strong> on the roles that belong to a pace segment.
           </p>
         </div>
       ) : (
         /* Console layout: fixed header (above) → chart row (min 40vh) → table row (max 30vh) */
         <div className="flex flex-col flex-1 min-h-0">
 
-          {/* Top strip: segment selector (left) + lens selector + scale toggle (right) */}
-          <div className="flex items-end justify-between">
-            <div className="flex-1">
-              {!activeLens && fragments.length > 1 && (
-                <SequenceMenu
-                  fragments={fragments}
-                  aggregates={fragmentAggregates}
-                  activeOrigin={activeFragment?.origin.role ?? null}
-                  onSelect={selectFragment}
-                />
-              )}
-            </div>
-            {entityLenses.length > 0 && (
+          {/* Top strip: the one board selector — Pace segments and Trend lenses. */}
+          {(fragments.length > 1 || entityLenses.length > 0) && (
+            <div className="flex items-end justify-end">
               <div className="px-4 pt-2 pb-0.5">
                 <ViewMenu
+                  fragments={fragmentOptions}
+                  activeFragment={activeFragment?.origin.role ?? null}
                   lenses={entityLenses}
                   activeLens={activeLens}
-                  stationCount={ordered.length}
-                  onSelect={selectLens}
+                  onSelectFragment={selectFragment}
+                  onSelectLens={selectLens}
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {activeLens ? (
             /* ── Entity lens: the board flipped entity-first — the system's

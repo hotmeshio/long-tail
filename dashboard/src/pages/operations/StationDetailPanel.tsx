@@ -233,11 +233,11 @@ function OverviewPanel({
       <div className="mb-4">
         {stationsAtRisk > 0 ? (
           <p className="text-2xs" style={{ color: PRIORITY_TEXT_COLOR }}>
-            {stationsAtRisk} station{stationsAtRisk > 1 ? 's' : ''} with items in jeopardy
+            {stationsAtRisk} role{stationsAtRisk > 1 ? "s" : ""} with items in jeopardy
           </p>
         ) : stationsWithLoad > 0 ? (
           <p className="text-2xs text-status-warning">
-            {stationsWithLoad} station{stationsWithLoad > 1 ? 's' : ''} with backlog
+            {stationsWithLoad} role{stationsWithLoad > 1 ? "s" : ""} with backlog
           </p>
         ) : totalResolved > 0 ? (
           <p className="text-2xs text-status-success">Flowing — queue clear</p>
@@ -271,7 +271,7 @@ function OverviewPanel({
       {/* Divider + column headers */}
       <div className="border-t border-surface-border/40 pt-2 mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-2xs text-text-quaternary uppercase tracking-wider flex-1">Station</span>
+          <span className="text-2xs text-text-quaternary uppercase tracking-wider flex-1">Role</span>
           <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">pend</span>
           <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">clmd</span>
           <span className="text-2xs text-text-quaternary uppercase tracking-wider w-8 text-right shrink-0">res</span>

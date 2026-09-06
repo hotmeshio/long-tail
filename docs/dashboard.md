@@ -10,12 +10,15 @@ The sidebar organizes pages into six groups.
 
 The reactive, event-driven surface — where operations watch the floor and builders configure choreography.
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| **Pace Board** | `/operations` | COO shop-floor view — pace chart of actual-vs-target flow across every station role, station table with live metrics, and the station detail panel. Readable by every login (aggregate counts and trends) while `features.publicPaceBoard`, default on, stands. |
-| **Event Topics** | `/topics` | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
-| **Agents** | `/agents` | Autonomous event-driven automations (labeled **Automations** when AI is not configured). Configure subscriptions, schedules, and knowledge domains. |
-| **Capabilities** | `/capabilities` | Browse MCP tools grouped by capability category, with a live run panel. |
+| Page | Route | Icon | Purpose |
+|------|-------|------|---------|
+| **Pace Board** | `/pace` | Gauge | Actual-vs-target flow across a segment of roles — a pace chart over the sequence, a live role table, and a role detail panel. Readable by every login (aggregate counts and trends) while `features.publicPaceBoard`, default on, stands. |
+| **Trend Board** | `/trends` | TrendingUp | Where the time went — the entity lens over a metadata facet (`serialNumber`, `orderId`): a state-mix summary, dwell rankings, and per-entity cross-queue timelines. Shares the combined board selector with the Pace Board. |
+| **Event Topics** | `/topics` | Radio | Topic catalog — browse all known event topics with descriptions, schemas, and subscriber counts. |
+| **Agents** | `/agents` | Bot | Autonomous event-driven automations (labeled **Automations** when AI is not configured). Configure subscriptions, schedules, and knowledge domains. |
+| **Capabilities** | `/capabilities` | Zap | Browse MCP tools grouped by capability category, with a live run panel. |
+
+Pace Board and Trend Board are two anchors on one page — the pathname picks the board, and the shared board selector switches between a Pace segment and a Trend lens without a reload. `/operations` redirects to `/pace`. Both entries appear only for logins that may read the board (admins, superadmins, and every login while `features.publicPaceBoard` stands).
 
 ### Orchestrate
 
@@ -49,7 +52,7 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Files** | `/files` | Browse and manage files in connected storage (MinIO/S3/GCS). |
-| **Knowledge** | `/knowledge` | Knowledge base entries for workflow context and retrieval. |
+| **Knowledge** | `/knowledge` | Versioned knowledge base — domain data (catalogs, reference tables, cascade options) that workflows and resolver forms read at runtime, every edit an immutable edition. |
 
 ### Identity & Access
 
@@ -58,6 +61,7 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 | **Accounts** | `/admin/users` | User accounts and service accounts (bots). Create, edit, assign roles, manage API keys. |
 | **Roles** | `/admin/roles` | Define roles — the queues, forms, and membership that connect workflows to people. Pace Board dials, capacity settings, versioned schemas, members, and default pins live here. |
 | **Personas** | `/admin/personas` | Bundle roles into named, one-step assignments. Each linked role carries a relationship scope (write-all, write-self, read-all); assigning a persona composes the member's whole surface from its roles' pins and schemas. |
+| **Scan Codes** | `/admin/scan-codes` | Configure barcode schemes and their scan-driven rules (event-condition-action over escalations). Shown when `features.scanCodes` stands. |
 
 ### Infrastructure
 
@@ -74,11 +78,13 @@ Builder-only.
 The top navigation bar contains:
 
 - **Home logo** — links to the home page (`/`), Recent Activity.
+- **Search bar** — the opt-in global lookup: type an id or facet value, pick a facet, and land on the matching escalation or a filtered queue. Off by default; enable via `search` in `start()` config or `LT_SEARCH_BAR`. See [Global search](#global-search).
 - **all** — links to `/escalations/available` with a live count of unclaimed escalations.
 - **mine** — links to `/escalations/queue` with a live count of escalations assigned to you.
+- **scan** (Barcode icon) — opens the scan panel for manual code entry and capture settings, shown when `features.scanCodes` stands. See [Scan Codes](#scan-codes).
 - **events** — toggles the live event feed (builders and ops; doubles as the connection indicator).
 - **docs** (BookOpen icon) — toggles the in-app documentation drawer. Each page also has a contextual docs link next to its title that opens the drawer to the relevant section.
-- **User menu** — Credentials, theme picker (five accent themes), and Sign Out.
+- **User menu** — **Credentials** (OAuth connections and API keys), **Link variables** (per-device facet bindings that scope pins and the Pace Board — see [Faceted Routing](faceted-routing.md#link-variables)), the **theme picker** (five accent themes), and **Sign Out**.
 
 ## Home — Recent Activity
 
@@ -121,15 +127,16 @@ workers: [
 
 ### Invoke Workflow
 
-A two-panel page for starting any invocable procedural workflow. The left panel lists invocable workflows grouped by task queue, with a queue select and search in the filter bar. Workflows with active cron schedules show a clock icon. Selecting a workflow opens the invocation form on the right:
+Accessible at `/workflows/durable/invoke`. A two-panel page for starting any invocable procedural workflow. The left panel lists invocable workflows grouped by task queue, with a queue select and search in the filter bar; each row carries its tier badge, and workflows with an active cron schedule show a clock icon. Selecting a workflow syncs `?type=<WorkflowType>` to the URL and opens the invocation form on the right:
 
-- **Identity summary** — shows who will execute (current user, configured bot, or admin override).
-- **Envelope editor** — dual-mode input: a structured form view (when `envelope_schema.data` has scalar fields) or a raw JSON editor. The form auto-generates fields from the schema with inferred types.
-- **Start Workflow** button — invokes the workflow and navigates to the executions page.
+- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override"). The invocation runs under that identity's `_scope`.
+- **Certification checkbox** — for a certified workflow, stamps `metadata.certified` on this one run.
+- **Envelope editor** — the envelope is `{ data, metadata }`: `data` holds the workflow input, `metadata` optional context. Two modes that stay in sync: a **Form view** that auto-generates a field per `envelope_schema.data` key (type inferred — text, number, boolean, object) and a raw **JSON view**. When a workflow has no `envelope_schema`, a banner links to the registry to add one.
+- **Start Workflow** button — calls the invoke endpoint and navigates to the executions list.
 
-Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page.
+Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page. The graph equivalent, **Graph → Invoke** (`/mcp/workflows/invoke`), starts a compiled YAML flow from the same shape.
 
-**API:** `POST /api/workflows/:type/invoke` starts a workflow.
+**API:** `POST /api/workflows/:type/invoke` starts a workflow (body `{ data, metadata?, execute_as? }`, returns `202` with the workflow id). `GET /api/workflows/discovered` backs the list; `GET /api/workflows/:type/config` supplies the envelope schema and identity.
 
 ### MCP Tool Designer
 
@@ -193,16 +200,18 @@ Execution history for all graph runs — both dynamic (agentic LLM loops) and co
 
 ### Procedural Executions
 
-Lists all procedural workflow runs across the system.
+Accessible at `/workflows/executions`. Lists procedural workflow runs from one HotMesh namespace.
 
-- **Tier filter** (top) — switch between All, Certified, and Durable to focus on specific workflow types.
-- **Columns:** Workflow name, workflow ID, status (running/completed/failed), start time, and duration.
-- **Click any row** to see the full execution detail: the swimlane timeline and events fill the main column, and a full-height side panel carries the record's facts. The main header stays quiet — just the title and a panel toggle; status, the refresh/copy toolbar, and the **Actions** menu (a small caret anchor at the right of the panel's icon row) all live in the panel. The panel and main column share the width as a flex set — the main column narrows as the panel expands.
-  - **Details** — status, workflow identity (type, ID, parent), task queue, start/end times, duration, history size, and activity counts.
-  - **Escalations** — every escalation the workflow raised, each a row with type, role, age, and status badge, so multiple escalations across the run's lifecycle read as a table rather than running on; related child tasks list the same way below.
-- **Duration** is computed from start to completion — useful for identifying slow workflows or comparing performance across versions.
+- **Namespace** — the `?namespace=` query param names the Postgres schema (HotMesh `app_id`) the list reads from; procedural runs live in `durable`, so the page defaults to `?namespace=durable`. Graph runs live in their own per-app namespaces and are browsed at [Graph Executions](#graph-executions) (`/mcp/executions`).
+- **Tier filter** — All, Certified, or Durable. Certified narrows to workflows with a certified config; Durable narrows to those with none.
+- **Type / Status / Search** — filter by workflow type, run status (running / completed / failed), or a workflow-id keyword.
+- **Columns:** Workflow ID (status dot + id), Type (pill with tier variant), Created, Updated, Duration, and hover Actions (filter-by-type, filter-by-status, and — for superadmins — a jump to the workflow's registry entry).
+- **Click any row** to open the execution detail (`/workflows/executions/:workflowId`). A tabbed main column — **Details** (input/output envelopes), **Execution Timeline** (the swimlane of activities, signals, timers, and child workflows), **Events** (the raw event stream) — sits beside a full-height side panel that carries the record's facts. The panel and main column share the width as a flex set.
+  - **Details** (panel) — status, workflow identity (type, id, parent), task queue, start/end times, duration, history size, and activity counts.
+  - **Escalations** (panel) — every escalation the workflow raised as a row (status dot, type, role, age), each linking to its detail page; related child tasks list below. Empty reads "This workflow has not escalated."
+  - **Actions** menu — Restart (prefills a fresh invoke from the start event), Terminate (running runs only), Compile into Pipeline (runs with tool calls), and jumps to worker / engine stream messages.
 
-**API:** `GET /api/workflows/executions` lists runs with tier, status, and pagination filters.
+**API:** `GET /api/workflow-states/jobs?namespace=durable` lists runs (params `entity` for type, `status`, `search`, `registered` for tier, `sort_by`, `order`, `limit`, `offset`). `GET /api/workflow-states/:workflowId/execution` returns the detail. `POST /api/workflows/:workflowId/terminate` stops a running one.
 
 ### Accounts
 
@@ -219,11 +228,11 @@ User Accounts and Service Accounts live on the same page, separated by a tab tog
 
 Roles are the system's central organizer and gatekeeper: every hand-off between the digital side (running workflows) and the outside world crosses a role. When a workflow needs something only a person or external actor can provide, it raises an escalation into exactly one role's queue and pauses. Membership in the role grants access to that queue and every escalation it contains; each member's scopes determine which specific combinations of activities they may perform via those escalations — which items appear, which they can claim, resolve, or forward. Resolving an item resumes the workflow exactly where it paused.
 
-Because roles carry the queue, the form schema, the membership, and the capacity targets in one place, they are also the unit everything else is built on: [Accounts](#accounts) grant them, escalation views filter by them, and the [Pace Board](#pace-board) renders them as stations.
+Because roles carry the queue, the form schema, the membership, and the capacity targets in one place, they are also the unit everything else is built on: [Accounts](#accounts) grant them, escalation views filter by them, and the [Pace Board](#pace-board) charts them.
 
 **Master list** (`/admin/roles`) — one row per role:
 
-- **Role** — an ops status dot (green marks roles that appear as stations on the [Pace Board](#pace-board)) beside the display name: the user-set title, else Title Case derived from the key.
+- **Role** — an ops status dot (green marks roles shown on the [Pace Board](#pace-board)) beside the display name: the user-set title, else Title Case derived from the key.
 - **Key** — the exact technical role id.
 - **Description** — the role's human-facing summary.
 - **Preceded By** — the role's prior step (`parent_role`), linked. Prior steps compose the Pace Board's sequences.
@@ -238,15 +247,15 @@ Search filters by key, label, or description. **+ Add Role** creates a role here
 
 Accessible at `/admin/roles/:role`. One page per role — a quiet header carrying the role's identity, with the configuration organized into a five-section left sub-nav: **Identity · Pace Board · Schemas · Members · Pins**. The active section rides the URL (`?section=pace-board`), so deep links land on the right concern. One draft spans every section — switching sections never loses edits — and the **Save** button sits in the sub-nav footer, visible from every section. (Members, Pins, and Upstream Inputs save live.)
 
-**Identity** — display name and description, shown on role rows and station labels. The danger zone lives here too: a role nothing references can be deleted.
+**Identity** — display name and description, shown on role rows and Pace Board labels. The danger zone lives here too: a role nothing references can be deleted.
 
 **Pace Board** — everything the board consumes about this role, in one column:
 
-- **Station** — the toggle that shows the role as a station on the [Pace Board](#pace-board).
+- **Show this role on the Pace Board** — the visibility toggle (`ops_visible`) that charts the role on the [Pace Board](#pace-board).
 - **Capacity** — `sla_minutes`, `target_per_hour`, and `worker_count`; enter any two and the section hints the derived third (`throughput = workers / (sla / 60)`).
-- **Priority** — `priority_threshold_minutes` and the age facet (`priority_facet`) driving the Pace Board priority count and the jeopardy filter (blank = `sla_minutes` and `created_at`). The dials stay editable while the station is hidden — they also drive jeopardy in the queues.
-- **Entity** — the metadata key naming what moves through this station (`entity_facet`, e.g. `serialNumber`, `orderId`). Roles sharing a key form that entity's system: the [entity lens](operations.md#entity-lens), per-entity dwell, and timelines all derive from it. Once a key is set, the **States from** picker (`entity_state_source`) chooses how the station names the entity's state — **Station** (being here is one state, e.g. a servicing queue) or **Subtypes** (this one role holds several states named by each escalation's subtype, e.g. a fleet role parking `idle` / `printing`).
-- **Sequence** — board geometry, shown while the station is visible: **Prior Step** (places the role in one Pace Board sequence; a role with no prior step starts its own), **Upstream Inputs** (the roles this station also draws from in other sequences — mixin-like, many allowed, saved live, rendered as a merge glyph on the station, never a bend in the line), and **Home Segment** (lead the home Pace Board with this role's sequence; one role holds this).
+- **Priority** — `priority_threshold_minutes` and the age facet (`priority_facet`) driving the Pace Board jeopardy count and the jeopardy filter (blank = `sla_minutes` and `created_at`). The dials stay editable while the role is hidden — they also drive jeopardy in the queues.
+- **Entity** — the metadata key naming what moves through this role (`entity_facet`, e.g. `serialNumber`, `orderId`). Roles sharing a key form that entity's system: the [Trend Board](#trend-board) lens, per-entity dwell, and timelines all derive from it. Once a key is set, the **States from** picker (`entity_state_source`) chooses how the role names the entity's state — **Role** (being here is one state, e.g. a servicing queue) or **Subtypes** (this one role holds several states named by each escalation's subtype, e.g. a fleet role parking `idle` / `printing`).
+- **Sequence** — board geometry, shown while the role is visible: **Prior Step** (places the role in one Pace Board segment; a role with no prior step starts its own), **Upstream Inputs** (the roles this role also draws from in other segments — mixin-like, many allowed, saved live, rendered as a merge glyph, never a bend in the line), and **Home Segment** (lead the home Pace Board with this role's segment; one role holds this).
 
 **Schemas** — the role's contracts:
 
@@ -293,6 +302,26 @@ Accessible at `/admin/personas` for admins, superadmins, and engineers — the s
 
 **API:** `GET /api/personas` lists. `POST /api/personas` creates; `PATCH`/`DELETE /api/personas/:key` edit and remove. `PUT`/`DELETE /api/personas/:key/roles/:role` manage links. `POST /api/personas/seed` applies a declarative spec set idempotently.
 
+### Scan Codes
+
+Scan codes turn a barcode into an action on an escalation — a floor operator scans a printed code and an item is claimed, resolved, escalated, or opened, with no keyboard. The dashboard captures scans globally: an HID scanner types like a keyboard, and a pattern-anchored wedge accumulates keystrokes and fires on a terminator or a quiet period (scanner-speed keys plus a short silence auto-fire; hand-typed codes need Enter). The matched code is stripped byte-exact from whatever field had focus, so a scan never leaks into a form. The whole surface is gated by `features.scanCodes` in `start()` config (a per-browser toggle in the Features panel flips it for testing); the execute and config APIs work regardless.
+
+A code encodes **`version:category:target`** (e.g. `10:1:SN-12345`):
+
+- **version** (two digits) selects the **scheme** — how the target is parsed and which metadata facet it matches (`serialNumber`, `assetTag`).
+- **category** (one digit) selects the **rule** under that scheme.
+- **target** is the value matched against the scheme's facet.
+
+**Rules are ECA over escalations.** A rule is an ordered list of event-condition-action steps, first match wins: the event is the scanned code, the condition is a query against the escalation (role, status, availability, metadata facets), and the action is a canonical verb (`show-detail`, `show-list`, `claim`, `claim-show-detail`, `release`, `resolve`, `escalate`, `cancel`, `present`). Mutations ride single-statement by-metadata operations under the caller's own role scope, and stamp provenance facets (`scanScheme`, `scanCategory`, `scanActionName`, `scannedAt`) on every transition. Ordering is the design: put the expected state first and a broad fallback last, since a scan is also a state query.
+
+**Admin config** lives at `/admin/scan-codes` (scheme list) and `/admin/scan-codes/:version` (a scheme with its rules) — builder-gated (admin, engineer, superadmin). A scheme carries a name, its target facet, encoding, and — for identity schemes — a grant policy.
+
+**Station surface.** `/scan/station` is a full-screen scan surface with an idle prompt, an info/choice screen (the current reality plus labeled choices when a rule presents options), and a badge prompt when identity is required. In **kiosk mode** — a login holding exactly one role whose `properties.kiosk` is set — the chrome falls away and only the role's list, escalation detail, and this scan screen are reachable. The header **scan** panel offers the same manual entry and capture settings on any page.
+
+**Badge scanning grants acting identity.** A scheme of kind `identity` binds a badge value to a person (via a facet on `lt_users.metadata`). Scanning a badge primes an **ephemeral acting grant** minted through the internal keystore; it rides subsequent scans as the `X-LT-Acting-Token` header, and verbs then run **as the badged person under their own RBAC** — attribution, never privilege escalation. A badge on a work form belongs to the submission: the form names who will submit, holds if the wrong badge scans, and consumes the single-use grant on the write. A dead grant (expired, exhausted, revoked) fails loudly rather than executing silently.
+
+**API:** `POST /api/scan-codes/execute` runs a code (`{ code, actingToken?, previousActingToken? }`, returning a structured outcome); `POST /api/scan-codes/execute-choice` runs a presented choice (the server re-validates config, row, identity, and RBAC). `GET/PUT/DELETE /api/scan-codes/schemes/:version` and `/schemes/:version/actions/:category` manage schemes and rules. See [Scan Codes](scan-codes.md) for the full concept doc and the four-corner printer demo.
+
 ### DB Maintenance
 
 Database housekeeping tools for keeping PostgreSQL healthy under sustained workflow load.
@@ -331,20 +360,39 @@ Messages are read-only. Status is derived from timestamps: pending (no timestamp
 
 ### All Escalations
 
-The central queue for all escalation activity across every workflow.
+Accessible at `/escalations/available`. The central queue for escalation activity across every workflow — every place a running workflow paused to wait on a person or external actor.
 
-- **Title = queue selector** — the page title reads as the selected role's friendly title, or "All Escalations" when unfiltered; clicking it switches queues over the same `?role=` param the filter bar mirrors. The **My Escalations** personal inbox (`/escalations/queue`) carries the identical control, titling itself "My Escalations" or the filtered role's title.
-- **Filter bar** — filter by status (pending/claimed/resolved), role, workflow type, priority, and time window.
-- **Columns:** Escalation ID, workflow type, role, status, priority, created time, and claimed-by user.
-- **Metadata value affordances** — each metadata key/value row in the list carries a three-icon triad on hover: **filter** (filter the current role's queue to rows where the key equals this value), **search** (the same facet match across all roles), and **history** (open the entity's cross-queue interval timeline in the right panel — every station this value has moved through, with durations and gaps). Filter-present, search-present, history-past. The history affordance renders for string values, since the timeline's GIN containment match serves JSON-string facets.
-- **Rich list view** — when the list is scoped to exactly one role (`?role=<role>`) and that role owns a [list schema](#escalations-list-schema), a role-authored view renders in place of the table (the live item as a card, plus a load-on-demand history), with a **Table view** toggle back to the columns.
-- **Claim** — click the claim action to lock an escalation to your user. Only users with matching roles see pending escalations. The queue list and aggregate stats reflect `read_all` memberships — a member scoped to `read_self` lands directly on their own assigned item in user mode rather than browsing the full queue.
-- **Bulk actions (admin)** — row checkboxes surface a selection bar with **Claim**, **Assign**, **Unassign**, **Escalate** (move to another role), and **Cancel**. Assign opens a modal to pick the target user and claim duration; rows under a live claim are skipped unless the modal's takeover checkbox (shown when the selection includes live claims) is checked, which reassigns them — admin/superadmin only. Unassign returns claimed rows to the available pool. The response reports how many rows were skipped. When the list is scoped to a single role, the Cancel button and its confirmation speak the role form's `x-lt-labels.cancel` vocabulary (`false` hides the verb).
-- **Admin claim override (detail page)** — when an item is claimed by someone else, admins and superadmins see **Reassign…** (hand the claim to another user via the assign modal, takeover implied) and **Return to queue** (unassign) in the action bar.
-- **Resolve** — after claiming, submit a resolver payload. The form is pre-filled from the role's versioned `form_schema` field defaults and from the workflow's seeded `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind`). The dashboard maps the flat form to the nested payload via `x-lt-bind` and the submitted payload is stored as-is. Resolution triggers a workflow re-run with the resolver data injected. A `member` whose `write_scope` is `self` can resolve only items already assigned to them; `write_scope=none` is read-only.
-- **Side panel** — a slide-in beside the resolve form with switchable views, selected by the icon set at its top: **Help** (the form's `x-lt-help` markdown, `{{domain.path}}`-interpolated against the live record, or a state-aware hint such as "Claim this escalation to enable the form"), **Details** (status, role, priority, claim provenance, timestamps, and — for builders — identifier links), **AI Analysis** (what triage diagnosed and corrected — shown when AI is enabled and triage data is present), **Metadata** (the row's metadata values), **Context** (input envelope, escalation context, resolver payload), and **Record** (the raw escalation JSON, builders only). The panel and form share the width as a flex set — the form column narrows as the panel expands. It opens expanded on Help when the form carries `x-lt-help`, stays hidden otherwise, and the page-header panel button toggles it either way.
+- **Title = queue selector** — the page title reads as the selected role's friendly title, or "All Escalations" when unfiltered; clicking it switches queues over the same `?role=` param the filter bar mirrors.
+- **Filter bar** — status (available / claimed / resolved / cancelled / expired), role, workflow type, priority, and time window. `available` means pending and either unclaimed or past its claim expiry.
+- **Columns:** a **Summary** cell (status dot + description or type), **Assignee** (claimant, or `—`), **Role** pill, **Priority**, and **Created**. The status dot distinguishes pending, claimed, resolved, cancelled, and expired; notification escalations show a bell.
+- **Faceted query** — beyond the filter bar, the queue takes a structured metadata query, all URL-backed so a query copy-pastes: `?facets={"orderId":"..."}` (equality, AND-ed), `?block=` (exclude), `?range=` (numeric bounds), `?exists=` (key present), `?roles=` (union of role queues), and `?orderBy=` (JSON sort). `?jeopardy=1` narrows to rows past the role's age threshold. List rows omit the envelope by default; `?include=envelope` pulls the full envelope and payload columns for rich views.
+- **Metadata value affordances** — each metadata key/value row carries a three-icon triad on hover: **filter** (scope the current role's queue to `key = value`), **search** (the same facet match across all roles), and **history** (open the entity's cross-queue interval timeline in the right panel — every role this value moved through, with durations and gaps). Filter-present, search-present, history-past. History renders for string values, since the timeline's GIN containment match serves JSON-string facets.
+- **View modes** (`?view=`) — `table` (the columns above), `timeline` (100 rows per page of cross-queue movement), and `rich`. When a role owns a [list schema](#escalations-list-schema), the list defaults to the role-authored `rich` view (the live item as a card, plus a load-on-demand history) with a **Table view** toggle back.
+- **Claim** — the claim action locks an item to your user for a claim window (default 30 min). Only members of the role see its pending items; a member scoped `read_self` lands directly on their own assigned item rather than browsing the queue. Re-claiming your own expired item extends it rather than failing.
+- **Bulk actions (admin)** — row checkboxes surface a selection bar: **Claim**, **Assign**, **Unassign**, **Escalate** (move to another role), and **Cancel**. Assign opens a modal for the target user and claim duration; rows under a live claim are skipped unless the modal's takeover checkbox (shown when the selection includes live claims) reassigns them — admin/superadmin only. Unassign returns claimed rows to the pool. Each response reports how many rows were skipped and why. Scoped to a single role, the Cancel verb and its confirmation speak the role form's `x-lt-labels.cancel` vocabulary (`false` hides it). Assign also accepts a faceted query instead of an id list, so "claim everything matching this facet" is one call.
 
-**API:** `GET /api/escalations` lists with filters. `POST /api/escalations/:id/claim` claims. `POST /api/escalations/:id/resolve` resolves.
+**API:** `GET /api/escalations` lists with filters; `POST /api/escalations/search-by-facets` backs the faceted query. `POST /api/escalations/bulk-claim`, `/bulk-assign`, `/bulk-unassign`, `PATCH /api/escalations/bulk-escalate`, `POST /api/escalations/bulk-cancel` drive the selection bar.
+
+### My Escalations
+
+Accessible at `/escalations/queue`. The personal inbox — the items currently assigned to you across your roles. It carries the same title-as-role-selector, the same rich/table views, and the same metadata affordances as All Escalations, minus the bulk selection bar (every row is already yours). A **Claim expiry** column counts down each item's remaining window. The shell also auto-navigates here on hand-off: when a workflow assigns a follow-on escalation to you (`assigned_to = you`), the dashboard opens that item's detail directly.
+
+### Escalation Detail & Resolve Form
+
+Accessible at `/escalations/detail/:id`. Where a person completes the work the workflow is waiting on. The main column is the resolve form; a switchable side panel carries context.
+
+- **Lifecycle** — pending → claimed → resolved (or cancelled / expired). The sticky action bar shows the verbs valid for the current state: **Claim**, **Submit** (resolve), **Release**, **Cancel**. The form is read-only until you hold a live claim.
+- **Form contract** — the form is the target role's versioned [`form_schema`](#escalation-schema), rendered flat. Fields pre-fill from two sources: the workflow's `envelope.formDefaults` (reverse-mapped through each field's `x-lt-bind` path) and the schema's own field defaults. On submit, the dashboard rebuilds the nested payload from the flat form via `x-lt-bind` and posts it as the resolver payload; password fields are redacted to short-lived ephemeral tokens before storage.
+- **Validation** — one isomorphic pass runs on the client (to gate submit) and again on the server when the role sets `enforce_schema`, returning a canonical `422` with field-level errors. It covers required/type/enum/bounds, dynamic `x-lt-minimum`/`x-lt-maximum` (with `{{token}}` interpolation), and the root-level `x-lt-require-any` / `x-lt-require-sum` groups. Fields hidden by `x-lt-showIf` never block submission.
+- **Resumption** — resolving resumes the paused workflow. When the escalation was created by `conditional()` (a HotMesh Leg1 write), the resolve is the signal: the run resumes in place with the payload injected, in one atomic Postgres statement — no re-run. A **notification** escalation (no `workflowType`) has no run to resume; **Acknowledge** still validates and submits the full form payload, resolving it atomically.
+- **Canned actions** — a form may declare `x-lt-actions`: extra action-bar buttons that submit a preset payload in one click (Approve / Reject / Skip), bypassing field editing.
+- **Submit guard** — `x-lt-submit-guard` gates a parent on a child query (e.g. "every item in this batch must resolve first"): the dashboard disables Submit with a live count while rows remain, and the server re-checks the guard atomically inside the resolving `UPDATE` so no race slips through. `autoResolveWhenEmpty` submits the parent the moment the query empties.
+- **Transition hand-off** — `x-lt-transition` replaces the return-to-previous-page jump with a short wait screen: the workflow assigns a follow-on escalation back to the submitter, the screen detects it and navigates onward (or falls back to `x-lt-transition-done` after a bounded wait). This is the submit → side-effect → next-step chain (submit, a label prints, the harvest task opens).
+- **Batch resolution** — a `conditional({ batch })` escalation accumulates N items on one row; `POST /api/escalations/:id/resolve-batch-item` submits each (claim-agnostic by default, `assertClaim` to require your own live claim), and the last item wakes the workflow with the full collection.
+- **Side panel** — switchable views selected by the icon strip: **Help** (the form's `x-lt-help` markdown, `{{domain.path}}`-interpolated against the live record — escalation, metadata, envelope, payload, resolver, and `lookup.*` — or a state-aware hint like "Claim this escalation to enable the form"), **Details** (status, role, priority, claim provenance, timestamps, and for builders the identifier links), **AI Analysis** (what triage diagnosed and corrected, when AI is on), **Metadata** (the row's facets, with the same triad), **Context** (input envelope, escalation context, resolver payload), **Record** (the raw JSON, builders only), and **Errors** (the last submit's validation failures). The panel and form share the width as a flex set; it opens expanded on Help when the form carries `x-lt-help`.
+- **Admin claim override** — when an item is held by someone else, admins and superadmins see **Reassign…** (hand the claim to another user, takeover implied) and **Return to queue** (unassign) in the action bar.
+
+**API:** `POST /api/escalations/:id/claim` claims, `/release` releases, `/resolve` resolves; `/resolve-batch-item` submits one batch item; `/escalate` moves; `/cancel` cancels. The role's form and its versions come from `GET /api/roles/:role/schema`.
 
 ### Escalations Overview
 
@@ -352,28 +400,51 @@ Accessible at `/escalations`. A statistics dashboard for escalation health acros
 
 - **Time window selector** — toggle between 1h, 24h, 7d, and 30d views.
 - **Summary cards** — open (pending), claimed (in progress), created (new), and resolved counts for the selected window.
-- **Role breakdown table** — groups escalations by role so you can see which teams have the most pending work. Useful for identifying bottlenecks and rebalancing workload.
+- **Role breakdown table** — groups escalations by role so you can see which teams have the most pending work; cells link into the filtered queue. Useful for identifying bottlenecks and rebalancing workload.
 
 ### Pace Board
 
-Accessible at `/operations`. The COO shop-floor view of the roles system: actual-vs-target flow across every station, rendered as a pace chart with a station table and detail panel below.
+Accessible at `/pace`. The live picture of how work flows across a segment of roles: actual-vs-target throughput, rendered as a pace chart over a role table with a role detail panel. It answers the question a COO actually asks — *are we keeping up, and where is work backing up?*
 
-The board is [Roles](#roles) end-to-end. Every station is a role with its **Ops** toggle on; sequences are composed from each role's Prior Step (`parent_role`); cross-sequence feeds come from Upstream Inputs; the red target line comes from each role's capacity settings. Configuring the board *is* configuring roles — the **Configure** button in the header goes straight there.
+The board is [Roles](#roles) end-to-end. Every role on it has **Visible in Operations** on; segments are composed from each role's **Prior Step** (`parent_role`); cross-segment feeds come from **Upstream Inputs**; the target line comes from each role's capacity settings. Configuring the board *is* configuring roles — the **Configure** action opens [Role Detail](#role-detail). See [Operations](operations.md) for the full concept doc.
 
-Execution is a graph; this page tells its story as **sequences**. Each station role with no prior step (or whose prior step is outside the station set) starts a sequence, followed by its `parent_role` descendants in dependency order. The longest sequence leads. The table is always the ground truth of the queues; the SVG is the narrative line drawn through them.
+**Segments.** A segment is a sequence of roles. A role with no prior step (or whose prior step lies outside the visible set) starts a segment, followed by its `parent_role` descendants in dependency order; the longest segment leads. The table is the ground truth of the queues; the chart is the line drawn through them.
 
-- **Sequence picker** — when more than one sequence exists, tabs appear above the chart, one per sequence, named by its origin role with the station count alongside. The active sequence is deep-linked (`?fragment=<origin role>`) and each switch is a browser-history entry, so a shared URL opens the same sequence and back/forward walks between them.
-- **Period selector** — `15m`, `1h`, `24h`, `7d`, `30d`. Controls the lookback window for resolved counts, percentile metrics, and throughput.
-- **Pace chart** — connects the active sequence's stations in process dependency order and plots absolute counts for the selected window: a straight red target polyline (`target_per_hour × window hours`) against a smooth actual (resolved) curve with a light area fill. The queue splits into two stacked bands — claimed-and-worked (indigo) and waiting-unclaimed (sky). Station circles are colored by pace ratio (green ≥ 100%, amber ≥ 60%, red below).
-- **Priority badge (jeopardy)** — a station with unclaimed items past its age threshold carries a powder-blue circle with the count. Age is measured from the role's priority facet (a metadata timestamp such as the order's authorized date; `created_at` when unset) against its priority threshold (`sla_minutes` when unset). Clicking the badge opens the **jeopardy deep link**: `/escalations/available?role=<r>&jeopardy=1&view=table&orderBy=[{"field":…,"direction":"asc"}]` — the table view filtered to exactly the counted items (the same server-side predicate produces the count and the list, so the totals always match), ordered oldest-first by the same facet. A red `in jeopardy · > <limit>` pill above the list names the active filter; its ✕ widens back to the full queue. The operator home's Task Queue cards carry the same pill and link.
-- **Merge affordance** — a station that declares upstream inputs shows a small dashed merge glyph at its floor position. It is deliberately a symbol, never a bend in the line: the upstream is an input, not a descendant. Hover names the feeding roles; click jumps to their sequence.
-- **Station table** — one row per station: ROLE (with a merge icon marking cross-sequence inputs), TARGET/H, then PENDING, ACTIVE, RESOLVED in column bands carrying the chart's hues, P99 WAIT, P99 WORK, and a TREND mini-bar. TREND shows the live backlog-to-target ratio while the queue has items; when the queue is idle it shows the period's throughput efficiency, marked with `↩`. Stations with priority items show a powder-blue sub-row linking to the queue ordered oldest-first by the priority facet.
-- **Station detail panel** — opens on row or circle click. Shows the role's identity, an independent period toggle, and the full metric breakdown (wait/work percentiles, SLA target, worker count, links to the queue).
-- **Live updates** — escalation events refresh the metrics push-driven and debounced; the header's refresh button forces a reload.
+**The combined board selector.** One menu switches views. Its **Pace Board** group lists the segments (each row: the segment title, its role count, pending total, and a jeopardy count); its **Trend Board** group lists the entity [lenses](#trend-board) (each `by <facet>`, with a live in-queue count). Choosing a segment stays on `/pace`; choosing a lens navigates to `/trends`. The collapsed button reads the active segment title, or `by <facet>` on a lens.
 
-A role joins the board via the **Ops** toggle on its [Role Detail](#role-detail) page; the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`) and the priority dials (`priority_threshold_minutes`, `priority_facet`) drive the computed metrics. See [Operations](operations.md) for the full concept doc.
+- **Segment deep link** — the active segment rides `?fragment=<origin role>`; each switch is a history entry, so a shared URL opens the same segment and back/forward walk them.
+- **Period** — `15m`, `1h`, `24h`, `7d`, `30d`, default `1h`. It is deep-linked as `?period=` (the default stays out of the URL for clean links) and carries across a Pace↔Trend switch. It bounds resolved counts and the percentile metrics; `pending` is always the live count.
+- **Pace chart** — the segment's roles on the X axis in dependency order. A muted-gray dashed **target** polyline sits at each role's expected count (`target_per_hour × window hours`); a green **actual** (resolved) curve with a faint area fill reads against it. The live queue shows as two faint stacked bands beneath — **claimed/worked** (orange) and **waiting/unclaimed** (sky). Each role is a circle on the resolved curve whose radius grows with volume; the selected role gets a ring. A `lin | log` toggle switches the Y axis (log by default, so small and large queues stay legible together).
+- **Jeopardy** — a role with unclaimed items past its age threshold carries a jeopardy count (warning triangle) in its row and on the segment menu. Age is measured from the role's **priority facet** (a metadata timestamp such as an order's authorized date; `created_at` when unset) against its **priority threshold** (`sla_minutes` when unset). Clicking it opens the jeopardy deep link — `/escalations/available?role=<r>&jeopardy=1&view=table&orderBy=[{…,"direction":"asc"}]` — the table filtered to exactly the counted items (one server-side predicate feeds both the count and the list, so totals always match), oldest-first by the same facet. A jeopardy pill above the list names the filter; clearing it widens back to the full queue.
+- **Merge glyph** — a role that declares upstream inputs shows a small dashed merge glyph at its floor position: deliberately a symbol, never a bend in the line, because the upstream is an input, not a descendant. Hover names the feeding roles; click jumps to their segment.
+- **Role table** — columns in order: **NAME**, **ROLE** (the id, wide viewports), **TARGET/H** and **SLA/M** (edit inline), **WORKERS** (derived — `workers = target ÷ (60 ÷ sla)`), then **PENDING**, **CLAIMED**, **RESOLVED** tinted with the chart's hues (each cell links into the queue filtered by that status), **P99 WAIT** and **P99 WORK** (wide viewports), a **MIX** time-in-state bar, a **TREND** mini-bar, and **ACTIONS** (view queue, configure, jeopardy). The TREND bar reads pending-to-target ratio: amber above 1.0 (backlog), gray below 0.2 (idle), green between.
+- **Role detail panel** — opens on a row or circle click: the role's identity, its own independent period toggle, the full wait/work percentile breakdown, SLA target and worker count, the time-in-state mix and per-entity timelines inline, and links into the queue.
+- **Scope pill** — when your roles declare [link variables](faceted-routing.md#link-variables), a scope pill sits in the header. Your device binding (`facility = north`) narrows the whole board — counts, mix, and every timeline — to that facet, or reads `All` when unbound. It opens the Link variables modal; the value picker's choices come from `GET /api/escalations/facet-values?key=<facet>`.
+- **Live updates** — escalation events invalidate the metrics and analytics through the shared realtime scheduler (SUMMARY tier, coalesced); the refresh button forces a reload. Every login may read the board while `features.publicPaceBoard` (default on) stands; turning it off narrows metrics to role membership and the board to admins and superadmins.
 
-**API:** `GET /api/escalations/station-metrics?period=24h`
+A role joins the board from its [Role Detail → Pace Board](#role-detail) section: the visibility toggle, the capacity settings (`sla_minutes`, `target_per_hour`, `worker_count`), the priority dials (`priority_threshold_minutes`, `priority_facet`), and the sequence placement (`parent_role`, upstream inputs).
+
+**API:** `GET /api/escalations/station-metrics?period=<window>&facets=<json>` returns the per-role live counts and windowed percentiles.
+
+### Trend Board
+
+Accessible at `/trends`. The entity lens — *where did the time go?* Instead of role-by-role throughput, it follows one **entity** (a `serialNumber`, an `orderId`) through every role that handles it and shows how its time splits across states. It shares the [combined board selector](#pace-board), the period, and the scope pill with the Pace Board.
+
+The lens is driven by two dials on each role's [Role Detail → Pace Board](#role-detail) section:
+
+- **`entity_facet`** — the `metadata` key naming what moves through the role (`serialNumber`, `orderId`). Roles sharing a key form that entity's **system**. Each distinct facet becomes one lens, deep-linked as `?lens=<facet>` (default: the first facet).
+- **`entity_state_source`** — how a role names the entity's state: **Station** (being in this role is one state, e.g. a servicing queue) or **Subtypes** (one role holds several states named by each escalation's subtype, e.g. a fleet role parking `idle` / `printing`).
+
+Three tiers, aggregate to individual:
+
+- **Where the time went** — a ranked-bar legend of states by total dwell over the window (top rows, with a "+N more stages" fold), beside an insight panel: the leader's share as a headline percentage, `<state> is the biggest time sink`, and `across N stages · M <entity> in queue now` for the selected period.
+- **Slice by** — `?slice=<facet>` splits the system into small-multiple columns, one per value of that key (e.g. `model` → `p1s` vs `h2s`), ranked by dwell. `?sliceValue=<value>` focuses one value with a paginated entity list.
+- **Entity table** — one row per entity, ranked by tracked time: the entity value, a current-state dot, its own dwell band, its total tracked time, and a history action. A **find** box (`?find=<prefix>`) prefix-filters the entities.
+- **Per-entity timeline** — `?entity=<value>` opens that entity's cross-queue interval timeline in the right panel: every role it moved through, with durations and gaps. The panel's copy-link emits a shareable `/trends?lens=<facet>&entity=<value>` URL.
+
+The aggregate bands are counts-only and readable by any login while the public board flag stands; the slice and per-entity tiers group by facet values and require full (`read_all`) access to the system's queues.
+
+**API:** `POST /api/escalations/aggregate-by-facets` (the state-mix and rankings) and `POST /api/escalations/timeline-by-facet` (the per-entity intervals). See [Escalation Analytics](escalation-analytics.md) for the query contract.
 
 ### Processes Overview
 
@@ -398,28 +469,30 @@ This is the primary view for understanding how a multi-step workflow progresses 
 
 ### Files
 
-Browse and manage files in connected storage backends (MinIO locally, S3/GCS in production).
+Accessible at `/files`. Browse and manage files in the connected storage backend (MinIO locally, S3/GCS in production).
 
-- **File browser** — navigate directories with breadcrumbs. View files in a list with name, size, type, and last modified date.
-- **Preview panel** — click a file to preview it in the side panel. Supports images, text, JSON, and PDF.
-- **Upload** — drag and drop or click to upload files to the current directory.
-- **Sidebar** — collapsible file tree for quick navigation across the storage hierarchy.
+- **File browser** — navigate directories with breadcrumbs; the list shows name, size, and last-modified. Paginated via a continuation token.
+- **Preview panel** — click a file to preview it in the side panel: images inline, text and code inline, JSON, and a PDF open-in-tab. Everything else downloads.
+- **Upload** — drag and drop, or the file input, into the current prefix; a confirmation names the target path.
+- **Signed URLs** — generate a time-boxed download link for a file (expiry from a fixed set, 1h to 30d).
 
-Storage backend is selected by the `STORAGE_BACKEND` env var. The same interface works against MinIO (local dev), S3, or GCS — no code changes needed.
+The backend is selected by the `LT_STORAGE_BACKEND` env var — `local` (filesystem) or `s3` (S3-compatible, including MinIO). The same interface serves every backend; only env changes.
 
-**API:** `GET /api/files` lists files. `POST /api/files/upload` uploads. `GET /api/files/download/:path` downloads.
+**API:** `GET /api/file-browser/browse?prefix=<path>` lists. `POST /api/file-browser/upload?path=<path>` uploads raw bytes. `GET /api/file-browser/download/<path>` downloads; `DELETE /api/file-browser/delete/<path>` removes; `POST /api/file-browser/signed-url` mints a link. Token-scoped serving is at `GET /api/files/<path>?token=<jwt>`.
 
 ### Knowledge
 
-Knowledge base for storing and retrieving domain-specific information used by workflows and MCP tools.
+Accessible at `/knowledge` (builder-only — superadmin or the `engineer` role). A **versioned** store of domain data that workflows and resolver forms read at runtime: product catalogs, reference tables, cascade option sets. An entry is keyed by `domain` + `key` and holds a JSON `data` value plus `tags`.
 
-- **Entry list** — browse knowledge entries by domain and key. Each entry stores structured data that workflows can query at runtime.
-- **Create/Edit** — add or update knowledge entries with a domain, key, and JSON value.
-- **Search** — filter entries by domain or key prefix.
+**Versioning is the defining property.** Every write that changes an entry's `data` mints an immutable edition and advances `current_version`; writes that leave the data identical (or touch only tags) are no-ops that never bump the version. The live entry is the current edition; past editions are retained and read-only.
 
-Knowledge entries are accessed by workflows via the `get_knowledge` MCP tool. This is how workflows retrieve domain context (product catalogs, configuration data, reference tables) without hardcoding values.
+- **Browse** — All Domains → a domain's entries (each row shows key, tags, field count, and current version) → an entry detail with a full JSON editor.
+- **Version rail** — the entry detail's version dropdown lists every edition, newest first, the current one marked. Selecting a past edition sets `?version=<N>` and shows an immutable, read-only snapshot with a "back to current" affordance.
+- **Field-level edits** — set or remove a value at a dot-path (`jsonb_set` / path delete) without clobbering sibling keys; each still mints an edition when the data changes.
 
-**API:** `GET /api/knowledge` lists entries. `PUT /api/knowledge/:domain/:key` creates or updates. `DELETE /api/knowledge/:domain/:key` removes.
+**How workflows and forms consume it.** A workflow pins knowledge onto an escalation as versioned lookup refs on the reserved `envelope.lookups` key — `{ domain, key, version, as? }`. Because the ref names an exact edition, the resolver always sees the data the workflow was written against, even as the entry later evolves. Resolving those refs (`GET /api/escalations/:id/lookups`, in-process LRU cached) exposes a `lookup.<key>` domain to the form: a field's `x-lt-options` reads `lookup.materials.items`, and cascades interpolate the live form — `lookup.geo.regions.{{resolver.country}}` narrows the second select from the first. The reader needs no separate knowledge grant; the ref on an escalation they can read *is* the grant. Agents reach the same data through the `get_knowledge` MCP tool (with an optional `version`).
+
+**API:** `GET /api/knowledge/domains` and `/entries?domain=` list; `GET /api/knowledge/entry?domain=&key=&version=` fetches the live entry or a pinned edition; `GET /api/knowledge/entry/versions?domain=&key=` returns the lineage. `POST /api/knowledge/entry` creates or merges, `PUT /api/knowledge/field` sets a path, `DELETE /api/knowledge/field` removes one, `DELETE /api/knowledge/entry` deletes (cascading its editions). See [Knowledge HTTP API](api/http/knowledge.md).
 
 ### Topic Catalog
 
