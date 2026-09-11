@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X, ScanBarcode } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { useScanInput } from '../../hooks/useScanInput';
-import { OUTCOME_TONE, outcomeHeadline, outcomeMarkdown } from './outcome-display';
-import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
+import { ScanOutcomeBody } from './ScanOutcomeBody';
 
 /**
  * Undo the usual clipboard mangling before a code reaches the barcode or the
@@ -106,8 +105,6 @@ export function ScanPanel({ onClose }: { onClose: () => void }) {
     void submitCode(code);
   };
 
-  const response = lastResult?.response ?? null;
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
@@ -154,22 +151,7 @@ export function ScanPanel({ onClose }: { onClose: () => void }) {
         {lastResult && (
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-text-tertiary">Last scan</div>
-            <div className="text-sm font-mono text-text-primary">{lastResult.code}</div>
-            {response ? (
-              <>
-                <div className={`text-sm font-medium ${OUTCOME_TONE[response.outcome]}`}>
-                  {outcomeHeadline(response)}
-                </div>
-                {response.error && <div className="text-xs text-text-tertiary">{response.error}</div>}
-                {outcomeMarkdown(response) && (
-                  <div className="text-sm border-t border-surface-border pt-2">
-                    <SimpleMarkdown content={outcomeMarkdown(response)!} compact />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-sm text-status-error">{lastResult.error}</div>
-            )}
+            <ScanOutcomeBody result={lastResult} />
           </div>
         )}
 

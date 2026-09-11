@@ -193,10 +193,11 @@ export function executeScanChoice(req: ScanChoiceExecuteRequest): Promise<ScanEx
 
 // ── Scheme / rule config ────────────────────────────────────────────────────
 
-export function useScanSchemes() {
+export function useScanSchemes(opts?: { enabled?: boolean; staleTime?: number }) {
   return useQuery<{ schemes: ScanScheme[] }>({
     queryKey: ['scan-schemes'],
     queryFn: () => apiFetch('/scan-codes/schemes'),
+    ...opts,
   });
 }
 

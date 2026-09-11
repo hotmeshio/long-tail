@@ -125,7 +125,7 @@ A bound link variable also **scopes the Pace Board** — the same device value
 narrows the board's station counts, time-in-state mix, and entity timelines,
 not just the pins. See [Operations — Scoping the board](operations.md#scoping-the-board).
 
-The dashboard's [global search bar](dashboard.md#global-search) is the
+The dashboard's [global search bar](dashboard.md#search-and-run) is the
 one-gesture sibling of this surface: a configured facet name plus a value
 lands on the same all-status faceted list a deep link produces.
 

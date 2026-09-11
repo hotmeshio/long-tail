@@ -78,7 +78,7 @@ Builder-only.
 The top navigation bar contains:
 
 - **Home logo** — links to the home page (`/`), Recent Activity.
-- **Search bar** — the opt-in global lookup: type an id or facet value, pick a facet, and land on the matching escalation or a filtered queue. Off by default; enable via `search` in `start()` config or `LT_SEARCH_BAR`. See [Global search](#global-search).
+- **Search and run bar** — one input, two verbs: find an escalation by id, workflow, or a configured facet, or run a scan rule against a typed target. Search is opt-in via `search` in `start()` config or `LT_SEARCH_BAR`; run modes ride `features.scanCodes`. See [Search and run](#search-and-run).
 - **all** — links to `/escalations/available` with a live count of unclaimed escalations.
 - **mine** — links to `/escalations/queue` with a live count of escalations assigned to you.
 - **scan** (Barcode icon) — opens the scan panel for manual code entry and capture settings, shown when `features.scanCodes` stands. See [Scan Codes](#scan-codes).
@@ -553,15 +553,18 @@ markdown body. Each user dismisses per-browser.
 Role targeting scopes display, never access: the live event reaches every
 authenticated subscriber, so announcement bodies must never carry secrets.
 
-### Global search
+### Search and run
 
-An opt-in header search bar for one-gesture lookups across every escalation
-of any status. Configure it in the `start()` config —
+The header bar is one input with two verbs, chosen by the type chip that
+trails it. **Find** modes look an escalation up; **Run** modes execute a scan
+code composed from a chosen rule plus the typed target. The bar appears when
+either verb is enabled and offers whichever modes the deployment provides.
+
+**Find** is the opt-in global search. Configure it in the `start()` config —
 `search: { enabled: true, facets: ['orderId', 'po'] }` — or by env
-(`LT_SEARCH_BAR=true`, `LT_SEARCH_FACETS=orderId,po`; env wins). The picklist
+(`LT_SEARCH_BAR=true`, `LT_SEARCH_FACETS=orderId,po`; env wins). The chip
 always offers `escalationId` and `workflowId` (long-tail-owned lookups) ahead
-of the configured metadata facets, and remembers the last-used facet per
-device.
+of the configured metadata facets.
 
 - A metadata facet lands on the escalation list filtered by that facet across
   all statuses, newest first (the same deep link as clicking a facet value).
@@ -570,10 +573,23 @@ device.
 - `workflowId` opens the workflow's single escalation, lists several to pick
   from, or links straight to the workflow execution when none exist.
 
-Kiosk sessions see the bar too — a station can dump a PO or order id and jump
-straight to it; RBAC read scope bounds what any search can return. See
-[Faceted Routing](faceted-routing.md) — a search is a one-gesture facet deep
-link.
+**Run** appears when `features.scanCodes` is on. Every enabled rule of every
+enabled action scheme is a mode, grouped by scheme; pick one and the bar
+shows its code head (`10:1:`) ahead of the input and names the target facet
+in the placeholder. Type the target and press Enter: the bar composes
+`10:1:<target>` and executes it through the same pipeline a scanner uses, so
+the outcome navigates, confirms, or answers exactly as a physical scan would.
+An outcome that answers in place (a fallback, a conflict, a closed row) is
+narrated right under the bar. A whole code pasted into a Run mode executes
+as-is; fixed-encoding rules accept digits only and say so inline. The menu
+footer opens the scan panel for scanner settings and the barcode preview.
+See [Scan codes](scan-codes.md).
+
+The chip remembers the last-used mode per device. Kiosk sessions see the bar
+too — a station can dump a PO or order id and jump straight to it, or run a
+rule against a serial it can read but not scan; RBAC bounds what any search or
+run can reach. See [Faceted Routing](faceted-routing.md) — a search is a
+one-gesture facet deep link.
 
 ### Inbox
 

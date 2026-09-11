@@ -17,7 +17,7 @@ import { ScanPanel } from '../scan/ScanPanel';
 import { useKioskMode } from '../../hooks/useKioskMode';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { LinkVariablesModal } from './LinkVariablesModal';
-import { GlobalSearchBar } from './GlobalSearchBar';
+import { SearchCommandBar } from './SearchCommandBar';
 import { useRoleDetails } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 
@@ -125,7 +125,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           it; while the user menu is open it lifts to the menu tier (z-[100])
           so an open menu is never occluded. */}
       <header className={`h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative ${menuOpen ? 'z-[100]' : 'z-30'}`}>
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-center gap-1 shrink-0">
           {/* Below lg the nav rail is a drawer behind this button. */}
           {onToggleNav && (
             <button
@@ -172,9 +172,14 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           </button>
         </div>
 
-        {settings?.search?.enabled && <GlobalSearchBar />}
+        {/* The flexible middle track: the bar takes what the fixed ends leave. */}
+        {(settings?.search?.enabled || scanEnabled) && (
+          <div className="hidden md:flex flex-1 min-w-0 justify-center px-4 lg:px-8">
+            <SearchCommandBar onOpenScanPanel={scanEnabled ? toggleScanPanel : undefined} />
+          </div>
+        )}
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 shrink-0">
           {/* Escalations: all */}
           <Link
             to="/escalations/available"
