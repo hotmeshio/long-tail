@@ -1,4 +1,5 @@
 import type { LoggerOptions } from 'pino';
+import type { WorkflowIconName } from './workflow-icons';
 
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
 import type { ScanEncoding, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
@@ -49,6 +50,8 @@ export interface LTWorkerConfig {
    * invoke API validates `data` against it with the same shared pass (422).
    */
   inputSchema?: Record<string, any>;
+  /** A curated icon (WORKFLOW_ICONS) shown in place of the tier glyph on the Invoke page and registry. */
+  icon?: WorkflowIconName;
   /**
    * @deprecated The escalation form is a versioned schema owned by the target
    * role, not the workflow. Declare the form on the role; retained only as a

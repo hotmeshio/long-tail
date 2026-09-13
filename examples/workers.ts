@@ -30,6 +30,7 @@ import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import * as printerTwinWorkflow from './workflows/printer-twin';
 import * as fleetToolsWorkflow from './workflows/fleet-tools';
 import { FLEET_TOOLS_INPUT_SCHEMA, FLEET_TOOLS_ENVELOPE_METADATA } from './workflows/fleet-tools/forms';
+import { WORKFLOW_ICONS } from '../types/workflow-icons';
 import {
   PRINT_FARM_DIABETIC,
   PRINT_FARM_STANDARD,
@@ -555,18 +556,8 @@ const twinBrokerConfig: LTWorkerConfig = {
 };
 
 const fleetToolsConfig: LTWorkerConfig = {
-  description: [
-    '**Fleet tools** — one form, four tools for one machine. Pick the tool; the form shows only its knobs.',
-    '',
-    '| Tool | Does |',
-    '|---|---|',
-    '| `reprint-label` | Prints the machine\'s bag, plate, or spool label again (1–5 copies) |',
-    '| `change-filament` | Records the material and spool count now loaded |',
-    '| `report-offline` | Parks the twin and alerts service; asks for a power cycle first |',
-    '| `retire` | Cancels the twin and releases the serial for good |',
-    '',
-    'The invoke-form reference: `inputSchema` renders the x-lt-* form and gates the API.',
-  ].join('\n'),
+  description: 'Four tools for one machine. Pick the tool; the form shows only its knobs.',
+  icon: WORKFLOW_ICONS.WRENCH,
   invocable: true,
   invocationRoles: [...INVOCATION_ROLES, PRINTER_FLEET, PRINT_SERVICER],
   envelopeSchema: { data: {}, metadata: FLEET_TOOLS_ENVELOPE_METADATA },

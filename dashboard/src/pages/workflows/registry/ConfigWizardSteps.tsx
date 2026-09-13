@@ -1,4 +1,5 @@
 import { labelCls, hintCls, jsonCls, jsonValid } from './config-form-types';
+import { WorkflowIconPicker } from '../../../components/common/form/WorkflowIconPicker';
 import type { ConfigFormState } from './config-form-types';
 import { RolePicker } from '../../../components/common/form/RolePicker';
 import { BotPicker } from '../../../components/common/form/BotPicker';
@@ -86,6 +87,12 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
       </div>
 
       <div>
+        <label className={labelCls}>Icon</label>
+        <WorkflowIconPicker value={form.icon} onChange={(name) => set('icon', name)} />
+        <p className={hintCls}>Leads the workflow's row and heading on the Invoke page.</p>
+      </div>
+
+      <div>
         <label className={labelCls}>Description</label>
         <input
           type="text"
@@ -161,6 +168,26 @@ export function InvocationStep({ form, set }: StepProps) {
               Only users with these roles can start this workflow.
               Leave empty to allow all authenticated users.
             </p>
+          </div>
+
+          {/* Input form */}
+          <div>
+            <label className={labelCls}>Input Form</label>
+            <textarea
+              value={form.input_schema}
+              onChange={(e) => set('input_schema', e.target.value)}
+              placeholder={'{\n  "x-lt-layout": "two-column",\n  "required": ["serialNumber"],\n  "properties": {\n    "serialNumber": { "type": "string", "title": "Serial number" }\n  }\n}'}
+              className={jsonCls}
+              rows={10}
+              spellCheck={false}
+            />
+            <p className={hintCls}>
+              The x-lt-* form operators complete on the Invoke page; the API validates every invoke against it.
+              Leave empty to use the envelope template below.
+            </p>
+            {form.input_schema.trim() && !jsonValid(form.input_schema) && (
+              <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
+            )}
           </div>
 
           {/* Envelope schema */}

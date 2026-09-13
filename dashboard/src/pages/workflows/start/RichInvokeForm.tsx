@@ -100,6 +100,7 @@ export function RichInvokeForm({
       />
       </div>
       <InvokeFooter
+        onSubmitAgain={submission.reset}
         onSubmit={handleSubmit}
         pending={submission.pending}
         error={parseError ?? submission.error}

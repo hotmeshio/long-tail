@@ -11,6 +11,7 @@ import { io, type Socket } from 'socket.io-client';
 import { LT_BASE } from '../lib/base-path';
 
 import { getToken } from '../api/client';
+import { useAuth } from './useAuth';
 import { subjectMatchesPattern } from '../lib/events/matching';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
 import { EventContext } from './useEventContext';
@@ -68,8 +69,13 @@ export function useSocketIOSubscription(pattern: string, handler: NatsEventHandl
  * The server emits events as `lt.events.{type}` (e.g. `lt.events.task.created`).
  * This provider listens for all `lt.events.*` events and dispatches them to
  * registered pattern-based handlers, matching the unified event context API.
+ *
+ * The connection follows the session: it opens once a login lands, however
+ * the identity arrived (credentials or the SSO exchange), closes on logout,
+ * and every reconnect presents the token current at that moment.
  */
 export function SocketIOProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -114,10 +120,11 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // The server refuses unauthenticated sockets; wait for the session.
+    if (!isAuthenticated) return;
     // Connect to same origin. Works for both:
     // - Production: dashboard served from same Express server
     // - Dev (Vite): proxy in vite.config.ts forwards /socket.io to backend
-    const authToken = getToken();
     const socket = io({
       path: `${LT_BASE}/socket.io`,
       transports: ['polling', 'websocket'],
@@ -125,7 +132,11 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
-      ...(authToken ? { auth: { token: authToken } } : {}),
+      // Read at every connection attempt so a refreshed token rides reconnects.
+      auth: (cb) => {
+        const token = getToken();
+        cb(token ? { token } : {});
+      },
     });
 
     socketRef.current = socket;
@@ -172,7 +183,7 @@ export function SocketIOProvider({ children }: { children: ReactNode }) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, [dispatchToListeners]);
+  }, [dispatchToListeners, isAuthenticated]);
 
   return (
     <SocketIOContext.Provider value={{ connected, subscribe }}>

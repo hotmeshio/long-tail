@@ -117,11 +117,14 @@ workers: [
       certified: true,
       roles: ['reviewer', 'admin'],
       envelopeSchema: { data: { field1: '', field2: 0 } },
+      inputSchema: MY_INPUT_FORM, // x-lt-* form for the Invoke page; see Invoke forms
       resolverSchema: { approved: true, notes: '' }, // deprecated legacy fallback — the escalation form is owned by the target role as a versioned form_schema
     },
   },
 ]
 ```
+
+The detail page has three columns. **Identity** carries the type, an **Icon** picker with a filter over the curated `WORKFLOW_ICONS` set (the chosen glyph leads the workflow's row and heading on the Invoke page in place of the tier glyph), the description, and the queue. **Invocation** edits the roles and the **Input Form**; with an input form declared, the envelope field narrows to the `metadata` stamped on every run. **Preview** renders that form live from the editor as operators will meet it, interactive so conditional sections can be walked before saving. **Unregister** sits with the header actions beside Cancel and Save. See [Invoke forms](hitl/invoke-form.md).
 
 **API:** `GET /api/workflows/discovered` returns the unified list. `PUT /api/workflows/:type/config` creates or updates a config entry. `DELETE /api/workflows/:type/config` removes it.
 
@@ -129,13 +132,13 @@ workers: [
 
 Accessible at `/workflows/durable/invoke` to anyone the server lists an invokable workflow for. The server decides the list with the same predicate the invoke gate runs (`invocationRoles` on each config; empty means every authenticated user; superadmin and admin see everything, including active durable workers with no registration). Builders keep Invoke under Orchestrate; every other persona gets a **Tools** nav section that appears only when the list is non-empty, and the route sends a caller with nothing to invoke home.
 
-The list of workflows takes the left quarter of the row, grouped by task queue with a queue select and search stacked above; each row carries its tier. The first row is preselected and `?type=<WorkflowType>` tracks the choice, so the page opens on a form. The form fills the rest of the row:
+The list of workflows takes the left quarter of the row, grouped by task queue. Names read as titles (`fleetTools` shows as **Fleet Tools**, queues the same way) and each row leads with the workflow's icon, or its tier glyph when none is declared. The first row is preselected, `?type=<WorkflowType>` tracks the choice, and every choice is a history entry, so the page opens on a form and the back button retraces picks. The form fills the rest of the row, its heading and Submit staying put while the body scrolls:
 
-- **Name and description** — the workflow pill with its tier, then the config's markdown description. Tables render.
+- **Heading and description** — the icon and title, with the identifier, tier, and queue as metadata, then the config's one-line description. Keep reference material in `x-lt-help`; it appears in the side panel on demand.
 - **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override").
 - **Certification checkbox** — for a certified workflow, stamps `metadata.certified` on this one run.
 - **The form** — a workflow that declares `inputSchema` renders the x-lt-* form: sections, two columns, conditional fields and instruction blocks, and a side panel with **Instructions** (the interpolated `x-lt-help`) and **Issues** (violations, click to focus). Every other workflow renders the envelope template form from `envelopeSchema`, with its Form and JSON views. See [Invoke forms](hitl/invoke-form.md).
-- **Start Workflow** — posts `{ data, metadata }` to the invoke endpoint. The page stays put and reports the started id; builders also get a **View workflow** link to its execution. A `422` from the input schema gate lands in the Issues view.
+- **Submit** — posts `{ data, metadata }` to the invoke endpoint. The page stays put, reports the started id, and subscribes to that run's `system.workflow.{id}.completed` and `.failed` events, so the outcome and the workflow's returned `data` appear beside Submit without leaving the page. One click disarms the button until the person chooses **Submit again**. While live events are off, a warning beside the button offers a reconnect, since the result could not arrive otherwise. Builders also get a **View workflow** link to its execution. A `422` from the input schema gate lands in the Issues view.
 
 Below 1280px the list folds into a select and the form takes the full width.
 

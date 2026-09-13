@@ -71,7 +71,7 @@ describe('RichInvokeForm', () => {
 
   it('a started run is reported in the footer, with the execution link when the caller may open it', () => {
     renderForm(submission({ startedId: 'wf-9' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Workflow started');
+    expect(screen.getByRole('status')).toHaveTextContent('Started');
     expect(screen.getByRole('status')).toHaveTextContent('wf-9');
     expect(screen.queryByRole('link', { name: /View workflow/ })).not.toBeInTheDocument();
     renderForm(submission({ startedId: 'wf-10', executionPath: '/workflows/executions/wf-10' }));

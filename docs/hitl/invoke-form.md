@@ -13,17 +13,21 @@ const fleetToolsConfig: LTWorkerConfig = {
   invocationRoles: ['printer-fleet', 'print-servicer'],
   envelopeSchema: { data: {}, metadata: { source: 'dashboard' } },
   inputSchema: FLEET_TOOLS_INPUT_SCHEMA,
+  icon: WORKFLOW_ICONS.WRENCH,
 };
 ```
+
+Workflow names read as titles on the page: `fleetTools` shows as **Fleet Tools**, and queue names the same way, with the identifiers kept as metadata beside them.
 
 | Field | Role in the invoke |
 |---|---|
 | `inputSchema` | The form. JSON Schema `properties` plus x-lt-* tokens. Rendered by the Invoke page; enforced by the invoke API. |
 | `envelopeSchema.metadata` | The `metadata` stamped on every run from this form. `envelopeSchema.data` is ignored when `inputSchema` is present. |
 | `invocationRoles` | Who sees the workflow on the Invoke page and who may start it. Empty means every authenticated user. |
-| `description` | Markdown at the top of the form column. Tables render. |
+| `description` | One line at the top of the form column, markdown allowed. Keep the reference material in `x-lt-help`, which appears in the side panel on demand. |
+| `icon` | A curated icon from `WORKFLOW_ICONS` (`icon: WORKFLOW_ICONS.WRENCH`). Leads the workflow's row and heading in place of the tier glyph so operators tell tools apart at a glance. The registry offers the same set as a picker. |
 
-The reference is [`examples/workflows/fleet-tools/forms.ts`](../../examples/workflows/fleet-tools/forms.ts): a `serialNumber` and an `action` decision, then one section per action that appears only when that action is chosen, each carrying its own knobs and its own instruction block.
+The registry detail page edits the same schema under **Input Form** in its Invocation column, beside a live preview of the form, and the registration wizard offers the field for new entries. The reference is [`examples/workflows/fleet-tools/forms.ts`](../../examples/workflows/fleet-tools/forms.ts): a `serialNumber` and an `action` decision, then one section per action that appears only when that action is chosen, each carrying its own knobs and its own instruction block.
 
 ## Form values, payload, and domains
 
@@ -68,6 +72,8 @@ An array of conditions requires every one, so the prompt belongs to its tool and
 The page is open to anyone the server lists an invokable workflow for. Builders reach it under Orchestrate; every other persona gets a **Tools** section in the nav that appears only when there is something to invoke. The list of workflows sits on the left, grouped by task queue, with the first workflow preselected; the form takes the rest of the row. Below 1280px the list folds into a select and the form takes the full width.
 
 The form's side panel carries two views: **Instructions**, the interpolated `x-lt-help`, and **Issues**, the current violations, each click focusing its field. A server rejection lands in the same Issues view.
+
+Once a run starts, the page subscribes to `system.workflow.{workflowId}.completed` and `.failed` for that id. The outcome and the workflow's returned `data` render beside Submit, so a tool's answer comes back to the person who asked for it. Submit disarms after one click until the person chooses to submit again, and a warning offers to reconnect live events when they are off.
 
 ## The server contract
 

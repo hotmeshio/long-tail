@@ -46,17 +46,18 @@ describe('StartWorkflowPage', () => {
   it('lists every invokable workflow grouped by queue in the list column', () => {
     renderPage();
     const list = screen.getByTestId('invoke-list');
-    expect(list).toHaveTextContent('long-tail-examples-reviewContent');
-    expect(list).toHaveTextContent('reviewContent');
-    expect(list).toHaveTextContent('processClaim');
-    expect(list).toHaveTextContent('durableOnly');
+    expect(list).toHaveTextContent('Long Tail Examples Review Content');
+    expect(list).toHaveTextContent('Review Content');
+    expect(list).toHaveTextContent('Process Claim');
+    expect(list).toHaveTextContent('Durable Only');
   });
 
   it('preselects the first row of the first queue group and renders its form in the page', () => {
     renderPage();
+    expect(screen.getByTestId('invoke-form')).toHaveTextContent('Durable Only');
     expect(screen.getByTestId('invoke-form')).toHaveTextContent('durableOnly');
     expect(screen.getByTestId('invoke-start')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /durableOnly/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /Durable Only/ })).toHaveAttribute('aria-current', 'true');
   });
 
   it('a ?type= deep link wins over the preselect', () => {

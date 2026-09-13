@@ -141,6 +141,7 @@ PUT /api/workflows/:type/config
 | `tool_tags` | `string[]` | `[]` | MCP tool tags for scoped tool discovery |
 | `envelope_schema` | `object \| null` | `null` | Example envelope that pre-fills the legacy invoke form |
 | `input_schema` | `object \| null` | `null` | x-lt-* JSON Schema for the rich invoke form; `POST /:type/invoke` validates `data` against it. See [Invoke forms](../../hitl/invoke-form.md). |
+| `icon` | `string \| null` | `null` | Curated icon name from `WORKFLOW_ICONS`; unknown names are refused with `400` |
 | `resolver_schema` | `object \| null` | `null` | **Deprecated** legacy fallback only. The escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `string \| null` | `null` | Cron expression for scheduled execution (e.g., `"0 9 * * *"`) |
 

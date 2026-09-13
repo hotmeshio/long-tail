@@ -55,9 +55,9 @@ describe('StartWorkflowPage — list beside form', () => {
   it('each choice is a history entry; the opening preselect is not', async () => {
     const router = renderWithRouter();
     expect(router.state.location.search).toBe('?type=processClaim');
-    fireEvent.click(screen.getByRole('button', { name: /reviewContent/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Review Content/ }));
     expect(router.state.location.search).toBe('?type=reviewContent');
-    fireEvent.click(screen.getByRole('button', { name: /processClaim/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Process Claim/ }));
     expect(router.state.location.search).toBe('?type=processClaim');
 
     await router.navigate(-1);
@@ -77,7 +77,7 @@ describe('StartWorkflowPage — list beside form', () => {
 
   it('clicking a row swaps the form in place', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /reviewContent/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Review Content/ }));
     expect(screen.getByTestId('location')).toHaveTextContent('?type=reviewContent');
     expect(screen.getByText('Review user-generated content')).toBeInTheDocument();
     expect(screen.queryByText('Process insurance claims')).not.toBeInTheDocument();

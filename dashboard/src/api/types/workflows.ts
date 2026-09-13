@@ -11,6 +11,7 @@ export interface LTWorkflowConfig {
   consumes: string[];
   envelope_schema: Record<string, unknown> | null;
   input_schema: Record<string, unknown> | null;
+  icon: string | null;
   resolver_schema: Record<string, unknown> | null;
   cron_schedule: string | null;
   execute_as: string | null;

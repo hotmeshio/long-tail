@@ -6,6 +6,7 @@ import { FilterSelect, FilterInput } from '../../../components/common/data/Filte
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import type { InvocableWorkflow, WorkflowTier } from '../../../api/types';
 import { WorkflowSelector, workflowQueues, firstWorkflowType } from './WorkflowSelector';
+import { identifierToTitle } from '../../../lib/identifier-label';
 import { StartNowPanel } from './StartNowPanel';
 
 const TYPE_PARAM = 'type';
@@ -95,18 +96,18 @@ export function StartWorkflowPage() {
             >
               <option value="">Choose a workflow…</option>
               {queues.map((q) => (
-                <optgroup key={q} label={q}>
+                <optgroup key={q} label={identifierToTitle(q)}>
                   {workflows
                     .filter((c) => (c.task_queue || '') === q)
                     .map((c) => (
-                      <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
+                      <option key={c.workflow_type} value={c.workflow_type}>{identifierToTitle(c.workflow_type)}</option>
                     ))}
                 </optgroup>
               ))}
               {workflows
                 .filter((c) => !c.task_queue)
                 .map((c) => (
-                  <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
+                  <option key={c.workflow_type} value={c.workflow_type}>{identifierToTitle(c.workflow_type)}</option>
                 ))}
             </select>
           </label>

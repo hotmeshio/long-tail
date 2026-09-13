@@ -71,6 +71,7 @@ async function replaceWorkflowConfig(
         certified,
         config.read_safe ?? false,
         config.input_schema ?? null,
+        config.icon ?? null,
       ],
     );
 
@@ -146,6 +147,7 @@ export async function seedWorkflowConfig(
     resolveCertified(config),
     config.read_safe ?? false,
     config.input_schema ?? null,
+    config.icon ?? null,
   ]);
 
   const inserted = (rowCount ?? 0) > 0;
@@ -171,6 +173,7 @@ export async function seedWorkflowConfig(
       if (JSON.stringify(config.envelope_schema) !== JSON.stringify(existing.envelope_schema)) drifts.push('envelope_schema');
       if (JSON.stringify(config.resolver_schema) !== JSON.stringify(existing.resolver_schema)) drifts.push('resolver_schema');
       if (JSON.stringify(config.input_schema ?? null) !== JSON.stringify(existing.input_schema ?? null)) drifts.push('input_schema');
+      if ((config.icon ?? null) !== (existing.icon ?? null)) drifts.push('icon');
       if (drifts.length) {
         loggerRegistry.warn(`[long-tail] config drift: ${config.workflow_type} — ${drifts.join(', ')} differ between code and DB`);
       }
@@ -216,7 +219,8 @@ export async function applyWorkflowConfig(
       sortedEqual(existing.invocation_roles ?? [], config.invocation_roles ?? []) &&
       isDeepStrictEqual(existing.envelope_schema ?? null, config.envelope_schema ?? null) &&
       isDeepStrictEqual(existing.resolver_schema ?? null, config.resolver_schema ?? null) &&
-      isDeepStrictEqual(existing.input_schema ?? null, config.input_schema ?? null);
+      isDeepStrictEqual(existing.input_schema ?? null, config.input_schema ?? null) &&
+      (existing.icon ?? null) === (config.icon ?? null);
     if (unchanged) return 'unchanged';
   }
 

@@ -118,6 +118,7 @@ export function LegacyInvokeForm({
       />
       </div>
       <InvokeFooter
+        onSubmitAgain={submission.reset}
         onSubmit={handleInvoke}
         pending={submission.pending}
         error={parseError || submission.error}

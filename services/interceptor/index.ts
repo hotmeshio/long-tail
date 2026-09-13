@@ -26,6 +26,12 @@ type ActivitiesType = typeof interceptorActivities;
 
 const DEFAULT_ACTIVITY_QUEUE = 'lt-interceptor';
 
+/** The result payload a completed event carries: the workflow's `data` when it returned the envelope shape. */
+function resultData(result: unknown): Record<string, any> | undefined {
+  const data = (result as { data?: unknown } | null)?.data;
+  return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, any>) : undefined;
+}
+
 /**
  * Register the Long Tail interceptors in a single call.
  *
@@ -129,6 +135,7 @@ export function createLTInterceptor(options: {
           workflowName: wf.workflowName,
           taskQueue: taskQueue0,
           status: 'completed',
+          data: resultData(result0),
         });
         return result0;
       }
@@ -150,6 +157,7 @@ export function createLTInterceptor(options: {
           workflowName: wf.workflowName,
           taskQueue: taskQueue2,
           status: 'completed',
+          data: resultData(result2),
         });
         return result2;
       }

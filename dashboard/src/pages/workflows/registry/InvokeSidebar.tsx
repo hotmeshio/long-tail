@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 import { SectionLabel } from '../../../components/common/layout/SectionLabel';
 import type { LTWorkflowConfig } from '../../../api/types';
@@ -35,6 +36,14 @@ export function InvokeSidebar({
       )}
 
       <div className="space-y-4">
+        {editing.input_schema && (
+          <p className="text-2xs text-text-secondary">
+            This workflow has an input form.{' '}
+            <Link to={`/workflows/durable/invoke?type=${encodeURIComponent(editing.workflow_type)}`} className="text-accent hover:underline">
+              Open it on the Invoke page →
+            </Link>
+          </p>
+        )}
         <div>
           <div className="flex items-baseline justify-between mb-2">
             <label className="block text-xs text-text-secondary">Envelope</label>

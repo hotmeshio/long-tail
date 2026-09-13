@@ -45,6 +45,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
     tool_tags: req.body.tool_tags,
     envelope_schema: req.body.envelope_schema,
     input_schema: req.body.input_schema,
+    icon: req.body.icon,
     resolver_schema: req.body.resolver_schema,
     cron_schedule: req.body.cron_schedule,
   });

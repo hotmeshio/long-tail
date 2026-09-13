@@ -1,4 +1,5 @@
 import * as configService from '../../services/config';
+import { isWorkflowIcon } from '../../types/workflow-icons';
 import { cronRegistry } from '../../services/cron';
 import { ltConfig } from '../../modules/ltconfig';
 import type { LTApiResult } from '../../types/sdk';
@@ -60,6 +61,7 @@ export async function getWorkflowConfig(input: {
  * @param input.tool_tags — MCP tool tags for discovery
  * @param input.envelope_schema — JSON template that pre-fills the invoke form
  * @param input.input_schema — x-lt-* JSON Schema for the rich invoke form; invoke validates data against it
+ * @param input.icon — curated icon name (WORKFLOW_ICONS); anything else is refused
  * @param input.resolver_schema — JSON Schema for resolver payload validation
  * @param input.cron_schedule — cron expression for scheduled execution
  * @returns `{ status: 200, data: <saved config> }`
@@ -78,11 +80,15 @@ export async function upsertWorkflowConfig(input: {
   tool_tags?: string[];
   envelope_schema?: any;
   input_schema?: any;
+  icon?: string | null;
   resolver_schema?: any;
   cron_schedule?: string | null;
   read_safe?: boolean;
 }): Promise<LTApiResult> {
   try {
+    if (input.icon && !isWorkflowIcon(input.icon)) {
+      return { status: 400, error: `Unknown workflow icon "${input.icon}"; choose one of WORKFLOW_ICONS` };
+    }
     // Validate cron expression before persisting
     if (input.cron_schedule) {
       const { validateCronSchedule } = await import('../../services/cron');
@@ -103,6 +109,7 @@ export async function upsertWorkflowConfig(input: {
       tool_tags: input.tool_tags ?? [],
       envelope_schema: input.envelope_schema ?? null,
       input_schema: input.input_schema ?? null,
+      icon: input.icon ?? null,
       resolver_schema: input.resolver_schema ?? null,
       cron_schedule: input.cron_schedule ?? null,
       read_safe: input.read_safe ?? false,

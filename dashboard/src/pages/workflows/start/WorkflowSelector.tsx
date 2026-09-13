@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Bot, Clock, Play, Server, Wrench } from 'lucide-react';
 import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
+import { WorkflowIcon } from '../../../components/common/display/WorkflowIcon';
+import { identifierToTitle } from '../../../lib/identifier-label';
 import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
 
@@ -74,7 +76,7 @@ export function WorkflowSelector({
             ) : (
               <Wrench className="w-3 h-3 text-text-quaternary shrink-0" strokeWidth={1.5} />
             )}
-            <h2 className="section-h2 truncate">{queue || NO_QUEUE_LABEL}</h2>
+            <h2 className="section-h2 truncate" title={queue || undefined}>{queue ? identifierToTitle(queue) : NO_QUEUE_LABEL}</h2>
             <span className="text-xs text-text-quaternary">{workflows.length}</span>
           </div>
           <div className={compact ? '' : 'divide-y divide-surface-border/30'}>
@@ -118,11 +120,13 @@ function WorkflowRow({
       <button
         onClick={() => onSelect(config)}
         aria-current={isSelected ? 'true' : undefined}
-        className={`group w-full text-left flex items-center gap-2 pl-3 pr-2 py-1.5 border-l-2 transition-colors ${
-          isSelected ? 'border-accent bg-accent/10' : 'border-transparent hover:bg-surface-hover'
+        title={config.workflow_type}
+        className={`group w-full text-left flex items-center gap-2.5 pl-3 pr-2 py-2 border-l-2 transition-colors ${
+          isSelected ? 'border-accent bg-accent/10 text-accent' : 'border-transparent text-text-primary hover:bg-surface-hover'
         }`}
       >
-        <WorkflowPill type={config.workflow_type} size="sm" variant={variant} />
+        <WorkflowIcon icon={config.icon} tier={tier} className={`w-5 h-5 shrink-0 ${isSelected ? 'text-accent' : 'text-accent/65'}`} />
+        <span className="text-sm truncate">{identifierToTitle(config.workflow_type)}</span>
         {cronActive && (
           <span title="Cron schedule active" className="ml-auto shrink-0">
             <Clock className="w-3 h-3 text-status-success/70" />

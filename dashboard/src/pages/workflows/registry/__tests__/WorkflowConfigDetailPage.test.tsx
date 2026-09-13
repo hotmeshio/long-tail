@@ -76,8 +76,11 @@ describe('WorkflowConfigDetailPage — edit', () => {
     expect(screen.getByText('Identity')).toBeInTheDocument();
     expect(screen.getByText('Invocation')).toBeInTheDocument();
     // The old "Certification" section (resolver schema + certify) is gone — the
-    // escalation surface belongs to the role now. Only the registration lifecycle remains.
-    expect(screen.getByText('Registration')).toBeInTheDocument();
+    // escalation surface belongs to the role now. The third column previews the
+    // input form; unregistering lives with the header actions.
+    expect(screen.getByText('Preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Unregister/ })).toBeInTheDocument();
+    expect(screen.queryByText('Registration')).not.toBeInTheDocument();
     expect(screen.queryByText('Certify for HITL Escalation')).not.toBeInTheDocument();
     expect(screen.queryByText('Resolver Schema')).not.toBeInTheDocument();
   });

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import type { InvocableWorkflow } from '../../../api/types';
-import { VARIANT_ICON } from '../../../components/common/display/WorkflowPill';
+import { WorkflowIcon } from '../../../components/common/display/WorkflowIcon';
 import { MarkdownRenderer } from '../../../components/common/display/MarkdownRenderer';
+import { identifierToTitle } from '../../../lib/identifier-label';
 import { IdentitySummary } from './IdentitySummary';
 import { LegacyInvokeForm } from './LegacyInvokeForm';
 import { RichInvokeForm } from './RichInvokeForm';
@@ -33,7 +34,6 @@ export function StartNowPanel({ selected }: { selected: InvocableWorkflow }) {
   }, [selected.envelope_schema]);
 
   const submission = useInvokeSubmit(selected, { certified, overrideBot });
-  const TierIcon = VARIANT_ICON[selected.tier];
 
   const lead = (
     <>
@@ -65,10 +65,11 @@ export function StartNowPanel({ selected }: { selected: InvocableWorkflow }) {
     <div className="max-w-form" data-testid="invoke-form">
       {/* Sticks to the top of the shell scroll; the pulled-up padding covers the page gutter above it. */}
       <header className="sticky top-0 z-10 bg-surface -mt-8 pt-8 flex items-baseline gap-3 min-w-0 pb-3 mb-5 border-b border-surface-border/60">
-        <TierIcon className="w-5 h-5 self-center shrink-0 text-accent/65" strokeWidth={1.5} aria-hidden />
-        <h2 className="text-2xl font-mono text-text-primary truncate" title={selected.workflow_type}>
-          {selected.workflow_type}
+        <WorkflowIcon icon={selected.icon} tier={selected.tier} className="w-7 h-7 self-center shrink-0 text-accent" />
+        <h2 className="heading-2 truncate" title={selected.workflow_type}>
+          {identifierToTitle(selected.workflow_type)}
         </h2>
+        <span className="text-2xs font-mono text-text-quaternary shrink-0">{selected.workflow_type}</span>
         <span className="text-2xs uppercase tracking-widest text-text-tertiary shrink-0">{selected.tier}</span>
         {selected.task_queue && (
           <span className="text-2xs font-mono text-text-quaternary truncate">{selected.task_queue}</span>

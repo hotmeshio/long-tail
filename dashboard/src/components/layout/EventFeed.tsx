@@ -182,7 +182,7 @@ export function EventFeed({ open, onToggle, configOpen, onToggleConfig }: { open
         )}
         <span className="ml-auto flex items-center gap-1">
           <span
-            className={`p-0.5 ${connected ? 'text-status-success' : 'text-text-quaternary hover:text-text-secondary cursor-pointer'}`}
+            className={`p-0.5 ${connected ? 'text-status-success' : 'text-status-warning hover:text-text-primary cursor-pointer'}`}
             title={connected ? 'Live events connected' : 'Events disconnected — click to reconnect'}
             onClick={(e) => { e.stopPropagation(); if (!connected) window.location.reload(); }}
           >
