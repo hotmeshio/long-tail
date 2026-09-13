@@ -32,6 +32,22 @@ router.get('/discovered', async (req, res) => {
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
+// ── Invocable for the caller ────────────────────────────────────────────────
+
+/**
+ * GET /api/workflows/invocable
+ * The workflows the calling user may invoke, decided by the invoke gate's
+ * own predicate. Drives the dashboard Invoke page and its nav entry.
+ */
+router.get('/invocable', async (req, res) => {
+  const result = await api.listInvocableWorkflows({
+    userId: req.auth?.userId ?? '',
+    role: req.auth?.role,
+    scopes: req.auth?.scopes,
+  });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
 // ── Cron status ─────────────────────────────────────────────────────────────
 
 /**

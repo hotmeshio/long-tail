@@ -9,6 +9,7 @@
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
+import { canInvokeWorkflow } from './invocation-access';
 
 import { createClient } from '../workers';
 import * as configService from './config';
@@ -187,17 +188,9 @@ export async function checkInvocationRoles(
     throw new InvocationError('User not registered', 403);
   }
 
-  const userRoles = user.roles.map((r) => r.role);
-  const hasInvocationRole = wfConfig.invocation_roles.some((r) =>
-    userRoles.includes(r),
-  );
-  if (!hasInvocationRole) {
-    // superadmin and admin/admin bypass role checks
-    const hasGlobalAccess = user.roles.some((r) => r.type === 'superadmin')
-      || user.roles.some((r) => r.role === 'admin' && r.type === 'admin');
-    if (!hasGlobalAccess) {
-      throw new InvocationError('Insufficient role for invocation', 403);
-    }
+  // invocable is resolveTaskQueue's concern; this gate decides roles only.
+  if (!canInvokeWorkflow({ ...wfConfig, invocable: true }, user.roles, authRole)) {
+    throw new InvocationError('Insufficient role for invocation', 403);
   }
 }
 

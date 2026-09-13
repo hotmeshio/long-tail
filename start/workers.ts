@@ -236,6 +236,7 @@ export async function startWorkers(
             consumes: c.consumes ?? [],
             tool_tags: c.toolTags ?? [],
             envelope_schema: c.envelopeSchema ?? null,
+            input_schema: c.inputSchema ?? null,
             resolver_schema: c.resolverSchema ?? null,
             cron_schedule: c.cronSchedule ?? null,
             execute_as: c.executeAs ?? null,

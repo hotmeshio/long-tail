@@ -17,10 +17,12 @@ vi.mock('../../../../services/workers/registry', () => ({
   getRegisteredWorkers: vi.fn().mockReturnValue(new Map()),
   SYSTEM_WORKFLOWS: new Set(),
 }));
+const mockCheckInvokeInput = vi.fn();
 vi.mock('../../../../api/workflows', () => ({
   getWorkflowStatus: vi.fn(),
   getWorkflowResult: vi.fn(),
   terminateWorkflow: (...a: unknown[]) => mockTerminateWorkflow(...a),
+  checkInvokeInput: (...a: unknown[]) => mockCheckInvokeInput(...a),
 }));
 
 import { registerWorkflowTools } from '../../../../system/mcp-servers/admin/workflows';
@@ -41,6 +43,7 @@ let tools: Map<string, (args: any) => Promise<any>>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCheckInvokeInput.mockReturnValue(null);
   tools = captureTools();
 });
 
@@ -105,5 +108,24 @@ describe('admin workflow MCP tools', () => {
     mockInvokeWorkflow.mockResolvedValue({ workflowId: 'auto-1' });
     await tools.get('invoke_workflow')!({ workflow_type: 'orderPipeline', data: {} });
     expect(mockInvokeWorkflow).toHaveBeenCalledWith(expect.objectContaining({ options: undefined }));
+  });
+
+  it('invoke_workflow returns the 422-shaped body as isError when input_schema rejects the data', async () => {
+    mockGetWorkflowConfig.mockResolvedValue({ workflow_type: 'fleetTools', invocable: true, input_schema: { required: ['serialNumber'] } });
+    const body = { code: 'schema_validation', violations: [{ field: 'serialNumber', message: 'Required' }], workflowType: 'fleetTools' };
+    mockCheckInvokeInput.mockReturnValue(body);
+    const result = await tools.get('invoke_workflow')!({ workflow_type: 'fleetTools', data: {} });
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toEqual(body);
+    expect(mockInvokeWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('invoke_workflow_read_safe runs the same input gate after the read_safe check', async () => {
+    mockGetWorkflowConfig.mockResolvedValue({ workflow_type: 'lookup', invocable: true, read_safe: true, input_schema: { required: ['q'] } });
+    mockCheckInvokeInput.mockReturnValue({ code: 'schema_validation', violations: [{ field: 'q', message: 'Required' }] });
+    const result = await tools.get('invoke_workflow_read_safe')!({ workflow_type: 'lookup', data: {} });
+    expect(result.isError).toBe(true);
+    expect(parse(result).code).toBe('schema_validation');
+    expect(mockInvokeWorkflow).not.toHaveBeenCalled();
   });
 });

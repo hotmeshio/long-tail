@@ -24,6 +24,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
+| The same rich form for starting a workflow from the Invoke page | `inputSchema` on the worker config | [invoke-form.md](hitl/invoke-form.md) |
 
 ---
 
@@ -103,6 +104,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 
 | Keyword | Level | Purpose |
 |---------|-------|---------|
+| `input.*` | domain | The live form values on the Invoke surface (alias of `resolver.*`) for `x-lt-showIf`, `x-lt-help`, and `x-lt-options` |
 | `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` or an ordered array of paths (first to resolve wins); may embed `{{domain.path}}` interpolation segments |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
@@ -113,7 +115,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `accept` | field | File-type filter for `file-upload` (e.g. `".pdf,.png"`) |
 | `x-lt-bind` | field | Path in the resolver payload (e.g. `"customer.email"`) |
 | `x-lt-span` | field | Column span in a `two-column` layout (`2` = full width) |
-| `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form |
+| `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form; an array requires every condition |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
 | `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` (or an ordered array of paths, first to resolve wins) to the field's option list (scalars or `{ value, label }`); static `enum` wins; `{{domain.path}}` segments make cascading selects |

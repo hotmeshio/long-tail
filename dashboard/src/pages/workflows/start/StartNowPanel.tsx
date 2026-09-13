@@ -1,150 +1,52 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { useInvokeWorkflow } from '../../../api/workflows';
 import { useAuth } from '../../../hooks/useAuth';
-import type { LTWorkflowConfig } from '../../../api/types';
-import {
-  DEFAULT_ENVELOPE,
-  extractDataFields,
-  dataToFields,
-  fieldsToJson,
-} from './helpers';
+import type { InvocableWorkflow } from '../../../api/types';
+import { VARIANT_ICON } from '../../../components/common/display/WorkflowPill';
+import { MarkdownRenderer } from '../../../components/common/display/MarkdownRenderer';
 import { IdentitySummary } from './IdentitySummary';
-import { EnvelopeEditor } from './EnvelopeEditor';
-import { SimpleMarkdown } from '../../../components/common/display/SimpleMarkdown';
+import { LegacyInvokeForm } from './LegacyInvokeForm';
+import { RichInvokeForm } from './RichInvokeForm';
+import { useInvokeSubmit } from './use-invoke-submit';
 
-export function StartNowPanel({ selected, executionsPath, inline = false }: {
-  selected: LTWorkflowConfig;
-  executionsPath: string;
-  /** In page flow (compact layouts) the footer sticks to the viewport bottom
-   *  instead of pinning to a fixed-height panel edge. */
-  inline?: boolean;
-}) {
-  const navigate = useNavigate();
+/**
+ * The form column. The workflow's name is the column's heading and stays
+ * put; Start stays put at the bottom; description, identity, options, and
+ * the fields scroll between them. A declared input_schema renders the
+ * x-lt-* form; otherwise the envelope template form.
+ */
+export function StartNowPanel({ selected }: { selected: InvocableWorkflow }) {
   const { isSuperAdmin, hasRoleType } = useAuth();
   const isAdmin = isSuperAdmin || hasRoleType('admin');
-  const invokeMutation = useInvokeWorkflow();
-  const [jsonInput, setJsonInput] = useState(DEFAULT_ENVELOPE);
-  const [parseError, setParseError] = useState('');
-  const [formFields, setFormFields] = useState<Record<string, unknown>>({});
-  const [isJsonMode, setIsJsonMode] = useState(false);
   const [overrideBot, setOverrideBot] = useState('');
-  // Per-run interceptor opt-out: offered when the workflow's registration is
-  // certified. metadata.certified=false bypasses config lookup for this run.
-  const isCertifiable = selected.certified;
-  const [certified, setCertified] = useState(isCertifiable);
+  // Per-run interceptor opt-out, offered when the registration is certified.
+  const [certified, setCertified] = useState(selected.certified);
 
-  const dataFields = useMemo(
-    () => extractDataFields(selected.envelope_schema ?? null),
-    [selected.envelope_schema],
-  );
-  const hasFormView = dataFields.length > 0;
+  useEffect(() => {
+    setOverrideBot('');
+    setCertified(selected.certified);
+  }, [selected.workflow_type, selected.certified]);
 
-  const schemaMetadata = useMemo(() => {
-    if (!selected.envelope_schema) return {};
-    const md = selected.envelope_schema.metadata;
+  const metadata = useMemo(() => {
+    const md = selected.envelope_schema?.metadata;
     return md && typeof md === 'object' ? (md as Record<string, unknown>) : {};
   }, [selected.envelope_schema]);
 
-  useEffect(() => {
-    setParseError('');
-    invokeMutation.reset();
+  const submission = useInvokeSubmit(selected, { certified, overrideBot });
+  const TierIcon = VARIANT_ICON[selected.tier];
 
-    const prefill = sessionStorage.getItem('lt:invoke:prefill');
-    if (prefill) {
-      sessionStorage.removeItem('lt:invoke:prefill');
-      setJsonInput(prefill);
-      try {
-        const parsed = JSON.parse(prefill);
-        const data = parsed?.data ?? parsed;
-        if (data && typeof data === 'object') setFormFields(dataToFields(data));
-      } catch { /* use as-is */ }
-      setIsJsonMode(true);
-      setOverrideBot('');
-      return;
-    }
-
-    const json = selected.envelope_schema
-      ? JSON.stringify(selected.envelope_schema, null, 2)
-      : DEFAULT_ENVELOPE;
-    setJsonInput(json);
-    if (selected.envelope_schema?.data && typeof selected.envelope_schema.data === 'object') {
-      setFormFields(dataToFields(selected.envelope_schema.data as Record<string, unknown>));
-    } else {
-      setFormFields({});
-    }
-    setIsJsonMode(!extractDataFields(selected.envelope_schema ?? null).length);
-    setOverrideBot('');
-    setCertified(isCertifiable);
-  }, [selected.workflow_type]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleToggleMode = () => {
-    if (isJsonMode) {
-      try {
-        const parsed = JSON.parse(jsonInput);
-        if (parsed.data && typeof parsed.data === 'object') setFormFields(dataToFields(parsed.data));
-      } catch { /* keep existing */ }
-    } else {
-      setJsonInput(fieldsToJson(formFields, schemaMetadata));
-    }
-    setIsJsonMode(!isJsonMode);
-  };
-
-  const updateFormField = (key: string, value: unknown, type: string) => {
-    let parsed = value;
-    if (type === 'number') parsed = value === '' ? 0 : Number(value);
-    else if (type === 'boolean') parsed = value === 'true' || value === true;
-    const updated = { ...formFields, [key]: parsed };
-    setFormFields(updated);
-    setJsonInput(fieldsToJson(updated, schemaMetadata));
-  };
-
-  const handleInvoke = async () => {
-    setParseError('');
-    let envelope: Record<string, unknown>;
-    try {
-      envelope = JSON.parse(jsonInput);
-    } catch {
-      setParseError('Invalid JSON');
-      return;
-    }
-    const { data, metadata } = envelope;
-    if (!data || typeof data !== 'object') {
-      setParseError('Envelope must include a "data" object');
-      return;
-    }
-    try {
-      const resolvedMetadata = { ...((metadata as Record<string, unknown>) ?? {}) };
-      if (certified) resolvedMetadata.certified = true;
-      await invokeMutation.mutateAsync({
-        workflowType: selected.workflow_type,
-        data: data as Record<string, unknown>,
-        metadata: resolvedMetadata,
-        ...(overrideBot ? { execute_as: overrideBot } : {}),
-      });
-      navigate(executionsPath);
-    } catch { /* error via mutation */ }
-  };
-
-  // The name heads the shell panel (InvokeRunPanel); the form leads with the
-  // description and pins its submit footer so Start is always reachable.
-  const content = (
+  const lead = (
     <>
       {selected.description && (
-        <div className="text-xs text-text-secondary leading-relaxed">
-          <SimpleMarkdown content={selected.description} compact />
-        </div>
+        <MarkdownRenderer content={selected.description} className="text-xs text-text-secondary leading-relaxed" />
       )}
-
       <IdentitySummary
         config={selected}
         overrideBot={overrideBot}
         onOverrideChange={setOverrideBot}
         showOverride={isAdmin}
       />
-
-      {isCertifiable && (
+      {selected.certified && (
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -156,51 +58,28 @@ export function StartNowPanel({ selected, executionsPath, inline = false }: {
           <span className="text-xs text-text-secondary">Enable task tracking and escalation routing</span>
         </label>
       )}
-
-      <EnvelopeEditor
-        selectedConfig={selected}
-        isJsonMode={isJsonMode}
-        hasFormView={hasFormView}
-        jsonInput={jsonInput}
-        formFields={formFields}
-        dataFields={dataFields}
-        onJsonChange={(v) => { setJsonInput(v); setParseError(''); }}
-        onToggleMode={handleToggleMode}
-        onUpdateFormField={updateFormField}
-        onSetFormFields={setFormFields}
-      />
-
     </>
   );
 
-  const footer = (
-    <div
-      className={`shrink-0 border-t border-surface-border/40 pt-3 pb-4 space-y-2 ${
-        inline ? 'sticky bottom-0 z-10 bg-surface' : 'bg-surface-raised'
-      }`}
-    >
-      {parseError && <p className="text-xs text-status-error">{parseError}</p>}
-      {invokeMutation.error && <p className="text-xs text-status-error">{invokeMutation.error.message}</p>}
-      {invokeMutation.isSuccess && <p className="text-xs text-status-success">Workflow started</p>}
-      <button onClick={handleInvoke} disabled={invokeMutation.isPending} className="btn-primary w-full">
-        {invokeMutation.isPending ? 'Starting...' : 'Start Workflow'}
-      </button>
-    </div>
-  );
-
-  if (inline) {
-    return (
-      <div className="space-y-6 max-w-2xl">
-        {content}
-        {footer}
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto space-y-6 pt-1 pb-4">{content}</div>
-      {footer}
+    <div className="max-w-form" data-testid="invoke-form">
+      {/* Sticks to the top of the shell scroll; the pulled-up padding covers the page gutter above it. */}
+      <header className="sticky top-0 z-10 bg-surface -mt-8 pt-8 flex items-baseline gap-3 min-w-0 pb-3 mb-5 border-b border-surface-border/60">
+        <TierIcon className="w-5 h-5 self-center shrink-0 text-accent/65" strokeWidth={1.5} aria-hidden />
+        <h2 className="text-2xl font-mono text-text-primary truncate" title={selected.workflow_type}>
+          {selected.workflow_type}
+        </h2>
+        <span className="text-2xs uppercase tracking-widest text-text-tertiary shrink-0">{selected.tier}</span>
+        {selected.task_queue && (
+          <span className="text-2xs font-mono text-text-quaternary truncate">{selected.task_queue}</span>
+        )}
+      </header>
+
+      {selected.input_schema ? (
+        <RichInvokeForm selected={selected} schema={selected.input_schema} metadata={metadata} submission={submission} lead={lead} />
+      ) : (
+        <LegacyInvokeForm selected={selected} metadata={metadata} submission={submission} lead={lead} />
+      )}
     </div>
   );
 }

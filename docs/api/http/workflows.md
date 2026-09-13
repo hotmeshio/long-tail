@@ -139,7 +139,8 @@ PUT /api/workflows/:type/config
 | `consumes` | `string[]` | `[]` | Workflow types whose completed data this workflow receives via `envelope.lt.providers` |
 | `execute_as` | `string \| null` | `null` | Service account `external_id` to run as (overrides invoker identity) |
 | `tool_tags` | `string[]` | `[]` | MCP tool tags for scoped tool discovery |
-| `envelope_schema` | `object \| null` | `null` | JSON Schema for the workflow input envelope |
+| `envelope_schema` | `object \| null` | `null` | Example envelope that pre-fills the legacy invoke form |
+| `input_schema` | `object \| null` | `null` | x-lt-* JSON Schema for the rich invoke form; `POST /:type/invoke` validates `data` against it. See [Invoke forms](../../hitl/invoke-form.md). |
 | `resolver_schema` | `object \| null` | `null` | **Deprecated** legacy fallback only. The escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `string \| null` | `null` | Cron expression for scheduled execution (e.g., `"0 9 * * *"`) |
 
@@ -241,10 +242,31 @@ The workflow starts on its configured `task_queue` with a generated workflow ID 
 | `403` | `{ "error": "User not registered" }` | RBAC check failed — no matching user |
 | `403` | `{ "error": "Insufficient role for invocation" }` | User lacks a required invocation role |
 | `404` | `{ "error": "Workflow not found" }` | No config exists for this type |
+| `422` | `{ "error": "data failed input schema validation (n violations)", "code": "schema_validation", "violations": [{ "field", "message" }], "role": null, "schemaVersion": null, "workflowType" }` | The config declares `input_schema` and `data` violates it |
 
 **Authorization:**
 
 When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one of the listed roles (checked against `lt_user_roles` via the user's `external_id`). Superadmins bypass this check.
+
+### List the caller's invokable workflows
+
+```
+GET /api/workflows/invocable
+```
+
+Every workflow the calling user may invoke, decided by the same predicate the invoke gate runs. Superadmins and `admin`/`admin` also receive active durable workers that carry no registration row.
+
+**Response 200:**
+
+```json
+{
+  "workflows": [
+    { "workflow_type": "fleetTools", "task_queue": "long-tail-examples", "tier": "registered", "invocable": true, "invocation_roles": ["printer-fleet"], "input_schema": { "...": "..." }, "envelope_schema": { "data": {}, "metadata": { "source": "dashboard" } }, "description": "..." }
+  ]
+}
+```
+
+Each entry is the full config row plus `tier` (`durable`, `registered`, `certified`). The dashboard Invoke page and its nav entry read this list.
 
 ---
 
@@ -632,6 +654,7 @@ Interrupt a running workflow. The workflow is immediately terminated.
 | `GET` | `/workers` | any | List active in-memory workers with registration status |
 | `GET` | `/discovered` | any | Unified list of workers, entities, and configs |
 | `GET` | `/cron/status` | any | List cron-configured workflows and active status |
+| `GET` | `/invocable` | any | The caller's invokable workflows with tier |
 | `GET` | `/config` | any | List all workflow configurations |
 | `GET` | `/:type/config` | any | Get a single workflow configuration |
 | `PUT` | `/:type/config` | admin | Create or replace a workflow configuration |

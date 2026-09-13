@@ -43,6 +43,13 @@ export interface LTWorkerConfig {
   /** JSON template that pre-fills the dashboard invocation form. */
   envelopeSchema?: Record<string, any>;
   /**
+   * Opt-in rich invoke form: an x-lt-* JSON Schema. When present the
+   * dashboard renders the form from it, submits `data` as the x-lt-bind
+   * mapped values with `metadata` from envelopeSchema.metadata, and the
+   * invoke API validates `data` against it with the same shared pass (422).
+   */
+  inputSchema?: Record<string, any>;
+  /**
    * @deprecated The escalation form is a versioned schema owned by the target
    * role, not the workflow. Declare the form on the role; retained only as a
    * legacy fallback.

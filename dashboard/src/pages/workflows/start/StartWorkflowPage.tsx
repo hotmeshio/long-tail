@@ -1,177 +1,67 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { X } from 'lucide-react';
-import { useWorkflowConfigs, useDiscoveredWorkflows, useCronStatus } from '../../../api/workflows';
+import { useInvocableWorkflows, useCronStatus } from '../../../api/workflows';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
-import { FilterBar, FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
-import { useShellPanelOptional } from '../../../hooks/useShellPanel';
+import { FilterSelect, FilterInput } from '../../../components/common/data/FilterBar';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
-import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
-import { WorkflowSelector, workflowQueues } from './WorkflowSelector';
+import type { InvocableWorkflow, WorkflowTier } from '../../../api/types';
+import { WorkflowSelector, workflowQueues, firstWorkflowType } from './WorkflowSelector';
 import { StartNowPanel } from './StartNowPanel';
 
-// Shell-panel ownership key — the invoke form claims/releases this slot.
-const INVOKE_PANEL_KEY = 'invoke-run';
+const TYPE_PARAM = 'type';
+// A few dozen workflows read fine grouped by queue; the filters wait for scale to demand them.
+const LIST_FILTERS_VISIBLE = false;
 
-/** The invoke form framed for the shell panel: the workflow's name heads the
- *  panel, and the form owns the scroll so its submit footer stays pinned. */
-function InvokeRunPanel({
-  config,
-  executionsPath,
-  onClose,
-}: {
-  config: LTWorkflowConfig;
-  executionsPath: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
-        <h2 className="text-base font-mono font-medium text-text-primary truncate" title={config.workflow_type}>
-          {config.workflow_type}
-        </h2>
-        <button onClick={onClose} className="icon-link shrink-0" title="Close" aria-label="Close">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="flex-1 min-h-0 px-5">
-        <StartNowPanel selected={config} executionsPath={executionsPath} />
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Invoke — the list of workflows the caller may run beside the form for the
+ * one chosen. The list is grouped by queue and takes a quarter of the row;
+ * the form takes the rest. Selection lives in `?type=`, and the first row
+ * is preselected so the page opens on a form, never on an empty column.
+ */
 export function StartWorkflowPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: configsData, isLoading } = useWorkflowConfigs();
-  const { data: discoveredData, isLoading: discoveredLoading } = useDiscoveredWorkflows();
+  const { data: invocable, isLoading } = useInvocableWorkflows();
   const { data: cronEntries } = useCronStatus();
-  const shell = useShellPanelOptional();
-  // Below xl the list + a 630px side panel can't share the row. The list
-  // folds into a select and the form renders inline at full width. The
-  // viewport (not the container) drives this so an opening panel can't
-  // feed back into its own layout decision.
+  // Below xl the list and the form cannot share the row: the list folds
+  // into a select and the form takes the full width.
   const compact = useMediaQuery('(max-width: 1279px)');
 
-  const selectedType = searchParams.get('type') ?? '';
-  // The list filters live at page level so the FilterBar spans the page —
-  // the standard master-list geometry.
+  const selectedType = searchParams.get(TYPE_PARAM) ?? '';
   const [search, setSearch] = useState('');
   const [activeQueue, setActiveQueue] = useState<string | null>(null);
 
-  const configs: LTWorkflowConfig[] = configsData ?? [];
-
+  const workflows: InvocableWorkflow[] = invocable ?? [];
   const tierMap = useMemo(() => {
     const map = new Map<string, WorkflowTier>();
-    for (const dw of discoveredData ?? []) {
-      map.set(dw.workflow_type, dw.tier ?? 'durable');
-    }
+    for (const w of workflows) map.set(w.workflow_type, w.tier);
     return map;
-  }, [discoveredData]);
+  }, [workflows]);
+  const selected = workflows.find((c) => c.workflow_type === selectedType);
+  const activeTypes = new Set((cronEntries ?? []).filter((e) => e.active).map((e) => e.workflow_type));
 
-  const invocableConfigs = useMemo(() => {
-    const invocable = configs.filter((c) => c.invocable);
-    const registeredTypes = new Set(configs.map((c) => c.workflow_type));
-    const discovered = discoveredData ?? [];
-    const durable = discovered
-      .filter((dw) => dw.active && !registeredTypes.has(dw.workflow_type))
-      .map((dw) => ({
-        workflow_type: dw.workflow_type,
-        task_queue: dw.task_queue ?? '',
-        invocable: true,
-        certified: false,
-        description: null,
-        default_role: 'reviewer',
-        roles: [],
-        invocation_roles: [],
-        consumes: [],
-        envelope_schema: null,
-        resolver_schema: null,
-        cron_schedule: null,
-        execute_as: null,
-      } satisfies LTWorkflowConfig));
-    return [...invocable, ...durable];
-  }, [configs, discoveredData]);
-
-  const selectedConfig = invocableConfigs.find((c) => c.workflow_type === selectedType);
-
-  const activeTypes = new Set(
-    (cronEntries ?? []).filter((e) => e.active).map((e) => e.workflow_type),
-  );
-
-  const executionsPath = '/workflows/executions';
-
+  // A user's choice is a history entry; the opening preselect only rewrites the landing URL.
   const setType = useCallback(
-    (value: string | null) => {
+    (value: string | null, opts: { replace?: boolean } = {}) => {
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          if (value) next.set('type', value);
-          else next.delete('type');
+          if (value) next.set(TYPE_PARAM, value);
+          else next.delete(TYPE_PARAM);
           return next;
         },
-        { replace: true },
+        { replace: opts.replace ?? false },
       );
     },
     [setSearchParams],
   );
-  const clearSelection = useCallback(() => setType(null), [setType]);
 
   useEffect(() => {
-    if (invocableConfigs.length === 1 && !searchParams.get('type')) {
-      setSearchParams({ type: invocableConfigs[0].workflow_type }, { replace: true });
-    }
-  }, [invocableConfigs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (searchParams.get(TYPE_PARAM) || workflows.length === 0) return;
+    const first = firstWorkflowType(workflows);
+    if (first) setType(first, { replace: true });
+  }, [workflows, searchParams, setType]);
 
-  // ── ?type= ↔ shell panel sync ──────────────────────────────────────────────
-  // The param is the source of truth: a change (row click, deep link,
-  // back/forward) opens/closes the run panel in the shell's right slot; an
-  // external close (the panel's X, slot takeover) clears the param. Refs
-  // guard both directions against loops — the same pattern as EntityLensView.
-  const appliedType = useRef<string | null>(null);
-  const panelWasOpen = useRef(false);
-  useEffect(() => {
-    if (!shell) return;
-    const type = !compact && selectedConfig ? selectedType : null;
-    if (type === appliedType.current) return;
-    appliedType.current = type;
-    if (type && selectedConfig) {
-      shell.setPanel(
-        <InvokeRunPanel config={selectedConfig} executionsPath={executionsPath} onClose={clearSelection} />,
-        { key: INVOKE_PANEL_KEY, width: 630 },
-      );
-    } else {
-      panelWasOpen.current = false;
-      shell.closePanel(INVOKE_PANEL_KEY);
-    }
-  }, [selectedType, selectedConfig, shell, clearSelection, executionsPath, compact]);
-  useEffect(() => {
-    if (!shell || !selectedType || compact) return;
-    if (shell.open && shell.ownerKey === INVOKE_PANEL_KEY) {
-      panelWasOpen.current = true;
-      return;
-    }
-    if (panelWasOpen.current) {
-      panelWasOpen.current = false;
-      clearSelection();
-    }
-  }, [shell, selectedType, clearSelection, compact]);
-  // Unmount with the panel open releases the slot (keyed — never yanks
-  // another claimant's panel).
-  const shellRef = useRef(shell);
-  shellRef.current = shell;
-  useEffect(
-    () => () => {
-      if (appliedType.current) shellRef.current?.closePanel(INVOKE_PANEL_KEY);
-    },
-    [],
-  );
-
-  const handleSelect = (config: LTWorkflowConfig) => {
-    setType(config.workflow_type);
-  };
-
-  if (isLoading || discoveredLoading) {
+  if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-surface-sunken rounded w-48" />
@@ -180,19 +70,22 @@ export function StartWorkflowPage() {
     );
   }
 
+  const queues = workflowQueues(workflows);
+  const form = selected
+    ? <StartNowPanel selected={selected} />
+    : <p className="text-xs text-text-tertiary">Choose a workflow to fill out its form.</p>;
+
   return (
     <div>
       <PageHeader title="Invoke" docsHash="#docs:dashboard.md:invoke-workflow" />
 
-      {invocableConfigs.length === 0 ? (
+      {workflows.length === 0 ? (
         <div className="py-16 text-center">
           <p className="text-sm text-text-primary mb-1">No invocable workflows</p>
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : compact ? (
         <>
-          {/* Compact: the list folds into a grouped select and the form takes
-              the full width, its submit footer sticking to the viewport. */}
           <label className="block mb-6 max-w-2xl">
             <span className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Workflow</span>
             <select
@@ -201,60 +94,57 @@ export function StartWorkflowPage() {
               className="select text-xs font-mono w-full"
             >
               <option value="">Choose a workflow…</option>
-              {workflowQueues(invocableConfigs).map((q) => (
+              {queues.map((q) => (
                 <optgroup key={q} label={q}>
-                  {invocableConfigs
+                  {workflows
                     .filter((c) => (c.task_queue || '') === q)
                     .map((c) => (
                       <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
                     ))}
                 </optgroup>
               ))}
-              {invocableConfigs
+              {workflows
                 .filter((c) => !c.task_queue)
                 .map((c) => (
                   <option key={c.workflow_type} value={c.workflow_type}>{c.workflow_type}</option>
                 ))}
             </select>
           </label>
-          {selectedConfig ? (
-            <StartNowPanel selected={selectedConfig} executionsPath={executionsPath} inline />
-          ) : (
-            <p className="text-xs text-text-tertiary">Choose a workflow to fill out its form.</p>
-          )}
+          {form}
         </>
       ) : (
-        <>
-          {/* The standard full-width sticky filter band — above the list. */}
-          <FilterBar>
-            {workflowQueues(invocableConfigs).length > 1 && (
-              <FilterSelect
-                label="Queue"
-                value={activeQueue ?? ''}
-                onChange={(v) => setActiveQueue(v || null)}
-                options={workflowQueues(invocableConfigs).map((q) => ({ value: q, label: q }))}
+        <div className="flex gap-10 items-start">
+          {/* The page scrolls as a whole; the list column and the form's title and Start stick while the title of the page rides away. */}
+          <aside className="w-1/4 min-w-[15rem] shrink-0 sticky top-0 self-start -mt-8 pt-8 max-h-[calc(100vh-5rem)] overflow-y-auto pr-1 space-y-4" data-testid="invoke-list">
+            {LIST_FILTERS_VISIBLE && <div className="flex flex-col gap-3">
+              {queues.length > 1 && (
+                <FilterSelect
+                  label="Queue"
+                  value={activeQueue ?? ''}
+                  onChange={(v) => setActiveQueue(v || null)}
+                  options={queues.map((q) => ({ value: q, label: q }))}
+                />
+              )}
+              <FilterInput
+                label="Search"
+                value={search}
+                onChange={setSearch}
+                placeholder={`${workflows.length} workflows…`}
               />
-            )}
-            <FilterInput
-              label="Search"
-              value={search}
-              onChange={setSearch}
-              placeholder={`${invocableConfigs.length} workflows…`}
+            </div>}
+            <WorkflowSelector
+              configs={workflows}
+              selectedType={selectedType}
+              onSelect={(c) => setType(c.workflow_type)}
+              tierMap={tierMap}
+              activeTypes={activeTypes}
+              search={search}
+              activeQueue={activeQueue}
+              compact
             />
-          </FilterBar>
-
-          {/* The list IS the page — selecting a row opens the invoke form in
-              the shell's right panel. */}
-          <WorkflowSelector
-            configs={invocableConfigs}
-            selectedType={selectedType}
-            onSelect={handleSelect}
-            tierMap={tierMap}
-            activeTypes={activeTypes}
-            search={search}
-            activeQueue={activeQueue}
-          />
-        </>
+          </aside>
+          <section className="flex-1 min-w-0">{form}</section>
+        </div>
       )}
     </div>
   );

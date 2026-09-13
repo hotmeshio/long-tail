@@ -52,8 +52,10 @@ function resolvePath(expr: string, ctx: ShowIfContext): { known: boolean; value:
 /**
  * Evaluates an x-lt-showIf condition. Returns true when the field should be
  * shown. Returns true when condition is absent, non-string, or context is null.
+ * An array of conditions shows the field only when every one holds.
  */
 export function evaluateShowIf(condition: unknown, ctx: ShowIfContext | null | undefined): boolean {
+  if (Array.isArray(condition)) return condition.every((c) => evaluateShowIf(c, ctx));
   if (typeof condition !== 'string' || condition.length === 0) return true;
   if (!ctx) return true;
   const negate = condition.startsWith('!');

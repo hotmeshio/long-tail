@@ -58,7 +58,8 @@ export async function getWorkflowConfig(input: {
  * @param input.invocation_roles — roles that can invoke this workflow
  * @param input.consumes — workflow types whose data this workflow consumes
  * @param input.tool_tags — MCP tool tags for discovery
- * @param input.envelope_schema — JSON Schema for envelope.data validation
+ * @param input.envelope_schema — JSON template that pre-fills the invoke form
+ * @param input.input_schema — x-lt-* JSON Schema for the rich invoke form; invoke validates data against it
  * @param input.resolver_schema — JSON Schema for resolver payload validation
  * @param input.cron_schedule — cron expression for scheduled execution
  * @returns `{ status: 200, data: <saved config> }`
@@ -76,6 +77,7 @@ export async function upsertWorkflowConfig(input: {
   consumes?: string[];
   tool_tags?: string[];
   envelope_schema?: any;
+  input_schema?: any;
   resolver_schema?: any;
   cron_schedule?: string | null;
   read_safe?: boolean;
@@ -100,6 +102,7 @@ export async function upsertWorkflowConfig(input: {
       consumes: input.consumes ?? [],
       tool_tags: input.tool_tags ?? [],
       envelope_schema: input.envelope_schema ?? null,
+      input_schema: input.input_schema ?? null,
       resolver_schema: input.resolver_schema ?? null,
       cron_schedule: input.cron_schedule ?? null,
       read_safe: input.read_safe ?? false,

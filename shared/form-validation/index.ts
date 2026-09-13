@@ -19,3 +19,4 @@ export * from './x-lt-options';
 export * from './ctx-path';
 export * from './field-validator';
 export * from './validate-resolver-payload';
+export * from './invoke-context';

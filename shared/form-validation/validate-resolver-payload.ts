@@ -36,7 +36,7 @@ export type { FieldError } from './field-validator';
  * dynamic constraints against. `resolver` is supplied by the pass itself
  * (the flat form values under validation) — callers provide the rest.
  */
-export type ResolverValidationContext = Omit<ShowIfContext, 'resolver'>;
+export type ResolverValidationContext = Omit<ShowIfContext, 'resolver' | 'input'>;
 
 /**
  * Validate FLAT form values against the form schema. This is the dashboard's
@@ -53,6 +53,7 @@ export function validateResolverForm(
   const liveCtx: ShowIfContext = {
     ...(ctx ?? {}),
     resolver: formValues as Record<string, unknown>,
+    input: formValues as Record<string, unknown>,
   };
 
   const errors: FieldError[] = [];

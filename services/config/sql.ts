@@ -29,8 +29,8 @@ INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING`;
 
 export const UPSERT_WORKFLOW = `\
 INSERT INTO lt_config_workflows
-  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as, certified, read_safe)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as, certified, read_safe, input_schema)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 ON CONFLICT (workflow_type) DO UPDATE SET
   invocable = EXCLUDED.invocable,
   task_queue = EXCLUDED.task_queue,
@@ -43,7 +43,8 @@ ON CONFLICT (workflow_type) DO UPDATE SET
   tool_tags = EXCLUDED.tool_tags,
   execute_as = EXCLUDED.execute_as,
   certified = EXCLUDED.certified,
-  read_safe = EXCLUDED.read_safe`;
+  read_safe = EXCLUDED.read_safe,
+  input_schema = EXCLUDED.input_schema`;
 
 export const DELETE_CONFIG_ROLES = `\
 DELETE FROM lt_config_roles WHERE workflow_type = $1`;
@@ -66,8 +67,8 @@ DELETE FROM lt_config_workflows WHERE workflow_type = $1`;
 
 export const SEED_WORKFLOW_CONFIG = `\
 INSERT INTO lt_config_workflows
-  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as, certified, read_safe)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+  (workflow_type, invocable, task_queue, default_role, description, consumes, envelope_schema, resolver_schema, cron_schedule, tool_tags, execute_as, certified, read_safe, input_schema)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 ON CONFLICT (workflow_type) DO NOTHING`;
 
 export const SEED_CONFIG_ROLE = `\

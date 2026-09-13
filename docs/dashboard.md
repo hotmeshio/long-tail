@@ -32,7 +32,7 @@ Each flavor exposes the same shape: configure, invoke, executions.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Procedural → Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
-| **Procedural → Invoke** | `/workflows/durable/invoke` | Start any invocable procedural workflow. Two-panel layout with workflow selector and envelope editor. |
+| **Procedural → Invoke** | `/workflows/durable/invoke` | Start a procedural workflow the caller may invoke. Grouped list beside the form; rich x-lt-* forms when a workflow declares `inputSchema`. Builders reach it under Orchestrate, everyone else under Tools. |
 | **Procedural → Executions** | `/workflows/executions` | All procedural runs with status, duration, and tier. Click through to task records and escalation history. |
 | **Graph → Configure** | `/mcp/workflows` | Graph workflows available to the orchestrator — compiled deterministic YAML DAGs, grouped by namespace. |
 | **Graph → Invoke** | `/mcp/workflows/invoke` | Start any active graph flow. Same two-panel layout as procedural invoke. |
@@ -127,16 +127,21 @@ workers: [
 
 ### Invoke Workflow
 
-Accessible at `/workflows/durable/invoke`. A two-panel page for starting any invocable procedural workflow. The left panel lists invocable workflows grouped by task queue, with a queue select and search in the filter bar; each row carries its tier badge, and workflows with an active cron schedule show a clock icon. Selecting a workflow syncs `?type=<WorkflowType>` to the URL and opens the invocation form on the right:
+Accessible at `/workflows/durable/invoke` to anyone the server lists an invokable workflow for. The server decides the list with the same predicate the invoke gate runs (`invocationRoles` on each config; empty means every authenticated user; superadmin and admin see everything, including active durable workers with no registration). Builders keep Invoke under Orchestrate; every other persona gets a **Tools** nav section that appears only when the list is non-empty, and the route sends a caller with nothing to invoke home.
 
-- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override"). The invocation runs under that identity's `_scope`.
+The list of workflows takes the left quarter of the row, grouped by task queue with a queue select and search stacked above; each row carries its tier. The first row is preselected and `?type=<WorkflowType>` tracks the choice, so the page opens on a form. The form fills the rest of the row:
+
+- **Name and description** — the workflow pill with its tier, then the config's markdown description. Tables render.
+- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override").
 - **Certification checkbox** — for a certified workflow, stamps `metadata.certified` on this one run.
-- **Envelope editor** — the envelope is `{ data, metadata }`: `data` holds the workflow input, `metadata` optional context. Two modes that stay in sync: a **Form view** that auto-generates a field per `envelope_schema.data` key (type inferred — text, number, boolean, object) and a raw **JSON view**. When a workflow has no `envelope_schema`, a banner links to the registry to add one.
-- **Start Workflow** button — calls the invoke endpoint and navigates to the executions list.
+- **The form** — a workflow that declares `inputSchema` renders the x-lt-* form: sections, two columns, conditional fields and instruction blocks, and a side panel with **Instructions** (the interpolated `x-lt-help`) and **Issues** (violations, click to focus). Every other workflow renders the envelope template form from `envelopeSchema`, with its Form and JSON views. See [Invoke forms](hitl/invoke-form.md).
+- **Start Workflow** — posts `{ data, metadata }` to the invoke endpoint. The page stays put and reports the started id; builders also get a **View workflow** link to its execution. A `422` from the input schema gate lands in the Issues view.
 
-Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page. The graph equivalent, **Graph → Invoke** (`/mcp/workflows/invoke`), starts a compiled YAML flow from the same shape.
+Below 1280px the list folds into a select and the form takes the full width.
 
-**API:** `POST /api/workflows/:type/invoke` starts a workflow (body `{ data, metadata?, execute_as? }`, returns `202` with the workflow id). `GET /api/workflows/discovered` backs the list; `GET /api/workflows/:type/config` supplies the envelope schema and identity.
+Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page. The graph equivalent, **Graph → Invoke** (`/mcp/workflows/invoke`), starts a compiled YAML flow.
+
+**API:** `GET /api/workflows/invocable` backs the list and the nav. `POST /api/workflows/:type/invoke` starts a workflow (body `{ data, metadata?, execute_as? }`, returns `202` with the workflow id; `422` with the canonical validation body when `input_schema` rejects the data).
 
 ### MCP Tool Designer
 

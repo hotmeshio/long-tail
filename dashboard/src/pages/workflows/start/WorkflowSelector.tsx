@@ -4,9 +4,38 @@ import { WorkflowPill } from '../../../components/common/display/WorkflowPill';
 import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import type { LTWorkflowConfig, WorkflowTier } from '../../../api/types';
 
-/** The queue set a page-level filter bar offers — shared with the grouping below. */
+const NO_QUEUE_LABEL = 'No Queue';
+
+/** The queue set a filter offers — shared with the grouping below. */
 export function workflowQueues(configs: LTWorkflowConfig[]): string[] {
   return [...new Set(configs.map((c) => c.task_queue).filter(Boolean))].sort() as string[];
+}
+
+/** One section per task queue; unqueued workflows trail under their own heading when no queue filter is active. */
+export function groupWorkflows(
+  configs: LTWorkflowConfig[],
+  search: string,
+  activeQueue: string | null,
+): { queue: string; workflows: LTWorkflowConfig[] }[] {
+  const q = search.toLowerCase().trim();
+  const matches = (c: LTWorkflowConfig) =>
+    !q || c.workflow_type.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q);
+
+  const targetQueues = activeQueue ? [activeQueue] : workflowQueues(configs);
+  const sections = targetQueues
+    .map((queue) => ({ queue, workflows: configs.filter((c) => c.task_queue === queue && matches(c)) }))
+    .filter((g) => g.workflows.length > 0);
+
+  if (!activeQueue) {
+    const noQueue = configs.filter((c) => !c.task_queue && matches(c));
+    if (noQueue.length > 0) sections.push({ queue: '', workflows: noQueue });
+  }
+  return sections;
+}
+
+/** The first row of the unfiltered list — what the page preselects. */
+export function firstWorkflowType(configs: LTWorkflowConfig[]): string | null {
+  return groupWorkflows(configs, '', null)[0]?.workflows[0]?.workflow_type ?? null;
 }
 
 export function WorkflowSelector({
@@ -17,74 +46,52 @@ export function WorkflowSelector({
   activeTypes,
   search,
   activeQueue,
+  compact = false,
 }: {
   configs: LTWorkflowConfig[];
   selectedType: string;
   onSelect: (config: LTWorkflowConfig) => void;
   tierMap: Map<string, WorkflowTier>;
   activeTypes?: Set<string>;
-  /** Owned by the page — the standard full-width FilterBar renders there. */
   search: string;
   activeQueue: string | null;
+  /** The narrow list column beside the form: name and tier only, headings in flow. */
+  compact?: boolean;
 }) {
-  const queues = useMemo(() => workflowQueues(configs), [configs]);
+  const grouped = useMemo(() => groupWorkflows(configs, search, activeQueue), [configs, search, activeQueue]);
 
-  // Group by task queue; workflows without a queue collect under a trailing section
-  const grouped = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    const matches = (c: LTWorkflowConfig) =>
-      !q ||
-      c.workflow_type.toLowerCase().includes(q) ||
-      c.description?.toLowerCase().includes(q);
-
-    const targetQueues = activeQueue ? [activeQueue] : queues;
-    const sections = targetQueues
-      .map((queue) => ({
-        queue,
-        workflows: configs.filter((c) => c.task_queue === queue && matches(c)),
-      }))
-      .filter((g) => g.workflows.length > 0);
-
-    if (!activeQueue) {
-      const noQueue = configs.filter((c) => !c.task_queue && matches(c));
-      if (noQueue.length > 0) sections.push({ queue: '', workflows: noQueue });
-    }
-    return sections;
-  }, [configs, queues, search, activeQueue]);
+  if (grouped.length === 0) {
+    return <p className="text-sm text-text-tertiary py-8 text-center">No workflows match your filter.</p>;
+  }
 
   return (
-    <div>
-      {grouped.length === 0 ? (
-        <p className="text-sm text-text-tertiary py-8 text-center">No workflows match your filter.</p>
-      ) : (
-        <div className="space-y-10">
-          {grouped.map(({ queue, workflows }) => (
-            <div key={queue || '__none__'}>
-              <div className="sticky top-[60px] z-10 bg-surface flex items-center gap-2 py-2 mb-2 border-b border-surface-border">
-                {queue ? (
-                  <Server className="w-3 h-3 text-accent" strokeWidth={1.5} />
-                ) : (
-                  <Wrench className="w-3 h-3 text-text-quaternary" strokeWidth={1.5} />
-                )}
-                <h2 className="section-h2">{queue || 'No Queue'}</h2>
-                <span className="text-xs text-text-quaternary">{workflows.length}</span>
-              </div>
-              <div className="divide-y divide-surface-border/30">
-                {workflows.map((config) => (
-                  <WorkflowRow
-                    key={config.workflow_type}
-                    config={config}
-                    isSelected={selectedType === config.workflow_type}
-                    tier={tierMap.get(config.workflow_type) ?? 'durable'}
-                    cronActive={activeTypes?.has(config.workflow_type) ?? false}
-                    onSelect={onSelect}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+    <div className={compact ? 'space-y-6' : 'space-y-10'}>
+      {grouped.map(({ queue, workflows }) => (
+        <div key={queue || '__none__'}>
+          <div className={`flex items-center gap-2 py-2 mb-1 border-b border-surface-border ${compact ? '' : 'sticky top-[60px] z-10 bg-surface mb-2'}`}>
+            {queue ? (
+              <Server className="w-3 h-3 text-accent shrink-0" strokeWidth={1.5} />
+            ) : (
+              <Wrench className="w-3 h-3 text-text-quaternary shrink-0" strokeWidth={1.5} />
+            )}
+            <h2 className="section-h2 truncate">{queue || NO_QUEUE_LABEL}</h2>
+            <span className="text-xs text-text-quaternary">{workflows.length}</span>
+          </div>
+          <div className={compact ? '' : 'divide-y divide-surface-border/30'}>
+            {workflows.map((config) => (
+              <WorkflowRow
+                key={config.workflow_type}
+                config={config}
+                isSelected={selectedType === config.workflow_type}
+                tier={tierMap.get(config.workflow_type) ?? 'durable'}
+                cronActive={activeTypes?.has(config.workflow_type) ?? false}
+                onSelect={onSelect}
+                compact={compact}
+              />
+            ))}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -95,15 +102,36 @@ function WorkflowRow({
   tier,
   cronActive,
   onSelect,
+  compact,
 }: {
   config: LTWorkflowConfig;
   isSelected: boolean;
   tier: WorkflowTier;
   cronActive: boolean;
   onSelect: (config: LTWorkflowConfig) => void;
+  compact: boolean;
 }) {
-  const variant =
-    tier === 'certified' ? 'certified' : tier === 'registered' ? 'registered' : 'durable';
+  const variant = tier === 'certified' ? 'certified' : tier === 'registered' ? 'registered' : 'durable';
+
+  if (compact) {
+    return (
+      <button
+        onClick={() => onSelect(config)}
+        aria-current={isSelected ? 'true' : undefined}
+        className={`group w-full text-left flex items-center gap-2 pl-3 pr-2 py-1.5 border-l-2 transition-colors ${
+          isSelected ? 'border-accent bg-accent/10' : 'border-transparent hover:bg-surface-hover'
+        }`}
+      >
+        <WorkflowPill type={config.workflow_type} size="sm" variant={variant} />
+        {cronActive && (
+          <span title="Cron schedule active" className="ml-auto shrink-0">
+            <Clock className="w-3 h-3 text-status-success/70" />
+          </span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={() => onSelect(config)}
@@ -132,8 +160,6 @@ function WorkflowRow({
             </span>
           )}
           <NamespacePill namespace="durable" />
-          {/* Trailing action icon — quiet until row hover, visible on the
-              selected row. Selecting opens the invoke form in the shell panel. */}
           <span title="Configure & invoke">
             <Play
               className={`w-3 h-3 transition-opacity ${

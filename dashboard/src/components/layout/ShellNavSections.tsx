@@ -1,6 +1,7 @@
 import { ChoreographySidebar } from './ChoreographySidebar';
 import { PinnedViewsSidebar } from './PinnedViewsSidebar';
 import { OrchestrationSidebar } from './OrchestrationSidebar';
+import { ToolsSidebar } from './ToolsSidebar';
 import { DesignSidebar } from './DesignSidebar';
 import { StorageSidebar } from './StorageSidebar';
 import { AdminSidebar } from './AdminSidebar';
@@ -23,6 +24,7 @@ export function ShellNavSections({ aiEnabled, isBuilder, isOps, viewAs, canSeePa
     <>
       <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
       <PinnedViewsSidebar />
+      {!isBuilder && <ToolsSidebar />}
       {isBuilder && <OrchestrationSidebar />}
       {isBuilder && aiEnabled && <DesignSidebar />}
       {isBuilder && <StorageSidebar />}
