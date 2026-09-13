@@ -128,7 +128,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-card` | schema (list) | `facet-board`: per-entity card — `{ title, state?, fields? }`; fields accept `format: "age"` |
 | `x-lt-help` | schema | Markdown guidance for the side panel's Help view |
 | `x-lt-context` | schema | Plain-text fallback for the Help view when `x-lt-help` is absent |
-| `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI |
+| `x-lt-viewport` | schema | Replace the generated form with a custom iframe UI; `src` is the editor, `onPending` / `onResolved` show the embed at the other stages |
 | `x-lt-submit-guard` | schema | Block the resolve while an embedded escalation query returns rows; `autoResolveWhenEmpty` auto-closes the claimed parent once it drains. Enforced isomorphically for `enforce_schema` roles |
 | `x-lt-submit-on-claim` | schema | Claiming also resolves the form's seeded defaults in one gesture |
 | `x-lt-labels` | schema | Per-target labels for the footer controls (`claim`, `cancel`, `submit`, `release`) |

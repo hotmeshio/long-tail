@@ -20,21 +20,47 @@ When `x-lt-viewport` is present, the dashboard renders an iframe instead of the 
 
 ---
 
+## Stage URLs
+
+`src` is the editor: it renders full-bleed once the viewer holds the claim. Two optional URLs show the embedded app at the other stages of the item's life, inside the standard page with its title and action bar:
+
+```json
+{
+  "x-lt-viewport": {
+    "type": "iframe",
+    "src": "https://your-app.example.com/design?workbenchId={workbenchId}",
+    "onPending": "https://your-app.example.com/preview?workbenchId={workbenchId}",
+    "onResolved": "https://your-app.example.com/summary?stl={stl_url}"
+  }
+}
+```
+
+| Stage | When | URL | The embed |
+|-------|------|-----|-----------|
+| `pending` | Pending and not workable by the viewer: available, or claimed by someone else | `onPending` | Shows; the action bar carries Claim |
+| `claimed` | Pending and workable by the viewer | `src` | Works; `lt:submit` resolves |
+| `resolved` | Resolved | `onResolved` | Shows the outcome |
+
+Pending and resolved embeds are read-only: the parent drops `lt:submit` and `lt:escalate` from them and never sends `lt:validate`. Every `lt:init` carries `stage`, so one app can serve all three URLs and branch on it. Leave a stage URL out to keep the default surface — the claim affordance while pending, the submitted values once resolved. A cancelled item always renders the default surface.
+
+---
+
 ## URL Token Substitution
 
-The `src` value supports `{key}` tokens — single-brace, flat key lookup. The dashboard expands them at render time using values merged from three sources, in priority order:
+Every stage URL supports `{key}` tokens — single-brace, flat key lookup. The dashboard expands them at render time using values merged from four sources, in priority order:
 
 | Priority | Source | Field |
 |----------|--------|-------|
-| 1 (highest) | `escalation_payload` | Per-escalation context set by the workflow |
-| 2 | `envelope` | Input envelope set by the workflow |
-| 3 (lowest) | `metadata` | Row metadata |
+| 1 (highest) | `resolver_payload` | The submitted resolution — populated once resolved, so `onResolved` can point at the outcome |
+| 2 | `escalation_payload` | Per-escalation context set by the workflow |
+| 3 | `envelope` | Input envelope set by the workflow |
+| 4 (lowest) | `metadata` | Row metadata |
 
 Keys present in multiple sources resolve from the highest-priority one. A key with no match is left as `{key}` in the final URL.
 
 ### Example — CAD designer workbench
 
-The `cad-designer` role embeds a WebGL editor. Each escalation carries `workbenchId` and `companyId` in its payload; the dashboard injects them into the iframe URL at render time:
+The `cad-designer` role embeds a WebGL editor at `/design` while claimed and its QC view at `/qc` before the claim and after the resolve. Each escalation carries `workbenchId` and `companyId` in its payload; the dashboard injects them into every stage URL at render time:
 
 ```typescript
 // Form schema on the role
@@ -42,6 +68,8 @@ const WORKBENCH_FORM_SCHEMA = {
   'x-lt-viewport': {
     type: 'iframe',
     src: `${BASE_URL}/design?workbenchId={workbenchId}&companyId={companyId}`,
+    onPending: `${BASE_URL}/qc?workbenchId={workbenchId}&companyId={companyId}`,
+    onResolved: `${BASE_URL}/qc?workbenchId={workbenchId}&companyId={companyId}`,
   },
   properties: {
     stl_url: {
@@ -68,7 +96,7 @@ At render time the dashboard produces:
 https://editor.internal/design?workbenchId=wb-123&companyId=co-456
 ```
 
-`{workbenchId}` and `{companyId}` are resolved from `escalation_payload`, which has the highest priority — so even if the same keys appear in `envelope` or `metadata`, the payload values win.
+`{workbenchId}` and `{companyId}` are resolved from `escalation_payload`, which outranks `envelope` and `metadata` — so even if the same keys appear there, the payload values win.
 
 ### Common token patterns
 
@@ -104,6 +132,7 @@ Communication happens via `window.postMessage`.
     workflow_type: string | null,
   },
   schema: Record<string, unknown>,   // The full form schema
+  stage: 'pending' | 'claimed' | 'resolved',  // Which stage URL this embed serves
 }
 
 // Optional: parent requests the iframe to submit

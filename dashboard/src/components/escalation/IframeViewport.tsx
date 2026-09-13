@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { LTEscalationRecord } from '../../api/types';
+import { VIEWPORT_STAGES, type ViewportStage } from '../../lib/x-lt-viewport';
 
 // ---------------------------------------------------------------------------
 // postMessage protocol types
@@ -7,7 +8,7 @@ import type { LTEscalationRecord } from '../../api/types';
 
 /** Messages sent from the parent to the iframe. */
 type ParentMessage =
-  | { type: 'lt:init'; escalation: IframeEscalationData; schema: Record<string, unknown> }
+  | { type: 'lt:init'; escalation: IframeEscalationData; schema: Record<string, unknown>; stage: ViewportStage }
   | { type: 'lt:requestSubmit' }
   | { type: 'lt:validate' };
 
@@ -48,8 +49,12 @@ interface IframeViewportProps {
   src: string;
   escalation: LTEscalationRecord;
   schema: Record<string, unknown>;
-  onResolve: (payload: Record<string, unknown>) => void;
-  onEscalate: (targetRole: string) => void;
+  /** The stage the URL was chosen for; travels on `lt:init`. */
+  stage?: ViewportStage;
+  onResolve?: (payload: Record<string, unknown>) => void;
+  onEscalate?: (targetRole: string) => void;
+  /** Pending and resolved stages: the embed shows, never submits. */
+  readOnly?: boolean;
   submitAttempted?: boolean;
   /** Fill the parent container edge-to-edge (absolute inset-0). Used for full-bleed iframe mode. */
   fill?: boolean;
@@ -77,7 +82,7 @@ function safeParse(s: string | null | undefined): Record<string, unknown> | null
  * The iframe can detect it is embedded via `window !== window.top` and
  * opt in to postMessage communication instead of its own submit UX.
  */
-export function IframeViewport({ src, escalation, schema, onResolve, onEscalate, submitAttempted, fill }: IframeViewportProps) {
+export function IframeViewport({ src, escalation, schema, stage = VIEWPORT_STAGES.CLAIMED, onResolve, onEscalate, readOnly = false, submitAttempted, fill }: IframeViewportProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const iframeOrigin = useRef<string>('');
 
@@ -109,9 +114,9 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
       escalation_payload: safeParse(escalation.escalation_payload),
     };
 
-    const message: ParentMessage = { type: 'lt:init', escalation: data, schema };
+    const message: ParentMessage = { type: 'lt:init', escalation: data, schema, stage };
     iframe.contentWindow.postMessage(message, iframeOrigin.current);
-  }, [escalation, schema]);
+  }, [escalation, schema, stage]);
 
   // Listen for messages from the iframe
   useEffect(() => {
@@ -126,13 +131,13 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
           sendInit();
           break;
         case 'lt:submit':
-          if (data.payload && typeof data.payload === 'object') {
-            onResolve(data.payload);
+          if (!readOnly && data.payload && typeof data.payload === 'object') {
+            onResolve?.(data.payload);
           }
           break;
         case 'lt:escalate':
-          if (typeof data.target === 'string' && data.target) {
-            onEscalate(data.target);
+          if (!readOnly && typeof data.target === 'string' && data.target) {
+            onEscalate?.(data.target);
           }
           break;
         case 'lt:resize': {
@@ -147,16 +152,16 @@ export function IframeViewport({ src, escalation, schema, onResolve, onEscalate,
 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [sendInit, onResolve, onEscalate]);
+  }, [sendInit, onResolve, onEscalate, readOnly]);
 
   // Forward lt:validate to iframe when the action bar triggers a submit attempt
   useEffect(() => {
-    if (!submitAttempted) return;
+    if (!submitAttempted || readOnly) return;
     const iframe = iframeRef.current;
     if (iframe?.contentWindow && iframeOrigin.current) {
       iframe.contentWindow.postMessage({ type: 'lt:validate' } as ParentMessage, iframeOrigin.current);
     }
-  }, [submitAttempted]);
+  }, [submitAttempted, readOnly]);
 
   if (fill) {
     return (

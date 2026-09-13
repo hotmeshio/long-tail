@@ -28,6 +28,8 @@ const WORKBENCH_FORM_SCHEMA = {
   'x-lt-viewport': {
     type: 'iframe',
     src: `${BASE_URL}/design?workbenchId={workbenchId}&companyId={companyId}`,
+    onPending: `${BASE_URL}/qc?workbenchId={workbenchId}&companyId={companyId}`,
+    onResolved: `${BASE_URL}/qc?workbenchId={workbenchId}&companyId={companyId}`,
   },
   // The schema is the submission contract even though no form renders: with
   // enforce_schema on the role, EVERY resolve surface (the iframe's lt:submit,

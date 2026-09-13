@@ -35,7 +35,8 @@ import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 import { UserName } from '../../../components/common/display/UserName';
 import type { FieldError } from '../../../lib/field-validator';
 import { validateResolverForm } from '../../../lib/field-validator';
-import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
+import { EscalationContextBlocks, EscalationFormSection, buildShowIfContext } from './EscalationDetailSections';
+import { VIEWPORT_STAGES, expandViewportSrc, readViewport } from '../../../lib/x-lt-viewport';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
 import { useClaimClock } from '../../../hooks/useClaimClock';
@@ -388,8 +389,8 @@ function EscalationDetailView({ id }: { id: string }) {
   const editable = claimedByMe || stationWorkable;
   const writeNeedsBadge = stationWorkable && esc.assigned_to !== user?.userId;
 
-  const iframeViewport = (effectiveSchema as any)?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
-  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && editable && !isTerminal;
+  const iframeViewport = readViewport(effectiveSchema as Record<string, unknown> | null);
+  const isIframeMode = !!iframeViewport && editable && !isTerminal;
 
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
@@ -668,9 +669,10 @@ function EscalationDetailView({ id }: { id: string }) {
               ))}
             </div>
             <IframeViewport
-              src={expandViewportSrc(iframeViewport!.src!, esc)}
+              src={expandViewportSrc(iframeViewport!.src, esc)}
               escalation={esc}
               schema={effectiveSchema!}
+              stage={VIEWPORT_STAGES.CLAIMED}
               onResolve={handleResolve}
               onEscalate={handleEscalate}
               submitAttempted={submitAttempted}
