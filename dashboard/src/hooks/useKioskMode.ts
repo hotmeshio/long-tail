@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
+import { isReadOnlyLogin } from '../lib/station-login';
 import { useMyRoles } from '../api/users';
 import { useRoleDetails } from '../api/roles';
 import { setSelectedRole, useStationRole } from '../lib/station-role-store';
@@ -82,8 +83,7 @@ export function useKioskMode(): KioskState {
     }
 
     // Multi-role station: only a fully readonly account is a station, never an operator.
-    const readonly = memberships.every((m) => m.write_scope === 'none');
-    if (!readonly || targets.length === 0) return off;
+    if (!isReadOnlyLogin(memberships) || targets.length === 0) return off;
 
     const active =
       selected && targets.includes(selected)

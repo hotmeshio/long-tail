@@ -33,6 +33,11 @@ vi.mock('../../../../api/escalations', async (importOriginal) => ({
   useCancelEscalation: () => state.idleMutation(),
 }));
 
+vi.mock('../../../../api/users', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useMyRoles: () => ({ data: [{ role: 'floor-role', type: 'member', read_scope: 'all', write_scope: 'none', created_at: '' }] }),
+}));
+
 vi.mock('../../../../api/roles', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEscalationTargets: () => ({ data: { targets: [] } }),
