@@ -74,27 +74,27 @@ export function StartWorkflowPage() {
   const queues = workflowQueues(workflows);
   const form = selected
     ? <StartNowPanel selected={selected} />
-    : <p className="text-xs text-text-tertiary">Choose a workflow to fill out its form.</p>;
+    : <p className="text-xs text-text-tertiary">Choose a tool to begin.</p>;
 
   return (
     <div>
-      <PageHeader title="Invoke" docsHash="#docs:dashboard.md:invoke-workflow" />
+      <PageHeader title="Invoke Tool" docsHash="#docs:dashboard.md:invoke-tool" />
 
       {workflows.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-sm text-text-primary mb-1">No invocable workflows</p>
+          <p className="text-sm text-text-primary mb-1">No tools to invoke</p>
           <p className="text-xs text-text-tertiary">Mark workflows as invocable in the registry, or start the server with examples enabled.</p>
         </div>
       ) : compact ? (
         <>
           <label className="block mb-6 max-w-2xl">
-            <span className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Workflow</span>
+            <span className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1">Tool</span>
             <select
               value={selectedType}
               onChange={(e) => setType(e.target.value || null)}
               className="select text-xs font-mono w-full"
             >
-              <option value="">Choose a workflow…</option>
+              <option value="">Choose a tool…</option>
               {queues.map((q) => (
                 <optgroup key={q} label={identifierToTitle(q)}>
                   {workflows
@@ -111,7 +111,8 @@ export function StartWorkflowPage() {
                 ))}
             </select>
           </label>
-          {form}
+          {/* The form heading pulls itself up over the page gutter when stuck; give it that room here so it never covers the picker. */}
+          <div className="pt-8">{form}</div>
         </>
       ) : (
         <div className="flex gap-10 items-start">

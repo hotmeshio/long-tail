@@ -267,7 +267,7 @@ Every workflow the calling user may invoke, decided by the same predicate the in
 }
 ```
 
-Each entry is the full config row plus `tier` (`durable`, `registered`, `certified`). The dashboard Invoke page and its nav entry read this list.
+Each entry is the full config row plus `tier` (`durable`, `registered`, `certified`). The dashboard Invoke Tool page and its nav entry read this list.
 
 ---
 

@@ -32,7 +32,7 @@ Each flavor exposes the same shape: configure, invoke, executions.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Procedural → Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
-| **Procedural → Invoke** | `/workflows/durable/invoke` | Start a procedural workflow the caller may invoke. Grouped list beside the form; rich x-lt-* forms when a workflow declares `inputSchema`. Builders reach it under Orchestrate, everyone else under Tools. |
+| **Procedural → Invoke Tool** | `/workflows/durable/invoke` | Start a tool the caller may invoke. Grouped list beside the form; rich x-lt-* forms when a workflow declares `inputSchema`. Builders reach it under Orchestrate, everyone else under Tools. |
 | **Procedural → Executions** | `/workflows/executions` | All procedural runs with status, duration, and tier. Click through to task records and escalation history. |
 | **Graph → Configure** | `/mcp/workflows` | Graph workflows available to the orchestrator — compiled deterministic YAML DAGs, grouped by namespace. |
 | **Graph → Invoke** | `/mcp/workflows/invoke` | Start any active graph flow. Same two-panel layout as procedural invoke. |
@@ -64,6 +64,8 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 | **Scan Codes** | `/admin/scan-codes` | Configure barcode schemes and their scan-driven rules (event-condition-action over escalations). Shown when `features.scanCodes` stands. |
 
 ### Infrastructure
+
+Builder-only and off by default. A superadmin or engineer opts in per browser with the **Infrastructure** toggle in the easter-egg Features panel (Ctrl or Cmd click the logo); the section then joins the sidebar. The pages themselves stay reachable by URL under the builder guard.
 
 Builder-only.
 
@@ -117,22 +119,22 @@ workers: [
       certified: true,
       roles: ['reviewer', 'admin'],
       envelopeSchema: { data: { field1: '', field2: 0 } },
-      inputSchema: MY_INPUT_FORM, // x-lt-* form for the Invoke page; see Invoke forms
+      inputSchema: MY_INPUT_FORM, // x-lt-* form for the Invoke Tool page; see Invoke forms
       resolverSchema: { approved: true, notes: '' }, // deprecated legacy fallback — the escalation form is owned by the target role as a versioned form_schema
     },
   },
 ]
 ```
 
-The detail page has three columns. **Identity** carries the type, an **Icon** picker with a filter over the curated `WORKFLOW_ICONS` set (the chosen glyph leads the workflow's row and heading on the Invoke page in place of the tier glyph), the description, and the queue. **Invocation** edits the roles and the **Input Form**; with an input form declared, the envelope field narrows to the `metadata` stamped on every run. **Preview** renders that form live from the editor as operators will meet it, interactive so conditional sections can be walked before saving. **Unregister** sits with the header actions beside Cancel and Save. See [Invoke forms](hitl/invoke-form.md).
+The detail page has three columns. **Identity** carries the type, an **Icon** picker with a filter over the curated `WORKFLOW_ICONS` set (the chosen glyph leads the workflow's row and heading on the Invoke Tool page in place of the tier glyph), the description, and the queue. **Invocation** edits the roles and the **Input Form**; with an input form declared, the envelope field narrows to the `metadata` stamped on every run. **Preview** renders that form live from the editor as operators will meet it, interactive so conditional sections can be walked before saving. **Unregister** sits with the header actions beside Cancel and Save. See [Invoke forms](hitl/invoke-form.md).
 
 **API:** `GET /api/workflows/discovered` returns the unified list. `PUT /api/workflows/:type/config` creates or updates a config entry. `DELETE /api/workflows/:type/config` removes it.
 
-### Invoke Workflow
+### Invoke Tool
 
-Accessible at `/workflows/durable/invoke` to anyone the server lists an invokable workflow for. The server decides the list with the same predicate the invoke gate runs (`invocationRoles` on each config; empty means every authenticated user; superadmin and admin see everything, including active durable workers with no registration). Builders keep Invoke under Orchestrate; every other persona gets a **Tools** nav section that appears only when the list is non-empty, and the route sends a caller with nothing to invoke home.
+Accessible at `/workflows/durable/invoke` to anyone the server lists an invokable workflow for. The server decides the list with the same predicate the invoke gate runs (`invocationRoles` on each config; empty means every authenticated user; superadmin and admin see everything, including active durable workers with no registration). Builders keep **Invoke Tool** under Orchestrate; every other persona gets a **Tools** nav section with the same **Invoke Tool** entry that appears only when the list is non-empty, and the route sends a caller with nothing to invoke home.
 
-The list of workflows takes the left quarter of the row, grouped by task queue. Names read as titles (`fleetTools` shows as **Fleet Tools**, queues the same way) and each row leads with the workflow's icon, or its tier glyph when none is declared. The first row is preselected, `?type=<WorkflowType>` tracks the choice, and every choice is a history entry, so the page opens on a form and the back button retraces picks. The form fills the rest of the row, its heading and Submit staying put while the body scrolls:
+Every invokable workflow is presented as a tool. The list of tools takes the left quarter of the row, grouped by task queue, with the prompt **Choose a tool to begin** until one is selected. Names read as titles (`fleetTools` shows as **Fleet Tools**, queues the same way) and each row leads with the workflow's icon, or its tier glyph when none is declared. The first row is preselected, `?type=<WorkflowType>` tracks the choice, and every choice is a history entry, so the page opens on a form and the back button retraces picks. The form fills the rest of the row, its heading and Submit staying put while the body scrolls:
 
 - **Heading and description** — the icon and title, with the identifier, tier, and queue as metadata, then the config's one-line description. Keep reference material in `x-lt-help`; it appears in the side panel on demand.
 - **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override").

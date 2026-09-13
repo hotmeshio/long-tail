@@ -1,6 +1,6 @@
 # Invoke Forms
 
-A workflow's invoke form can be the same rich, versioned form the escalation surfaces use. Declare `inputSchema` on the worker config and the Invoke page renders it with the full [x-lt-* vocabulary](../hitl-guide.md#full-vocabulary-quick-reference): two-column layout, sections, column groups, conditional display, instruction blocks, dynamic options, and a help panel. The submitted `data` is the x-lt-bind mapped payload, and the invoke API validates it against the same schema with the same shared pass, so a payload the form accepts is accepted by the API, and a rejection lists the exact violations the form shows.
+A workflow's invoke form can be the same rich, versioned form the escalation surfaces use. Declare `inputSchema` on the worker config and the Invoke Tool page renders it with the full [x-lt-* vocabulary](../hitl-guide.md#full-vocabulary-quick-reference): two-column layout, sections, column groups, conditional display, instruction blocks, dynamic options, and a help panel. The submitted `data` is the x-lt-bind mapped payload, and the invoke API validates it against the same schema with the same shared pass, so a payload the form accepts is accepted by the API, and a rejection lists the exact violations the form shows.
 
 Without `inputSchema`, the page renders the envelope template form from `envelopeSchema` exactly as before. Nothing changes for existing deployments until a workflow opts in.
 
@@ -21,9 +21,9 @@ Workflow names read as titles on the page: `fleetTools` shows as **Fleet Tools**
 
 | Field | Role in the invoke |
 |---|---|
-| `inputSchema` | The form. JSON Schema `properties` plus x-lt-* tokens. Rendered by the Invoke page; enforced by the invoke API. |
+| `inputSchema` | The form. JSON Schema `properties` plus x-lt-* tokens. Rendered by the Invoke Tool page; enforced by the invoke API. |
 | `envelopeSchema.metadata` | The `metadata` stamped on every run from this form. `envelopeSchema.data` is ignored when `inputSchema` is present. |
-| `invocationRoles` | Who sees the workflow on the Invoke page and who may start it. Empty means every authenticated user. |
+| `invocationRoles` | Who sees the workflow on the Invoke Tool page and who may start it. Empty means every authenticated user. |
 | `description` | One line at the top of the form column, markdown allowed. Keep the reference material in `x-lt-help`, which appears in the side panel on demand. |
 | `icon` | A curated icon from `WORKFLOW_ICONS` (`icon: WORKFLOW_ICONS.WRENCH`). Leads the workflow's row and heading in place of the tier glyph so operators tell tools apart at a glance. The registry offers the same set as a picker. |
 
@@ -67,9 +67,9 @@ An array of conditions requires every one, so the prompt belongs to its tool and
 
 `x-lt-help` on the schema root is the longer reference for the side panel: markdown, tables, and `{{input.*}}` tokens that re-interpolate as the operator types.
 
-## The Invoke page
+## The Invoke Tool page
 
-The page is open to anyone the server lists an invokable workflow for. Builders reach it under Orchestrate; every other persona gets a **Tools** section in the nav that appears only when there is something to invoke. The list of workflows sits on the left, grouped by task queue, with the first workflow preselected; the form takes the rest of the row. Below 1280px the list folds into a select and the form takes the full width.
+The page is open to anyone the server lists an invokable workflow for. Builders reach **Invoke Tool** under Orchestrate; every other persona gets a **Tools** section in the nav that appears only when there is something to invoke. Each invokable workflow is a tool; the list sits on the left, grouped by task queue, with the first workflow preselected; the form takes the rest of the row. Below 1280px the list folds into a select and the form takes the full width.
 
 The form's side panel carries two views: **Instructions**, the interpolated `x-lt-help`, and **Issues**, the current violations, each click focusing its field. A server rejection lands in the same Issues view.
 

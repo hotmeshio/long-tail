@@ -24,7 +24,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
-| The same rich form for starting a workflow from the Invoke page | `inputSchema` on the worker config | [invoke-form.md](hitl/invoke-form.md) |
+| The same rich form for starting a workflow from the Invoke Tool page | `inputSchema` on the worker config | [invoke-form.md](hitl/invoke-form.md) |
 
 ---
 

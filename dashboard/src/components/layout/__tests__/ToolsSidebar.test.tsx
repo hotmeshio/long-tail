@@ -17,7 +17,7 @@ describe('ToolsSidebar', () => {
     data = [{ workflow_type: 'fleetTools' }];
     renderNav();
     expect(screen.getByText('Tools')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Invoke/ })).toHaveAttribute('href', '/workflows/durable/invoke');
+    expect(screen.getByRole('link', { name: 'Invoke Tool' })).toHaveAttribute('href', '/workflows/durable/invoke');
   });
 
   it('renders nothing when the list is empty or unloaded', () => {

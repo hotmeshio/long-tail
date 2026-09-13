@@ -16,7 +16,7 @@ function parseSchema(text: string): Record<string, unknown> | null {
 
 /**
  * The input form rendered live from the editor text through the same
- * ResolverForm the Invoke page uses. Interactive, so conditional sections
+ * ResolverForm the Invoke Tool page uses. Interactive, so conditional sections
  * can be walked before saving. Nothing here submits.
  */
 export function InputFormPreview({ schemaText }: { schemaText: string }) {

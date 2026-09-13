@@ -10,7 +10,7 @@ export interface ConfigFormState {
   invocation_roles: string;
   consumes: string;
   envelope_schema: string;
-  /** The x-lt-* input form the Invoke page renders and the API enforces; empty = envelope template form. */
+  /** The x-lt-* input form the Invoke Tool page renders and the API enforces; empty = envelope template form. */
   input_schema: string;
   /** Curated icon name; empty = tier glyph. */
   icon: string;

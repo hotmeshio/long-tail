@@ -259,7 +259,7 @@ The dashboard surfaces IAM across four pages:
 
 **Accounts** (`/admin/users`) — unified management for User Accounts and Service Accounts via tab toggle. Create service accounts, assign roles, generate API keys. The key generation flow displays the raw key once; it cannot be retrieved after dismissal.
 
-**Invoke Workflow** (`/workflows/start`) — all invocable workflows in a single list with visual tier distinction. Certified workflows show the green shield; durable workflows show the standard icon. Both support Start Now and Schedule (cron).
+**Invoke Tool** (`/workflows/start`) — all invocable workflows in a single list with visual tier distinction. Certified workflows show the green shield; durable workflows show the standard icon. Both support Start Now and Schedule (cron).
 
 **Connections** (`/credentials`) — each user manages their OAuth provider connections. Status, credential type, and expiry are visible. Users connect or revoke providers here.
 

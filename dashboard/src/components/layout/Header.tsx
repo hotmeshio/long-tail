@@ -136,11 +136,11 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               <Menu className="w-5 h-5" strokeWidth={1.5} />
             </button>
           )}
-          {/* Brand — full watermark on desktop, comet mark on small screens. */}
+          {/* Brand — the full watermark on desktop; below lg the hamburger holds this spot and the mark stays out of its way. */}
           <Link
             to="/"
             aria-label="Home"
-            className="shrink-0"
+            className="shrink-0 hidden lg:block"
             onClick={(e) => {
               if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
@@ -148,8 +148,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               }
             }}
           >
-            <AppLogo appName={appName} className="hidden lg:flex" />
-            <AppLogo appName={appName} variant="comet" className="flex lg:hidden" />
+            <AppLogo appName={appName} className="flex" />
           </Link>
           {/* Separator groups back/forward away from the logo on desktop. */}
           <div className="hidden lg:block w-px h-4 bg-surface-border mx-1" />

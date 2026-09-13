@@ -241,7 +241,7 @@ export function WorkflowConfigDetailPage() {
               )}
             </Field>
 
-            <Field label="Icon" hint="Leads the workflow's row and heading on the Invoke page so operators tell tools apart at a glance. Declared in code as WORKFLOW_ICONS.*">
+            <Field label="Icon" hint="Leads the workflow's row and heading on the Invoke Tool page so operators tell tools apart at a glance. Declared in code as WORKFLOW_ICONS.*">
               <WorkflowIconPicker value={form.icon} onChange={(name) => set('icon', name)} />
             </Field>
 

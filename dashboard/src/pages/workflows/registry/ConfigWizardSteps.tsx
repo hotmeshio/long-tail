@@ -89,7 +89,7 @@ export function BasicsStep({ form, set, editing, durableTypes = [] }: BasicsStep
       <div>
         <label className={labelCls}>Icon</label>
         <WorkflowIconPicker value={form.icon} onChange={(name) => set('icon', name)} />
-        <p className={hintCls}>Leads the workflow's row and heading on the Invoke page.</p>
+        <p className={hintCls}>Leads the workflow's row and heading on the Invoke Tool page.</p>
       </div>
 
       <div>
@@ -182,7 +182,7 @@ export function InvocationStep({ form, set }: StepProps) {
               spellCheck={false}
             />
             <p className={hintCls}>
-              The x-lt-* form operators complete on the Invoke page; the API validates every invoke against it.
+              The x-lt-* form operators complete on the Invoke Tool page; the API validates every invoke against it.
               Leave empty to use the envelope template below.
             </p>
             {form.input_schema.trim() && !jsonValid(form.input_schema) && (

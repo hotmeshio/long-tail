@@ -39,7 +39,7 @@ describe('StartWorkflowPage', () => {
 
   it('renders the page header and no schedule toggle', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Invoke' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Invoke Tool' })).toBeInTheDocument();
     expect(screen.queryByText('Schedule')).not.toBeInTheDocument();
   });
 
@@ -75,6 +75,6 @@ describe('StartWorkflowPage', () => {
   it('shows the empty state when the caller has nothing to invoke', () => {
     invocableOverride = { data: [], isLoading: false };
     renderPage();
-    expect(screen.getByText('No invocable workflows')).toBeInTheDocument();
+    expect(screen.getByText('No tools to invoke')).toBeInTheDocument();
   });
 });

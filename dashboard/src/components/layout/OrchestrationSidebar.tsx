@@ -26,7 +26,7 @@ export function OrchestrationSidebar() {
 
   const proceduralItems = [
     { to: '/workflows/registry', label: 'Registry', icon: SlidersHorizontal },
-    { to: '/workflows/durable/invoke', label: 'Invoke', icon: Play },
+    { to: '/workflows/durable/invoke', label: 'Invoke Tool', icon: Play },
     { to: '/workflows/executions', label: 'Executions', icon: ListChecks },
   ];
 

@@ -40,7 +40,7 @@ export function InvokeSidebar({
           <p className="text-2xs text-text-secondary">
             This workflow has an input form.{' '}
             <Link to={`/workflows/durable/invoke?type=${encodeURIComponent(editing.workflow_type)}`} className="text-accent hover:underline">
-              Open it on the Invoke page →
+              Open it on the Invoke Tool page →
             </Link>
           </p>
         )}
