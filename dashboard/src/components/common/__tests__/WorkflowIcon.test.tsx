@@ -19,6 +19,9 @@ describe('workflow icons', () => {
     const { container: c } = render(<WorkflowIcon icon={null} tier="certified" />);
     const { container: d } = render(<ShieldCheck aria-hidden strokeWidth={1.5} />);
     expect(c.innerHTML).toBe(d.innerHTML);
+    // An unknown tier from a newer server never crashes the row.
+    const { container: e } = render(<WorkflowIcon icon={null} tier={'future' as never} />);
+    expect(e.querySelector('svg')).toBeTruthy();
   });
 
   it('the picker marks the choice and offers a return to the tier glyph', () => {

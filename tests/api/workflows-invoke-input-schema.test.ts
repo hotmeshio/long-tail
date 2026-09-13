@@ -82,6 +82,14 @@ describe('POST invoke with input_schema', () => {
     expect(result.status).toBe(202);
   });
 
+  it('a data value that is not an object is left to the service, never a 422', async () => {
+    mockGetConfig.mockResolvedValue(config(SCHEMA));
+    mockInvoke.mockRejectedValue(Object.assign(new Error('Request body must include a data object'), { statusCode: 400 }));
+    const result = await invokeWorkflow({ type: 'fleetTools', data: 'nope' as unknown as Record<string, any> }, AUTH);
+    expect(result.status).not.toBe(422);
+    expect(mockInvoke).toHaveBeenCalled();
+  });
+
   it('an unregistered workflow passes through to the service', async () => {
     mockGetConfig.mockResolvedValue(null);
     const result = await invokeWorkflow({ type: 'adhoc', data: { anything: 1 } }, AUTH);

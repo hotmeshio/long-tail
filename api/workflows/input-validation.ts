@@ -4,19 +4,24 @@ import { LT_ERROR_CODES, type LTValidationErrorBody } from '../../types/validati
 import type { LTWorkflowConfig } from '../../types/config';
 import type { LTApiResult } from '../../types/sdk';
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * The invoke input gate. A workflow that declares input_schema has its
  * submitted data validated by the same shared pass the dashboard form runs,
  * so a payload the form accepts is accepted here and a rejection lists the
- * exact violations the form would show. No schema, no gate.
+ * exact violations the form would show. No schema, no gate; a data value
+ * that is not an object is left to the service's own 400.
  */
 export function checkInvokeInput(
   config: Pick<LTWorkflowConfig, 'workflow_type' | 'input_schema'> | null | undefined,
-  data: Record<string, unknown>,
+  data: unknown,
   metadata: Record<string, unknown> | null | undefined,
 ): LTValidationErrorBody | null {
   const schema = config?.input_schema;
-  if (!schema) return null;
+  if (!schema || !isPlainObject(data)) return null;
   const violations = validateResolverPayload(schema, data, buildInvokeFormContext(metadata));
   if (violations.length === 0) return null;
   const n = violations.length;
