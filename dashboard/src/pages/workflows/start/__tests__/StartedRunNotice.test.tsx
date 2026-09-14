@@ -29,6 +29,15 @@ function renderStarted(executionPath: string | null = null) {
 beforeEach(() => { patterns = []; handler = null; });
 
 describe('InvokeFooter — following a started run', () => {
+  it('subscribes to nothing until a run has started', () => {
+    render(
+      <MemoryRouter>
+        <InvokeFooter onSubmit={vi.fn()} onSubmitAgain={vi.fn()} pending={false} error={null} startedId={null} executionPath={null} />
+      </MemoryRouter>,
+    );
+    expect(patterns).toEqual([]);
+  });
+
   it('subscribes to the run\'s completed and failed subjects as soon as it starts', () => {
     renderStarted();
     expect(patterns).toEqual([

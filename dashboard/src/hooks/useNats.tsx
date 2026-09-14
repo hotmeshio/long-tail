@@ -199,10 +199,12 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
         openBrokerSub(pattern);
       }
 
-      // Monitor connection status
+      // Only the link state drives the indicator. A server error reply (a
+      // rejected subject, for one) arrives on a live connection and is not a
+      // disconnect.
       (async () => {
         for await (const s of nc.status()) {
-          if (s.type === 'disconnect' || s.type === 'error') {
+          if (s.type === 'disconnect') {
             setConnected(false);
           } else if (s.type === 'reconnect') {
             setConnected(true);

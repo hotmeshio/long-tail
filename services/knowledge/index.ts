@@ -7,6 +7,7 @@ import { getPool } from '../../lib/db';
 import { GET_KNOWLEDGE_VERSION, LIST_KNOWLEDGE_VERSIONS } from './sql';
 
 export * from './lookup-cache';
+export * from './lookup-refs';
 
 export interface KnowledgeVersionMeta {
   version: number;

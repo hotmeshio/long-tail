@@ -1,4 +1,4 @@
-import { resolveFieldOptions } from './x-lt-options';
+import { resolveFieldOptions, X_LT_OPTIONS } from './x-lt-options';
 import { hasInterpolation, interpolatePath, resolveCtxPath } from './ctx-path';
 
 export interface FieldError { field: string; message: string }
@@ -92,6 +92,22 @@ export function validateRequireAll(
   return `${incomplete} of ${mandatory.length} checks incomplete`;
 }
 
+export const INVALID_JSON = 'Invalid JSON';
+
+/** The json editor holds unparseable text as a string at the field's key. */
+function isJsonWidget(fieldSchema: Record<string, unknown> | undefined): boolean {
+  return fieldSchema?.['x-lt-widget'] === 'json';
+}
+
+/** A list is edited through the json editor or a multi-select; any other list value is display only. */
+function isEditableList(fieldSchema: Record<string, unknown> | undefined): boolean {
+  return isJsonWidget(fieldSchema) || fieldSchema?.[X_LT_OPTIONS] !== undefined;
+}
+
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
 /**
  * Runtime type check against the field's declared JSON Schema `type`. Guards
  * the payload contract for API-first callers (a form widget already produces
@@ -115,9 +131,11 @@ export function validateFieldType(
     case 'boolean':
       return typeof value === 'boolean' ? undefined : 'Expected true or false';
     case 'array':
-      return Array.isArray(value) ? undefined : 'Expected a list';
+      if (Array.isArray(value)) return undefined;
+      return isJsonWidget(fieldSchema) && typeof value === 'string' ? INVALID_JSON : 'Expected a list';
     case 'object':
-      return typeof value === 'object' && !Array.isArray(value) ? undefined : 'Expected an object';
+      if (typeof value === 'object' && !Array.isArray(value)) return undefined;
+      return isJsonWidget(fieldSchema) && typeof value === 'string' ? INVALID_JSON : 'Expected an object';
     default:
       return undefined;
   }
@@ -147,13 +165,21 @@ export function validateFieldConstraints(
   // interpolated list that currently offers nothing fails closed — a stale
   // cascade child value never submits.
   const allowed = resolveFieldOptions(fieldSchema, ctx);
-  if (allowed !== undefined && value !== undefined && value !== null && value !== '') {
+  if (allowed !== undefined && value !== undefined && value !== null && value !== '' && !Array.isArray(value)) {
     if (allowed.length === 0) {
       return 'No valid options for this selection';
     }
     if (!allowed.some((o) => o.value === value)) {
       return `Must be one of: ${allowed.map((o) => String(o.value)).join(', ')}`;
     }
+  }
+
+  if (Array.isArray(value)) {
+    return isEditableList(fieldSchema) ? validateListConstraints(value, fieldSchema, allowed, ctx) : undefined;
+  }
+
+  if (value !== null && typeof value === 'object') {
+    return validateMapConstraints(value as Record<string, unknown>, fieldSchema, ctx);
   }
 
   if (typeof value === 'string') {
@@ -214,6 +240,68 @@ export function validateFieldConstraints(
   return undefined;
 }
 
+/**
+ * An edited list: every item must belong to the field's `x-lt-options` when
+ * declared, the length must sit within `minItems`/`maxItems`, and each item
+ * must satisfy `items`. An empty list passes; presence is the required
+ * check's job.
+ */
+function validateListConstraints(
+  value: unknown[],
+  fieldSchema: Record<string, unknown>,
+  allowed: ReturnType<typeof resolveFieldOptions>,
+  ctx: Record<string, unknown> | undefined,
+): string | undefined {
+  if (value.length === 0) return undefined;
+  if (allowed !== undefined) {
+    if (allowed.length === 0) return 'No valid options for this selection';
+    if (value.some((v) => !allowed.some((o) => o.value === v))) {
+      return `Must be one of: ${allowed.map((o) => String(o.value)).join(', ')}`;
+    }
+  }
+  const minItems = resolveNumericConstraint(fieldSchema.minItems, undefined, ctx);
+  if (minItems !== undefined && value.length < minItems) return `At least ${plural(minItems, 'item')}`;
+  const maxItems = resolveNumericConstraint(fieldSchema.maxItems, undefined, ctx);
+  if (maxItems !== undefined && value.length > maxItems) return `At most ${plural(maxItems, 'item')}`;
+  const items = fieldSchema.items;
+  if (items && typeof items === 'object' && !Array.isArray(items)) {
+    const itemSchema = items as Record<string, unknown>;
+    for (let i = 0; i < value.length; i++) {
+      const err = validateFieldType(value[i], itemSchema) ?? validateFieldConstraints(value[i], itemSchema, ctx);
+      if (err) return `Item ${i + 1}: ${err}`;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A map value: keys must belong to `propertyNames.enum` when declared, and
+ * every value must satisfy an object-shaped `additionalProperties`.
+ */
+function validateMapConstraints(
+  value: Record<string, unknown>,
+  fieldSchema: Record<string, unknown>,
+  ctx: Record<string, unknown> | undefined,
+): string | undefined {
+  const entries = Object.entries(value);
+  if (entries.length === 0) return undefined;
+  const propertyNames = fieldSchema.propertyNames as Record<string, unknown> | undefined;
+  const allowedKeys = Array.isArray(propertyNames?.enum) ? propertyNames.enum.map(String) : undefined;
+  if (allowedKeys) {
+    const unknown = entries.find(([k]) => !allowedKeys.includes(k));
+    if (unknown) return `Unknown key "${unknown[0]}". Allowed: ${allowedKeys.join(', ')}`;
+  }
+  const ap = fieldSchema.additionalProperties;
+  if (ap && typeof ap === 'object' && !Array.isArray(ap)) {
+    const valueSchema = ap as Record<string, unknown>;
+    for (const [k, v] of entries) {
+      const err = validateFieldType(v, valueSchema) ?? validateFieldConstraints(v, valueSchema, ctx);
+      if (err) return `"${k}": ${err}`;
+    }
+  }
+  return undefined;
+}
+
 function resolveNumericConstraint(
   staticVal: unknown,
   dynamicPath: unknown,
@@ -256,11 +344,16 @@ export function validateField(
 
   if (isRequired) {
     if (value === undefined || value === null) return 'Required';
-    if (typeof value === 'boolean' && !value) return 'Required';
+    // A checkbox must be checked; a boolean with an option list is answered by either value.
+    if (typeof value === 'boolean' && !value && resolveFieldOptions(fieldSchema, ctx) === undefined) return 'Required';
     if (typeof value === 'string' && value.trim() === '') return 'Required';
+    // A picked or edited list needs one item; a plain list value is not checked.
+    if (Array.isArray(value) && value.length === 0 && isEditableList(fieldSchema)) return 'Required';
     if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
       const vals = Object.values(value as Record<string, unknown>);
-      if (vals.length === 0 || vals.every((v) => !v)) return 'Required';
+      if (vals.length === 0) return 'Required';
+      // A json map is answered by any key; every other object needs one truthy value.
+      if (!isJsonWidget(fieldSchema) && vals.every((v) => !v)) return 'Required';
     }
   }
 

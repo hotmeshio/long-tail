@@ -66,8 +66,9 @@ describe('ResolverForm dynamic options (x-lt-options)', () => {
     expect(emitted.designation).toBe('finishing');
   });
 
-  it('shows the disabled Choose… placeholder while the value is outside the options', () => {
+  it('a required select shows the disabled Choose… placeholder while the value is outside the options', () => {
     const json = formJson({ designation: '' }, {
+      required: ['designation'],
       properties: {
         designation: { type: 'string', 'x-lt-options': 'envelope.return_stations' },
       },
@@ -78,8 +79,9 @@ describe('ResolverForm dynamic options (x-lt-options)', () => {
     expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('');
   });
 
-  it('a value already among the options renders selected with no placeholder', () => {
+  it('a required value already among the options renders selected with no placeholder', () => {
     const json = formJson({ left_quantity: 3 }, {
+      required: ['left_quantity'],
       properties: {
         left_quantity: { type: 'number', 'x-lt-options': 'envelope.left_quantity_options' },
       },
@@ -107,8 +109,23 @@ describe('ResolverForm dynamic options (x-lt-options)', () => {
     expect(emitted.reason).toBe('uuid-2');
   });
 
+  it('x-lt-nullable keeps Choose… enabled and picking it submits null', () => {
+    const onChange = vi.fn();
+    const json = formJson({ reason: 'uuid-1' }, {
+      properties: {
+        reason: { type: 'string', 'x-lt-options': 'envelope.reject_reasons', 'x-lt-nullable': true },
+      },
+    });
+    render(<ResolverForm value={json} onChange={onChange} escalationContext={CTX} />);
+    const placeholder = screen.getByRole('option', { name: 'Choose…' }) as HTMLOptionElement;
+    expect(placeholder.disabled).toBe(false);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
+    expect(JSON.parse(onChange.mock.calls[0][0]).reason).toBeNull();
+  });
+
   it('a stored value renders with its label selected', () => {
     const json = formJson({ reason: 'uuid-1' }, {
+      required: ['reason'],
       properties: {
         reason: { type: 'string', 'x-lt-options': 'envelope.reject_reasons' },
       },

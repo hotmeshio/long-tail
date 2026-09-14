@@ -442,9 +442,23 @@ List all certified workflow configurations with roles and settings.
 
 **Parameters:** None.
 
+### get_workflow_config
+
+The full configuration row for one workflow, plus `tier` (`registered` or `certified`) and `input_lookup_data`: the pinned `input_lookups` resolved into the form-context shape the input form reads, keyed `<as ?? key>`, or `null` when none are pinned. Call it before `invoke_workflow` to read the `input_schema` a payload must satisfy and the `envelope_schema.metadata` every run starts from.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workflow_type | string | Yes | Registered workflow type name |
+
 ### upsert_workflow_config
 
-Create or replace a workflow configuration (certify). Activates the interceptor for task tracking and escalation chains.
+Create or replace a workflow configuration (certify). Activates the interceptor for task tracking and escalation chains. Full replace, matching `PUT /api/workflows/:type/config`: omitted fields clear to their defaults, so send the whole profile (start from `get_workflow_config`).
 
 | | |
 |---|---|
@@ -466,6 +480,11 @@ Create or replace a workflow configuration (certify). Activates the interceptor 
 | consumes | string[] | No | Event topics consumed |
 | tool_tags | string[] | No | Tool tags for routing |
 | cron_schedule | string | No | Cron schedule expression |
+| envelope_schema | object | No | Envelope template; the dashboard stamps its `metadata` on runs it starts |
+| input_schema | object | No | x-lt-* JSON Schema for the invoke form; invoke validates `data` against it |
+| input_lookups | `{ domain, key, version, as? }[]` | No | Versioned knowledge refs the invoke form reads as `lookup.<as ?? key>`; malformed refs are refused |
+| icon | string | No | Curated icon name from `WORKFLOW_ICONS`; unknown names are refused |
+| read_safe | boolean | No | Side-effect-free; eligible for `invoke_workflow_read_safe` |
 
 ### delete_workflow_config
 
@@ -499,7 +518,7 @@ Unified list of all known workflows: active workers, historical entities, and re
 
 ### invoke_workflow
 
-Start a certified workflow by type. Returns workflow ID immediately.
+Start a certified workflow by type. Returns workflow ID immediately. Call `get_workflow_config` for the `input_schema` the payload must satisfy. The input gate validates against the `metadata` the caller sends.
 
 | | |
 |---|---|
@@ -510,9 +529,26 @@ Start a certified workflow by type. Returns workflow ID immediately.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | workflow_type | string | Yes | Workflow type to invoke |
-| data | object | Yes | Input data |
-| metadata | object | No | Workflow metadata |
+| data | object | Yes | Input data; validated against `input_schema` when the config declares one |
+| metadata | object | No | Control flow metadata passed as `envelope.metadata` |
 | execute_as | string | No | Execution identity |
+| options | object | No | HotMesh WorkflowOptions passthrough (`workflowId`, `entity`, `expire`, `search`) |
+
+**Errors:**
+
+| Result | Meaning |
+|--------|---------|
+| `isError` with `{ "error": "data failed input schema validation (n violations)", "code": "schema_validation", "violations": [{ "field", "message" }], "role": null, "schemaVersion": null, "workflowType" }` | The config declares `input_schema` and `data` violates it; nothing starts |
+
+### invoke_workflow_read_safe
+
+Start a workflow registered read-safe (side-effect-free). Same contract as `invoke_workflow`, including the input gate and metadata merge, gated to configs carrying `read_safe: true`. Any workflow may be attempted; one without the flag, or one not invocable, fails with a clear error. The invocation surface for read-scoped callers.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:** Same as `invoke_workflow`.
 
 ### get_workflow_status
 

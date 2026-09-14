@@ -18,14 +18,28 @@ function submission(overrides: Partial<InvokeSubmission> = {}): InvokeSubmission
   };
 }
 
-function renderForm(sub = submission()) {
+function renderForm(sub = submission(), props: { schema?: Record<string, unknown>; lookup?: Record<string, unknown> } = {}) {
   render(
     <MemoryRouter>
-      <RichInvokeForm selected={TOOLS} schema={RICH_SCHEMA} metadata={{ source: 'dashboard' }} submission={sub} />
+      <RichInvokeForm
+        selected={TOOLS}
+        schema={props.schema ?? RICH_SCHEMA}
+        metadata={{ source: 'dashboard' }}
+        lookup={props.lookup}
+        submission={sub}
+      />
     </MemoryRouter>,
   );
   return sub;
 }
+
+const LOOKUP_SCHEMA = {
+  required: ['serialNumber'],
+  properties: {
+    serialNumber: { type: 'string', title: 'Serial', 'x-lt-options': 'lookup.serials.items' },
+  },
+};
+const SERIALS = { serials: { items: [{ value: 'sn-1', label: 'Printer 1' }, { value: 'sn-2', label: 'Printer 2' }] } };
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -52,7 +66,7 @@ describe('RichInvokeForm', () => {
     expect(screen.getByTestId('invoke-issues')).toHaveTextContent('2 issues to resolve');
   });
 
-  it('a complete form submits the x-lt-bind mapped data with the envelope metadata', () => {
+  it('a complete form submits the x-lt-bind mapped data with the declared metadata', () => {
     const sub = renderForm();
     fireEvent.change(screen.getByLabelText(/Serial/), { target: { value: 'sn-1' } });
     fireEvent.change(screen.getByLabelText(/Action/), { target: { value: 'retire' } });
@@ -62,6 +76,17 @@ describe('RichInvokeForm', () => {
       { printer: { serialNumber: 'sn-1' }, tool: { action: 'retire' }, copies: 1, reprintTips: '### Reprint tips' },
       { source: 'dashboard' },
     );
+  });
+
+  it('x-lt-options over a pinned lookup renders the resolved edition as a select', () => {
+    const sub = renderForm(submission(), { schema: LOOKUP_SCHEMA, lookup: SERIALS });
+    const select = screen.getByLabelText(/Serial/) as HTMLSelectElement;
+    expect(select.tagName).toBe('SELECT');
+    expect(screen.getByRole('option', { name: 'Printer 1' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Printer 2' })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'sn-2' } });
+    fireEvent.click(screen.getByTestId('invoke-start'));
+    expect(sub.submit).toHaveBeenCalledWith({ serialNumber: 'sn-2' }, { source: 'dashboard' });
   });
 
   it('server violations surface as issues', () => {

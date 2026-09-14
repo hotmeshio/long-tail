@@ -29,7 +29,7 @@ import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import * as printerTwinWorkflow from './workflows/printer-twin';
 import * as fleetToolsWorkflow from './workflows/fleet-tools';
-import { FLEET_TOOLS_INPUT_SCHEMA, FLEET_TOOLS_ENVELOPE_METADATA } from './workflows/fleet-tools/forms';
+import { FLEET_TOOLS_INPUT_SCHEMA, FLEET_TOOLS_ENVELOPE_METADATA, FLEET_SERIALS_LOOKUP, FLEET_MATERIALS_LOOKUP } from './workflows/fleet-tools/forms';
 import { WORKFLOW_ICONS } from '../types/workflow-icons';
 import {
   PRINT_FARM_DIABETIC,
@@ -562,6 +562,7 @@ const fleetToolsConfig: LTWorkerConfig = {
   invocationRoles: [...INVOCATION_ROLES, PRINTER_FLEET, PRINT_SERVICER],
   envelopeSchema: { data: {}, metadata: FLEET_TOOLS_ENVELOPE_METADATA },
   inputSchema: FLEET_TOOLS_INPUT_SCHEMA,
+  inputLookups: [FLEET_SERIALS_LOOKUP, FLEET_MATERIALS_LOOKUP],
 };
 
 // ── Worker exports ──────────────────────────────────────────────────────────

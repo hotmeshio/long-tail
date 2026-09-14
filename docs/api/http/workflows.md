@@ -141,6 +141,7 @@ PUT /api/workflows/:type/config
 | `tool_tags` | `string[]` | `[]` | MCP tool tags for scoped tool discovery |
 | `envelope_schema` | `object \| null` | `null` | Example envelope that pre-fills the legacy invoke form |
 | `input_schema` | `object \| null` | `null` | x-lt-* JSON Schema for the rich invoke form; `POST /:type/invoke` validates `data` against it. See [Invoke forms](../../hitl/invoke-form.md). |
+| `input_lookups` | `{ domain, key, version, as? }[] \| null` | `null` | Versioned knowledge refs the invoke form reads as `lookup.<as ?? key>`; malformed refs are refused with `400`. See [Lookups](../../hitl/lookups.md#pinning-on-a-workflow-config). |
 | `icon` | `string \| null` | `null` | Curated icon name from `WORKFLOW_ICONS`; unknown names are refused with `400` |
 | `resolver_schema` | `object \| null` | `null` | **Deprecated** legacy fallback only. The escalation form is owned by the target role as a versioned `form_schema`. |
 | `cron_schedule` | `string \| null` | `null` | Cron expression for scheduled execution (e.g., `"0 9 * * *"`) |
@@ -161,6 +162,29 @@ PUT /api/workflows/:type/config
 **Response 200:** The created or updated config object.
 
 This endpoint is idempotent. It replaces the entire configuration, including roles and invocation roles (cascade delete + re-insert). It also invalidates the in-memory config cache.
+
+### Resolve a workflow's input lookups
+
+```
+GET /api/workflows/:type/input-lookups
+```
+
+The versioned knowledge editions pinned on the config's `input_lookups`, resolved server-side. The refs on the config ARE the grant: any caller the invoke gate admits for the workflow reads exactly the pinned editions it names. Editions are immutable, so the response caches for the session. A ref whose snapshot does not exist answers with `missing: true`; the batch never fails.
+
+**Response 200:**
+
+```json
+{
+  "lookups": [
+    { "domain": "fleet", "key": "serial-numbers", "version": 1, "as": "serials", "data": { "items": [{ "value": "sn-1", "label": "Printer 1" }] } }
+  ]
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `403` | The caller may not invoke this workflow |
+| `404` | No config exists for this type |
 
 ### Delete a workflow configuration
 
@@ -210,6 +234,8 @@ Start a workflow by its registered type. The workflow must have `invocable: true
 | `metadata` | `object` | no | Control flow metadata passed as `envelope.metadata` |
 | `execute_as` | `string` | no | Service account `external_id` to run as (admin only) |
 
+The input gate validates against the `metadata` in the request; the dashboard sends the config's `envelope_schema.metadata` with every invoke it starts.
+
 **Example request:**
 
 ```json
@@ -243,7 +269,7 @@ The workflow starts on its configured `task_queue` with a generated workflow ID 
 | `403` | `{ "error": "User not registered" }` | RBAC check failed — no matching user |
 | `403` | `{ "error": "Insufficient role for invocation" }` | User lacks a required invocation role |
 | `404` | `{ "error": "Workflow not found" }` | No config exists for this type |
-| `422` | `{ "error": "data failed input schema validation (n violations)", "code": "schema_validation", "violations": [{ "field", "message" }], "role": null, "schemaVersion": null, "workflowType" }` | The config declares `input_schema` and `data` violates it |
+| `422` | `{ "error": "data failed input schema validation (n violations)", "code": "schema_validation", "violations": [{ "field", "message" }], "role": null, "schemaVersion": null, "workflowType" }` | The config declares `input_schema` and `data` violates it; `x-lt-options` over pinned `input_lookups` constrains values to the resolved edition |
 
 **Authorization:**
 
@@ -660,6 +686,7 @@ Interrupt a running workflow. The workflow is immediately terminated.
 | `GET` | `/:type/config` | any | Get a single workflow configuration |
 | `PUT` | `/:type/config` | admin | Create or replace a workflow configuration |
 | `DELETE` | `/:type/config` | admin | Delete a workflow configuration (cascade) |
+| `GET` | `/:type/input-lookups` | RBAC | Resolve the config's pinned knowledge lookups (invoke predicate) |
 | `POST` | `/:type/invoke` | RBAC | Invoke a workflow (requires `invocable: true`) |
 | `GET` | `/:workflowId/status` | any | Workflow status |
 | `GET` | `/:workflowId/result` | any | Get workflow result (200 if complete, 202 if running) |

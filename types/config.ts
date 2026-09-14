@@ -1,3 +1,5 @@
+import type { EscalationLookupRef } from './escalation';
+
 /**
  * Full workflow configuration as stored in the database.
  * Includes all sub-entities (roles, consumers).
@@ -29,6 +31,8 @@ export interface LTWorkflowConfig {
   envelope_schema?: Record<string, any> | null;
   /** Opt-in x-lt-* JSON Schema for the invoke form; the invoke API validates data against it. */
   input_schema?: Record<string, any> | null;
+  /** Versioned knowledge refs the invoke form reads under `lookup.<as ?? key>`. */
+  input_lookups?: EscalationLookupRef[] | null;
   /** Curated icon name (WORKFLOW_ICONS); null shows the tier glyph. */
   icon?: string | null;
   /** @deprecated The escalation form is a versioned, role-owned schema. Legacy fallback only. */
@@ -60,6 +64,7 @@ export interface LTResolvedConfig {
   toolTags: string[];
   envelopeSchema: Record<string, any> | null;
   inputSchema: Record<string, any> | null;
+  inputLookups: EscalationLookupRef[] | null;
   icon: string | null;
   /** @deprecated Role-owned versioned schema supersedes this. Legacy fallback only. */
   resolverSchema: Record<string, any> | null;

@@ -6,7 +6,9 @@
  * offer a different legal set per escalation (e.g. `[1..N]` where N rides the
  * envelope, or a versioned knowledge lookup under the `lookup` domain).
  *
- *   x-lt-options   "domain.path" or an ORDERED array of paths — e.g.
+ *   x-lt-options   "domain.path", an ORDERED array of paths, or an inline
+ *                  literal list (an array with no string entries: `{ value,
+ *                  label }` objects, numbers, or booleans) — e.g.
  *                  "envelope.left_quantity_options" or
  *                  ["lookup.reasons.items", "envelope.reject_reason_items"].
  *                  With an array, the first entry that resolves to options
@@ -39,7 +41,7 @@ import { hasInterpolation, interpolatePath, resolveCtxPath } from './ctx-path';
 
 export const X_LT_OPTIONS = 'x-lt-options';
 
-export type OptionValue = string | number;
+export type OptionValue = string | number | boolean;
 
 /** One resolved option: the payload value and the rendered label. */
 export interface ResolvedOption {
@@ -48,7 +50,16 @@ export interface ResolvedOption {
 }
 
 function isScalar(v: unknown): v is OptionValue {
-  return typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v));
+  return typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v));
+}
+
+/**
+ * An array token with no string entries is the option list itself, written
+ * inline. A bare string is always a context path, so a literal string value
+ * is written as `{ value, label }`.
+ */
+function isLiteralList(token: unknown): token is unknown[] {
+  return Array.isArray(token) && token.length > 0 && !token.some((e) => typeof e === 'string');
 }
 
 /** Normalize one array entry, mixed arrays resolving each entry independently. */
@@ -65,8 +76,8 @@ function toOption(entry: unknown): ResolvedOption | null {
 }
 
 /**
- * The field's effective option list: the static `enum` when present, else the
- * entries at the token's `"domain.path"`.
+ * The field's effective option list: the static `enum` when present, else an
+ * inline literal list, else the entries at the token's `"domain.path"`.
  */
 export function resolveFieldOptions(
   fieldSchema: Record<string, unknown> | null | undefined,
@@ -75,13 +86,17 @@ export function resolveFieldOptions(
   if (!fieldSchema) return undefined;
 
   // Enum entries pass through verbatim as values (whatever their type), each
-  // labeled by its string form — the legacy membership contract is unchanged.
+  // labeled by its string form.
   const staticEnum = fieldSchema.enum;
   if (Array.isArray(staticEnum) && staticEnum.length > 0) {
     return staticEnum.map((v) => ({ value: v as OptionValue, label: String(v) }));
   }
 
   const token = fieldSchema[X_LT_OPTIONS];
+  if (isLiteralList(token)) {
+    const options = token.map(toOption).filter((o): o is ResolvedOption => o !== null);
+    return options.length > 0 ? options : undefined;
+  }
   const paths = (typeof token === 'string' ? [token] : Array.isArray(token) ? token : [])
     .filter((p): p is string => typeof p === 'string' && p.length > 0);
   if (paths.length === 0) return undefined;

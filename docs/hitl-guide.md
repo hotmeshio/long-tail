@@ -105,7 +105,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Keyword | Level | Purpose |
 |---------|-------|---------|
 | `input.*` | domain | The live form values on the Invoke surface (alias of `resolver.*`) for `x-lt-showIf`, `x-lt-help`, and `x-lt-options` |
-| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `json`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` or an ordered array of paths (first to resolve wins); may embed `{{domain.path}}` interpolation segments |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
 | `x-lt-default-checked` | field | Checklist first-load default — an unanswered field initializes to every item checked (affirm-then-exception); saved answers are never clobbered |
@@ -118,7 +118,10 @@ Ordered as a learning path — each file adds one capability to the same form:
 | `x-lt-showIf` | field | Show field when a value is truthy at `domain.path`; prefix `!` to invert; `=VALUE` / `!=VALUE` compare the string form; an array requires every condition |
 | `x-lt-hide-if-empty` | field | `true` — suppress the field when its value is null, `""`, `false`, or `0` |
 | `x-lt-section` | field | Section group label |
-| `x-lt-options` | field | Dynamic select options — resolves a `"domain.path"` (or an ordered array of paths, first to resolve wins) to the field's option list (scalars or `{ value, label }`); static `enum` wins; `{{domain.path}}` segments make cascading selects |
+| `x-lt-options` | field | Select options — an inline literal list (`{ value, label }` objects, numbers, booleans), or a `"domain.path"` (or an ordered array of paths, first to resolve wins) resolved from the context; static `enum` wins; `{{domain.path}}` segments make cascading selects; on a list field, the multi-select's options |
+| `x-lt-nullable` | field | `true` — a select keeps **Choose…** enabled and picking it submits `null` |
+| `items` / `minItems` / `maxItems` | field | Rules for a multi-select or `json` list: `items` validates each entry, the bounds cap the length |
+| `propertyNames` / `additionalProperties` | field | Map rules for the `json` editor: an `enum` of allowed keys, and the schema every value must satisfy |
 | `x-lt-minimum` | field | Dynamic lower bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-maximum` | field | Dynamic upper bound — resolves a `"domain.path"` from the escalation context |
 | `x-lt-min-length` | field | Dynamic minimum string length — resolves a `"domain.path"` |

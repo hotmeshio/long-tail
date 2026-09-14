@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockInvoke = vi.fn();
 const mockCheckRoles = vi.fn();
 const mockGetConfig = vi.fn();
+const mockResolveLookupContext = vi.fn();
 
 vi.mock('../../services/workflow-invocation', () => ({
   invokeWorkflow: (...a: unknown[]) => mockInvoke(...a),
@@ -14,6 +15,9 @@ vi.mock('../../services/workflow-invocation', () => ({
 }));
 vi.mock('../../services/config', () => ({
   getWorkflowConfig: (...a: unknown[]) => mockGetConfig(...a),
+}));
+vi.mock('../../services/knowledge/lookup-cache', () => ({
+  resolveLookupContext: (...a: unknown[]) => mockResolveLookupContext(...a),
 }));
 vi.mock('../../services/export', () => ({}));
 vi.mock('../../services/task', () => ({ resolveWorkflowHandle: vi.fn() }));
@@ -32,12 +36,23 @@ const SCHEMA = {
     copies: { type: 'number', minimum: 1, 'x-lt-showIf': 'input.action=reprint-label' },
   },
 };
-const config = (input_schema: unknown) => ({ workflow_type: 'fleetTools', invocable: true, invocation_roles: [], input_schema });
+const LOOKUP_SCHEMA = {
+  required: ['serialNumber'],
+  properties: { serialNumber: { type: 'string', 'x-lt-options': 'lookup.serials.items' } },
+};
+const SERIAL_REFS = [{ domain: 'fleet', key: 'serial-numbers', version: 1, as: 'serials' }];
+const STRICT_SCHEMA = {
+  required: ['reason'],
+  properties: { reason: { type: 'string', 'x-lt-showIf': 'metadata.mode=strict' } },
+};
+const config = (input_schema: unknown, extra: Record<string, unknown> = {}) =>
+  ({ workflow_type: 'fleetTools', invocable: true, invocation_roles: [], input_schema, input_lookups: null, ...extra });
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockCheckRoles.mockResolvedValue(undefined);
   mockInvoke.mockResolvedValue({ workflowId: 'wf-1' });
+  mockResolveLookupContext.mockResolvedValue(null);
 });
 
 describe('POST invoke with input_schema', () => {
@@ -80,6 +95,7 @@ describe('POST invoke with input_schema', () => {
     mockGetConfig.mockResolvedValue(config(null));
     const result = await invokeWorkflow({ type: 'basicEcho', data: {} }, AUTH);
     expect(result.status).toBe(202);
+    expect(mockResolveLookupContext).not.toHaveBeenCalled();
   });
 
   it('a data value that is not an object is left to the service, never a 422', async () => {
@@ -94,5 +110,21 @@ describe('POST invoke with input_schema', () => {
     mockGetConfig.mockResolvedValue(null);
     const result = await invokeWorkflow({ type: 'adhoc', data: { anything: 1 } }, AUTH);
     expect(result.status).toBe(202);
+  });
+});
+
+describe('POST invoke with input_lookups', () => {
+  it('x-lt-options over a pinned lookup constrains the value to the resolved edition', async () => {
+    mockGetConfig.mockResolvedValue(config(LOOKUP_SCHEMA, { input_lookups: SERIAL_REFS }));
+    mockResolveLookupContext.mockResolvedValue({ serials: { items: [{ value: 'sn-1', label: 'Printer 1' }] } });
+
+    const rejected = await invokeWorkflow({ type: 'fleetTools', data: { serialNumber: 'sn-9' } }, AUTH);
+    expect(rejected.status).toBe(422);
+    expect(rejected.data.violations[0]).toMatchObject({ field: 'serialNumber' });
+    expect(mockInvoke).not.toHaveBeenCalled();
+
+    const accepted = await invokeWorkflow({ type: 'fleetTools', data: { serialNumber: 'sn-1' } }, AUTH);
+    expect(accepted.status).toBe(202);
+    expect(mockResolveLookupContext).toHaveBeenCalledWith(SERIAL_REFS);
   });
 });

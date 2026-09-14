@@ -1,5 +1,6 @@
 import type { LoggerOptions } from 'pino';
 import type { WorkflowIconName } from './workflow-icons';
+import type { EscalationLookupRef } from './escalation';
 
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
 import type { ScanEncoding, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
@@ -50,6 +51,11 @@ export interface LTWorkerConfig {
    * invoke API validates `data` against it with the same shared pass (422).
    */
   inputSchema?: Record<string, any>;
+  /**
+   * Versioned knowledge refs the invoke form reads under `lookup.<as ?? key>`.
+   * Each ref pins an immutable edition; validated at boot.
+   */
+  inputLookups?: EscalationLookupRef[];
   /** A curated icon (WORKFLOW_ICONS) shown in place of the tier glyph on the Invoke page and registry. */
   icon?: WorkflowIconName;
   /**

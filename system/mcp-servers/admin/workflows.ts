@@ -12,6 +12,7 @@ import {
   checkInvocationRoles,
 } from '../../../services/workflow-invocation';
 import * as workflowApi from '../../../api/workflows';
+import type { LTWorkflowConfig } from '../../../types/config';
 import {
   listDiscoveredWorkflowsSchema,
   invokeWorkflowSchema,
@@ -75,9 +76,11 @@ export function registerWorkflowTools(server: McpServer): void {
   );
 
   // The invoke input gate: data is validated against input_schema when declared.
-  const inputSchemaRejection = async (args: { workflow_type: string; data?: Record<string, any>; metadata?: Record<string, any> }) => {
-    const config = await configService.getWorkflowConfig(args.workflow_type);
-    const body = workflowApi.checkInvokeInput(config, args.data ?? {}, args.metadata);
+  const inputSchemaRejection = async (
+    config: LTWorkflowConfig | null,
+    args: { data?: Record<string, any>; metadata?: Record<string, any> },
+  ) => {
+    const body = await workflowApi.checkInvokeInput(config, args.data ?? {}, args.metadata);
     return body ? { content: [{ type: 'text' as const, text: JSON.stringify(body) }], isError: true } : null;
   };
 
@@ -89,12 +92,14 @@ export function registerWorkflowTools(server: McpServer): void {
       description:
         'Start a certified workflow by type. The workflow must have invocable=true ' +
         'in its config. Data is validated against the config input_schema when one ' +
-        'is declared (422-shaped error). Returns the workflow ID immediately; the ' +
+        'is declared (422-shaped error). Call get_workflow_config for the input_schema ' +
+        'the payload must satisfy. Returns the workflow ID immediately; the ' +
         'workflow runs durably in the background.',
       inputSchema: invokeWorkflowSchema,
     },
     async (args: z.infer<typeof invokeWorkflowSchema>) => {
-      const rejected = await inputSchemaRejection(args);
+      const config = await configService.getWorkflowConfig(args.workflow_type);
+      const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
         workflowType: args.workflow_type,
@@ -126,7 +131,8 @@ export function registerWorkflowTools(server: McpServer): void {
         'Start a workflow registered read-safe (side-effect-free). Same contract ' +
         'as invoke_workflow, gated to configs carrying read_safe=true — the ' +
         'variant exposed to read-scoped MCP callers. A workflow without the ' +
-        'flag fails with a clear error.',
+        'flag fails with a clear error. Call get_workflow_config for the ' +
+        'input_schema the payload must satisfy.',
       inputSchema: invokeWorkflowSchema,
     },
     async (args: z.infer<typeof invokeWorkflowSchema>) => {
@@ -149,7 +155,7 @@ export function registerWorkflowTools(server: McpServer): void {
           isError: true,
         };
       }
-      const rejected = await inputSchemaRejection(args);
+      const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
         workflowType: args.workflow_type,

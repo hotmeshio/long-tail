@@ -9,6 +9,8 @@ vi.mock('../../../../api/workflows', () => ({
   useInvocableWorkflows: () => ({ data: [REVIEW, CLAIM], isLoading: false }),
   useCronStatus: () => ({ data: [] }),
   useInvokeWorkflow: () => ({ mutateAsync: vi.fn(), isPending: false, isSuccess: false, error: null, reset: vi.fn() }),
+  useWorkflowLookups: () => ({ data: undefined }),
+  foldWorkflowLookups: () => ({}),
 }));
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { username: 'testuser' }, isSuperAdmin: false, hasRoleType: () => false }),

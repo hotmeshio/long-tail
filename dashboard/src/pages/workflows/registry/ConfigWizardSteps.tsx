@@ -190,6 +190,25 @@ export function InvocationStep({ form, set }: StepProps) {
             )}
           </div>
 
+          {/* Input lookups */}
+          <div>
+            <label className={labelCls}>Lookups</label>
+            <textarea
+              value={form.input_lookups}
+              onChange={(e) => set('input_lookups', e.target.value)}
+              placeholder={'[\n  { "domain": "fleet", "key": "serial-numbers", "version": 1, "as": "serials" }\n]'}
+              className={jsonCls}
+              rows={5}
+              spellCheck={false}
+            />
+            <p className={hintCls}>
+              Versioned knowledge refs the input form reads as <code className="font-mono">lookup.&lt;as&gt;</code>.
+            </p>
+            {form.input_lookups.trim() && !jsonValid(form.input_lookups) && (
+              <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
+            )}
+          </div>
+
           {/* Envelope schema */}
           <div>
             <label className={labelCls}>Envelope Schema</label>

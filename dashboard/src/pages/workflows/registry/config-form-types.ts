@@ -12,6 +12,8 @@ export interface ConfigFormState {
   envelope_schema: string;
   /** The x-lt-* input form the Invoke Tool page renders and the API enforces; empty = envelope template form. */
   input_schema: string;
+  /** Versioned knowledge refs the invoke form reads as lookup.<as>; JSON array text, empty = none. */
+  input_lookups: string;
   /** Curated icon name; empty = tier glyph. */
   icon: string;
   resolver_schema: string;
@@ -35,6 +37,7 @@ export const EMPTY_FORM: ConfigFormState = {
   consumes: '',
   envelope_schema: '',
   input_schema: '',
+  input_lookups: '',
   icon: '',
   resolver_schema: '',
   cron_schedule: '',
@@ -56,6 +59,7 @@ export function configToForm(c: LTWorkflowConfig): ConfigFormState {
     consumes,
     envelope_schema: c.envelope_schema ? JSON.stringify(c.envelope_schema, null, 2) : '',
     input_schema: c.input_schema ? JSON.stringify(c.input_schema, null, 2) : '',
+    input_lookups: c.input_lookups?.length ? JSON.stringify(c.input_lookups, null, 2) : '',
     icon: c.icon ?? '',
     resolver_schema: c.resolver_schema ? JSON.stringify(c.resolver_schema, null, 2) : '',
     cron_schedule: c.cron_schedule ?? '',
@@ -73,7 +77,7 @@ export function jsonValid(v: string): boolean {
 
 export function isStepValid(step: number, form: ConfigFormState): boolean {
   if (step === 1) return !!form.workflow_type.trim();
-  if (step === 2) return jsonValid(form.envelope_schema) && jsonValid(form.input_schema);
+  if (step === 2) return jsonValid(form.envelope_schema) && jsonValid(form.input_schema) && jsonValid(form.input_lookups);
   if (step === 3) return jsonValid(form.resolver_schema);
   return true;
 }

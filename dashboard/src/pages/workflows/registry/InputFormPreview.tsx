@@ -17,14 +17,15 @@ function parseSchema(text: string): Record<string, unknown> | null {
 /**
  * The input form rendered live from the editor text through the same
  * ResolverForm the Invoke Tool page uses. Interactive, so conditional sections
- * can be walked before saving. Nothing here submits.
+ * can be walked before saving, with pinned lookups resolved into the same
+ * lookup domain the Invoke Tool page reads. Nothing here submits.
  */
-export function InputFormPreview({ schemaText }: { schemaText: string }) {
+export function InputFormPreview({ schemaText, lookup }: { schemaText: string; lookup?: Record<string, unknown> }) {
   const schema = useMemo(() => parseSchema(schemaText), [schemaText]);
   const seed = useMemo(() => (schema ? seedFormJson(schema) : ''), [schema]);
   const [json, setJson] = useState(seed);
   useEffect(() => { setJson(seed); }, [seed]);
-  const context = useMemo<ShowIfContext>(() => ({ ...buildInvokeFormContext({}), resolver: null }), []);
+  const context = useMemo<ShowIfContext>(() => ({ ...buildInvokeFormContext({}, lookup), resolver: null }), [lookup]);
 
   if (!schema) {
     return (

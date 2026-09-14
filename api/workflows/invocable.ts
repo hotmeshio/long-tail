@@ -35,6 +35,7 @@ function durableEntry(workflowType: string, taskQueue: string): InvocableWorkflo
     envelope_schema: null,
     input_schema: null,
     icon: null,
+    input_lookups: null,
     resolver_schema: null,
     cron_schedule: null,
     execute_as: null,

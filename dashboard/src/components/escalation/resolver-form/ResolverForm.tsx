@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { LockedFormFrame } from './LockedFormFrame';
 import { HelpCircle } from 'lucide-react';
-import { evaluateShowIf, type ShowIfContext } from '../../../lib/x-lt-show-if';
+import { evaluateShowIf, isHiddenIfEmpty, type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateField } from '../../../lib/field-validator';
 import { FieldRow } from './FieldRow';
 import { SectionGroup } from './SectionGroup';
@@ -120,11 +120,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   const entries = ordered.filter(([key, val]) => {
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
     if (!evaluateShowIf(fieldSchema?.['x-lt-showIf'], liveCtx)) return false;
-    if (fieldSchema?.['x-lt-hide-if-empty'] === true) {
-      const isEmpty = val === null || val === undefined || val === '' || val === false || val === 0;
-      if (isEmpty) return false;
-    }
-    return true;
+    return !isHiddenIfEmpty(fieldSchema, val);
   });
 
   const requiredFields = new Set(formSchema?.required as string[] ?? []);

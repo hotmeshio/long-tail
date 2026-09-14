@@ -22,7 +22,8 @@ Workflow names read as titles on the page: `fleetTools` shows as **Fleet Tools**
 | Field | Role in the invoke |
 |---|---|
 | `inputSchema` | The form. JSON Schema `properties` plus x-lt-* tokens. Rendered by the Invoke Tool page; enforced by the invoke API. |
-| `envelopeSchema.metadata` | The `metadata` stamped on every run from this form. `envelopeSchema.data` is ignored when `inputSchema` is present. |
+| `envelopeSchema.metadata` | The `metadata` the Invoke Tool page stamps on every run from this form. `envelopeSchema.data` is ignored when `inputSchema` is present. |
+| `inputLookups` | Versioned knowledge refs (`{ domain, key, version, as? }`) the form reads as `lookup.<as ?? key>`. See [Lookups](lookups.md#pinning-on-a-workflow-config). |
 | `invocationRoles` | Who sees the workflow on the Invoke Tool page and who may start it. Empty means every authenticated user. |
 | `description` | One line at the top of the form column, markdown allowed. Keep the reference material in `x-lt-help`, which appears in the side panel on demand. |
 | `icon` | A curated icon from `WORKFLOW_ICONS` (`icon: WORKFLOW_ICONS.WRENCH`). Leads the workflow's row and heading in place of the tier glyph so operators tell tools apart at a glance. The registry offers the same set as a picker. |
@@ -44,7 +45,9 @@ The form edits flat values keyed by property name. On submit, `x-lt-bind` maps t
   "metadata": { "source": "dashboard" } }
 ```
 
-Conditions and help tokens read the live form under the `input` domain: `x-lt-showIf: "input.action=retire"`, `{{input.serialNumber}}`. `resolver` names the same values, so a schema written for an escalation form works unchanged. The only other domain an invoke form can read is `metadata`, the envelope metadata declared above.
+Conditions and help tokens read the live form under the `input` domain: `x-lt-showIf: "input.action=retire"`, `{{input.serialNumber}}`. `resolver` names the same values, so a schema written for an escalation form works unchanged. An invoke form reads four domains: `input`, `resolver`, `metadata` (the run's metadata), and `lookup` (the editions pinned by `inputLookups`, keyed `<as ?? key>`).
+
+The gate validates against the `metadata` the caller sends. The Invoke Tool page sends the declared `envelopeSchema.metadata` plus the per-run `certified` flag; an API or MCP caller that wants a condition such as `x-lt-showIf: "metadata.mode=strict"` to hold sends that metadata itself.
 
 Hidden conditional fields still submit their defaults, as on every x-lt-* form. Treat empty as absent in the workflow.
 
@@ -93,6 +96,6 @@ Once a run starts, the page subscribes to `system.workflow.{workflowId}.complete
 }
 ```
 
-The MCP tools `invoke_workflow` and `invoke_workflow_read_safe` run the same gate and return the body as an error result. The gate reads bound paths from the nested `data`, skips fields a `x-lt-showIf` hides, and applies every validation keyword the form applies.
+The MCP tools `invoke_workflow` and `invoke_workflow_read_safe` run the same gate and return the body as an error result; `get_workflow_config` returns the `input_schema`, the declared metadata, and the resolved lookup data a caller needs to compose a valid payload. The gate reads bound paths from the nested `data`, skips fields a `x-lt-showIf` hides, resolves `x-lt-options` over pinned lookups, and applies every validation keyword the form applies.
 
 `GET /api/workflows/invocable` returns the caller's invokable workflows with their tier. The list and the gate share one predicate, so the page never offers a workflow the API would refuse.

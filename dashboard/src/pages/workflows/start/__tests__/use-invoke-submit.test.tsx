@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe('useInvokeSubmit', () => {
-  it('posts data and metadata, stamping certified and the identity override', async () => {
+  it('posts data and metadata with the certified flag and the identity override', async () => {
     const { result } = renderHook(() => useInvokeSubmit(selected, { certified: true, overrideBot: 'bot-1' }));
     await act(() => result.current.submit({ a: 1 }, { source: 'dashboard' }));
     expect(mutateAsync).toHaveBeenCalledWith({
@@ -35,6 +35,12 @@ describe('useInvokeSubmit', () => {
       metadata: { source: 'dashboard', certified: true },
       execute_as: 'bot-1',
     });
+  });
+
+  it('an uncertified run adds nothing to the metadata', async () => {
+    const { result } = renderHook(() => useInvokeSubmit(selected, { certified: false, overrideBot: '' }));
+    await act(() => result.current.submit({ a: 1 }, { k: 1 }));
+    expect(mutateAsync).toHaveBeenCalledWith({ workflowType: 'fleetTools', data: { a: 1 }, metadata: { k: 1 } });
   });
 
   it('a non-builder stays put and sees the started id with no execution link', async () => {

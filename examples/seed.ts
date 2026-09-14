@@ -20,6 +20,7 @@ import { seedChecklistRole } from './seed-checklist';
 import { seedConstraintFormRole, seedConstraintFormEscalations } from './seed-constraint-form';
 import { seedParameterizedFormRole, seedParameterizedFormEscalations } from './seed-parameterized-form';
 import { seedLookupCascadeKnowledge, seedLookupCascadeRole, seedLookupCascadeEscalations } from './seed-lookup-cascade';
+import { seedFleetToolsKnowledge } from './seed-fleet-tools';
 import { seedPrinterFleetRoles, seedPrinterFleetEscalations } from './seed-fleet-sim';
 import { seedAutoResolveDemoRoles, seedAutoResolveDemoEscalations } from './seed-auto-resolve-demo';
 
@@ -131,6 +132,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedParameterizedFormRole();
   await seedParameterizedFormEscalations();
   await seedLookupCascadeKnowledge();
+  await seedFleetToolsKnowledge();
   await seedLookupCascadeRole();
   await seedLookupCascadeEscalations();
   await seedAutoResolveDemoRoles();

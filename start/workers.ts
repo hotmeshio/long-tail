@@ -22,6 +22,8 @@ import {
 } from './apply-report';
 
 import type { LTStartConfig, LTWorkerConfig } from '../types/startup';
+import { assertLookupRefs } from '../types/escalation';
+import { describeMissingLookupRefs } from '../services/knowledge/lookup-refs';
 
 type WorkerEntry = {
   taskQueue: string;
@@ -224,6 +226,13 @@ export async function startWorkers(
         for (const w of workersWithConfig) {
           const workflowType = w.workflow.name;
           const c = w.config!;
+          if (c.inputLookups !== undefined) {
+            assertLookupRefs(c.inputLookups);
+            // Editions may be seeded after registration; a missing pin warns here and surfaces on the Invoke Tool page.
+            for (const problem of await describeMissingLookupRefs(c.inputLookups)) {
+              loggerRegistry.warn(`[long-tail] ${workflowType}: ${problem}`);
+            }
+          }
           const declaration = {
             workflow_type: workflowType,
             task_queue: w.taskQueue,
@@ -238,6 +247,7 @@ export async function startWorkers(
             envelope_schema: c.envelopeSchema ?? null,
             input_schema: c.inputSchema ?? null,
             icon: c.icon ?? null,
+            input_lookups: c.inputLookups ?? null,
             resolver_schema: c.resolverSchema ?? null,
             cron_schedule: c.cronSchedule ?? null,
             execute_as: c.executeAs ?? null,

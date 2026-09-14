@@ -41,7 +41,7 @@ export async function invokeWorkflow(
     await checkInvocationRoles(input.type, auth.userId, auth.role);
 
     const config = await configService.getWorkflowConfig(input.type);
-    const violation = checkInvokeInput(config, input.data, input.metadata);
+    const violation = await checkInvokeInput(config, input.data, input.metadata);
     if (violation) return inputValidationFailure(violation);
 
     const result = await invokeWorkflowService({

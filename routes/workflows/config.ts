@@ -26,6 +26,19 @@ router.get('/:type/config', async (req, res) => {
 });
 
 /**
+ * GET /api/workflows/:type/input-lookups
+ * Resolve the versioned knowledge lookups pinned on a workflow config.
+ * Open to any caller the invoke gate admits for that workflow.
+ */
+router.get('/:type/input-lookups', async (req, res) => {
+  const result = await api.getWorkflowInputLookups(
+    { type: req.params.type },
+    { userId: req.auth?.userId ?? '', role: req.auth?.role, scopes: req.auth?.scopes },
+  );
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * PUT /api/workflows/:type/config
  * Create or replace a workflow configuration.
  * Requires admin or superadmin role.
@@ -46,6 +59,7 @@ router.put('/:type/config', requireAdmin, async (req, res) => {
     envelope_schema: req.body.envelope_schema,
     input_schema: req.body.input_schema,
     icon: req.body.icon,
+    input_lookups: req.body.input_lookups,
     resolver_schema: req.body.resolver_schema,
     cron_schedule: req.body.cron_schedule,
   });
