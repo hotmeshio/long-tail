@@ -1,3 +1,11 @@
+/** One versioned knowledge ref pinned on a workflow config; the invoke form reads it as `lookup.<as ?? key>`. */
+export interface WorkflowLookupRef {
+  domain: string;
+  key: string;
+  version: number;
+  as?: string;
+}
+
 export interface LTWorkflowConfig {
   workflow_type: string;
   description: string | null;
@@ -12,6 +20,7 @@ export interface LTWorkflowConfig {
   envelope_schema: Record<string, unknown> | null;
   input_schema: Record<string, unknown> | null;
   icon: string | null;
+  input_lookups: WorkflowLookupRef[] | null;
   resolver_schema: Record<string, unknown> | null;
   cron_schedule: string | null;
   execute_as: string | null;

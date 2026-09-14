@@ -13,20 +13,24 @@ import type { InvokeSubmission } from './use-invoke-submit';
 /**
  * The x-lt-* invoke form. The declared input_schema renders through the same
  * ResolverForm the escalation surface uses; live values drive x-lt-showIf
- * under `input` and `resolver`; submit runs the shared validation pass, maps
- * x-lt-bind into the nested `data`, and posts the envelope the API has
- * always taken. A server 422 lands in the same Issues view.
+ * under `input` and `resolver`, pinned lookups under `lookup`; submit runs
+ * the shared validation pass, maps x-lt-bind into the nested `data`, and
+ * posts the envelope the API has always taken. A server 422 lands in the
+ * same Issues view.
  */
 export function RichInvokeForm({
   selected,
   schema,
   metadata,
+  lookup,
   submission,
   lead,
 }: {
   selected: LTWorkflowConfig;
   schema: Record<string, unknown>;
   metadata: Record<string, unknown>;
+  /** Resolved knowledge editions keyed as the form reads them: lookup.<as ?? key>. */
+  lookup?: Record<string, unknown>;
   submission: InvokeSubmission;
   /** Content that scrolls with the form ahead of its fields: description, identity, options. */
   lead?: ReactNode;
@@ -45,8 +49,8 @@ export function RichInvokeForm({
   }, [selected.workflow_type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const context = useMemo<ShowIfContext>(
-    () => ({ ...buildInvokeFormContext(metadata), resolver: null }),
-    [metadata],
+    () => ({ ...buildInvokeFormContext(metadata, lookup), resolver: null }),
+    [metadata, lookup],
   );
   const liveContext = useMemo<ShowIfContext>(() => {
     try {

@@ -1,27 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { seedFormJson } from '../seed-form-json';
 
-const schema = {
-  properties: {
-    serialNumber: { type: 'string', 'x-lt-bind': 'printer.serialNumber' },
-    copies: { type: 'number', default: 1 },
-    checks: { type: 'object' },
-    note: { type: 'string' },
-  },
-};
-
 describe('seedFormJson', () => {
-  it('carries the schema as the sidecar and seeds defaults and typed zero values', () => {
-    const seeded = JSON.parse(seedFormJson(schema));
-    expect(seeded._form_schema).toEqual(schema);
-    expect(seeded.copies).toBe(1);
-    expect(seeded.checks).toEqual({});
-    expect(seeded.note).toBe('');
+  it('seeds every field to its prefill, its default, or the zero value: {} for objects, empty text otherwise', () => {
+    const seeded = JSON.parse(seedFormJson({
+      properties: {
+        name: { type: 'string' },
+        copies: { type: 'number' },
+        force: { type: 'boolean' },
+        roles: { type: 'array' },
+        mix: { type: 'object' },
+        withDefault: { type: 'number', default: 3 },
+      },
+    }));
+    expect(seeded).toMatchObject({ name: '', copies: '', force: '', roles: '', mix: {}, withDefault: 3 });
+    expect(seeded._form_schema.properties.mix.type).toBe('object');
   });
 
-  it('a prefill payload wins over defaults, read through x-lt-bind', () => {
-    const seeded = JSON.parse(seedFormJson(schema, { printer: { serialNumber: 'sn-1' }, copies: 3 }));
-    expect(seeded.serialNumber).toBe('sn-1');
-    expect(seeded.copies).toBe(3);
+  it('a prefilled payload wins over defaults through x-lt-bind', () => {
+    const seeded = JSON.parse(seedFormJson(
+      { properties: { serial: { type: 'string', 'x-lt-bind': 'printer.serialNumber', default: 'none' } } },
+      { printer: { serialNumber: 'sn-1' } },
+    ));
+    expect(seeded.serial).toBe('sn-1');
   });
 });

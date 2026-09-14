@@ -26,16 +26,21 @@ Declare `title` on every field whose key isn't already a readable label — it i
 
 ## Field Types
 
-| JSON Type | Renders As |
+The control follows the field's declared `type` and its tokens; the stored value only fills it. A field with no value yet renders the empty state of its control: a number is an empty input, a boolean is an unchecked box, a select opens on **Choose…**, a multi-select has nothing picked, a JSON editor is empty. Every property starts at its `default`, or `{}` for an object, or empty text.
+
+| Declared type | Renders As |
 |-----------|-----------|
 | `boolean` | Checkbox toggle |
-| `number` | Number input |
-| `string` | Text input (default) |
-| `string` + `enum` | Dropdown select |
-| `string`/`number` + `x-lt-options` | Dropdown select — options resolved from the escalation context (see [x-lt-validation.md](x-lt-validation.md#dynamic-select-options-x-lt-options)) |
+| `boolean` + `enum` / `x-lt-options` | Select emitting `true` or `false` (a Yes/No decision) |
+| `number` / `integer` | Number input |
+| `string` | Text input; `format: "textarea"` for multi-line |
+| `string`/`number` + `enum` | Select |
+| any scalar + `x-lt-options` | Select with labeled options: inline, from the context, or from a lookup (see [x-lt-validation.md](x-lt-validation.md#select-options-x-lt-options)) |
+| `array` + `x-lt-options` | Multi-select chips emitting the picked values in list order |
+| `array` / `object` + `x-lt-widget: "json"` | Validated JSON editor (see [x-lt-widget.md](x-lt-widget.md#json)) |
+| `array` without options | Tag display (read-only) |
+| `object` | Nested fields from `properties`, or a widget (see [x-lt-widget.md](x-lt-widget.md)) |
 | `null` | Read-only "null" display |
-| `array` | Tag display (read-only) |
-| `object` | Nested section with recursive fields, or a widget (see [x-lt-widget.md](x-lt-widget.md)) |
 
 ---
 

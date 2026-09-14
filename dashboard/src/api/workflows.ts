@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { ActiveWorker, CronScheduleEntry, DiscoveredWorkflow, InvocableWorkflow, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
+import type { ActiveWorker, CronScheduleEntry, DiscoveredWorkflow, InvocableWorkflow, LTJob, LTWorkflowConfig, WorkflowExecution, WorkflowLookupRef } from './types';
 
 export function useActiveWorkers() {
   return useQuery<ActiveWorker[]>({
@@ -40,6 +40,33 @@ export function useInvocableWorkflows() {
       const res = await apiFetch<{ workflows: InvocableWorkflow[] }>('/workflows/invocable');
       return res.workflows;
     },
+  });
+}
+
+export interface WorkflowLookup {
+  domain: string;
+  key: string;
+  version: number;
+  as?: string;
+  data: Record<string, unknown> | null;
+  missing?: boolean;
+}
+
+/**
+ * The versioned knowledge lookups pinned on a workflow config, resolved
+ * server-side. Editions are immutable, so one fetch serves the session.
+ */
+/** The lookup form-context domain: resolved editions keyed as the form reads them, missing refs dropped. */
+export function foldWorkflowLookups(lookups: WorkflowLookup[]): Record<string, unknown> {
+  return Object.fromEntries(lookups.filter((l) => !l.missing).map((l) => [l.as ?? l.key, l.data]));
+}
+
+export function useWorkflowLookups(type: string, enabled: boolean) {
+  return useQuery<{ lookups: WorkflowLookup[] }>({
+    queryKey: ['workflows', type, 'input-lookups'],
+    queryFn: () => apiFetch(`/workflows/${encodeURIComponent(type)}/input-lookups`),
+    enabled: !!type && enabled,
+    staleTime: Infinity,
   });
 }
 
@@ -130,6 +157,7 @@ export function useUpsertWorkflowConfig() {
       envelope_schema?: Record<string, unknown> | null;
       input_schema?: Record<string, unknown> | null;
       icon?: string | null;
+      input_lookups?: WorkflowLookupRef[] | null;
       resolver_schema?: Record<string, unknown> | null;
       cron_schedule?: string | null;
       execute_as?: string | null;

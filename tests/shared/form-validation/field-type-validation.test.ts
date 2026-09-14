@@ -9,6 +9,13 @@ import { validateField, validateFieldType, validateFieldConstraints } from '../.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('validateFieldType', () => {
+  it('reads unparseable text in a json editor as Invalid JSON, elsewhere as the wrong type', () => {
+    expect(validateFieldType('{oops', { type: 'object', 'x-lt-widget': 'json' })).toBe('Invalid JSON');
+    expect(validateFieldType('[oops', { type: 'array', 'x-lt-widget': 'json' })).toBe('Invalid JSON');
+    expect(validateFieldType('{oops', { type: 'object' })).toBe('Expected an object');
+    expect(validateFieldType(3, { type: 'array' })).toBe('Expected a list');
+  });
+
   it('rejects a string where a number is declared', () => {
     expect(validateFieldType('1', { type: 'number' })).toBe('Expected a number');
     expect(validateFieldType(1, { type: 'number' })).toBeUndefined();

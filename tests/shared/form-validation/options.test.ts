@@ -239,9 +239,41 @@ describe('x-lt-options ordered sources (first-resolvable-wins)', () => {
   });
 
   it('malformed entries drop; an all-malformed array reads as no token', () => {
-    expect(resolveFieldOptions({ 'x-lt-options': [42, null] } as any, PARKED_ROW)).toBeUndefined();
+    expect(resolveFieldOptions({ 'x-lt-options': [null, {}] } as any, PARKED_ROW)).toBeUndefined();
+    // A string entry makes the array a path list; the non-path entry is ignored.
     expect(resolveFieldOptions(
       { 'x-lt-options': [42, 'envelope.reject_reason_items'] } as any, PARKED_ROW,
     )).toHaveLength(2);
+  });
+});
+
+describe('x-lt-options inline literal lists', () => {
+  it('an array with no string entries is the option list itself', () => {
+    const options = resolveFieldOptions({
+      'x-lt-options': [{ value: 'rn', label: 'Registered Nurse' }, { id: 'lpn', label: 'Practical Nurse' }],
+    }, undefined);
+    expect(options).toEqual([
+      { value: 'rn', label: 'Registered Nurse' },
+      { value: 'lpn', label: 'Practical Nurse' },
+    ]);
+    expect(resolveFieldOptions({ 'x-lt-options': [1, 2, 3] }, undefined)).toHaveLength(3);
+  });
+
+  it('boolean options render a decision as a select and enforce membership', () => {
+    const schema = {
+      required: ['powerCycled'],
+      properties: {
+        powerCycled: { type: 'boolean', 'x-lt-options': [{ value: true, label: 'Yes' }, { value: false, label: 'No' }] },
+      },
+    };
+    expect(resolveFieldOptions(schema.properties.powerCycled, undefined)?.map((o) => o.value)).toEqual([true, false]);
+    expect(validateResolverForm(schema, { powerCycled: false })).toEqual([]);
+    expect(validateResolverForm(schema, { powerCycled: null })).toEqual([{ field: 'powerCycled', message: 'Required' }]);
+    expect(validateResolverForm(schema, { powerCycled: 'yes' })).toHaveLength(1);
+  });
+
+  it('a list field takes its options from its own x-lt-options literal', () => {
+    const list = { type: 'array', 'x-lt-options': [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] };
+    expect(resolveFieldOptions(list, undefined)?.map((o) => o.value)).toEqual(['a', 'b']);
   });
 });

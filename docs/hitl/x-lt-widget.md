@@ -6,6 +6,7 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 |--------|------------|
 | `"file-upload"` | File picker with drag-and-drop. Stores a base64 data URL. Use `accept` to filter file types. |
 | `"code-editor"` | Monospace textarea with tab-key support. Use `x-lt-language` for the syntax hint. |
+| `"json"` | Validated JSON editor for a `list` or `object` field. Unparseable text blocks submit as **Invalid JSON**; a parsed value is validated as the declared type. |
 | `"signature"` | HTML5 Canvas drawing pad. Outputs a PNG data URL. |
 | `"rich-text"` | Tall textarea for formatted text input. |
 | `"markdown"` | Markdown source rendered with headings, tables, lists, code blocks. Editable by default; set `readOnly: true` for a pure content block. |
@@ -58,6 +59,26 @@ The submitted value is a base64 data URL (`data:image/png;base64,...`). `accept`
 ```
 
 `x-lt-language` is a display hint only — the editor does not enforce syntax.
+
+---
+
+## JSON
+
+```json
+{
+  "properties": {
+    "weights": {
+      "type": "object",
+      "x-lt-widget": "json",
+      "propertyNames": { "enum": ["bag", "plate", "spool"] },
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+      "description": "Zero or omit a key to exclude it"
+    }
+  }
+}
+```
+
+A monospace editor holding the raw JSON of a `type: "array"` or `"object"` field. While the text does not parse, the field reads **Invalid JSON** and blocks submit; once it parses, the value is validated as the declared type: `items` (`type`, `enum`, bounds), `minItems`, `maxItems` for lists; `propertyNames.enum` and `additionalProperties` (`type`, `minimum`, `maximum`) for maps. Empty text submits `null`. Typing never reformats the text. See [Lists and Maps](x-lt-validation.md#lists-and-maps).
 
 ---
 

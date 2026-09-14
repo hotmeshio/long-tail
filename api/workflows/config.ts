@@ -1,5 +1,7 @@
 import * as configService from '../../services/config';
 import { isWorkflowIcon } from '../../types/workflow-icons';
+import { assertLookupRefs, type EscalationLookupRef } from '../../types/escalation';
+import { describeMissingLookupRefs } from '../../services/knowledge/lookup-refs';
 import { cronRegistry } from '../../services/cron';
 import { ltConfig } from '../../modules/ltconfig';
 import type { LTApiResult } from '../../types/sdk';
@@ -62,6 +64,7 @@ export async function getWorkflowConfig(input: {
  * @param input.envelope_schema — JSON template that pre-fills the invoke form
  * @param input.input_schema — x-lt-* JSON Schema for the rich invoke form; invoke validates data against it
  * @param input.icon — curated icon name (WORKFLOW_ICONS); anything else is refused
+ * @param input.input_lookups: versioned knowledge refs the invoke form reads as `lookup.<as ?? key>`; malformed refs are refused
  * @param input.resolver_schema — JSON Schema for resolver payload validation
  * @param input.cron_schedule — cron expression for scheduled execution
  * @returns `{ status: 200, data: <saved config> }`
@@ -81,6 +84,7 @@ export async function upsertWorkflowConfig(input: {
   envelope_schema?: any;
   input_schema?: any;
   icon?: string | null;
+  input_lookups?: EscalationLookupRef[] | null;
   resolver_schema?: any;
   cron_schedule?: string | null;
   read_safe?: boolean;
@@ -88,6 +92,15 @@ export async function upsertWorkflowConfig(input: {
   try {
     if (input.icon && !isWorkflowIcon(input.icon)) {
       return { status: 400, error: `Unknown workflow icon "${input.icon}"; choose one of WORKFLOW_ICONS` };
+    }
+    if (input.input_lookups != null) {
+      try {
+        assertLookupRefs(input.input_lookups);
+      } catch (err: any) {
+        return { status: 400, error: err.message };
+      }
+      const missing = await describeMissingLookupRefs(input.input_lookups);
+      if (missing.length) return { status: 400, error: missing.join('; ') };
     }
     // Validate cron expression before persisting
     if (input.cron_schedule) {
@@ -110,6 +123,7 @@ export async function upsertWorkflowConfig(input: {
       envelope_schema: input.envelope_schema ?? null,
       input_schema: input.input_schema ?? null,
       icon: input.icon ?? null,
+      input_lookups: input.input_lookups ?? null,
       resolver_schema: input.resolver_schema ?? null,
       cron_schedule: input.cron_schedule ?? null,
       read_safe: input.read_safe ?? false,

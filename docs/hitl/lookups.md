@@ -37,6 +37,27 @@ const decision = await conditional<CascadeResolverV1>(signalId, {
 
 The refs fold into `envelope.lookups` as a pure transform — a pinned wait costs exactly what an unpinned one does. A malformed ref (missing field, non-integer version) throws before the row is written; over the HTTP create surface the same validation answers with a 400.
 
+## Pinning on a Workflow Config
+
+An invoke form pins editions the same way. Declare `inputLookups` beside `inputSchema` on the worker config and the form reads them under `lookup.<as ?? key>`:
+
+```typescript
+const fleetToolsConfig: LTWorkerConfig = {
+  invocable: true,
+  inputSchema: FLEET_TOOLS_INPUT_SCHEMA,
+  inputLookups: [{ domain: 'fleet', key: 'serial-numbers', version: 1, as: 'serials' }],
+};
+```
+
+```jsonc
+// inputSchema.properties
+"serialNumber": { "type": "string", "title": "Serial", "x-lt-options": "lookup.serials.items" }
+```
+
+The Invoke Tool page fetches `GET /api/workflows/:type/input-lookups` once per workflow; the grant is the invoke predicate, so whoever may start the workflow reads exactly the pinned editions. The invoke API resolves the same refs into the gate, so a value outside the edition is refused with the canonical 422. The registry detail page edits the refs under **Lookups** in its Invocation column; the preview renders against the resolved editions.
+
+The refs are checked twice on save. Shape first: a missing `domain` or `key`, a `version` that is not a positive integer, or an empty `as` answers `400` with the field named. Existence second: a ref whose edition does not exist answers `400` naming the editions that do (`Lookup ref fleet/serial-numbers v3 names no edition (editions: v1, v2)`), from `PUT /api/workflows/:type/config` and from the MCP `upsert_workflow_config` tool alike. On the worker boot path a malformed ref fails the boot; a ref whose edition is not yet written logs a warning, since seeds commonly run after registration. At run time the resolver reads each edition once and holds it in memory (editions are immutable), a missing edition answers `missing: true` for that ref without failing the batch, the Invoke Tool page shows which pinned editions are unavailable, and the fields that read them follow the `x-lt-options` rules: a plain path falls back to the typed input, an interpolated path stays a disabled select and fails closed.
+
 ## Versioning
 
 Every knowledge entry carries a `current_version`, and every write that changes its data mints an immutable snapshot automatically — no publish step:

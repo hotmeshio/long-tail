@@ -85,11 +85,12 @@ Chroma is spent, not spread.
     rich text, uploads) fill the cell. The signature pad holds its natural
     document proportion (25rem, the 400×150 export) — the PNG is the
     artifact, and stretching the pad stretches the document.
-- **Decisions are never checkboxes.** A decision is an enum opening on an
-  explicit disabled **Choose…** placeholder. The user picks; nothing is an
-  implicit first option, and there is no way back to unchosen.
-- Checkboxes exist only inside checklists — confirmations of work, not
-  choices.
+- **Decisions are never checkboxes.** A decision is an option list opening
+  on an explicit disabled **Choose…** placeholder, a Yes/No pair included.
+  The user picks; nothing is an implicit first option, and there is no way
+  back to unchosen unless the field declares `x-lt-nullable`.
+- Checkboxes exist only inside checklists and multi-selects, and as the
+  single confirmation box — confirmations of work, not choices.
 - **Item length and selection mode determine list geometry.**
   Sentence-length require-all *rituals* read top-down, one per row — the
   vertical stack is deliberate. Short pick-any *tags* (reasons, categories)

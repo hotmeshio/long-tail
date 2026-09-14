@@ -13,6 +13,7 @@ export function invocable(overrides: Partial<InvocableWorkflow> & { workflow_typ
     consumes: [],
     envelope_schema: null,
     input_schema: null,
+    input_lookups: null,
     icon: null,
     resolver_schema: null,
     cron_schedule: null,

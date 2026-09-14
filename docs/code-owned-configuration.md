@@ -57,7 +57,7 @@ The domain dictionary's override lives beside its path:
 
 | Surface | Declared via | Code-owned apply writes | Left alone (runtime state) |
 |---|---|---|---|
-| Workflow profiles | `workers[].config` | full profile incl. role lists and `input_schema` (replace semantics) | task history, escalations |
+| Workflow profiles | `workers[].config` | full profile incl. role lists, `input_schema`, and `input_lookups` (replace semantics) | task history, escalations |
 | Roles | `roles[]` | declared fields only (PATCH); escalation targets replace | membership, undeclared fields |
 | Topics | `topics[]` | whole catalog entry (`managed: true`) | `last_seen_at` |
 | MCP servers | `mcp.serverFactories[].config` | description, tags, category, compile hints, credential providers | tool manifest, connection status |

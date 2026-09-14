@@ -23,7 +23,7 @@ import { ScanConfirmModal } from '../../../components/scan/ScanConfirmModal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ListToolbar } from '../../../components/common/data/ListToolbar';
 import { isEffectivelyClaimed } from '../../../lib/escalation';
-import { mapPayloadToForm } from '../../../lib/x-lt-bind';
+import { seedFormJson } from '../../../lib/seed-form-json';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
 import { getAiOverride } from '../../../lib/view-as';
@@ -247,17 +247,7 @@ function EscalationDetailView({ id }: { id: string }) {
         ...(esc?.metadata ?? {}),
         ...(typeof formDefaults === 'object' && formDefaults !== null ? formDefaults : {}),
       };
-      const prefill = mapPayloadToForm(mergedPrefill, formSchema);
-      const initial: Record<string, any> = { _form_schema: formSchema };
-      for (const [key, def] of Object.entries(formSchema.properties)) {
-        const fieldDef = def as Record<string, any>;
-        // The zero value follows the declared type: an object field (e.g. a
-        // checklist) starts as {} — never '' — so its value round-trips as
-        // an object from the first interaction.
-        const zero = fieldDef.type === 'object' ? {} : '';
-        initial[key] = prefill[key] ?? fieldDef.default ?? zero;
-      }
-      initialJsonRef.current = JSON.stringify(initial, null, 2);
+      initialJsonRef.current = seedFormJson(formSchema, mergedPrefill);
       // A saved draft (typed input from an earlier visit or a lapsed claim)
       // wins over the seeded defaults. The schema is always taken fresh —
       // a draft never resurrects a stale form definition.

@@ -80,3 +80,12 @@ export function evaluateShowIf(condition: unknown, ctx: ShowIfContext | null | u
   if (!known) return true;
   return negate ? !isTruthy(value) : isTruthy(value);
 }
+
+/**
+ * `x-lt-hide-if-empty`: the field is suppressed while its value is empty
+ * (null, undefined, '', false, or 0). Render and validation share this test.
+ */
+export function isHiddenIfEmpty(fieldSchema: Record<string, unknown> | undefined, value: unknown): boolean {
+  if (fieldSchema?.['x-lt-hide-if-empty'] !== true) return false;
+  return value === null || value === undefined || value === '' || value === false || value === 0;
+}

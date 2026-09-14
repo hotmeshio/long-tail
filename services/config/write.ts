@@ -22,6 +22,11 @@ import {
  * seed blocks without `certified`): derived from roles/consumes presence —
  * the rule that governed the tier before the flag existed.
  */
+/** pg binds JS arrays as Postgres arrays; jsonb columns take the JSON text. */
+function toJsonb(value: unknown): string | null {
+  return value == null ? null : JSON.stringify(value);
+}
+
 function resolveCertified(config: LTWorkflowConfig): boolean {
   return (
     config.certified ??
@@ -72,6 +77,7 @@ async function replaceWorkflowConfig(
         config.read_safe ?? false,
         config.input_schema ?? null,
         config.icon ?? null,
+        toJsonb(config.input_lookups),
       ],
     );
 
@@ -148,6 +154,7 @@ export async function seedWorkflowConfig(
     config.read_safe ?? false,
     config.input_schema ?? null,
     config.icon ?? null,
+    toJsonb(config.input_lookups),
   ]);
 
   const inserted = (rowCount ?? 0) > 0;
@@ -174,6 +181,7 @@ export async function seedWorkflowConfig(
       if (JSON.stringify(config.resolver_schema) !== JSON.stringify(existing.resolver_schema)) drifts.push('resolver_schema');
       if (JSON.stringify(config.input_schema ?? null) !== JSON.stringify(existing.input_schema ?? null)) drifts.push('input_schema');
       if ((config.icon ?? null) !== (existing.icon ?? null)) drifts.push('icon');
+      if (JSON.stringify(config.input_lookups ?? null) !== JSON.stringify(existing.input_lookups ?? null)) drifts.push('input_lookups');
       if (drifts.length) {
         loggerRegistry.warn(`[long-tail] config drift: ${config.workflow_type} — ${drifts.join(', ')} differ between code and DB`);
       }
@@ -220,7 +228,8 @@ export async function applyWorkflowConfig(
       isDeepStrictEqual(existing.envelope_schema ?? null, config.envelope_schema ?? null) &&
       isDeepStrictEqual(existing.resolver_schema ?? null, config.resolver_schema ?? null) &&
       isDeepStrictEqual(existing.input_schema ?? null, config.input_schema ?? null) &&
-      (existing.icon ?? null) === (config.icon ?? null);
+      (existing.icon ?? null) === (config.icon ?? null) &&
+      isDeepStrictEqual(existing.input_lookups ?? null, config.input_lookups ?? null);
     if (unchanged) return 'unchanged';
   }
 

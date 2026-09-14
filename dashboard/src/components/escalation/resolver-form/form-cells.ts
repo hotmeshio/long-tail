@@ -21,6 +21,20 @@ export type JsonValue =
 
 export type FormEntry = [string, JsonValue];
 
+export type FieldKind = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null';
+const FIELD_KINDS = new Set<FieldKind>(['string', 'number', 'integer', 'boolean', 'array', 'object']);
+
+/** The control follows the declared `type`; the runtime value decides only when the schema declares none. */
+export function declaredKind(fieldSchema: Record<string, unknown> | undefined, value: unknown): FieldKind {
+  const declared = fieldSchema?.type;
+  if (typeof declared === 'string' && FIELD_KINDS.has(declared as FieldKind)) return declared as FieldKind;
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return 'array';
+  const t = typeof value;
+  if (t === 'number' || t === 'boolean' || t === 'string') return t;
+  return 'object';
+}
+
 export interface SectionOptions {
   display?: string;
   columns?: number;

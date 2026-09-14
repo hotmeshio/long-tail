@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Code2, Play, ShieldOff, Eye,
 } from 'lucide-react';
-import { useWorkflowConfigs, useUpsertWorkflowConfig, useDeleteWorkflowConfig, useJobs } from '../../../api/workflows';
+import { useWorkflowConfigs, useUpsertWorkflowConfig, useDeleteWorkflowConfig, useJobs, useWorkflowLookups, foldWorkflowLookups } from '../../../api/workflows';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { RolePicker } from '../../../components/common/form/RolePicker';
 import { BotPicker } from '../../../components/common/form/BotPicker';
@@ -13,6 +13,7 @@ import { EMPTY_FORM, configToForm, jsonValid } from './config-form-types';
 import { InputFormPreview } from './InputFormPreview';
 import { WorkflowIconPicker } from '../../../components/common/form/WorkflowIconPicker';
 import type { ConfigFormState } from './config-form-types';
+import type { WorkflowLookupRef } from '../../../api/types';
 
 // ── Local helpers ─────────────────────────────────────────────────────────────
 
@@ -58,6 +59,9 @@ export function WorkflowConfigDetailPage() {
   const [confirmUnregister, setConfirmUnregister] = useState(false);
 
   const editing = configs?.find((c) => c.workflow_type === workflowType) ?? null;
+  const hasLookups = Array.isArray(editing?.input_lookups) && editing!.input_lookups!.length > 0;
+  const { data: lookupData } = useWorkflowLookups(editing?.workflow_type ?? '', hasLookups);
+  const previewLookup = useMemo(() => (lookupData ? foldWorkflowLookups(lookupData.lookups) : undefined), [lookupData]);
 
   const { data: jobsData } = useJobs({ limit: 500 });
   const unregisteredTypes = useMemo(() => {
@@ -99,6 +103,7 @@ export function WorkflowConfigDetailPage() {
 
     let envelope_schema: Record<string, unknown> | null = null;
     let input_schema: Record<string, unknown> | null = null;
+    let input_lookups: WorkflowLookupRef[] | null = null;
     let resolver_schema: Record<string, unknown> | null = null;
     try {
       if (form.envelope_schema.trim()) envelope_schema = JSON.parse(form.envelope_schema);
@@ -106,6 +111,9 @@ export function WorkflowConfigDetailPage() {
     try {
       if (form.input_schema.trim()) input_schema = JSON.parse(form.input_schema);
     } catch { setSchemaError('Invalid JSON in Input Form'); return; }
+    try {
+      if (form.input_lookups.trim()) input_lookups = JSON.parse(form.input_lookups);
+    } catch { setSchemaError('Invalid JSON in Lookups'); return; }
     try {
       if (form.resolver_schema.trim()) resolver_schema = JSON.parse(form.resolver_schema);
     } catch { setSchemaError('Invalid JSON in Resolver Schema'); return; }
@@ -123,6 +131,7 @@ export function WorkflowConfigDetailPage() {
         consumes: splitCsv(form.consumes),
         envelope_schema,
         input_schema,
+        input_lookups,
         icon: form.icon || null,
         resolver_schema,
         cron_schedule: form.cron_schedule.trim() || null,
@@ -144,7 +153,7 @@ export function WorkflowConfigDetailPage() {
     return <p className="text-sm text-text-secondary">Config not found.</p>;
   }
 
-  const canSave = !!form.workflow_type.trim() && jsonValid(form.envelope_schema) && jsonValid(form.input_schema) && jsonValid(form.resolver_schema);
+  const canSave = !!form.workflow_type.trim() && jsonValid(form.envelope_schema) && jsonValid(form.input_schema) && jsonValid(form.input_lookups) && jsonValid(form.resolver_schema);
   const showPickList = isNew && !form.workflow_type && unregisteredTypes.length > 0;
 
   return (
@@ -317,6 +326,24 @@ export function WorkflowConfigDetailPage() {
                 </Field>
 
                 <Field
+                  label="Lookups"
+                  hint={<>Versioned knowledge refs read as <code className="font-mono">lookup.&lt;as&gt;</code>. <button type="button" onClick={() => { window.location.hash = '#docs:hitl/lookups.md'; }} className="text-accent hover:underline">Lookups reference →</button></>}
+                >
+                  <textarea
+                    value={form.input_lookups}
+                    onChange={(e) => set('input_lookups', e.target.value)}
+                    placeholder={'[\n  { "domain": "fleet", "key": "serial-numbers", "version": 1, "as": "serials" }\n]'}
+                    className={jsonCls}
+                    rows={5}
+                    spellCheck={false}
+                    data-testid="input-lookups-editor"
+                  />
+                  {form.input_lookups.trim() && !jsonValid(form.input_lookups) && (
+                    <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
+                  )}
+                </Field>
+
+                <Field
                   label={form.input_schema.trim() ? 'Envelope Metadata' : 'Envelope Schema'}
                   hint={form.input_schema.trim()
                     ? <>With an input form, only <code className="font-mono">metadata</code> is read from here and stamped on every run; <code className="font-mono">data</code> comes from the form.</>
@@ -347,7 +374,7 @@ export function WorkflowConfigDetailPage() {
         <div className="@wall:sticky @wall:top-0 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
           <SectionHeader icon={Eye} color="text-accent">Preview</SectionHeader>
           {form.invocable && form.input_schema.trim() && jsonValid(form.input_schema) ? (
-            <InputFormPreview schemaText={form.input_schema} />
+            <InputFormPreview schemaText={form.input_schema} lookup={previewLookup} />
           ) : (
             <p className="text-2xs text-text-tertiary leading-relaxed">
               {form.invocable

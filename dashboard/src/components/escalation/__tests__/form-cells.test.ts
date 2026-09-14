@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  declaredKind,
   partitionCells,
   isDictionaryField,
   sectionOptionsFor,
@@ -107,5 +108,17 @@ describe('sectionOptionsFor', () => {
     expect(sectionOptionsFor(schema, 'Facts')).toEqual({ display: 'dictionary', columns: 1 });
     expect(sectionOptionsFor(schema, 'Missing')).toBeUndefined();
     expect(sectionOptionsFor(schema, null)).toBeUndefined();
+  });
+});
+
+
+describe('declaredKind', () => {
+  it('the declared type wins; the runtime value decides only when none is declared', () => {
+    expect(declaredKind({ type: 'number' }, '')).toBe('number');
+    expect(declaredKind({ type: 'boolean' }, '')).toBe('boolean');
+    expect(declaredKind(undefined, [1])).toBe('array');
+    expect(declaredKind(undefined, null)).toBe('null');
+    expect(declaredKind({ type: ['string', 'null'] }, 'x')).toBe('string');
+    expect(declaredKind(undefined, { a: 1 })).toBe('object');
   });
 });

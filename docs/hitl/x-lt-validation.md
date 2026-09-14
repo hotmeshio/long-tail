@@ -6,7 +6,7 @@ The form runs a full validation pass before any submit is accepted. Every visibl
 
 ## Required
 
-Fields listed in the schema's `required` array block submission when empty. A red asterisk marks required fields. Required validation is skipped for fields hidden by `x-lt-showIf` at submission time.
+Fields listed in the schema's `required` array block submission when empty. A red asterisk marks required fields. Empty means `null`, `undefined`, blank text, an unchecked checkbox, an object with no truthy value, an empty multi-select, or an empty `json` list. A boolean with an option list is answered by either value, and a `json` map is answered by any key. Required validation is skipped for fields hidden by `x-lt-showIf` at submission time.
 
 ```json
 {
@@ -93,9 +93,30 @@ When `envelope.min_score` is `60`, submitting a score of `45` blocks with "Minim
 
 ---
 
-## Dynamic Select Options (`x-lt-options`)
+## Select Options (`x-lt-options`)
 
-A select's option list can ride the escalation instead of the schema. The field-level token names a `"domain.path"`; the array of strings or numbers at that path becomes the field's options — one static role form, per-row legal values:
+`x-lt-options` takes one of three forms. A `"domain.path"` string, or an array of path strings, resolves the list from the context (first path that resolves wins). An array with **no string entries** is the list itself, written inline: `{ value, label }` objects, numbers, or booleans. A literal string value is written as an object, `{ "value": "rn", "label": "Registered Nurse" }`, since a bare string is always read as a path. A static `enum` wins over both.
+
+```json
+{
+  "properties": {
+    "role": {
+      "type": "string",
+      "x-lt-options": [{ "value": "rn", "label": "Registered Nurse" }, { "value": "lpn", "label": "Practical Nurse" }]
+    },
+    "powerCycled": {
+      "type": "boolean",
+      "x-lt-options": [{ "value": true, "label": "Yes" }, { "value": false, "label": "No" }]
+    }
+  }
+}
+```
+
+A boolean with an option list renders as a select, not a checkbox: use it for decisions, and keep the checkbox for confirmations.
+
+**Clearable selects.** A select opens on a disabled **Choose…** placeholder and, once a value is picked, offers no way back. With `"x-lt-nullable": true` the placeholder stays enabled and picking it submits `null`, for a choice that may lawfully stay unmade.
+
+The list can also ride the escalation instead of the schema. The token names a `"domain.path"`; the array of strings or numbers at that path becomes the field's options, one static role form, per-row legal values:
 
 ```json
 {
@@ -123,6 +144,32 @@ When the envelope carries `left_quantity_options: [0, 1, 2, 3]`, the field rende
 - When no path resolves (missing, empty array, no valid entries) the field renders as the plain input for its type and membership is not enforced for that submission — unless any path embeds `{{domain.path}}` interpolation, in which case the field stays a disabled select and a present value fails closed (a cascade child never becomes free text).
 - Membership is enforced on both sides of the wire — always on the option VALUE, never the label: the dashboard constrains the choices, and an enforced role's server gate rejects a payload whose value is outside the row's resolved list with the canonical 422 (`Must be one of: 0, 1, 2, 3`).
 - Option lists can also come from version-pinned knowledge entries (the `lookup` domain), and paths may embed `{{domain.path}}` interpolation segments for cascading selects — a dependent select whose parent is unanswered renders disabled and fails closed. See [lookups.md](lookups.md).
+
+---
+
+## Lists and Maps
+
+A `type: "array"` field with its own `x-lt-options` (path or literal) renders as a multi-select of chips; the submitted value is the array of picked values in list order. A list is validated only when it is edited this way or through the `json` widget; a list shown as read-only tags is left alone.
+
+```json
+{
+  "required": ["roles"],
+  "properties": {
+    "roles": { "type": "array", "x-lt-options": [{ "value": "gluer", "label": "Gluer" }, { "value": "qa", "label": "QA" }], "minItems": 1, "maxItems": 2 },
+    "weights": {
+      "type": "object",
+      "x-lt-widget": "json",
+      "propertyNames": { "enum": ["bag", "plate", "spool"] },
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+    }
+  }
+}
+```
+
+- A required multi-select or `json` list needs at least one item. An empty optional list passes its constraints.
+- Every item must belong to the option list (`Must be one of: gluer, qa`); `minItems`/`maxItems` bound the length (`At least 1 item`, `At most 2 items`); a `json` list checks each item against `items`, including `items.enum` (`Item 2: Expected a number`).
+- A map's keys must belong to `propertyNames.enum` (`Unknown key "tray". Allowed: bag, plate, spool`) and every value must satisfy an object-shaped `additionalProperties` (`"bag": Minimum value is 0`). A required map needs at least one key; a zero weight is an answer.
+- The same rules run on the wire: an API or MCP caller sending the list or map under the bound key receives the same violations as the form shows.
 
 ---
 

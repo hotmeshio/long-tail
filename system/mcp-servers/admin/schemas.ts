@@ -117,6 +117,10 @@ export const bulkTriageSchema = z.object({
 
 export const listWorkflowConfigsSchema = z.object({});
 
+export const getWorkflowConfigSchema = z.object({
+  workflow_type: z.string().describe('Registered workflow type name'),
+});
+
 export const upsertWorkflowConfigSchema = z.object({
   workflow_type: z.string().describe('Workflow function name'),
   invocable: z.boolean().optional().default(false),
@@ -136,6 +140,19 @@ export const upsertWorkflowConfigSchema = z.object({
     .describe('DEPRECATED: the escalation form is a versioned schema owned by the target role. Legacy fallback only.')
     .default(null),
   cron_schedule: z.string().nullable().optional().default(null),
+  input_schema: z.record(z.any()).nullable().optional().default(null)
+    .describe('x-lt-* JSON Schema for the invoke form; invoke validates data against it'),
+  input_lookups: z.array(z.object({
+    domain: z.string(),
+    key: z.string(),
+    version: z.number().int().min(1),
+    as: z.string().optional(),
+  })).nullable().optional().default(null)
+    .describe('Versioned knowledge refs the invoke form reads as lookup.<as ?? key>'),
+  icon: z.string().nullable().optional().default(null)
+    .describe('Curated icon name (WORKFLOW_ICONS); unknown names are refused'),
+  read_safe: z.boolean().optional().default(false)
+    .describe('Side-effect-free; eligible for invoke_workflow_read_safe'),
 });
 
 export const deleteWorkflowConfigSchema = z.object({
