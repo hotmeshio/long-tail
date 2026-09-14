@@ -166,4 +166,50 @@ describe('IframeViewport', () => {
 
     expect(onResolve).not.toHaveBeenCalled();
   });
+
+  it('readOnly: lt:submit and lt:escalate are ignored', () => {
+    const onResolve = vi.fn();
+    const onEscalate = vi.fn();
+    render(
+      <IframeViewport
+        src={IFRAME_SRC}
+        escalation={mockEscalation}
+        schema={{ properties: {} }}
+        onResolve={onResolve}
+        onEscalate={onEscalate}
+        readOnly
+      />,
+    );
+
+    act(() => {
+      messageHandler?.({ origin: 'https://custom-app.example.com', data: { type: 'lt:submit', payload: { approved: true } } } as MessageEvent);
+      messageHandler?.({ origin: 'https://custom-app.example.com', data: { type: 'lt:escalate', target: 'manager' } } as MessageEvent);
+    });
+
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(onEscalate).not.toHaveBeenCalled();
+  });
+
+  it('lt:init carries the stage the URL was chosen for', () => {
+    render(
+      <IframeViewport
+        src={IFRAME_SRC}
+        escalation={mockEscalation}
+        schema={{ properties: {} }}
+        stage="pending"
+        readOnly
+      />,
+    );
+    const iframe = screen.getByTitle('HITL Viewport') as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
+
+    act(() => {
+      messageHandler?.({ origin: 'https://custom-app.example.com', data: { type: 'lt:ready' } } as MessageEvent);
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'lt:init', stage: 'pending', escalation: expect.objectContaining({ id: 'esc-123' }) }),
+      'https://custom-app.example.com',
+    );
+  });
 });

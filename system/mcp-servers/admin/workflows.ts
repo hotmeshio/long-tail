@@ -74,6 +74,13 @@ export function registerWorkflowTools(server: McpServer): void {
     },
   );
 
+  // The invoke input gate: data is validated against input_schema when declared.
+  const inputSchemaRejection = async (args: { workflow_type: string; data?: Record<string, any>; metadata?: Record<string, any> }) => {
+    const config = await configService.getWorkflowConfig(args.workflow_type);
+    const body = workflowApi.checkInvokeInput(config, args.data ?? {}, args.metadata);
+    return body ? { content: [{ type: 'text' as const, text: JSON.stringify(body) }], isError: true } : null;
+  };
+
   // mirrors POST /api/workflows/:type/invoke
   (server as any).registerTool(
     'invoke_workflow',
@@ -81,11 +88,14 @@ export function registerWorkflowTools(server: McpServer): void {
       title: 'Invoke Workflow',
       description:
         'Start a certified workflow by type. The workflow must have invocable=true ' +
-        'in its config. Returns the workflow ID immediately; the workflow runs ' +
-        'durably in the background.',
+        'in its config. Data is validated against the config input_schema when one ' +
+        'is declared (422-shaped error). Returns the workflow ID immediately; the ' +
+        'workflow runs durably in the background.',
       inputSchema: invokeWorkflowSchema,
     },
     async (args: z.infer<typeof invokeWorkflowSchema>) => {
+      const rejected = await inputSchemaRejection(args);
+      if (rejected) return rejected;
       const result = await invokeWorkflow({
         workflowType: args.workflow_type,
         data: args.data,
@@ -139,6 +149,8 @@ export function registerWorkflowTools(server: McpServer): void {
           isError: true,
         };
       }
+      const rejected = await inputSchemaRejection(args);
+      if (rejected) return rejected;
       const result = await invokeWorkflow({
         workflowType: args.workflow_type,
         data: args.data,

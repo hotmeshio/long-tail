@@ -8,34 +8,9 @@ import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
 import type { LTEscalationRecord } from '../../../api/types';
+import { VIEWPORT_STAGES, expandViewportSrc, readViewport, viewportSrcForStage } from '../../../lib/x-lt-viewport';
 
-/**
- * Expands `{key}` tokens in a viewport src URL using values from the
- * escalation's payload, envelope, and metadata — merged in that order so
- * escalation_payload values win over envelope, and envelope wins over metadata.
- *
- * This mirrors how the existing form schemas map envelope/metadata values into
- * default field values, but applied to the iframe src URL.
- */
-export function expandViewportSrc(src: string, esc: LTEscalationRecord): string {
-  if (!src.includes('{')) return src;
-  try {
-    const parse = (s: string | null | undefined): Record<string, unknown> => {
-      if (!s) return {};
-      try { return JSON.parse(s) as Record<string, unknown>; } catch { return {}; }
-    };
-    const merged = {
-      ...(esc.metadata ?? {}),
-      ...parse(esc.envelope),
-      ...parse(esc.escalation_payload),
-    };
-    return src.replace(/\{([^}]+)\}/g, (_, key) =>
-      Object.prototype.hasOwnProperty.call(merged, key) ? String(merged[key]) : `{${key}}`
-    );
-  } catch {
-    return src;
-  }
-}
+export { expandViewportSrc };
 
 function parseJson(s: string | null | undefined): Record<string, unknown> | null {
   if (!s) return null;
@@ -183,7 +158,19 @@ export function EscalationFormSection({
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it
   // back to flat form fields so the resolution renders as the same two-column
   // form it was filled in on, not as raw payload sections.
+  const viewport = readViewport(schema);
+
   if (isTerminal) {
+    const resolvedSrc = viewport && esc.status === 'resolved'
+      ? viewportSrcForStage(viewport, VIEWPORT_STAGES.RESOLVED)
+      : null;
+    if (resolvedSrc) {
+      return (
+        <div className="mt-3">
+          <IframeViewport src={expandViewportSrc(resolvedSrc, esc)} escalation={esc} schema={schema!} stage={VIEWPORT_STAGES.RESOLVED} readOnly />
+        </div>
+      );
+    }
     if (resolverPayload == null) return null;
     const payload = typeof resolverPayload === 'object' && resolverPayload !== null
       ? resolverPayload as Record<string, unknown>
@@ -207,10 +194,17 @@ export function EscalationFormSection({
 
   if (activeView !== 'resolve' || !(esc.workflow_type || effectiveSchema)) return null;
 
-  const viewport = schema?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
-  const isIframeViewport = viewport?.type === 'iframe' && !!viewport.src && onResolve && onEscalate;
+  const isIframeViewport = !!viewport && !!onResolve && !!onEscalate;
 
   if (isIframeViewport && !editable) {
+    const pendingSrc = viewportSrcForStage(viewport, VIEWPORT_STAGES.PENDING);
+    if (pendingSrc) {
+      return (
+        <div className="mt-3">
+          <IframeViewport src={expandViewportSrc(pendingSrc, esc)} escalation={esc} schema={schema!} stage={VIEWPORT_STAGES.PENDING} readOnly />
+        </div>
+      );
+    }
     return (
       <button
         onClick={() => onClaim?.()}
@@ -223,7 +217,7 @@ export function EscalationFormSection({
     );
   }
 
-  const resolvedSrc = isIframeViewport ? expandViewportSrc(viewport!.src!, esc) : '';
+  const resolvedSrc = isIframeViewport ? expandViewportSrc(viewport.src, esc) : '';
 
   return (
     <div className="mt-3">

@@ -9,13 +9,14 @@ import {
 } from 'lucide-react';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSettings } from '../../api/settings';
+import { getInfrastructureEnabled } from '../../lib/view-as';
 
 /**
  * Admin navigation. "Identity & Access" and "Infrastructure" are top-level
  * categories (no "Admin" umbrella). RBAC is unchanged: Identity & Access shows
  * for any admin (Accounts; Roles only for builders), while Infrastructure is
- * builder-only — so an admin who could see Identity & Access but not
- * Infrastructure still sees exactly that.
+ * builder-only AND opt-in through the easter-egg Features panel — a powerful
+ * set that stays out of the way until a builder asks for it.
  * Operations lives in ChoreographySidebar, not here.
  */
 export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?: boolean; isOps?: boolean }) {
@@ -41,7 +42,7 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
   return (
     <>
       <SidebarNav heading="Identity & Access" entries={identityItems} />
-      {isBuilder && <SidebarNav heading="Infrastructure" entries={infraItems} />}
+      {isBuilder && getInfrastructureEnabled() && <SidebarNav heading="Infrastructure" entries={infraItems} />}
     </>
   );
 }

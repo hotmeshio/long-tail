@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Code2, Play, ShieldOff,
+  Code2, Play, ShieldOff, Eye,
 } from 'lucide-react';
 import { useWorkflowConfigs, useUpsertWorkflowConfig, useDeleteWorkflowConfig, useJobs } from '../../../api/workflows';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
@@ -10,6 +10,8 @@ import { BotPicker } from '../../../components/common/form/BotPicker';
 import { NamespacePill } from '../../../components/common/display/NamespacePill';
 import { splitCsv } from '../../../lib/parse';
 import { EMPTY_FORM, configToForm, jsonValid } from './config-form-types';
+import { InputFormPreview } from './InputFormPreview';
+import { WorkflowIconPicker } from '../../../components/common/form/WorkflowIconPicker';
 import type { ConfigFormState } from './config-form-types';
 
 // ── Local helpers ─────────────────────────────────────────────────────────────
@@ -96,10 +98,14 @@ export function WorkflowConfigDetailPage() {
     setSchemaError('');
 
     let envelope_schema: Record<string, unknown> | null = null;
+    let input_schema: Record<string, unknown> | null = null;
     let resolver_schema: Record<string, unknown> | null = null;
     try {
       if (form.envelope_schema.trim()) envelope_schema = JSON.parse(form.envelope_schema);
     } catch { setSchemaError('Invalid JSON in Envelope Schema'); return; }
+    try {
+      if (form.input_schema.trim()) input_schema = JSON.parse(form.input_schema);
+    } catch { setSchemaError('Invalid JSON in Input Form'); return; }
     try {
       if (form.resolver_schema.trim()) resolver_schema = JSON.parse(form.resolver_schema);
     } catch { setSchemaError('Invalid JSON in Resolver Schema'); return; }
@@ -116,6 +122,8 @@ export function WorkflowConfigDetailPage() {
         invocation_roles: splitCsv(form.invocation_roles),
         consumes: splitCsv(form.consumes),
         envelope_schema,
+        input_schema,
+        icon: form.icon || null,
         resolver_schema,
         cron_schedule: form.cron_schedule.trim() || null,
         execute_as: form.execute_as.trim() || null,
@@ -136,7 +144,7 @@ export function WorkflowConfigDetailPage() {
     return <p className="text-sm text-text-secondary">Config not found.</p>;
   }
 
-  const canSave = !!form.workflow_type.trim() && jsonValid(form.envelope_schema) && jsonValid(form.resolver_schema);
+  const canSave = !!form.workflow_type.trim() && jsonValid(form.envelope_schema) && jsonValid(form.input_schema) && jsonValid(form.resolver_schema);
   const showPickList = isNew && !form.workflow_type && unregisteredTypes.length > 0;
 
   return (
@@ -154,6 +162,15 @@ export function WorkflowConfigDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-3 mt-1">
+          {editing && (
+            <button
+              onClick={() => setConfirmUnregister(true)}
+              className="flex items-center gap-1.5 text-2xs text-status-warning hover:underline mr-3"
+              title="Delete this registration — the workflow returns to plain durable"
+            >
+              <ShieldOff className="w-3 h-3" strokeWidth={1.5} /> Unregister
+            </button>
+          )}
           <button onClick={() => navigate('/workflows/registry')} className="btn-ghost text-xs">
             Cancel
           </button>
@@ -224,6 +241,10 @@ export function WorkflowConfigDetailPage() {
               )}
             </Field>
 
+            <Field label="Icon" hint="Leads the workflow's row and heading on the Invoke Tool page so operators tell tools apart at a glance. Declared in code as WORKFLOW_ICONS.*">
+              <WorkflowIconPicker value={form.icon} onChange={(name) => set('icon', name)} />
+            </Field>
+
             <Field label="Description">
               <input
                 type="text"
@@ -277,7 +298,30 @@ export function WorkflowConfigDetailPage() {
                   />
                 </Field>
 
-                <Field label="Envelope Schema" hint={<>Pre-fills the JSON editor when invoking. Include <code className="font-mono">data</code> (input) and optional <code className="font-mono">metadata</code>.</>}>
+                <Field
+                  label="Input Form"
+                  hint={<button type="button" onClick={() => { window.location.hash = '#docs:hitl/invoke-form.md'; }} className="text-accent hover:underline">Authoring reference →</button>}
+                >
+                  <textarea
+                    value={form.input_schema}
+                    onChange={(e) => set('input_schema', e.target.value)}
+                    placeholder={'{\n  "x-lt-layout": "two-column",\n  "required": ["serialNumber"],\n  "properties": {\n    "serialNumber": { "type": "string", "title": "Serial number", "description": "Read it off the label" }\n  }\n}'}
+                    className={jsonCls}
+                    rows={14}
+                    spellCheck={false}
+                    data-testid="input-form-editor"
+                  />
+                  {form.input_schema.trim() && !jsonValid(form.input_schema) && (
+                    <p className="text-2xs text-status-error mt-1">Invalid JSON</p>
+                  )}
+                </Field>
+
+                <Field
+                  label={form.input_schema.trim() ? 'Envelope Metadata' : 'Envelope Schema'}
+                  hint={form.input_schema.trim()
+                    ? <>With an input form, only <code className="font-mono">metadata</code> is read from here and stamped on every run; <code className="font-mono">data</code> comes from the form.</>
+                    : <>Pre-fills the JSON editor when invoking. Include <code className="font-mono">data</code> (input) and optional <code className="font-mono">metadata</code>. Declare an input form above for a rich, validated form instead.</>}
+                >
                   <textarea
                     value={form.envelope_schema}
                     onChange={(e) => set('envelope_schema', e.target.value)}
@@ -299,22 +343,19 @@ export function WorkflowConfigDetailPage() {
           </div>
         </div>
 
-        {/* Escalation & resolution config is ROLE-owned now — a workflow no longer
-            declares a resolver schema or a certification tier here. The escalation
-            surface (form_schema + resolver_schema, versioned) lives on the target
-            role. This section is intentionally hidden from the workflow view. */}
-        {editing && (
-          <div>
-            <SectionHeader icon={ShieldOff} color="text-text-tertiary">Registration</SectionHeader>
-            <button
-              onClick={() => setConfirmUnregister(true)}
-              className="flex items-center gap-1.5 text-2xs text-status-warning hover:underline"
-              title="Delete this registration — the workflow returns to plain durable"
-            >
-              <ShieldOff className="w-3 h-3" /> Unregister workflow
-            </button>
-          </div>
-        )}
+        {/* ── Preview ─────────────────────────────────────────────────── */}
+        <div className="@wall:sticky @wall:top-0 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
+          <SectionHeader icon={Eye} color="text-accent">Preview</SectionHeader>
+          {form.invocable && form.input_schema.trim() && jsonValid(form.input_schema) ? (
+            <InputFormPreview schemaText={form.input_schema} />
+          ) : (
+            <p className="text-2xs text-text-tertiary leading-relaxed">
+              {form.invocable
+                ? 'Declare an Input Form and it previews here as the operator\'s form, live as you type.'
+                : 'Enable Invocable and declare an Input Form to preview the operator\'s form here.'}
+            </p>
+          )}
+        </div>
       </div>
 
       {(schemaError || upsert.error) && (

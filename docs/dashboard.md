@@ -32,7 +32,7 @@ Each flavor exposes the same shape: configure, invoke, executions.
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Procedural → Registry** | `/workflows/registry` | All discovered workflows with tier, queue, and access columns. Configure, certify, or invoke from here. |
-| **Procedural → Invoke** | `/workflows/durable/invoke` | Start any invocable procedural workflow. Two-panel layout with workflow selector and envelope editor. |
+| **Procedural → Invoke Tool** | `/workflows/durable/invoke` | Start a tool the caller may invoke. Grouped list beside the form; rich x-lt-* forms when a workflow declares `inputSchema`. Builders reach it under Orchestrate, everyone else under Tools. |
 | **Procedural → Executions** | `/workflows/executions` | All procedural runs with status, duration, and tier. Click through to task records and escalation history. |
 | **Graph → Configure** | `/mcp/workflows` | Graph workflows available to the orchestrator — compiled deterministic YAML DAGs, grouped by namespace. |
 | **Graph → Invoke** | `/mcp/workflows/invoke` | Start any active graph flow. Same two-panel layout as procedural invoke. |
@@ -65,6 +65,8 @@ The LLM authoring add-on. Appears when an Anthropic key is configured.
 
 ### Infrastructure
 
+Builder-only and off by default. A superadmin or engineer opts in per browser with the **Infrastructure** toggle in the easter-egg Features panel (Ctrl or Cmd click the logo); the section then joins the sidebar. The pages themselves stay reachable by URL under the builder guard.
+
 Builder-only.
 
 | Page | Route | Purpose |
@@ -78,7 +80,7 @@ Builder-only.
 The top navigation bar contains:
 
 - **Home logo** — links to the home page (`/`), Recent Activity.
-- **Search bar** — the opt-in global lookup: type an id or facet value, pick a facet, and land on the matching escalation or a filtered queue. Off by default; enable via `search` in `start()` config or `LT_SEARCH_BAR`. See [Global search](#global-search).
+- **Search and run bar** — one input, two verbs: find an escalation by id, workflow, or a configured facet, or run a scan rule against a typed target. Search is opt-in via `search` in `start()` config or `LT_SEARCH_BAR`; run modes ride `features.scanCodes`. See [Search and run](#search-and-run).
 - **all** — links to `/escalations/available` with a live count of unclaimed escalations.
 - **mine** — links to `/escalations/queue` with a live count of escalations assigned to you.
 - **scan** (Barcode icon) — opens the scan panel for manual code entry and capture settings, shown when `features.scanCodes` stands. See [Scan Codes](#scan-codes).
@@ -117,26 +119,34 @@ workers: [
       certified: true,
       roles: ['reviewer', 'admin'],
       envelopeSchema: { data: { field1: '', field2: 0 } },
+      inputSchema: MY_INPUT_FORM, // x-lt-* form for the Invoke Tool page; see Invoke forms
       resolverSchema: { approved: true, notes: '' }, // deprecated legacy fallback — the escalation form is owned by the target role as a versioned form_schema
     },
   },
 ]
 ```
 
+The detail page has three columns. **Identity** carries the type, an **Icon** picker with a filter over the curated `WORKFLOW_ICONS` set (the chosen glyph leads the workflow's row and heading on the Invoke Tool page in place of the tier glyph), the description, and the queue. **Invocation** edits the roles and the **Input Form**; with an input form declared, the envelope field narrows to the `metadata` stamped on every run. **Preview** renders that form live from the editor as operators will meet it, interactive so conditional sections can be walked before saving. **Unregister** sits with the header actions beside Cancel and Save. See [Invoke forms](hitl/invoke-form.md).
+
 **API:** `GET /api/workflows/discovered` returns the unified list. `PUT /api/workflows/:type/config` creates or updates a config entry. `DELETE /api/workflows/:type/config` removes it.
 
-### Invoke Workflow
+### Invoke Tool
 
-Accessible at `/workflows/durable/invoke`. A two-panel page for starting any invocable procedural workflow. The left panel lists invocable workflows grouped by task queue, with a queue select and search in the filter bar; each row carries its tier badge, and workflows with an active cron schedule show a clock icon. Selecting a workflow syncs `?type=<WorkflowType>` to the URL and opens the invocation form on the right:
+Accessible at `/workflows/durable/invoke` to anyone the server lists an invokable workflow for. The server decides the list with the same predicate the invoke gate runs (`invocationRoles` on each config; empty means every authenticated user; superadmin and admin see everything, including active durable workers with no registration). Builders keep **Invoke Tool** under Orchestrate; every other persona gets a **Tools** nav section with the same **Invoke Tool** entry that appears only when the list is non-empty, and the route sends a caller with nothing to invoke home.
 
-- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override"). The invocation runs under that identity's `_scope`.
+Every invokable workflow is presented as a tool. The list of tools takes the left quarter of the row, grouped by task queue, with the prompt **Choose a tool to begin** until one is selected. Names read as titles (`fleetTools` shows as **Fleet Tools**, queues the same way) and each row leads with the workflow's icon, or its tier glyph when none is declared. The first row is preselected, `?type=<WorkflowType>` tracks the choice, and every choice is a history entry, so the page opens on a form and the back button retraces picks. The form fills the rest of the row, its heading and Submit staying put while the body scrolls:
+
+- **Heading and description** — the icon and title, with the identifier, tier, and queue as metadata, then the config's one-line description. Keep reference material in `x-lt-help`; it appears in the side panel on demand.
+- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override").
 - **Certification checkbox** — for a certified workflow, stamps `metadata.certified` on this one run.
-- **Envelope editor** — the envelope is `{ data, metadata }`: `data` holds the workflow input, `metadata` optional context. Two modes that stay in sync: a **Form view** that auto-generates a field per `envelope_schema.data` key (type inferred — text, number, boolean, object) and a raw **JSON view**. When a workflow has no `envelope_schema`, a banner links to the registry to add one.
-- **Start Workflow** button — calls the invoke endpoint and navigates to the executions list.
+- **The form** — a workflow that declares `inputSchema` renders the x-lt-* form: sections, two columns, conditional fields and instruction blocks, and a side panel with **Instructions** (the interpolated `x-lt-help`) and **Issues** (violations, click to focus). Every other workflow renders the envelope template form from `envelopeSchema`, with its Form and JSON views. See [Invoke forms](hitl/invoke-form.md).
+- **Submit** — posts `{ data, metadata }` to the invoke endpoint. The page stays put, reports the started id, and subscribes to that run's `system.workflow.{id}.completed` and `.failed` events, so the outcome and the workflow's returned `data` appear beside Submit without leaving the page. One click disarms the button until the person chooses **Submit again**. While live events are off, a warning beside the button offers a reconnect, since the result could not arrive otherwise. Builders also get a **View workflow** link to its execution. A `422` from the input schema gate lands in the Issues view.
 
-Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page. The graph equivalent, **Graph → Invoke** (`/mcp/workflows/invoke`), starts a compiled YAML flow from the same shape.
+Below 1280px the list folds into a select and the form takes the full width.
 
-**API:** `POST /api/workflows/:type/invoke` starts a workflow (body `{ data, metadata?, execute_as? }`, returns `202` with the workflow id). `GET /api/workflows/discovered` backs the list; `GET /api/workflows/:type/config` supplies the envelope schema and identity.
+Recurring (cron) execution is owned by Automations — schedule workflows from the Agents page. The graph equivalent, **Graph → Invoke** (`/mcp/workflows/invoke`), starts a compiled YAML flow.
+
+**API:** `GET /api/workflows/invocable` backs the list and the nav. `POST /api/workflows/:type/invoke` starts a workflow (body `{ data, metadata?, execute_as? }`, returns `202` with the workflow id; `422` with the canonical validation body when `input_schema` rejects the data).
 
 ### MCP Tool Designer
 
@@ -553,15 +563,18 @@ markdown body. Each user dismisses per-browser.
 Role targeting scopes display, never access: the live event reaches every
 authenticated subscriber, so announcement bodies must never carry secrets.
 
-### Global search
+### Search and run
 
-An opt-in header search bar for one-gesture lookups across every escalation
-of any status. Configure it in the `start()` config —
+The header bar is one input with two verbs, chosen by the type chip that
+trails it. **Find** modes look an escalation up; **Run** modes execute a scan
+code composed from a chosen rule plus the typed target. The bar appears when
+either verb is enabled and offers whichever modes the deployment provides.
+
+**Find** is the opt-in global search. Configure it in the `start()` config —
 `search: { enabled: true, facets: ['orderId', 'po'] }` — or by env
-(`LT_SEARCH_BAR=true`, `LT_SEARCH_FACETS=orderId,po`; env wins). The picklist
+(`LT_SEARCH_BAR=true`, `LT_SEARCH_FACETS=orderId,po`; env wins). The chip
 always offers `escalationId` and `workflowId` (long-tail-owned lookups) ahead
-of the configured metadata facets, and remembers the last-used facet per
-device.
+of the configured metadata facets.
 
 - A metadata facet lands on the escalation list filtered by that facet across
   all statuses, newest first (the same deep link as clicking a facet value).
@@ -570,10 +583,23 @@ device.
 - `workflowId` opens the workflow's single escalation, lists several to pick
   from, or links straight to the workflow execution when none exist.
 
-Kiosk sessions see the bar too — a station can dump a PO or order id and jump
-straight to it; RBAC read scope bounds what any search can return. See
-[Faceted Routing](faceted-routing.md) — a search is a one-gesture facet deep
-link.
+**Run** appears when `features.scanCodes` is on. Every enabled rule of every
+enabled action scheme is a mode, grouped by scheme; pick one and the bar
+shows its code head (`10:1:`) ahead of the input and names the target facet
+in the placeholder. Type the target and press Enter: the bar composes
+`10:1:<target>` and executes it through the same pipeline a scanner uses, so
+the outcome navigates, confirms, or answers exactly as a physical scan would.
+An outcome that answers in place (a fallback, a conflict, a closed row) is
+narrated right under the bar. A whole code pasted into a Run mode executes
+as-is; fixed-encoding rules accept digits only and say so inline. The menu
+footer opens the scan panel for scanner settings and the barcode preview.
+See [Scan codes](scan-codes.md).
+
+The chip remembers the last-used mode per device. Kiosk sessions see the bar
+too — a station can dump a PO or order id and jump straight to it, or run a
+rule against a serial it can read but not scan; RBAC bounds what any search or
+run can reach. See [Faceted Routing](faceted-routing.md) — a search is a
+one-gesture facet deep link.
 
 ### Inbox
 

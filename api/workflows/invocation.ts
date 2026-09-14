@@ -7,6 +7,8 @@ import {
   InvocationError,
 } from '../../services/workflow-invocation';
 import { cancelEscalationsByWorkflowId } from '../../services/escalation/crud';
+import * as configService from '../../services/config';
+import { checkInvokeInput, inputValidationFailure } from './input-validation';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 function isResolveError(err: any): boolean {
@@ -37,6 +39,10 @@ export async function invokeWorkflow(
 ): Promise<LTApiResult> {
   try {
     await checkInvocationRoles(input.type, auth.userId, auth.role);
+
+    const config = await configService.getWorkflowConfig(input.type);
+    const violation = checkInvokeInput(config, input.data, input.metadata);
+    if (violation) return inputValidationFailure(violation);
 
     const result = await invokeWorkflowService({
       workflowType: input.type,

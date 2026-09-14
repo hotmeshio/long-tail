@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../../../api/settings', () => ({ useSettings: vi.fn() }));
@@ -42,5 +42,24 @@ describe('EasterEggPanel', () => {
     render(<EasterEggPanel onClose={vi.fn()} />);
     expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(screen.getByText('Operator')).toBeInTheDocument();
+  });
+
+  it('offers the Infrastructure toggle to superadmins and engineers only', () => {
+    const openFeatures = () => { const tab = screen.queryAllByText('Features')[0]; if (tab) fireEvent.click(tab); };
+    mockAuth.mockReturnValue(auth({ superadmin: true }));
+    const { unmount } = render(<EasterEggPanel onClose={vi.fn()} />);
+    openFeatures();
+    expect(screen.getByTestId('feature-infrastructure')).toHaveTextContent('Hidden');
+    unmount();
+    mockAuth.mockReturnValue(auth({ engineer: true }));
+    const { unmount: unmount2 } = render(<EasterEggPanel onClose={vi.fn()} />);
+    openFeatures();
+    expect(screen.getByTestId('feature-infrastructure')).toBeInTheDocument();
+    unmount2();
+    mockAuth.mockReturnValue(auth({ admin: true }));
+    render(<EasterEggPanel onClose={vi.fn()} />);
+    openFeatures();
+    expect(screen.getByText('AI features')).toBeInTheDocument();
+    expect(screen.queryByTestId('feature-infrastructure')).not.toBeInTheDocument();
   });
 });

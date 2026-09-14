@@ -245,3 +245,6 @@ export type {
   AgentSchedule,
   AgentTrigger,
 } from './agent';
+
+export { WORKFLOW_ICONS, isWorkflowIcon } from './workflow-icons';
+export type { WorkflowIconName } from './workflow-icons';

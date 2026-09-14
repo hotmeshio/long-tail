@@ -16,6 +16,8 @@ export async function loadAllConfigs(): Promise<Map<string, LTResolvedConfig>> {
       consumes: c.consumes,
       toolTags: c.tool_tags || [],
       envelopeSchema: c.envelope_schema ?? null,
+      inputSchema: c.input_schema ?? null,
+      icon: c.icon ?? null,
       resolverSchema: c.resolver_schema ?? null,
       cronSchedule: c.cron_schedule ?? null,
       executeAs: c.execute_as ?? null,

@@ -17,7 +17,7 @@ import { ScanPanel } from '../scan/ScanPanel';
 import { useKioskMode } from '../../hooks/useKioskMode';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { LinkVariablesModal } from './LinkVariablesModal';
-import { GlobalSearchBar } from './GlobalSearchBar';
+import { SearchCommandBar } from './SearchCommandBar';
 import { useRoleDetails } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 
@@ -125,7 +125,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           it; while the user menu is open it lifts to the menu tier (z-[100])
           so an open menu is never occluded. */}
       <header className={`h-14 shrink-0 border-b border-surface-border bg-surface-raised flex items-center justify-between pl-2 pr-5 relative ${menuOpen ? 'z-[100]' : 'z-30'}`}>
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-center gap-1 shrink-0">
           {/* Below lg the nav rail is a drawer behind this button. */}
           {onToggleNav && (
             <button
@@ -136,11 +136,11 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               <Menu className="w-5 h-5" strokeWidth={1.5} />
             </button>
           )}
-          {/* Brand — full watermark on desktop, comet mark on small screens. */}
+          {/* Brand — the full watermark on desktop; below lg the hamburger holds this spot and the mark stays out of its way. */}
           <Link
             to="/"
             aria-label="Home"
-            className="shrink-0"
+            className="shrink-0 hidden lg:block"
             onClick={(e) => {
               if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
@@ -148,8 +148,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
               }
             }}
           >
-            <AppLogo appName={appName} className="hidden lg:flex" />
-            <AppLogo appName={appName} variant="comet" className="flex lg:hidden" />
+            <AppLogo appName={appName} className="flex" />
           </Link>
           {/* Separator groups back/forward away from the logo on desktop. */}
           <div className="hidden lg:block w-px h-4 bg-surface-border mx-1" />
@@ -172,9 +171,14 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
           </button>
         </div>
 
-        {settings?.search?.enabled && <GlobalSearchBar />}
+        {/* The flexible middle track: the bar takes what the fixed ends leave. */}
+        {(settings?.search?.enabled || scanEnabled) && (
+          <div className="hidden md:flex flex-1 min-w-0 justify-center px-4 lg:px-8">
+            <SearchCommandBar onOpenScanPanel={scanEnabled ? toggleScanPanel : undefined} />
+          </div>
+        )}
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 shrink-0">
           {/* Escalations: all */}
           <Link
             to="/escalations/available"

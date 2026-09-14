@@ -1,6 +1,7 @@
 const VIEW_AS_KEY = 'lt_view_as';
 const AI_OVERRIDE_KEY = 'lt_ai_override';
 const GRAPH_ENABLED_KEY = 'lt_graph_enabled';
+const INFRASTRUCTURE_ENABLED_KEY = 'lt_infrastructure_enabled';
 const SCAN_OVERRIDE_KEY = 'lt_scan_override';
 
 /** Returns the local AI override, or null if no override is set (falls back to server setting). */
@@ -50,6 +51,18 @@ export function setGraphEnabled(enabled: boolean): void {
   try {
     if (enabled) localStorage.setItem(GRAPH_ENABLED_KEY, 'true');
     else localStorage.removeItem(GRAPH_ENABLED_KEY);
+  } catch {}
+}
+
+/** Infrastructure nav section (Routers, Messages, DB Maintenance) — off by default, opt-in via easter egg for builders. */
+export function getInfrastructureEnabled(): boolean {
+  try { return localStorage.getItem(INFRASTRUCTURE_ENABLED_KEY) === 'true'; } catch { return false; }
+}
+
+export function setInfrastructureEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(INFRASTRUCTURE_ENABLED_KEY, 'true');
+    else localStorage.removeItem(INFRASTRUCTURE_ENABLED_KEY);
   } catch {}
 }
 

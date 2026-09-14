@@ -244,7 +244,11 @@ resolve lands back on the list rather than walking browser history — see
 
 On the work form, the badge belongs to the submission, not the editing. Once
 an item is claimed, anyone at the bench edits the form freely: a grant is not
-required to type. The submit is the state-changing act, so that is where the
+required to type. This is the read-only station login's surface: plain member
+grants, none able to write. A login that holds its own write authority, an
+operator with write scope on the queue or an admin or superadmin, is a person
+and keeps the standard surface: another person's claim shows as claimed by
+them, with the management verbs its RBAC allows, and no badge is asked of it. The submit is the state-changing act, so that is where the
 badge is asked for. The form warns up front who the submit will act as — "When
 you submit, you'll scan your badge to confirm you're <claimant>" — and the
 submit opens a badge prompt naming that claimant. The resolve fires the moment
@@ -341,9 +345,14 @@ Capture sources are pluggable (`dashboard/src/lib/scan-sources/`): the
 keyboard wedge is one provider behind a `ScanSource` contract; an RFID or
 camera provider plugs into the same dispatch pipeline.
 
-The **scan panel** (barcode button in the header) carries a manual entry
-field — type or paste a code to execute it with zero hardware — the last
-scan's outcome, and the capture settings.
+The **header bar** runs rules without hardware: its type chip lists every
+enabled rule as a Run mode, the bar shows the rule's code head (`10:1:`) ahead
+of the input, and Enter composes and executes `10:1:<target>` through the same
+pipeline a scanner uses. See [Search and run](dashboard.md#search-and-run).
+
+The **scan panel** (the bar's menu footer, or the user menu) carries a manual
+entry field — type or paste a whole code to execute it — the last scan's
+outcome, the live barcode preview, and the capture settings.
 
 ## Scanner setup
 

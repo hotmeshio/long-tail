@@ -30,6 +30,8 @@ await start({
 
 The dashboard auto-detects its event transport via `GET /api/settings`. By default, Socket.IO is reported — it works in-process with no additional infrastructure.
 
+The connection follows the session. It opens the moment a login lands, whether the person signed in with credentials or arrived through the host's SSO exchange, closes on logout, and presents the token current at each reconnect, so a refreshed token never strands the socket. The footer's event indicator turns green while connected and amber while not; clicking it while amber reloads the page.
+
 For multi-container deployments where the API and workers run as separate processes, set `EVENT_TRANSPORT=nats` to tell the dashboard to connect via NATS WebSocket instead of Socket.IO:
 
 ```yaml
@@ -69,7 +71,7 @@ System families declare the fields they populate. Which fields exist is a functi
 
 | Family | Subject | Adds |
 |---|---|---|
-| workflow | `system.workflow.{id}.{started\|completed\|failed}` | `workflowId`, `workflowName`, `taskQueue`, `status` |
+| workflow | `system.workflow.{id}.{started\|completed\|failed}` | `workflowId`, `workflowName`, `taskQueue`, `status`; `completed` carries the workflow's returned `data` |
 | task | `system.task.{taskId}.{created\|started\|completed\|escalated\|failed}` | + `taskId` |
 | escalation | `system.escalation.{role}.{id}.{created\|resolved\|claimed\|released\|cancelled\|reassigned\|expired}` | `escalationId`, `role` (+ workflow context), `status` |
 | activity | `system.activity.{wfId}.{activity}.{started\|completed\|failed}` | `activityName` (+ workflow context) |

@@ -27,6 +27,10 @@ export interface LTWorkflowConfig {
   consumes: string[];
   tool_tags?: string[];
   envelope_schema?: Record<string, any> | null;
+  /** Opt-in x-lt-* JSON Schema for the invoke form; the invoke API validates data against it. */
+  input_schema?: Record<string, any> | null;
+  /** Curated icon name (WORKFLOW_ICONS); null shows the tier glyph. */
+  icon?: string | null;
   /** @deprecated The escalation form is a versioned, role-owned schema. Legacy fallback only. */
   resolver_schema?: Record<string, any> | null;
   cron_schedule?: string | null;
@@ -55,6 +59,8 @@ export interface LTResolvedConfig {
   consumes: string[];
   toolTags: string[];
   envelopeSchema: Record<string, any> | null;
+  inputSchema: Record<string, any> | null;
+  icon: string | null;
   /** @deprecated Role-owned versioned schema supersedes this. Legacy fallback only. */
   resolverSchema: Record<string, any> | null;
   cronSchedule: string | null;

@@ -2,89 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { REVIEW, CLAIM, DURABLE } from './invoke-test-data';
 
-// ── Mock data ────────────────────────────────────────────────────────────────
-
-const mockConfigs = [
-  {
-    workflow_type: 'reviewContent',
-    task_queue: 'long-tail-examples-reviewContent',
-    invocable: true,
-    description: 'Review user-generated content',
-    default_role: 'reviewer',
-    roles: ['reviewer', 'admin'],
-    invocation_roles: ['admin'],
-    consumes: [],
-    envelope_schema: null,
-    resolver_schema: null,
-    cron_schedule: null,
-    execute_as: null,
-  },
-  {
-    workflow_type: 'processClaim',
-    task_queue: 'long-tail-examples-processClaim',
-    invocable: true,
-    description: 'Process insurance claims',
-    default_role: 'reviewer',
-    roles: ['adjuster'],
-    invocation_roles: [],
-    consumes: [],
-    envelope_schema: null,
-    resolver_schema: null,
-    cron_schedule: null,
-    execute_as: 'lt-system',
-  },
-];
-
-const mockDiscovered = [
-  { workflow_type: 'durableOnly', task_queue: 'durable-queue', tier: 'durable', active: true },
-];
-
-const mockCronEntries = [
-  { workflow_type: 'reviewContent', active: true, cron_schedule: '0 * * * *' },
-];
-
-// ── API mocks ────────────────────────────────────────────────────────────────
-
-let workflowConfigsOverride: { data: typeof mockConfigs | undefined; isLoading: boolean } | undefined;
-let discoveredOverride: { data: typeof mockDiscovered | undefined; isLoading: boolean } | undefined;
+let invocableOverride: { data: unknown; isLoading: boolean } | undefined;
 
 vi.mock('../../../../api/workflows', () => ({
-  useWorkflowConfigs: () => workflowConfigsOverride ?? ({ data: mockConfigs, isLoading: false }),
-  useDiscoveredWorkflows: () => discoveredOverride ?? ({ data: mockDiscovered, isLoading: false }),
-  useCronStatus: () => ({ data: mockCronEntries }),
+  useInvocableWorkflows: () => invocableOverride ?? ({ data: [REVIEW, CLAIM, DURABLE], isLoading: false }),
+  useCronStatus: () => ({ data: [{ workflow_type: 'reviewContent', active: true, cron_schedule: '0 * * * *' }] }),
   useInvokeWorkflow: () => ({ mutateAsync: vi.fn(), isPending: false, isSuccess: false, error: null, reset: vi.fn() }),
-  useSetCronSchedule: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, error: null, reset: vi.fn() }),
-  useJobs: () => ({ data: { jobs: [] }, isLoading: false }),
 }));
-
 vi.mock('../../../../hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { username: 'testuser', displayName: 'Test User' },
-    isSuperAdmin: false,
-    hasRoleType: () => false,
-  }),
+  useAuth: () => ({ user: { username: 'testuser', displayName: 'Test User' }, isSuperAdmin: false, hasRoleType: () => false }),
 }));
+vi.mock('../../../../hooks/useAccess', () => ({ useAccess: () => ({ realIsBuilder: false }) }));
+vi.mock('../../../../api/bots', () => ({ useBots: () => ({ data: { bots: [] } }) }));
+vi.mock('../../../../hooks/useMediaQuery', () => ({ useMediaQuery: () => false }));
 
-vi.mock('../../../../api/bots', () => ({
-  useBots: () => ({ data: { bots: [] } }),
-}));
+import { StartWorkflowPage } from '../StartWorkflowPage';
 
-// Shell panel mock — selection opens the run panel in the shell's right slot.
-const mockSetPanel = vi.fn();
-const mockClosePanel = vi.fn();
-vi.mock('../../../../hooks/useShellPanel', () => ({
-  useShellPanelOptional: () => ({
-    open: false,
-    ownerKey: null,
-    setPanel: mockSetPanel,
-    closePanel: mockClosePanel,
-  }),
-}));
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function renderPage(initialEntries = ['/workflows/start']) {
+function renderPage(initialEntries = ['/workflows/durable/invoke']) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -95,106 +31,50 @@ function renderPage(initialEntries = ['/workflows/start']) {
   );
 }
 
-import { StartWorkflowPage } from '../StartWorkflowPage';
-
-// ── Tests — the full-width master list ───────────────────────────────────────
-
 describe('StartWorkflowPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    workflowConfigsOverride = undefined;
-    discoveredOverride = undefined;
+    invocableOverride = undefined;
   });
 
-  it('renders page header', () => {
+  it('renders the page header and no schedule toggle', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: 'Invoke' })).toBeInTheDocument();
-  });
-
-  it('has no schedule toggle (cron is owned by agents/automations)', () => {
-    renderPage();
-    expect(screen.queryByText('Start Now')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Invoke Tool' })).toBeInTheDocument();
     expect(screen.queryByText('Schedule')).not.toBeInTheDocument();
   });
 
-  it('renders workflow selector full-width with all invocable workflows', () => {
-    const { container } = renderPage();
-    expect(screen.getByRole('heading', { name: 'long-tail-examples-reviewContent' })).toBeInTheDocument();
-    expect(screen.getByText('reviewContent')).toBeInTheDocument();
-    expect(screen.getByText('processClaim')).toBeInTheDocument();
-    expect(screen.getAllByText('durable').length).toBeGreaterThanOrEqual(1);
-    // The old reserved right column is gone — the list is the page.
-    expect(container.querySelector('.grid-cols-3')).not.toBeInTheDocument();
-  });
-
-  it('includes discovered durable workflows in the selector', () => {
+  it('lists every invokable workflow grouped by queue in the list column', () => {
     renderPage();
-    expect(screen.getByText('durableOnly')).toBeInTheDocument();
+    const list = screen.getByTestId('invoke-list');
+    expect(list).toHaveTextContent('Long Tail Examples Review Content');
+    expect(list).toHaveTextContent('Review Content');
+    expect(list).toHaveTextContent('Process Claim');
+    expect(list).toHaveTextContent('Durable Only');
   });
 
-  it('opens no run panel when nothing is selected', () => {
+  it('preselects the first row of the first queue group and renders its form in the page', () => {
     renderPage();
-    expect(mockSetPanel).not.toHaveBeenCalled();
-    expect(screen.queryByText('Select a workflow')).not.toBeInTheDocument();
+    expect(screen.getByTestId('invoke-form')).toHaveTextContent('Durable Only');
+    expect(screen.getByTestId('invoke-form')).toHaveTextContent('durableOnly');
+    expect(screen.getByTestId('invoke-start')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Durable Only/ })).toHaveAttribute('aria-current', 'true');
   });
 
-  it('shows a trailing invoke icon per row, quiet until row hover', () => {
-    renderPage();
-    const icons = screen.getAllByTitle('Configure & invoke');
-    expect(icons.length).toBe(3); // reviewContent, processClaim, durableOnly
-    for (const wrapper of icons) {
-      const svg = wrapper.querySelector('svg');
-      expect(svg?.getAttribute('class')).toContain('opacity-0');
-      expect(svg?.getAttribute('class')).toContain('group-hover:opacity-100');
-    }
-  });
-
-  it('keeps the trailing icon visible on the selected row', () => {
-    renderPage(['/workflows/start?type=reviewContent']);
-    const icons = screen.getAllByTitle('Configure & invoke');
-    // Exact token match — the quiet rows carry group-hover:opacity-100 instead.
-    const visible = icons.filter((w) =>
-      w.querySelector('svg')?.getAttribute('class')?.split(' ').includes('opacity-100'),
-    );
-    expect(visible.length).toBe(1);
-  });
-
-  it('shows loading skeleton when configs are loading', () => {
-    workflowConfigsOverride = { data: undefined, isLoading: true };
-    const { container } = renderPage();
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
-  });
-
-  it('shows loading skeleton when discovered workflows are loading', () => {
-    discoveredOverride = { data: undefined, isLoading: true };
-    const { container } = renderPage();
-    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
-  });
-
-  it('shows empty state when no invocable workflows exist', () => {
-    workflowConfigsOverride = { data: [], isLoading: false };
-    discoveredOverride = { data: [], isLoading: false };
-    renderPage();
-    expect(screen.getByText('No invocable workflows')).toBeInTheDocument();
-    expect(screen.getByText(/Mark workflows as invocable/)).toBeInTheDocument();
-  });
-
-  it('displays workflow description when available', () => {
-    renderPage();
-    expect(screen.getByText('Review user-generated content')).toBeInTheDocument();
+  it('a ?type= deep link wins over the preselect', () => {
+    renderPage(['/workflows/durable/invoke?type=processClaim']);
     expect(screen.getByText('Process insurance claims')).toBeInTheDocument();
-  });
-
-  it('shows execute_as bot badge in workflow selector', () => {
-    renderPage();
     expect(screen.getByText('lt-system')).toBeInTheDocument();
   });
 
-  it('auto-selects workflow when only one is available and opens its panel', () => {
-    workflowConfigsOverride = { data: [mockConfigs[0]], isLoading: false };
-    discoveredOverride = { data: [], isLoading: false };
+  it('shows the loading skeleton while the list loads', () => {
+    invocableOverride = { data: undefined, isLoading: true };
+    const { container } = renderPage();
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when the caller has nothing to invoke', () => {
+    invocableOverride = { data: [], isLoading: false };
     renderPage();
-    expect(mockSetPanel).toHaveBeenCalled();
-    expect(mockSetPanel.mock.calls[0][1]).toEqual({ key: 'invoke-run', width: 630 });
+    expect(screen.getByText('No tools to invoke')).toBeInTheDocument();
   });
 });

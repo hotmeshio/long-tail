@@ -26,6 +26,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   mockSettings.mockReturnValue({ data: { features: { dbMaintenance: true } } });
 });
 
@@ -36,7 +37,14 @@ describe('AdminSidebar — top-level categories', () => {
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });
 
-  it('shows Infrastructure as its own top-level category for builders', () => {
+  it('keeps Infrastructure out of the way until a builder opts in', () => {
+    render(<AdminSidebar isBuilder />, { wrapper });
+    expect(screen.queryByText('Infrastructure')).not.toBeInTheDocument();
+    expect(screen.queryByText('Routers')).not.toBeInTheDocument();
+  });
+
+  it('shows Infrastructure as its own top-level category once a builder opts in', () => {
+    localStorage.setItem('lt_infrastructure_enabled', 'true');
     render(<AdminSidebar isBuilder />, { wrapper });
     expect(screen.getByText('Infrastructure')).toBeInTheDocument();
     expect(screen.getByText('Routers')).toBeInTheDocument();
@@ -45,7 +53,8 @@ describe('AdminSidebar — top-level categories', () => {
 });
 
 describe('AdminSidebar — RBAC preserved', () => {
-  it('a non-builder admin sees Identity & Access (Accounts) but NOT Infrastructure', () => {
+  it('a non-builder admin sees Identity & Access (Accounts) but NOT Infrastructure, opt-in or not', () => {
+    localStorage.setItem('lt_infrastructure_enabled', 'true');
     render(<AdminSidebar isBuilder={false} />, { wrapper });
     expect(screen.getByText('Identity & Access')).toBeInTheDocument();
     expect(screen.getByText('Accounts')).toBeInTheDocument();
@@ -62,6 +71,8 @@ describe('AdminSidebar — RBAC preserved', () => {
 });
 
 describe('AdminSidebar — DB Maintenance feature flag', () => {
+  beforeEach(() => localStorage.setItem('lt_infrastructure_enabled', 'true'));
+
   it('shows DB Maintenance by default (flag true)', () => {
     render(<AdminSidebar isBuilder />, { wrapper });
     expect(screen.getByText('DB Maintenance')).toBeInTheDocument();
@@ -74,6 +85,7 @@ describe('AdminSidebar — DB Maintenance feature flag', () => {
   });
 
   it('hides DB Maintenance when the flag is explicitly false', () => {
+    localStorage.setItem('lt_infrastructure_enabled', 'true');
     mockSettings.mockReturnValue({ data: { features: { dbMaintenance: false } } });
     render(<AdminSidebar isBuilder />, { wrapper });
     expect(screen.queryByText('DB Maintenance')).not.toBeInTheDocument();

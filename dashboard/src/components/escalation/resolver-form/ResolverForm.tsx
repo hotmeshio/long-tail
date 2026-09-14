@@ -114,7 +114,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
 
   // Merge current form data into the resolver domain so x-lt-showIf: 'resolver.field'
   // reacts to live edits — the parent context only carries the saved row state.
-  const liveCtx: ShowIfContext = { ...(escalationContext ?? {}), resolver: data as Record<string, unknown> };
+  const liveCtx: ShowIfContext = { ...(escalationContext ?? {}), resolver: data as Record<string, unknown>, input: data as Record<string, unknown> };
 
   // Conditional visibility via x-lt-showIf and x-lt-hide-if-empty
   const entries = ordered.filter(([key, val]) => {

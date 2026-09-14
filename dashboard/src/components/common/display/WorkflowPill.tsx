@@ -10,7 +10,7 @@ interface WorkflowPillProps {
   variant?: WorkflowVariant;
 }
 
-const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
+export const VARIANT_ICON: Record<WorkflowVariant, typeof Workflow> = {
   certified:  ShieldCheck,
   registered: SlidersHorizontal,
   pipeline:   Wand2,

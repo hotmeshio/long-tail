@@ -35,7 +35,10 @@ import type { ActionBarMode, ActiveView } from './EscalationActionBar';
 import { UserName } from '../../../components/common/display/UserName';
 import type { FieldError } from '../../../lib/field-validator';
 import { validateResolverForm } from '../../../lib/field-validator';
-import { EscalationContextBlocks, EscalationFormSection, expandViewportSrc, buildShowIfContext } from './EscalationDetailSections';
+import { EscalationContextBlocks, EscalationFormSection, buildShowIfContext } from './EscalationDetailSections';
+import { VIEWPORT_STAGES, expandViewportSrc, readViewport } from '../../../lib/x-lt-viewport';
+import { isReadOnlyLogin } from '../../../lib/station-login';
+import { useMyRoles } from '../../../api/users';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
 import { useClaimClock } from '../../../hooks/useClaimClock';
@@ -99,6 +102,8 @@ function EscalationDetailView({ id }: { id: string }) {
   const canManage = isSuperAdmin || hasRoleType('admin');
   const { identity: acting, clear: clearActing } = useActingIdentity();
   const scanEnabled = useScanEnabled();
+  // Memberships come from the DB so the read-only-station test holds whatever the login method.
+  const { data: myRoles } = useMyRoles(user?.userId ?? null);
   // The badge grant outranks the session: whoever badged in owns the claim
   // comparisons here, and the mutations they fire ride the acting header so
   // the server attributes them to the same person.
@@ -384,12 +389,14 @@ function EscalationDetailView({ id }: { id: string }) {
   const claimedByOther = claimed && !claimedByMe;
   const isTerminal = esc.status === 'resolved' || esc.status === 'cancelled';
 
-  const stationWorkable = scanEnabled && claimed && !isTerminal;
+  // Only a read-only station login works another person's claim and badges at
+  // submit. A login with its own write authority keeps the standard bar.
+  const stationWorkable = scanEnabled && isReadOnlyLogin(myRoles) && claimed && !isTerminal;
   const editable = claimedByMe || stationWorkable;
   const writeNeedsBadge = stationWorkable && esc.assigned_to !== user?.userId;
 
-  const iframeViewport = (effectiveSchema as any)?.['x-lt-viewport'] as { type?: string; src?: string } | undefined;
-  const isIframeMode = iframeViewport?.type === 'iframe' && !!iframeViewport?.src && editable && !isTerminal;
+  const iframeViewport = readViewport(effectiveSchema as Record<string, unknown> | null);
+  const isIframeMode = !!iframeViewport && editable && !isTerminal;
 
   const escalationPayload = safeParse(esc.escalation_payload);
   const resolverPayload = safeParse(esc.resolver_payload);
@@ -668,9 +675,10 @@ function EscalationDetailView({ id }: { id: string }) {
               ))}
             </div>
             <IframeViewport
-              src={expandViewportSrc(iframeViewport!.src!, esc)}
+              src={expandViewportSrc(iframeViewport!.src, esc)}
               escalation={esc}
               schema={effectiveSchema!}
+              stage={VIEWPORT_STAGES.CLAIMED}
               onResolve={handleResolve}
               onEscalate={handleEscalate}
               submitAttempted={submitAttempted}

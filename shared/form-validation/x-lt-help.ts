@@ -17,8 +17,8 @@
  */
 import { getDeep } from './x-lt-bind';
 
-/** The token domains a help template may reference. */
-export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver', 'lookup'] as const;
+/** The token domains a help template may reference. `input` is the invoke-form name for the live values `resolver` also carries. */
+export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver', 'lookup', 'input'] as const;
 export type HelpDomain = (typeof HELP_DOMAINS)[number];
 
 export type HelpTokenContext = Partial<Record<HelpDomain, Record<string, unknown> | null>>;

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { getToken } from '../api/client';
+import { useAuth } from './useAuth';
 import { loadSettings } from '../api/settings';
 import { LT_BASE } from '../lib/base-path';
 import { NatsProvider } from './useNats';
@@ -22,6 +23,7 @@ interface NatsSettings {
  * - While loading — renders children without a provider (events disabled until detected)
  */
 export function EventTransportProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [transport, setTransport] = useState<Transport>(null);
   const [natsSettings, setNatsSettings] = useState<NatsSettings>({ url: null, token: null });
 
@@ -68,7 +70,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
 
     detect();
     return () => { cancelled = true; };
-  }, []);
+  }, [isAuthenticated]);
 
   if (transport === 'nats') {
     return <NatsProvider url={natsSettings.url} token={natsSettings.token}>{children}</NatsProvider>;

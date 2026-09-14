@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { ActiveWorker, CronScheduleEntry, DiscoveredWorkflow, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
+import type { ActiveWorker, CronScheduleEntry, DiscoveredWorkflow, InvocableWorkflow, LTJob, LTWorkflowConfig, WorkflowExecution } from './types';
 
 export function useActiveWorkers() {
   return useQuery<ActiveWorker[]>({
@@ -27,6 +27,17 @@ export function useWorkflowConfigs() {
     queryKey: ['workflowConfigs'],
     queryFn: async () => {
       const res = await apiFetch<{ workflows: LTWorkflowConfig[] }>('/workflows/config');
+      return res.workflows;
+    },
+  });
+}
+
+/** The workflows the caller may invoke, decided server-side by the invoke gate's own predicate. */
+export function useInvocableWorkflows() {
+  return useQuery<InvocableWorkflow[]>({
+    queryKey: ['invocableWorkflows'],
+    queryFn: async () => {
+      const res = await apiFetch<{ workflows: InvocableWorkflow[] }>('/workflows/invocable');
       return res.workflows;
     },
   });
@@ -117,6 +128,8 @@ export function useUpsertWorkflowConfig() {
       invocation_roles?: string[];
       consumes?: string[];
       envelope_schema?: Record<string, unknown> | null;
+      input_schema?: Record<string, unknown> | null;
+      icon?: string | null;
       resolver_schema?: Record<string, unknown> | null;
       cron_schedule?: string | null;
       execute_as?: string | null;
@@ -164,6 +177,7 @@ export function useSetCronSchedule() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflowConfigs'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['invocableWorkflows'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['cronStatus'], refetchType: 'all' });
     },
   });

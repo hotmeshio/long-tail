@@ -10,6 +10,8 @@ export interface LTWorkflowConfig {
   invocation_roles: string[];
   consumes: string[];
   envelope_schema: Record<string, unknown> | null;
+  input_schema: Record<string, unknown> | null;
+  icon: string | null;
   resolver_schema: Record<string, unknown> | null;
   cron_schedule: string | null;
   execute_as: string | null;
@@ -151,3 +153,6 @@ export interface LTJob {
   updated_at: string;
   set_id?: string;
 }
+
+/** A workflow the caller may invoke, with its registry tier. */
+export type InvocableWorkflow = LTWorkflowConfig & { tier: WorkflowTier };

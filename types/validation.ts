@@ -38,10 +38,12 @@ export interface LTValidationErrorBody {
   code: typeof LT_ERROR_CODES.SCHEMA_VALIDATION;
   /** Every field-level violation, in schema property order. */
   violations: LTFieldViolation[];
-  /** The role whose enforced schema rejected the payload. */
-  role: string;
+  /** The role whose enforced schema rejected the payload; null for a workflow input schema. */
+  role: string | null;
   /** The schema version validated against; null when the role's live (unversioned) schema applied. */
   schemaVersion: number | null;
+  /** The workflow whose input_schema rejected the data (invoke surface only). */
+  workflowType?: string;
 }
 
 /** Narrow an unknown response body to the canonical validation-error shape. */

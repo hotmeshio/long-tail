@@ -3,7 +3,7 @@ import { X, Eye, Sparkles, Megaphone } from 'lucide-react';
 import { AlertsSection } from './AlertsSection';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../api/settings';
-import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, getScanOverride, setScanOverride, clearScanOverride, type ViewAsRole } from '../../lib/view-as';
+import { getViewAs, setViewAs, clearViewAs, getAiOverride, setAiOverride, clearAiOverride, getGraphEnabled, setGraphEnabled, getInfrastructureEnabled, setInfrastructureEnabled, getScanOverride, setScanOverride, clearScanOverride, type ViewAsRole } from '../../lib/view-as';
 import { LT_BASE } from '../../lib/base-path';
 
 type RealTier = 'superadmin' | 'admin' | 'engineer' | 'operator';
@@ -52,6 +52,11 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
   const [graphToggle, setGraphToggle] = useState(
     serverGraph === true || (graphUserControlled && getGraphEnabled()),
   );
+
+  // Infrastructure (Routers, Messages, DB Maintenance) is builder-only and
+  // opt-in on this device.
+  const canSeeInfrastructure = isSuperAdmin || hasRole('engineer');
+  const [infraToggle, setInfraToggle] = useState(getInfrastructureEnabled());
 
   // Scan input is opt-in: the deployment default (features.scanCodes, false
   // when omitted) unless a local override is set for testing.
@@ -114,6 +119,13 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
     const next = !graphToggle;
     setGraphToggle(next);
     setGraphEnabled(next);
+    window.location.reload();
+  };
+
+  const toggleInfrastructure = () => {
+    const next = !infraToggle;
+    setInfraToggle(next);
+    setInfrastructureEnabled(next);
     window.location.reload();
   };
 
@@ -255,6 +267,25 @@ export function EasterEggPanel({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className={`shrink-0 ml-4 w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${graphToggle ? 'bg-accent' : 'bg-surface-border'}`}>
                   <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${graphToggle ? 'translate-x-4' : 'translate-x-0'}`} />
+                </span>
+              </button>
+            )}
+            {canSeeInfrastructure && (
+              <button
+                onClick={toggleInfrastructure}
+                className="w-full text-left flex items-center justify-between py-2.5 px-1 group"
+                data-testid="feature-infrastructure"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-text-primary group-hover:text-accent transition-colors">
+                    Infrastructure
+                  </span>
+                  <span className="block text-xs text-text-secondary mt-0.5">
+                    {infraToggle ? 'Visible — Routers, Messages, and DB Maintenance in the sidebar' : 'Hidden — routers, message streams, and database maintenance'}
+                  </span>
+                </span>
+                <span className={`shrink-0 ml-4 w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${infraToggle ? 'bg-accent' : 'bg-surface-border'}`}>
+                  <span className={`w-4 h-4 rounded-full bg-text-inverse shadow-sm transition-transform ${infraToggle ? 'translate-x-4' : 'translate-x-0'}`} />
                 </span>
               </button>
             )}

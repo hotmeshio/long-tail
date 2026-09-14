@@ -21,6 +21,16 @@ Compare the resolved value's string form against a literal:
 
 The expected value is the raw remainder after the operator (trimmed; no quoting). Numbers and booleans compare via their string form (`metadata.count=3`, `metadata.live=true`). An absent value compares as the empty string — so `=X` is false and `!=X` is true when the path is missing. `resolver.` conditions react live as the user edits, exactly like the truthy form — this is what drives per-designation sub-surfaces on verdict forms (different fields for send-to-design vs send-to-printing).
 
+### Several conditions
+
+Pass an array to require every condition. The field shows only when all hold:
+
+```json
+"x-lt-showIf": ["input.action=report-offline", "!input.powerCycled"]
+```
+
+Each entry uses the same grammar as a single condition. A hidden field is skipped by validation exactly as with one condition.
+
 ### Domains
 
 | Domain | Resolves against |
@@ -30,6 +40,7 @@ The expected value is the raw remainder after the operator (trimmed; no quoting)
 | `envelope` | The workflow-sent input envelope |
 | `escalation` | Top-level escalation row fields (`role`, `status`, `priority`, …) |
 | `resolver` | The submitted resolver payload — **live**: reacts in real time as the user edits the form |
+| `input` | The same live form values under the invoke form's name (see [invoke-form.md](invoke-form.md)) |
 
 Conditions based on `metadata`, `payload`, `envelope`, and `escalation` are static (read from the stored row). Conditions based on `resolver` are dynamic — the field appears or disappears immediately as the user edits a sibling field, without a page reload.
 

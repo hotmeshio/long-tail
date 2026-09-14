@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { ScanBarcode, X } from 'lucide-react';
 import { useScanInput } from '../../hooks/useScanInput';
 import { useShellPanel } from '../../hooks/useShellPanel';
-import { OUTCOME_TONE, outcomeHeadline, outcomeMarkdown } from './outcome-display';
-import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
+import { SCAN_SOURCE_IDS } from '../../lib/scan-sources/types';
+import { ScanOutcomeBody } from './ScanOutcomeBody';
 
 const DISMISS_MS = 6_000;
 const SCAN_PANEL_KEY = 'scan';
@@ -29,10 +29,9 @@ export function ScanToast() {
 
   if (!lastResult || lastResult.navigated) return null;
   if (dismissedAt === lastResult.at) return null;
-  // The open scan panel already narrates the outcome.
+  // The open scan panel and the header bar each narrate their own outcomes.
   if (panelOpen && ownerKey === SCAN_PANEL_KEY) return null;
-
-  const { response } = lastResult;
+  if (lastResult.source === SCAN_SOURCE_IDS.TOOLBAR) return null;
 
   return (
     <div
@@ -42,24 +41,7 @@ export function ScanToast() {
       <div className="flex items-start gap-2.5 px-3.5 py-3">
         <ScanBarcode className="w-4 h-4 mt-0.5 text-accent-muted shrink-0" strokeWidth={1.5} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-mono text-text-secondary truncate">{lastResult.code}</div>
-          {response ? (
-            <>
-              <div className={`text-sm font-medium ${OUTCOME_TONE[response.outcome]}`}>
-                {outcomeHeadline(response)}
-              </div>
-              {response.error && (
-                <div className="text-xs text-text-tertiary mt-0.5">{response.error}</div>
-              )}
-              {outcomeMarkdown(response) && (
-                <div className="text-xs text-text-secondary mt-1.5">
-                  <SimpleMarkdown content={outcomeMarkdown(response)!} compact />
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-sm text-status-error">{lastResult.error}</div>
-          )}
+          <ScanOutcomeBody result={lastResult} />
         </div>
         <button
           type="button"

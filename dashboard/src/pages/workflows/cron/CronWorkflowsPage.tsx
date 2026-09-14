@@ -31,7 +31,7 @@ export function CronWorkflowsPage() {
 
   return (
     <div>
-      <PageHeader title="Cron" docsHash="#docs:dashboard.md:invoke-workflow" />
+      <PageHeader title="Cron" docsHash="#docs:dashboard.md:invoke-tool" />
 
       {invocable.length === 0 ? (
         <div className="py-16 text-center">

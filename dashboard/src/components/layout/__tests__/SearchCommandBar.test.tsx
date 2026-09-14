@@ -9,10 +9,18 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 }));
 vi.mock('../../../api/settings', () => ({ useSettings: vi.fn() }));
 vi.mock('../../../api/client', () => ({ apiFetch: vi.fn() }));
+vi.mock('../../../hooks/useScanInput', () => ({
+  useScanEnabled: () => false,
+  useScanInput: () => ({ submitCode: vi.fn(), busy: false, lastResult: null }),
+}));
+vi.mock('../../../hooks/useScanCommands', () => ({
+  useScanCommands: () => ({ commands: [], loading: false }),
+}));
 
 import { useSettings } from '../../../api/settings';
 import { apiFetch } from '../../../api/client';
-import { GlobalSearchBar, buildSearchTarget, BUILT_IN_SEARCH_FACETS } from '../GlobalSearchBar';
+import { SearchCommandBar } from '../SearchCommandBar';
+import { BUILT_IN_SEARCH_FACETS, SEARCH_MODE_KEY } from '../../../lib/search-command';
 
 const mockSettings = vi.mocked(useSettings);
 const mockFetch = vi.mocked(apiFetch);
@@ -22,11 +30,16 @@ const settings = (facets: string[]) => ({
 } as unknown as ReturnType<typeof useSettings>);
 
 function renderBar() {
-  return render(<MemoryRouter><GlobalSearchBar /></MemoryRouter>);
+  return render(<MemoryRouter><SearchCommandBar /></MemoryRouter>);
 }
 
-async function search(facet: string, value: string) {
-  fireEvent.change(screen.getByLabelText('Search facet'), { target: { value: facet } });
+function pickFacet(facet: string) {
+  fireEvent.click(screen.getByTestId('search-mode'));
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(`^${facet}`) }));
+}
+
+function search(facet: string, value: string) {
+  pickFacet(facet);
   fireEvent.change(screen.getByLabelText('Global search'), { target: { value } });
   fireEvent.keyDown(screen.getByLabelText('Global search'), { key: 'Enter' });
 }
@@ -37,30 +50,24 @@ beforeEach(() => {
   mockSettings.mockReturnValue(settings(['orderId']));
 });
 
-describe('buildSearchTarget', () => {
-  it('routes a metadata facet to the all-status table', () => {
-    const url = buildSearchTarget('orderId', 'order-9')!;
-    expect(url).toContain('/escalations/available');
-    expect(url).toContain('status=all');
-    expect(url).toContain(encodeURIComponent(JSON.stringify({ orderId: 'order-9' })));
-  });
-
-  it('defers built-in facets to a lookup', () => {
-    expect(buildSearchTarget('escalationId', 'x')).toBeNull();
-    expect(buildSearchTarget('workflowId', 'x')).toBeNull();
-  });
-});
-
-describe('GlobalSearchBar', () => {
-  it('prepends the built-in facets ahead of the configured list', () => {
+describe('SearchCommandBar — Find modes', () => {
+  it('offers the built-in facets ahead of the configured list', () => {
     renderBar();
-    const options = screen.getAllByRole('option').map((o) => (o as HTMLOptionElement).value);
+    fireEvent.click(screen.getByTestId('search-mode'));
+    const options = screen.getAllByRole('option').map((o) => o.textContent?.replace(/opens.*|filters.*/, ''));
     expect(options).toEqual([...BUILT_IN_SEARCH_FACETS, 'orderId']);
   });
 
-  it('a facet search navigates to the filtered all-status list', async () => {
+  it('the type chip trails the input', () => {
     renderBar();
-    await search('orderId', 'order-9');
+    const input = screen.getByLabelText('Global search');
+    const chip = screen.getByTestId('search-mode');
+    expect(input.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('a facet search navigates to the filtered all-status list', () => {
+    renderBar();
+    search('orderId', 'order-9');
     expect(navigate).toHaveBeenCalledWith(expect.stringContaining('status=all'));
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -69,13 +76,13 @@ describe('GlobalSearchBar', () => {
     const id = '3f216994-7704-4e7a-9702-62130afaf9b0';
     mockFetch.mockResolvedValue({ id });
     renderBar();
-    await search('escalationId', id);
+    search('escalationId', id);
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(`/escalations/detail/${id}`));
   });
 
-  it('escalationId: a non-UUID never costs a request — inline shape error', async () => {
+  it('escalationId: a non-UUID never costs a request', async () => {
     renderBar();
-    await search('escalationId', 'Sample1 Jill Prinsen');
+    search('escalationId', 'Sample1 Jill Prinsen');
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not a valid escalation id/));
     expect(mockFetch).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
@@ -84,7 +91,7 @@ describe('GlobalSearchBar', () => {
   it('escalationId: not found → inline error, no navigation', async () => {
     mockFetch.mockRejectedValue(new Error('404'));
     renderBar();
-    await search('escalationId', '00000000-0000-4000-8000-000000000000');
+    search('escalationId', '00000000-0000-4000-8000-000000000000');
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/No escalation/));
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -92,7 +99,7 @@ describe('GlobalSearchBar', () => {
   it('workflowId: exactly one escalation → its detail', async () => {
     mockFetch.mockResolvedValue({ escalations: [{ id: 'esc-7', role: 'gluer', status: 'pending', type: 't' }] });
     renderBar();
-    await search('workflowId', 'wf-1');
+    search('workflowId', 'wf-1');
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/escalations/detail/esc-7'));
   });
 
@@ -102,7 +109,7 @@ describe('GlobalSearchBar', () => {
       { id: 'b', role: 'finisher', status: 'resolved', type: 't' },
     ] });
     renderBar();
-    await search('workflowId', 'wf-2');
+    search('workflowId', 'wf-2');
     await waitFor(() => expect(screen.getByTestId('search-workflow-results')).toBeTruthy());
     expect(screen.getByText('Workflow execution →').getAttribute('href')).toBe('/workflows/executions/wf-2');
     expect(navigate).not.toHaveBeenCalled();
@@ -111,14 +118,23 @@ describe('GlobalSearchBar', () => {
   it('workflowId: none → picker offers only the execution link', async () => {
     mockFetch.mockResolvedValue({ escalations: [] });
     renderBar();
-    await search('workflowId', 'wf-3');
+    search('workflowId', 'wf-3');
     await waitFor(() => expect(screen.getByText(/No escalations for this workflow/)).toBeTruthy());
     expect(screen.getByText('Workflow execution →').getAttribute('href')).toBe('/workflows/executions/wf-3');
   });
 
-  it('remembers the last-used facet on this device', async () => {
+  it('remembers the last-used mode on this device and honors the legacy facet key', () => {
+    localStorage.setItem('lt:search:facet', 'orderId');
     renderBar();
-    fireEvent.change(screen.getByLabelText('Search facet'), { target: { value: 'orderId' } });
-    expect(localStorage.getItem('lt:search:facet')).toBe('orderId');
+    expect(screen.getByTestId('search-mode').textContent).toBe('orderId');
+    pickFacet('workflowId');
+    expect(JSON.parse(localStorage.getItem(SEARCH_MODE_KEY)!)).toEqual({ kind: 'facet', facet: 'workflowId' });
+    expect(screen.getByLabelText('Global search').getAttribute('placeholder')).toBe('Workflow id');
+  });
+
+  it('renders nothing when search is off and scan input is off', () => {
+    mockSettings.mockReturnValue({ data: { search: { enabled: false, facets: [] } } } as unknown as ReturnType<typeof useSettings>);
+    renderBar();
+    expect(screen.queryByTestId('global-search')).toBeNull();
   });
 });

@@ -26,7 +26,7 @@ A certified workflow is durable plus the full Long Tail control plane. It has an
 - **Invocation controls** — `invocable: true` exposes the workflow for external invocation via the API and dashboard.
 - **Execution identity** — roles, default assignees, and `execute_as` overrides are defined in the config.
 
-In the dashboard, certified workflows display a ShieldCheck icon with a "Certified" label in accent blue. Durable workflows display a muted "Durable" badge. Both are invocable from the same **Invoke Workflow** page; the distinction is how much operational infrastructure backs them.
+In the dashboard, certified workflows display a ShieldCheck icon with a "Certified" label in accent blue. Durable workflows display a muted "Durable" badge. Both are invocable from the same **Invoke Tool** page; the distinction is how much operational infrastructure backs them.
 
 To certify a workflow, create a config entry with the `certified` flag:
 

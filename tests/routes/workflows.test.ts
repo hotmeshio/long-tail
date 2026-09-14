@@ -101,6 +101,22 @@ describe('Workflow routes', () => {
     });
   });
 
+  describe('GET /api/workflows/invocable', () => {
+    it('returns 401 without auth', async () => {
+      const res = await fetch(`${ctx.BASE}/workflows/invocable`);
+      expect(res.status).toBe(401);
+    });
+
+    it('returns the caller\'s invokable workflows', async () => {
+      const res = await fetch(`${ctx.BASE}/workflows/invocable`, {
+        headers: authHeaders(ctx.memberToken),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(Array.isArray(body.workflows)).toBe(true);
+    });
+  });
+
   describe('POST /api/workflows/:type/invoke', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/workflows/some-type/invoke`, {

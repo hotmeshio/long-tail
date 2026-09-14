@@ -25,5 +25,7 @@ export interface ScanSource {
 export const SCAN_SOURCE_IDS = {
   KEYBOARD_WEDGE: 'keyboard-wedge',
   MANUAL: 'manual',
+  /** The header bar: a chosen command plus a typed target. */
+  TOOLBAR: 'toolbar',
 } as const;
 export type ScanSourceId = (typeof SCAN_SOURCE_IDS)[keyof typeof SCAN_SOURCE_IDS];

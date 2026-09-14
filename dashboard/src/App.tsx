@@ -7,6 +7,7 @@ import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
 import { RequireRole } from './components/layout/RequireRole';
+import { RequireInvocable } from './components/layout/RequireInvocable';
 import { RequireAI } from './components/layout/RequireAI';
 import { RequireFeature } from './components/layout/RequireFeature';
 
@@ -294,6 +295,15 @@ const router = createBrowserRouter([
       { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
       { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
 
+      // Invoke: open to anyone the server lists an invokable workflow for
+      {
+        element: <RequireInvocable />,
+        children: [
+          { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
+          { path: 'workflows/durable/invoke', element: <Lazy><DurableInvokePage /></Lazy> },
+        ],
+      },
+
       // Workflows section (builder: superadmin or engineer)
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
@@ -305,8 +315,6 @@ const router = createBrowserRouter([
           { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
           { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
           { path: 'workflows/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
-          { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
-          { path: 'workflows/durable/invoke', element: <Lazy><DurableInvokePage /></Lazy> },
           { path: 'workflows/cron', element: <Navigate to="/workflows/start?mode=schedule" replace /> },
           { path: 'workflows/workers', element: <Lazy><WorkersPage /></Lazy> },
           { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
