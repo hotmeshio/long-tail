@@ -18,7 +18,9 @@ export function workflowEventPattern(workflowId: string, action: 'completed' | '
 
 /**
  * Follows one run: subscribes to its completed and failed subjects the moment
- * it starts and holds the outcome and the returned payload.
+ * it starts and holds the outcome and the returned payload. With no id there
+ * is nothing to follow, so nothing is subscribed; a subject with an empty
+ * token is a protocol error on NATS.
  */
 export function useRunOutcome(workflowId: string): { outcome: RunOutcome; payload: Record<string, unknown> | undefined } {
   const [outcome, setOutcome] = useState<RunOutcome>(RUN_OUTCOMES.RUNNING);
@@ -30,7 +32,7 @@ export function useRunOutcome(workflowId: string): { outcome: RunOutcome; payloa
   }, [workflowId]);
 
   useEventSubscriptions(
-    [workflowEventPattern(workflowId, 'completed'), workflowEventPattern(workflowId, 'failed')],
+    workflowId ? [workflowEventPattern(workflowId, 'completed'), workflowEventPattern(workflowId, 'failed')] : [],
     (event: NatsLTEvent) => {
       if (event.workflowId !== workflowId) return;
       setOutcome(event.type.endsWith('.failed') ? RUN_OUTCOMES.FAILED : RUN_OUTCOMES.COMPLETED);
