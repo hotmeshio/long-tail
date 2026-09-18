@@ -6,7 +6,7 @@
  * schemas, proving the same machinery that wraps Epic, Stripe, or any
  * external API works end-to-end.
  *
- * See docs/self-test.md for the full narrative.
+ * See docs/donotpublish/self-test.md for the full narrative.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';

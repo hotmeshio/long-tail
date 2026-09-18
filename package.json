@@ -17,6 +17,7 @@
     "docs/",
     "!docs/img/",
     "!docs/donotcommit/",
+    "!docs/donotpublish/",
     "dashboard/dist/",
     "LICENSE",
     "README.md"

@@ -50,7 +50,7 @@ A pipeline workflow is a compiled deterministic workflow. It is generated from a
 
 In the dashboard, pipeline workflows display a Wand2 (magic wand) icon in purple. They are managed from the **MCP Pipeline Tools** page and created through the **Pipeline Designer**.
 
-See the [Compilation Pipeline](compilation.md) guide for the full lifecycle from dynamic execution to deployed pipeline.
+See the [Compilation Pipeline](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compilation.md) guide for the full lifecycle from dynamic execution to deployed pipeline.
 
 ## Contents
 
@@ -713,4 +713,4 @@ The durable code is the spec — developer-friendly, familiar, testable with sta
   (write and test here)           (deploy and run this)
 ```
 
-Write procedural because it's productive. Compile because it's fast. See the [Compiler Guide](compiler.md) for details.
+Write procedural because it's productive. Compile because it's fast. See the [Compiler Guide](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compiler.md) for details.

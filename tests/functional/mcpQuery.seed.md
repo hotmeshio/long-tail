@@ -40,4 +40,4 @@ Each wizard panel represents a state transition worth capturing:
 | `tests/functional/mcpQuery.test.ts` | Functional test — the assertions |
 | `tests/functional/mcpQuery.screenshots.ts` | Screenshot companion — the images |
 | `tests/functional/mcpQuery.seed.md` | This file — the storytelling guide |
-| `docs/compilation.md` | The tutorial output |
+| `docs/donotpublish/compilation.md` | The tutorial output |

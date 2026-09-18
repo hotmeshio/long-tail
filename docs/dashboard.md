@@ -166,7 +166,7 @@ The MCP Tool Designer page lists previous tool design sessions and provides entr
 
 **Composer mode** — manual tool design for building tools from scratch using the visual DAG editor.
 
-Steps unlock sequentially in each wizard. Compiled tools appear in **Graph Workflows** and **Graph Executions**. See the [Compilation Pipeline](compilation.md) guide for details.
+Steps unlock sequentially in each wizard. Compiled tools appear in **Graph Workflows** and **Graph Executions**. See the [Compilation Pipeline](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compilation.md) guide for details.
 
 ### MCP Server Tools
 

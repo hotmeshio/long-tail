@@ -8,7 +8,7 @@ author schemas and copy, the rules the renderer applies to errors, and how a
 deployment plugs its own stylesheet in through static config.
 
 The full internal doctrine lives in
-[`docs/design-principles.md`](../design-principles.md); the reference form
+[`docs/donotpublish/design-principles.md`](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/design-principles.md); the reference form
 implementation is `examples/workflows/acme-stations`.
 
 ---

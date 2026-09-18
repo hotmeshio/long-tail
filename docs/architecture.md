@@ -132,7 +132,7 @@ A pipeline workflow is a compiled deterministic workflow generated from a succes
 
 Pipeline workflows are stored in `lt_yaml_workflows` with status lifecycle: `draft` → `deployed` → `active` → `archived`. In the dashboard, pipeline workflows display a **Wand2** (magic wand) icon in purple.
 
-See the [Compilation Pipeline](compilation.md) guide for the full lifecycle and the [Workflows Guide](workflows.md) for detailed coverage of all three types.
+See the [Compilation Pipeline](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compilation.md) guide for the full lifecycle and the [Workflows Guide](workflows.md) for detailed coverage of all three types.
 
 ## System Capabilities
 
