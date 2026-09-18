@@ -27,16 +27,25 @@ const printStation: RoleDetail = {
   list_schema: null,
   current_list_schema_version: null,
   default_pins: null,
+  portals: null,
   upstream_roles: [],
   user_count: 0,
   chain_count: 0,
   workflow_count: 0,
 };
 
+const mutate = vi.fn();
 vi.mock('../../../../api/roles', () => ({
+  PORTAL_LIMITS: { MAX_PORTALS: 12, MAX_ROWS: 4, MAX_COLS: 6 },
   useRoleDetails: () => ({ data: { roles: [printStation] }, isLoading: false }),
-  useUpdateRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useUpdateRole: () => ({ mutate, isPending: false, error: null }),
   useDeleteRole: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+vi.mock('../../../../api/preferences', () => ({
+  usePreferences: () => ({ data: { preferences: { pinnedViews: [] } } }),
+}));
+vi.mock('../../../../hooks/useLinkVariables', () => ({
+  useLinkVariables: () => ({ values: {}, defaults: {} }),
 }));
 
 vi.mock('../../../../api/users', () => ({
@@ -77,9 +86,9 @@ describe('RoleDetailPage — section sub-nav', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the five nav sections', () => {
+  it('renders the six nav sections', () => {
     renderPage();
-    for (const label of ['Identity', 'Pace Board', 'Schemas', 'Members', 'Pins']) {
+    for (const label of ['Identity', 'Pace Board', 'Schemas', 'Members', 'Pins', 'Portal']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
   });
@@ -160,5 +169,30 @@ describe('kiosk property helpers', () => {
   it('leaves an unparseable bag untouched (returns null)', async () => {
     const { toggleKioskFlag } = await import('../role-detail-shared');
     expect(toggleKioskFlag('{not json')).toBeNull();
+  });
+});
+
+describe('RoleDetailPage — the Portal section edits the draft and Save writes it', () => {
+  it('composing a portal enables Save and the save payload carries the portals', () => {
+    renderPage('/admin/roles/print-station?section=portal');
+    const save = screen.getByRole('button', { name: /^Save/ });
+    expect(save).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('New portal name'), { target: { value: 'Floor screen' } });
+    fireEvent.change(screen.getByTestId('add-portal'), { target: { value: 'custom' } });
+    fireEvent.change(screen.getByLabelText('View label'), { target: { value: 'Board' } });
+    fireEvent.change(screen.getByLabelText('View URL'), { target: { value: '/escalations/available?role=print-station' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const enabled = screen.getByRole('button', { name: 'Save changes' });
+    expect(enabled).toBeEnabled();
+    fireEvent.click(enabled);
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'print-station',
+        portals: [{ key: 'floor-screen', label: 'Floor screen', rows: [[{ label: 'Board', url: '/escalations/available?role=print-station', badge: true }]] }],
+      }),
+      expect.anything(),
+    );
   });
 });

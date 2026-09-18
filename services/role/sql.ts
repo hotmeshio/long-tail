@@ -73,7 +73,7 @@ export const GET_ROLE_ROW = `
     r.sla_minutes, r.target_per_hour, r.worker_count,
     r.priority_threshold_minutes, r.priority_facet,
     r.entity_facet, r.entity_state_source,
-    r.list_schema, r.default_pins, r.enforce_schema,
+    r.list_schema, r.default_pins, r.portals, r.enforce_schema,
     r.current_schema_version, r.current_list_schema_version,
     COALESCE((SELECT array_agg(u.upstream_role ORDER BY u.upstream_role)
               FROM lt_role_upstreams u WHERE u.role = r.role), '{}') AS upstream_roles
@@ -126,6 +126,9 @@ export const DELETE_ROLE = `
  * entity_state_source ($39 = provided sentinel, $40 = value) is unversioned
  * config: 'role' | 'subtype' — how this role names its contribution to the
  * entity's state space (the station itself, or its subtypes).
+ *
+ * portals ($41 = provided sentinel, $42 = value) is unversioned config: the
+ * role's named portal views, each a matrix of pin cells rendered as one page.
  */
 export const UPDATE_ROLE_METADATA = `
   WITH home_clear AS (
@@ -151,6 +154,7 @@ export const UPDATE_ROLE_METADATA = `
                       = CASE WHEN $39::boolean THEN COALESCE($40, 'role')             ELSE entity_state_source END,
       list_schema     = CASE WHEN $29::boolean THEN $30::jsonb                        ELSE list_schema     END,
       default_pins    = CASE WHEN $31::boolean THEN $32::jsonb                        ELSE default_pins    END,
+      portals         = CASE WHEN $41::boolean THEN $42::jsonb                        ELSE portals         END,
       enforce_schema  = CASE WHEN $33::boolean THEN COALESCE($34::boolean, false)     ELSE enforce_schema  END,
       ops_home_default = CASE WHEN $35::boolean THEN COALESCE($36::boolean, false)    ELSE ops_home_default END,
       current_schema_version = CASE
@@ -168,7 +172,7 @@ export const UPDATE_ROLE_METADATA = `
       ops_visible, ops_home_default, parent_role, sla_minutes, target_per_hour, worker_count,
       priority_threshold_minutes, priority_facet, entity_facet, entity_state_source,
       current_schema_version, list_schema, current_list_schema_version,
-      default_pins, enforce_schema
+      default_pins, portals, enforce_schema
   ), snapshot AS (
     INSERT INTO lt_role_schemas (role, version, form_schema, metadata_schema, change_summary)
     SELECT role, current_schema_version, form_schema, metadata_schema, $26
@@ -330,6 +334,7 @@ export const LIST_ROLES_WITH_DETAILS = `
     r.list_schema,
     r.current_list_schema_version,
     r.default_pins,
+    r.portals,
     r.enforce_schema,
     COALESCE(up.ups, '{}') AS upstream_roles,
     COALESCE(uc.cnt, 0) AS user_count,

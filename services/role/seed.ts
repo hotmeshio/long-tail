@@ -22,12 +22,15 @@ export const STARTUP_CHANGE_SUMMARY = 'startup apply (code)';
 const METADATA_FIELDS = [
   'title', 'description', 'form_schema', 'metadata_schema', 'list_schema',
   'properties', 'ops_visible', 'ops_home_default', 'parent_role',
-  'upstream_roles', 'default_pins', 'enforce_schema', 'sla_minutes',
+  'upstream_roles', 'default_pins', 'portals', 'enforce_schema', 'sla_minutes',
   'target_per_hour', 'worker_count', 'priority_threshold_minutes',
   'priority_facet', 'entity_facet', 'entity_state_source',
 ] as const;
 
 type MetadataField = (typeof METADATA_FIELDS)[number];
+
+// Arrays whose order is meaning (portals and their rows), compared as declared.
+const ORDERED_ARRAY_FIELDS: ReadonlySet<MetadataField> = new Set(['portals']);
 
 /**
  * Compare one declared field against the stored row. jsonb round-trips lose
@@ -36,6 +39,9 @@ type MetadataField = (typeof METADATA_FIELDS)[number];
  */
 function fieldDiffers(field: MetadataField, declared: unknown, row: Record<string, any>): boolean {
   const stored = row[field];
+  if (Array.isArray(declared) && ORDERED_ARRAY_FIELDS.has(field)) {
+    return !isDeepStrictEqual(declared, stored ?? null);
+  }
   if (Array.isArray(declared)) {
     const a = [...declared].sort();
     const b = Array.isArray(stored) ? [...stored].sort() : [];

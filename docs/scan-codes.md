@@ -229,8 +229,9 @@ set with the same `PATCH /api/roles/:role` as every other dial). When the
 signed-in user is a **member of exactly that one role** — the station-login
 shape — the dashboard locks the viewport: the left nav is gone entirely, the
 role's escalation list is home (`/` and every other surface redirect to it),
-and the session is held to the list, the escalation detail page, and the scan
-screens (choice, badge). The header toolbar and event feed remain. A user
+and the session is held to the list, the escalation detail page, the role's
+portals, and the scan screens (choice, badge). A role that declares
+[portals](./hitl/portal.md) lands on its first one as home instead of the list. The header toolbar and event feed remain. A user
 holding more than one role, or an admin-type grant, always gets full chrome —
 kiosk is for the single-role floor login, never a way to hide the product from
 a real operator.

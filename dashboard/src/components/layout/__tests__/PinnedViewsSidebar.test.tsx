@@ -46,6 +46,7 @@ vi.mock('../../../api/roles', () => ({
         {
           role: 'gang-harvest',
           title: null, // display title derives from the key
+          portals: [{ key: 'harvest', label: 'Harvest floor', rows: [[{ label: 'To Harvest', url: '/escalations/available?role=gang-harvest' }]] }],
           default_pins: [
             { label: 'To Harvest', url: '/escalations/available?role=gang-harvest' },
             { label: 'My Harvest', url: '/escalations?role=gang-harvest' },
@@ -79,6 +80,16 @@ describe('PinnedViewsSidebar — role-grouped pins', () => {
     renderSidebar();
     const labels = screen.getAllByTestId('pin-group-label').map((el) => el.textContent);
     expect(labels).toEqual(['Print Farm', 'Gang Harvest']);
+  });
+
+  it('a role that declares a portal leads its group with the Portal link', () => {
+    renderSidebar();
+    const portal = screen.getByTestId('portal-link-gang-harvest-harvest');
+    expect(portal).toHaveAttribute('href', '/portal/gang-harvest/harvest');
+    expect(portal).toHaveTextContent('Harvest floor');
+    const pinLink = screen.getByRole('link', { name: /To Harvest/ });
+    expect(portal.compareDocumentPosition(pinLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId('portal-link-print-farm-harvest')).not.toBeInTheDocument();
   });
 
   it('never shows a group label without visible pins', () => {

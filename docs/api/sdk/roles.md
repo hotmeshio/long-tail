@@ -34,6 +34,7 @@ interface RoleDetail {
   priority_facet: string | null;
   list_schema: Record<string, any> | null;
   default_pins: { label: string; url: string; badge?: boolean }[] | null;
+  portals: { key: string; label: string; rows: { label: string; url: string; badge?: boolean }[][]; counts?: { label: string; url: string; blurb?: string }[] }[] | null;
   upstream_roles: string[];
   user_count: number;
   chain_count: number;
@@ -281,6 +282,7 @@ const result = await lt.roles.update({
 | `upstream_roles` | `string[] \| null` | No | Replace the set of roles this station draws input from across other Operations sequences (omitted = preserve; `null` or `[]` = clear). Distinct from `parent_role`, which places the role in its own sequence |
 | `list_schema` | `object \| null` | No | Rich formatting (x-lt-* markup) for this role's escalation LIST page; versions independently of `form_schema` |
 | `default_pins` | `array \| null` | No | Pinned-view seeds for members: `[{ label, url, badge? }]` with dashboard-relative `url`s. Members promote, hide, or reorder via their own preferences (`lt.me`) |
+| `portals` | `array \| null` | No | The role's named portals `[{ key, label, rows, counts? }]`, each 1..4 rows of 1..6 pin cells rendered as one page at `/portal/<role>/<key>`, with up to 8 count tiles above |
 | `change_summary` | `string` | No | Label recorded on the schema version snapshot when this update changes a schema field |
 
 When the update changes `form_schema` or `metadata_schema`, the new pair is snapshotted into the role's version history and `current_schema_version` advances.

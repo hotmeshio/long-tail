@@ -24,6 +24,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
 | Start another workflow from inside the form, mapped from the record, directly or in a prefilled dialog | `x-lt-invoke` | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
+| A role's pinned views laid out as named pages of live panels | `portals` on the role | [portal.md](hitl/portal.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
 | The same rich form for starting a workflow from the Invoke Tool page | `inputSchema` on the worker config | [invoke-form.md](hitl/invoke-form.md) |
 
@@ -93,6 +94,8 @@ Ordered as a learning path — each file adds one capability to the same form:
 | List schema (`active-history`, `active`, `facet-table`, `facet-board` cards) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Embedded widgets (`link`, `escalation`, `escalation-list`) and the submit guard | [x-lt-embed.md](hitl/x-lt-embed.md) |
 | Starting a workflow from the form (`x-lt-invoke`) | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
+| Pinned views, role default pins, link variables | [pinned-views.md](hitl/pinned-views.md) |
+| Role portals: named matrices of pins rendered as pages | [portal.md](hitl/portal.md) |
 | Footer labels, claim-and-submit, and the list-driven "start" action | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |

@@ -28,6 +28,7 @@ beforeEach(() => {
       { role: 'gluer', properties: { kiosk: true } },
       { role: 'packer', properties: { kiosk: true } },
       { role: 'finisher', properties: {} },
+      { role: 'porter', properties: { kiosk: true }, portals: [{ key: 'floor', label: 'Floor', rows: [[{ label: 'Board', url: '/escalations/available?role=porter' }]] }, { key: 'focus', label: 'Focus', rows: [[{ label: 'B', url: '/escalations' }]] }] },
     ] },
   });
 });
@@ -39,6 +40,13 @@ describe('useKioskMode', () => {
     expect(result.current.kiosk).toBe(true);
     expect(result.current.role).toBe('gluer');
     expect(result.current.homePath).toBe('/escalations/available?role=gluer&status=available');
+  });
+
+  it('a kiosk role that declares portals makes its first portal home', () => {
+    rolesOf(membership('porter'));
+    const { result } = renderHook(() => useKioskMode());
+    expect(result.current.kiosk).toBe(true);
+    expect(result.current.homePath).toBe('/portal/porter/floor');
   });
 
   it('stays off when the role does not opt in', () => {
@@ -93,6 +101,7 @@ describe('isKioskAllowedPath', () => {
     expect(isKioskAllowedPath('/escalations/available')).toBe(true);
     expect(isKioskAllowedPath('/escalations/detail/abc-123')).toBe(true);
     expect(isKioskAllowedPath('/scan/station')).toBe(true);
+    expect(isKioskAllowedPath('/portal/gluer/floor')).toBe(true);
     expect(isKioskAllowedPath('/login')).toBe(true);
   });
 

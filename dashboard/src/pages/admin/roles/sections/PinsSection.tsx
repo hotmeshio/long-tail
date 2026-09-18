@@ -18,7 +18,7 @@ interface LinkVariableRow {
  */
 export function PinsSection({ role }: { role: RoleDetail }) {
   return (
-    <>
+    <div className="space-y-14">
       <SectionGroup
         icon={Braces}
         label="Link Variables"
@@ -36,7 +36,7 @@ export function PinsSection({ role }: { role: RoleDetail }) {
       >
         <DefaultPinsEditor role={role} />
       </SectionGroup>
-    </>
+    </div>
   );
 }
 
@@ -72,7 +72,7 @@ function LinkVariablesEditor({ role }: { role: RoleDetail }) {
   const canAdd = FACET_KEY.test(trimmed) && !vars.some((v) => v.name === trimmed);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -117,9 +117,9 @@ function LinkVariablesEditor({ role }: { role: RoleDetail }) {
           and each device opens it scoped to its own value.
         </p>
       ) : (
-        <div className="space-y-1">
+        <div className="divide-y divide-surface-border/60">
           {vars.map((v) => (
-            <div key={v.name} className="flex items-baseline gap-2 text-2xs" data-testid="link-var-decl">
+            <div key={v.name} className="flex items-baseline gap-3 py-2.5 text-2xs" data-testid="link-var-decl">
               <span className="font-mono font-medium text-text-secondary shrink-0">{v.name}</span>
               {v.label && <span className="text-text-quaternary truncate">{v.label}</span>}
               <span className="font-mono text-text-quaternary truncate flex-1">
@@ -164,7 +164,7 @@ function DefaultPinsEditor({ role }: { role: RoleDetail }) {
   const canAdd = label.trim() !== '' && url.trim().startsWith('/');
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -198,12 +198,12 @@ function DefaultPinsEditor({ role }: { role: RoleDetail }) {
           Add one above and it lands here.
         </p>
       ) : (
-        <div className="space-y-1">
+        <div className="divide-y divide-surface-border/60">
           {pins.map((p) => {
             const varNames = extractLinkVarNames(p.url);
             return (
-              <div key={p.label}>
-                <div className="flex items-baseline gap-2 text-2xs">
+              <div key={p.label} className="py-2.5">
+                <div className="flex items-baseline gap-3 text-2xs">
                   <span className="font-medium text-text-secondary shrink-0">{p.label}</span>
                   {p.badge && <span className="text-2xs text-accent shrink-0" title="Shows a live count">count</span>}
                   <span className="font-mono text-text-quaternary truncate flex-1" title={p.url}>{p.url}</span>
@@ -216,7 +216,7 @@ function DefaultPinsEditor({ role }: { role: RoleDetail }) {
                   </button>
                 </div>
                 {varNames.length > 0 && (
-                  <p className="pl-2 font-mono text-2xs text-text-quaternary" data-testid="pin-binding-caption">
+                  <p className="mt-1.5 font-mono text-2xs text-text-tertiary" data-testid="pin-binding-caption">
                     {varNames.map((n) => {
                       const bound = values[n] ?? defaults[n];
                       return `${n} = ${bound ? `'${bound}'` : '<empty>'}`;

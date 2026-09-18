@@ -75,7 +75,8 @@ they always have.)
 ## Roles: first-class declarations
 
 `roles[]` registers roles with titles, versioned form/metadata/list schemas,
-escalation targets, upstream inputs, dials, and pins:
+escalation targets, upstream inputs, dials, pins, and portals
+(`portals`, named matrices of pin cells, each rendered as one page):
 
 ```typescript
 roles: [

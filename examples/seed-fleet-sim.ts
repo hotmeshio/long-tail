@@ -112,10 +112,36 @@ interface PrinterRoleData {
   list_schema?: Record<string, any>;
   form_schema?: Record<string, any>;
   default_pins?: { label: string; url: string; badge?: boolean }[];
+  // Named portals: each rows of pin cells rendered as one page.
+  portals?: { key: string; label: string; rows: { label: string; url: string; badge?: boolean }[][] }[];
   // Fronts a locked station viewport. The shared 'station' login is a read-only
   // member of all three, so it picks which of these is its kiosk home.
   kiosk?: boolean;
 }
+
+// The fleet's portals. "Floor screen": the board across the top, the two
+// facilities and the harvest queue beneath it. "By model": one panel per
+// printer model, side by side. Every cell is a pin in the nav's vocabulary.
+const facetPin = (facets: Record<string, string>, label: string) => ({
+  label,
+  url: `/escalations/available?role=${PRINTER_FLEET_ROLE}&facets=${encodeURIComponent(JSON.stringify(facets))}&view=table`,
+  badge: true,
+});
+const FLEET_PORTALS = [
+  {
+    key: 'floor',
+    label: 'Floor screen',
+    rows: [
+      [FLEET_DEFAULT_PINS[0]],
+      [facetPin({ facility: 'north' }, 'North facility'), facetPin({ facility: 'south' }, 'South facility'), FLEET_DEFAULT_PINS[1]],
+    ],
+  },
+  {
+    key: 'by-model',
+    label: 'By model',
+    rows: [[facetPin({ model: 'p1s' }, 'P1S'), facetPin({ model: 'h2s' }, 'H2S')]],
+  },
+];
 
 const PRINTER_ROLE_DATA: PrinterRoleData[] = [
   {
@@ -128,6 +154,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     list_schema: FLEET_LIST_SCHEMA,
     form_schema: PRINTER_FORM_SCHEMA,
     default_pins: FLEET_DEFAULT_PINS,
+    portals: FLEET_PORTALS,
     kiosk: true,
   },
   {
@@ -179,6 +206,7 @@ export async function seedPrinterFleetRoles(): Promise<void> {
           ...(data.list_schema ? { list_schema: data.list_schema } : {}),
           ...(data.form_schema ? { form_schema: data.form_schema } : {}),
           ...(data.default_pins ? { default_pins: data.default_pins } : {}),
+          ...(data.portals ? { portals: data.portals } : {}),
         });
       } else if (row != null && row.entity_facet == null) {
         // Self-heal: the role predates the dials (or another seeder configured

@@ -1,4 +1,4 @@
-import type { RoleDetail } from '../../../api/roles';
+import type { RoleDetail, RolePortal } from '../../../api/roles';
 
 // ── Shared helpers for the role detail page and its sections ─────────────────
 
@@ -61,6 +61,8 @@ export interface Draft {
   priority_facet: string;
   entity_facet: string;
   entity_state_source: 'role' | 'subtype';
+  /** The role's portals as edited; empty saves as null. */
+  portals: RolePortal[];
 }
 
 export interface DraftErrors {
@@ -75,6 +77,7 @@ export const EMPTY_DRAFT: Draft = {
   metadata_schema: '', properties: '{}',
   sla_minutes: '', target_per_hour: '', worker_count: '',
   priority_threshold_minutes: '', priority_facet: '', entity_facet: '', entity_state_source: 'role',
+  portals: [],
 };
 
 export function draftFrom(role: RoleDetail): Draft {
@@ -94,6 +97,7 @@ export function draftFrom(role: RoleDetail): Draft {
     priority_facet: role.priority_facet ?? '',
     entity_facet: role.entity_facet ?? '',
     entity_state_source: role.entity_state_source ?? 'role',
+    portals: role.portals ?? [],
   };
 }
 

@@ -1,4 +1,4 @@
-import { parseFacetParams } from './facet-url';
+import { parseEscalationListUrl, resolveListRoute } from './escalation-list-url';
 import type { PinnedView, UserPreferences } from '../api/preferences';
 import type { FacetFilters } from '../api/escalations';
 
@@ -40,36 +40,24 @@ export function resolvePins(
 }
 
 /**
- * Parse a pinned escalations-list URL back into the query its badge counts —
- * the same parsers the list page itself uses, so the badge is definitionally
- * the number the pin opens onto. Returns null for any other URL (no badge).
+ * A pinned escalations-list URL as the query its badge counts: the same
+ * parser and routing the list page uses, so the badge is definitionally the
+ * number the pin opens onto. Null for any other URL (no badge).
  */
 export function pinBadgeQuery(url: string): { available: boolean; params: Record<string, unknown> & FacetFilters } | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(url, 'http://local');
-  } catch {
-    return null;
-  }
-  if (parsed.pathname !== '/escalations/available' && parsed.pathname !== '/escalations') {
-    return null;
-  }
-  const sp = parsed.searchParams;
-  const facets = parseFacetParams(sp);
-  const status = sp.get('status') || undefined;
-  // Mirrors the list page: 'available' status routes through the available
-  // pool; 'all' and unset span statuses on the plain list.
-  const available = parsed.pathname === '/escalations/available'
-    && (status === undefined || status === 'available');
+  const list = parseEscalationListUrl(url);
+  if (!list) return null;
+  const { available, claimed, apiStatus } = resolveListRoute(list.statusFilter);
   return {
     available,
     params: {
-      ...facets,
-      role: sp.get('role') || undefined,
-      type: sp.get('type') || undefined,
-      priority: sp.get('priority') ? parseInt(sp.get('priority')!, 10) : undefined,
-      status: available || status === 'all' ? undefined : status,
-      search: sp.get('search') || undefined,
+      ...list.facets,
+      role: list.role,
+      type: list.type,
+      priority: list.priority,
+      status: apiStatus,
+      ...(claimed ? { claimed: true } : {}),
+      search: list.search,
     },
   };
 }

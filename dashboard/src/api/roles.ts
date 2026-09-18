@@ -6,6 +6,31 @@ export interface EscalationChain {
   target_role: string;
 }
 
+/** One pinned view: a label over a dashboard-relative URL, optionally badged with its live count. */
+export interface RolePin {
+  label: string;
+  url: string;
+  badge?: boolean;
+}
+
+/** Bounds for a role's portals and their matrices. */
+export const PORTAL_LIMITS = { MAX_PORTALS: 12, MAX_ROWS: 4, MAX_COLS: 6, MAX_COUNTS: 8 } as const;
+
+/** One count tile above a portal: a label, a blurb, and the live total of an escalations-list URL. */
+export interface PortalCount {
+  label: string;
+  url: string;
+  blurb?: string;
+}
+
+/** One named portal view: a matrix of pins rendered as one page, with optional count tiles above. */
+export interface RolePortal {
+  key: string;
+  label: string;
+  rows: RolePin[][];
+  counts?: PortalCount[];
+}
+
 export interface RoleDetail {
   role: string;
   title: string | null;
@@ -37,7 +62,9 @@ export interface RoleDetail {
   /** Version of the live list_schema; advances only on list-schema edits. Null until the role first carries one. */
   current_list_schema_version: number | null;
   /** Pinned-view seeds for members: [{ label, url, badge? }]. Users promote/hide/reorder via preferences. */
-  default_pins: { label: string; url: string; badge?: boolean }[] | null;
+  default_pins: RolePin[] | null;
+  /** The role's named portals, each a matrix of pin cells rendered as one page at /portal/:role/:key. */
+  portals: RolePortal[] | null;
   /**
    * Roles this station draws input from that live in other sequences.
    * parent_role is the single prior step placing the role in one sequence;
@@ -96,7 +123,8 @@ export interface UpdateRoleInput {
   form_schema?: Record<string, unknown> | null;
   metadata_schema?: Record<string, unknown> | null;
   list_schema?: Record<string, unknown> | null;
-  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
+  default_pins?: RolePin[] | null;
+  portals?: RolePortal[] | null;
   properties?: Record<string, unknown> | null;
   ops_visible?: boolean;
   /** Lead the home Pace Board with this role's sequence (single-holder). */

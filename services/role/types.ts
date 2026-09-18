@@ -38,6 +38,40 @@ export const ROLE_PROPERTY_KEYS = {
  * binding. Values are strings — jsonb containment is type-sensitive, so
  * numeric facets are not templatable.
  */
+/** One pinned view: a label over a dashboard-relative URL, optionally badged with its live count. */
+export interface RolePin {
+  label: string;
+  url: string;
+  badge?: boolean;
+}
+
+/** Bounds for a role's portals: how many, and the matrix of each (rows of cells, each cell a pin). */
+export const PORTAL_LIMITS = {
+  MAX_PORTALS: 12,
+  MAX_ROWS: 4,
+  MAX_COLS: 6,
+  MAX_COUNTS: 8,
+} as const;
+
+/** One count tile above a portal: a label, a blurb, and the live total of an escalations-list URL. */
+export interface PortalCount {
+  label: string;
+  url: string;
+  blurb?: string;
+}
+
+/** A portal key: a short url-safe slug, unique within the role. */
+export const PORTAL_KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** One named portal view: a matrix of pins rendered as one page. */
+export interface RolePortal {
+  key: string;
+  label: string;
+  rows: RolePin[][];
+  /** Count tiles shown above the panels, each the live total of a list URL. */
+  counts?: PortalCount[];
+}
+
 export interface RoleLinkVariable {
   name: string;
   label?: string;
@@ -129,7 +163,12 @@ export interface RoleDetail {
    * in their Pinned nav section (marked role-provided); users promote, hide,
    * or reorder them through their own preferences. URLs only — never data.
    */
-  default_pins: { label: string; url: string; badge?: boolean }[] | null;
+  default_pins: RolePin[] | null;
+  /**
+   * The role's portals: named matrices of pins, each rendered as one page of
+   * live list panels at /portal/:role/:portal. Null when the role declares none.
+   */
+  portals: RolePortal[] | null;
   /**
    * Roles this station draws input from that live in OTHER sequences.
    * parent_role is the single "prior step" placing the role in one sequence;
@@ -190,7 +229,9 @@ export interface UpdateRoleInput {
   metadata_schema?: Record<string, any> | null;
   /** JSON contract that richly formats this role's escalation list page. */
   list_schema?: Record<string, any> | null;
-  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
+  default_pins?: RolePin[] | null;
+  /** The role's named portals; null clears. */
+  portals?: RolePortal[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   /** Make this role's sequence the home Pace Board's default segment (single-holder). */

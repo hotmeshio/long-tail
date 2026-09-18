@@ -40,6 +40,10 @@ A role may declare `default_pins: [{ label, url, badge? }]` (edited on Role Deta
 
 Membership *is* the persona's bookmark set — no per-user setup. Duplicate labels across a user's roles collapse to the first role's pin.
 
+## Portal
+
+A role can lay its pins out as pages: `portals` is a list of named matrices, each an array of rows of pins, rendered at `/portal/<role>/<key>` as a grid of live list panels. Members choose one from the global menu, each also leads the role's group in the nav, and a kiosk role lands on its first portal as home. See [portal.md](portal.md).
+
 ## Reference Example
 
 The `fleet-servicer` seed (`examples/seed-fleet-sim.ts`) ships a facet-board list schema, jeopardy dials, and three default pins — the board, a badged "Needs harvesting" facet query, and a badged jeopardy view — so the whole persona story is exercisable from the dashboard. The seeded `reviewer` user is a member.

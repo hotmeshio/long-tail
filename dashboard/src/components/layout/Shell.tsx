@@ -6,6 +6,7 @@ import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
 import { useFollowMyClaims } from '../../hooks/useFollowMyClaims';
 import { useKioskMode, isKioskAllowedPath } from '../../hooks/useKioskMode';
+import { isPortalPath } from '../../lib/portal-path';
 import { useSettings } from '../../api/settings';
 import { getAiOverride } from '../../lib/view-as';
 import { SidebarProvider, useSidebar } from '../../hooks/useSidebar';
@@ -56,6 +57,9 @@ function ShellLayout() {
   // Kiosk (locked station viewport): single-role members of a kiosk role get
   // no left nav and are held to the role list / detail / scan screens.
   const { kiosk, homePath } = useKioskMode();
+  // A portal is a screen read from across a room: the nav steps aside for it
+  // the way it does for kiosk, while every other route stays reachable.
+  const hideNav = kiosk || isPortalPath(location.pathname);
 
   // Cross-fade on route change
   useEffect(() => {
@@ -87,7 +91,7 @@ function ShellLayout() {
       <Header
         onToggleEventFeed={() => setFeedOpen((v) => !v)}
         onToggleDocs={() => setDocsOpen((v) => !v)}
-        onToggleNav={kiosk ? undefined : () => setNavOpen((v) => !v)}
+        onToggleNav={hideNav ? undefined : () => setNavOpen((v) => !v)}
       />
 
       {/* Broadcast notices — full width, under the header */}
@@ -96,8 +100,8 @@ function ShellLayout() {
       {/* Sidebar + Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar — the rail lives at lg+; below lg the NavDrawer is the nav.
-            Kiosk sessions have no nav at all. */}
-        {!kiosk && (
+            Kiosk sessions and portal screens have no nav at all. */}
+        {!hideNav && (
         <aside
           className={`${
             collapsed ? 'w-16' : 'w-60'
@@ -153,8 +157,8 @@ function ShellLayout() {
         <ShellRightPanel />
       </div>
 
-      {/* Below-lg navigation drawer — absent in kiosk sessions. */}
-      {!kiosk && (
+      {/* Below-lg navigation drawer — absent in kiosk sessions and on portal screens. */}
+      {!hideNav && (
         <NavDrawer
           open={navOpen}
           onClose={() => setNavOpen(false)}

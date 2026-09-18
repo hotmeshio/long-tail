@@ -83,6 +83,35 @@ async function main() {
       },
     },
     examples: true,
+    // Code-owned declaration for the reviewer queue the examples route to: a
+    // portal that leads with the queue's counts and lays its lists beneath.
+    // `reset` keeps the declaration applied on every boot.
+    roles: [
+      {
+        role: 'reviewer',
+        title: 'Reviewer',
+        reset: true,
+        portals: [
+          {
+            key: 'review-desk',
+            label: 'Review desk',
+            counts: [
+              { label: 'Waiting', url: '/escalations/available?role=reviewer', blurb: 'Unclaimed items in the queue' },
+              { label: 'In progress', url: '/escalations/available?role=reviewer&status=claimed', blurb: 'Claimed and being worked' },
+              { label: 'Resolved', url: '/escalations/available?role=reviewer&status=resolved', blurb: 'Closed out by a reviewer' },
+              { label: 'Expired', url: '/escalations/available?role=reviewer&status=expired', blurb: 'Timed out before anyone acted' },
+              { label: 'Cancelled', url: '/escalations/available?role=reviewer&status=cancelled', blurb: 'Withdrawn by the workflow' },
+            ],
+            rows: [
+              [
+                { label: 'Waiting', url: '/escalations/available?role=reviewer&view=table&layout=compact', badge: true },
+                { label: 'In progress', url: '/escalations/available?role=reviewer&status=claimed&view=table&layout=compact', badge: true },
+              ],
+            ],
+          },
+        ],
+      },
+    ],
     features: {
       // The examples ship the full scan demo (schemes 10/11); surface it.
       scanCodes: true,

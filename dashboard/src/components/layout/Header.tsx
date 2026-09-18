@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Inbox, User, Menu, X, BookmarkPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Inbox, User, Menu, X, BookmarkPlus, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
@@ -14,7 +14,8 @@ import { getAllThemes, registerThemes, getTheme, setTheme, type Theme } from '..
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { useScanEnabled } from '../../hooks/useScanInput';
 import { ScanPanel } from '../scan/ScanPanel';
-import { useKioskMode } from '../../hooks/useKioskMode';
+import { kioskHomePath, useKioskMode } from '../../hooks/useKioskMode';
+import { portalPath, portalsOf } from '../../lib/portal-path';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { LinkVariablesModal } from './LinkVariablesModal';
 import { SearchCommandBar } from './SearchCommandBar';
@@ -43,7 +44,7 @@ function persistBookmarks(bookmarks: Bookmark[]): void {
 
 export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onToggleEventFeed?: () => void; onToggleDocs?: () => void; onToggleNav?: () => void }) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isSuperAdmin, hasRoleType } = useAuth();
   const { viewAs, realIsBuilder } = useAccess();
   const { available, mine } = useEscalationCounts();
   usePersona();
@@ -52,7 +53,17 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
   const { role: kioskRole, targets: kioskTargets, selectable: kioskSelectable, selectRole: selectKioskRole } = useKioskMode();
   const { declarations: linkVarDeclarations, values: linkVarValues } = useLinkVariables();
   const [linkVarsOpen, setLinkVarsOpen] = useState(false);
-  const { data: roleDetails } = useRoleDetails({ enabled: kioskSelectable });
+  const { data: roleDetails } = useRoleDetails();
+  // The portals this login may open from the menu: every role's for a global
+  // viewer, the member roles' for everyone else. One entry per named portal.
+  const portalMenu = useMemo(() => {
+    const roles = roleDetails?.roles ?? [];
+    const member = new Set((user?.roles ?? []).map((r) => r.role));
+    const global = isSuperAdmin || hasRoleType('admin');
+    return roles
+      .filter((r) => portalsOf(r).length > 0 && (global || member.has(r.role)))
+      .map((r) => ({ role: r.role, title: displayRoleTitle(r), portals: portalsOf(r) }));
+  }, [roleDetails, user, isSuperAdmin, hasRoleType]);
   const { setPanel, closePanel, open: panelOpen, ownerKey } = useShellPanel();
   const scanEnabled = useScanEnabled();
   const location = useLocation();
@@ -324,7 +335,7 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                               onClick={() => {
                                 setMenuOpen(false);
                                 selectKioskRole(r);
-                                navigate(`/escalations/available?role=${encodeURIComponent(r)}&status=available`);
+                                navigate(kioskHomePath(r, portalsOf(detail)));
                               }}
                               className={`flex items-center gap-2 -mx-1 px-1 py-1 text-xs text-left rounded hover:bg-surface-hover ${active ? 'text-accent' : 'text-text-secondary'}`}
                             >
@@ -333,6 +344,36 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                             </button>
                           );
                         })}
+                      </div>
+                    </div>
+                  )}
+                  {portalMenu.length > 0 && (
+                    <div className="px-3 py-2 border-t border-surface-border/60" data-testid="menu-portals">
+                      <p className="text-2xs font-medium uppercase tracking-widest text-text-tertiary mb-1.5">Portals</p>
+                      <div className="flex flex-col gap-1.5">
+                        {portalMenu.map((group) => (
+                          <div key={group.role}>
+                            {portalMenu.length > 1 && (
+                              <p className="text-2xs text-text-quaternary truncate" title={group.role}>{group.title}</p>
+                            )}
+                            {group.portals.map((portal) => {
+                              const to = portalPath(group.role, portal.key);
+                              const active = location.pathname === to;
+                              return (
+                                <button
+                                  key={portal.key}
+                                  type="button"
+                                  onClick={() => { setMenuOpen(false); navigate(to); }}
+                                  className={`flex items-center gap-2 -mx-1 px-1 py-1 w-full text-xs text-left rounded hover:bg-surface-hover ${active ? 'text-accent' : 'text-text-secondary'}`}
+                                  data-testid={`menu-portal-${group.role}-${portal.key}`}
+                                >
+                                  <LayoutGrid className="w-3.5 h-3.5 shrink-0 text-accent/75" strokeWidth={1.5} />
+                                  <span className="truncate">{portal.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
