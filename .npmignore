@@ -42,3 +42,9 @@ docs/img/
 !LICENSE
 
 CLAUDE.md
+
+# Planning and brainstorming docs
+docs/donotcommit/
+
+# Narrative and concept docs: on GitHub, never in the package
+docs/donotpublish/

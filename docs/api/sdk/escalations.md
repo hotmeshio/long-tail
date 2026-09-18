@@ -436,6 +436,25 @@ fires first resumes the workflow with `false` and expires the row in a guarded
 UPDATE, so operators can never resolve into a workflow that already moved on.
 `expiresAt`, by contrast, is display metadata on the row — it arms nothing.
 
+### Open accumulation (`accumulate`)
+
+`conditionalAccumulator<P, R>(signalId, config)` is `conditional` typed for an open accumulator: the config carries `accumulate: { max?, resolveAtMax?, unique? }`, and the wait resolves with `AccumulatorResult<P, R>` (`{ $accumulated: AccumulatedItem<P>[], $trigger: 'count' | 'timeout' | 'resolve', ...R }`) on every terminal path except cancel (`null`). `false` is not in the return type because a timeout delivers the collection. `P` types each item's payload; `R` types the resolver payload merged in when a person closes the container by hand.
+
+```typescript
+import { conditionalAccumulator } from '@hotmeshio/long-tail';
+
+const bin = await conditionalAccumulator<BagV1, { shippedBy?: string }>(signalId, {
+  role: 'bin',
+  metadata: { binKey },
+  accumulate: { max: 12 },
+  timeout: '4h',
+});
+if (bin === null) return cancelled();
+ship(bin.$accumulated.map((item) => item.itemKey), bin.$trigger);
+```
+
+Requires hotmesh 0.29.0+. `conditional` accepts the same `accumulate` field and returns `T | false | null`; `partialOnTimeout: true` on a `batch` wait likewise makes the timer deliver the filled items with `$trigger: 'timeout'`. See [Creating Escalations](../../hitl/escalation.md#open-accumulation--items-arrive-over-time).
+
 ### Two-step form
 
 Create the escalation first (e.g. to enrich routing metadata), then wait:
@@ -825,6 +844,78 @@ const result = await lt.escalations.resolveByMetadata({
 **Returns:** `LTApiResult<{ escalation }>` for non-signal, `LTApiResult<{ signaled, escalationId, workflowId }>` for signal-backed. 404 if no match.
 
 **Auth:** Required
+
+## resolveBatchItem / resolveBatchItemBySignalKey / resolveBatchItemByMetadata
+
+Submit ONE declared item of a batch escalation (`conditional` with `batch: [...]`). Interim items return `{ outcome: 'accepted', remaining, escalationId }`; the LAST item returns `{ outcome: 'completed', remaining: 0, signaled, escalationId, workflowId }` and the waiting workflow resumes with the full collection. See [Resolution — Batch items](../../hitl/resolution.md#batch-items).
+
+```typescript
+await lt.escalations.resolveBatchItem({ id, itemKey: 'weld', resolverPayload: { ok: true }, metadata?, assertClaim? });
+await lt.escalations.resolveBatchItemBySignalKey({ signalKey, itemKey, resolverPayload, metadata? });
+await lt.escalations.resolveBatchItemByMetadata({ key, value, itemKey, resolverPayload, metadata?, restrictRoles? });
+```
+
+**Returns:** `LTApiResult<{ outcome, remaining, escalationId, signaled?, workflowId? }>`. 409 on a duplicate item, 400 on an undeclared key or a non-batch row.
+
+**Auth:** Required
+
+## accumulate / accumulateBySignalKey / accumulateByMetadata
+
+Add ONE item to an open accumulator escalation (`conditionalAccumulator` with `accumulate: {...}`). Interim adds return `accepted` with the count held and slots remaining; the add that reaches `max` returns `completed` and the waiting workflow resumes with the ordered collection, in the same statement. See [Resolution — Accumulator items](../../hitl/resolution.md#accumulator-items).
+
+```typescript
+const added = await lt.escalations.accumulate({
+  id: binId,
+  itemKey: orderId,
+  payload: { weight: 2 },
+  reciprocal: { id: bagEscalationId },
+});
+// added.data → { outcome: 'accepted', count: 1, remaining: 11, escalationId,
+//                reciprocal: { outcome: 'completed', count: 1, remaining: 0, escalationId, signaled: true } }
+
+await lt.escalations.accumulateBySignalKey({ signalKey, itemKey });
+await lt.escalations.accumulateByMetadata({ key: 'binKey', value: binKey, itemKey, restrictRoles: ['bin'] });
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` / `signalKey` / `key` + `value` | `string` | Yes | The container selector, one per method |
+| `itemKey` | `string` | Yes | The key the item is held under (1 to 128 characters) |
+| `payload` | `object` | No | Stored on the entry and delivered inside `$accumulated`; validates against the container's versioned role form |
+| `metadata` | `object` | No | Merge patch for the container metadata, same statement; reserved `accumulate_*` keys rejected |
+| `assertClaim` | `boolean` | No | By id only: require the caller's own live claim |
+| `reciprocal` | `object` | No | `{ id \| signalKey \| key + value, payload? }`: a second accumulator row written in the same statement, both or neither |
+| `restrictRoles` | `string[]` | No | By metadata only: expected queues, intersected with the caller's write scope |
+
+**Returns:** `LTApiResult<{ outcome: 'accepted' \| 'completed', count, remaining, escalationId, signaled?, workflowId?, reciprocal? }>`. `remaining` is `null` on an unbounded accumulator. 409 on `Item already held`, `Accumulator is full`, claim blocks, terminal rows, and reciprocal blocks; 400 on a non-accumulator; 404 non-disclosure.
+
+**Auth:** Required
+
+## removeItem / removeItemBySignalKey / removeItemByMetadata
+
+Remove ONE held item from a pending accumulator in one guarded statement. The row stays pending and the waiter never wakes.
+
+```typescript
+await lt.escalations.removeItem({ id: binId, itemKey: orderId, reciprocal: { id: bagEscalationId } });
+// → { outcome: 'removed', count: 11, escalationId, reciprocal?: { count, escalationId } }
+```
+
+**Returns:** `LTApiResult<{ outcome: 'removed', count, escalationId, reciprocal? }>`. 404 `Item not held by this escalation`.
+
+**Auth:** Required
+
+## getItems
+
+The held items of an accumulator or batch row in arrival order.
+
+```typescript
+const { data } = await lt.escalations.getItems({ id: binId });
+// data → { escalationId, kind: 'accumulate' | 'batch', status, count, max, items: [{ itemKey, payload?, at, actor?, reciprocalId? }], pending? }
+```
+
+**Auth:** Required (read access; 404 non-disclosure)
 
 ## resolveByIds
 

@@ -193,6 +193,7 @@ export async function updateRoleMetadata(
     provided('ops_home_default'), input.ops_home_default ?? null,
     provided('entity_facet'), input.entity_facet ?? null,
     provided('entity_state_source'), input.entity_state_source ?? null,
+    provided('portals'), input.portals != null ? JSON.stringify(input.portals) : null,
   ]);
   if (!rows[0]) return null;
   // Enforcement state may have changed — drop this role's cached entries so

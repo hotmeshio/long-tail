@@ -15,6 +15,7 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 | `"link"` | ReadOnly navigation link. URL is an `x-lt-href` template with `{{domain.path}}` tokens. See [x-lt-embed.md](x-lt-embed.md). |
 | `"escalation"` | ReadOnly embedded escalation card. ID sourced from `x-lt-source`; optional `x-lt-fields` surfaces any metadata or resolver detail. See [x-lt-embed.md](x-lt-embed.md). |
 | `"escalation-list"` | ReadOnly embedded escalation list. Driven by an `x-lt-query` facet object; columns from `x-lt-columns`. See [x-lt-embed.md](x-lt-embed.md). |
+| `"invoke"` | ReadOnly control that starts a workflow, directly or in a prefilled dialog. Target and payload mapping in `x-lt-invoke`. See [x-lt-invoke.md](x-lt-invoke.md). |
 
 ---
 

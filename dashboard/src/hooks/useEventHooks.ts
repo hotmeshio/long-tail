@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEventSubscription, useEventSubscriptions } from './useEventContext';
 import { getInvalidationKeys } from '../lib/events/invalidation';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
@@ -15,7 +15,7 @@ import { getInvalidationScheduler, type RefreshTier } from '../lib/realtime-refr
  */
 export function useThrottledInvalidation(tier: RefreshTier) {
   const qc = useQueryClient();
-  return useCallback((keys: string[][]) => {
+  return useCallback((keys: ReadonlyArray<QueryKey>) => {
     getInvalidationScheduler(qc).request(tier, keys);
   }, [qc, tier]);
 }

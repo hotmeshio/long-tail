@@ -88,3 +88,26 @@ describe('role service — startup apply (code-owned)', () => {
     expect(detail?.current_schema_version).toBe(1);
   });
 });
+
+describe('role service — startup apply of portals', () => {
+  const PORTAL_ROLE = `apply-portal-${Date.now()}`;
+  const cellA = { label: 'A', url: '/escalations/available?role=a' };
+  const cellB = { label: 'B', url: '/escalations/available?role=b' };
+  const cellC = { label: 'C', url: '/escalations/available?role=c' };
+  const declared = (rows: typeof cellA[][]) => [{ key: 'main', label: 'Main', rows }];
+
+  afterAll(async () => {
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [PORTAL_ROLE]);
+  });
+
+  const stored = async () => (await roleService.listRolesWithDetails()).find((r) => r.role === PORTAL_ROLE)?.portals;
+
+  it('applies the declared portals, treats an identical apply as a no-op, and sees a row reorder as a change', async () => {
+    expect(await applyRoleConfig({ role: PORTAL_ROLE, portals: declared([[cellA, cellB], [cellC]]) }, true)).toBe('applied');
+    expect(await stored()).toEqual(declared([[cellA, cellB], [cellC]]));
+    expect(await applyRoleConfig({ role: PORTAL_ROLE, portals: declared([[cellA, cellB], [cellC]]) }, true)).toBe('unchanged');
+    // Rows with different cell counts swap places: the order is the layout.
+    expect(await applyRoleConfig({ role: PORTAL_ROLE, portals: declared([[cellC], [cellA, cellB]]) }, true)).toBe('applied');
+    expect(await stored()).toEqual(declared([[cellC], [cellA, cellB]]));
+  });
+});

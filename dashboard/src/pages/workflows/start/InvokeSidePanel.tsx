@@ -64,21 +64,25 @@ function InvokePanelContent({
  * The invoke form's side panel in the shell's right slot: Instructions
  * (x-lt-help, re-interpolated against the live values) and Issues (the
  * current violations, click-to-focus). Content follows the form while the
- * panel is open; the slot is released on unmount.
+ * panel is open; the slot is released on unmount. A host that cannot use the
+ * slot (a dialog over the shell) passes `enabled: false` and renders the same
+ * content inline; the hook then never claims the slot.
  */
 export function useInvokeSidePanel({
   schema,
   context,
   errors,
+  enabled = true,
 }: {
   schema: Record<string, unknown>;
   context: ShowIfContext;
   errors: FieldError[];
+  enabled?: boolean;
 }) {
   const shell = useShellPanelOptional();
   // The provider's callbacks are stable; the context object is not.
-  const setPanel = shell?.setPanel;
-  const closePanel = shell?.closePanel;
+  const setPanel = enabled ? shell?.setPanel : undefined;
+  const closePanel = enabled ? shell?.closePanel : undefined;
   const ownerKey = shell?.ownerKey ?? null;
   const slotOpen = shell?.open ?? false;
   const [view, setView] = useState<InvokePanelView | null>(null);
@@ -115,6 +119,7 @@ export function useInvokeSidePanel({
   useEffect(() => () => { closeRef.current?.(INVOKE_PANEL_KEY); }, []);
 
   return {
+    helpMarkdown,
     hasInstructions: !!helpMarkdown,
     open: view !== null,
     showInstructions: () => setView(INVOKE_PANEL_VIEWS.INSTRUCTIONS),

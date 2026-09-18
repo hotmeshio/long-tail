@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEventSubscriptions } from '../../../hooks/useEventContext';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
+import { TreeNode } from '../../../components/common/data/json-viewer-nodes';
 import type { NatsLTEvent } from '../../../lib/nats/types';
 
 export const RUN_OUTCOMES = {
@@ -41,6 +42,34 @@ export function useRunOutcome(workflowId: string): { outcome: RunOutcome; payloa
   );
 
   return { outcome, payload };
+}
+
+const OUTCOME_LABELS: Record<RunOutcome, string> = {
+  [RUN_OUTCOMES.RUNNING]: 'Working…',
+  [RUN_OUTCOMES.COMPLETED]: 'Completed',
+  [RUN_OUTCOMES.FAILED]: 'Failed',
+};
+
+/** The outcome as one word in its tone, pulsing while the run is still working. Carries no run id. */
+export function RunOutcomeLabel({ outcome, className = '' }: { outcome: RunOutcome; className?: string }) {
+  const tone = outcome === RUN_OUTCOMES.FAILED ? 'text-status-error'
+    : outcome === RUN_OUTCOMES.COMPLETED ? 'text-status-success' : 'text-text-secondary';
+  return (
+    <p className={`flex items-center gap-1.5 text-xs ${tone} ${className}`} role="status" data-testid="run-outcome">
+      {OUTCOME_LABELS[outcome]}
+      {outcome === RUN_OUTCOMES.RUNNING && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" aria-hidden />}
+    </p>
+  );
+}
+
+/** The returned payload as an outline: labeled values, nested groups, nothing to operate. */
+export function RunOutline({ payload }: { payload: Record<string, unknown> | undefined }) {
+  if (!payload || Object.keys(payload).length === 0) return null;
+  return (
+    <div className="max-h-72 overflow-y-auto px-3 py-2 bg-surface-sunken" data-testid="run-outline">
+      <TreeNode data={payload} />
+    </div>
+  );
 }
 
 /** The one-line status: outcome, id, and the execution link for callers who may open it. */

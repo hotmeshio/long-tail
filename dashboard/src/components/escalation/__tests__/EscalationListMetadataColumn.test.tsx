@@ -66,15 +66,44 @@ describe('facet-table refine — cells carry data, the row carries the drill', (
     expect(screen.getAllByTestId('row-refine')).toHaveLength(1);
   });
 
-  it('rows without metadata-bound values carry no trigger', () => {
+  it('a row with no metadata facets carries no trigger', () => {
     render(
       <EscalationListView
         role="policy-document"
         listSchema={{ ...SCHEMA, 'x-lt-columns': [{ label: 'Description', value: '{{escalation.description}}' }] }}
-        activeEscalations={[makeRow()]}
+        activeEscalations={[makeRow({ metadata: {} })]}
       />,
     );
     expect(screen.queryByTestId('row-refine')).not.toBeInTheDocument();
+  });
+
+  it('the dialog reaches every scalar facet on the record: bound columns first under their labels, the rest under derived labels', () => {
+    render(
+      <EscalationListView
+        role="policy-document"
+        listSchema={{ ...SCHEMA, 'x-lt-columns': [{ label: 'PO', value: '{{metadata.po}}' }] }}
+        activeEscalations={[makeRow({ metadata: { owner: 'Legal', po: 'PO-9', facility_code: 'north', rush: true, tags: ['a'], blank: '' } })]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('row-refine'));
+    const labels = screen.getAllByTestId('refine-pair').map((p) => p.querySelector('span:nth-child(2)')!.textContent);
+    expect(labels).toEqual(['PO', 'Owner', 'Facility Code', 'Rush']);
+    fireEvent.click(screen.getAllByTestId('refine-pair')[2]);
+    fireEvent.click(screen.getByTestId('refine-filter-role'));
+    expect(screen.getByTestId('loc').textContent).toContain('"facility_code":"north"');
+  });
+
+  it('past a handful of facts a find box narrows the list by label, key, or value', () => {
+    const metadata = Object.fromEntries(Array.from({ length: 8 }, (_, i) => [`facet_${i}`, `value-${i}`]));
+    render(
+      <EscalationListView role="policy-document" listSchema={SCHEMA} activeEscalations={[makeRow({ metadata })]} />,
+    );
+    fireEvent.click(screen.getByTestId('row-refine'));
+    expect(screen.getAllByTestId('refine-pair')).toHaveLength(8);
+    fireEvent.change(screen.getByTestId('refine-find'), { target: { value: 'value-3' } });
+    expect(screen.getAllByTestId('refine-pair')).toHaveLength(1);
+    fireEvent.change(screen.getByTestId('refine-find'), { target: { value: 'Facet 5' } });
+    expect(screen.getAllByTestId('refine-pair')).toHaveLength(1);
   });
 
   it('the dialog lists the row facts; multi-select ANDs facets into a role-scoped filter', () => {

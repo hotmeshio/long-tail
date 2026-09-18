@@ -12,6 +12,7 @@ import { useEscalations, useClaimEscalation } from '../../api/escalations';
 import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { formatAgoCompact } from '../../lib/format';
+import { identifierToTitle } from '../../lib/identifier-label';
 import { getDeep } from '../../lib/x-lt-bind';
 import { typeColor } from '../../lib/type-color';
 import { RefineDialog, type RefinePair } from './RefineDialog';
@@ -67,8 +68,8 @@ export interface ColumnDef {
    */
   priority?: 1 | 2 | 3;
   /** CSS column width ("40%", "12rem"). Unset columns share the remainder;
-   *  when no column declares one, the first column gets 40% — the identity
-   *  is nearly always the row's most important value. */
+   *  when no column declares one, the first column holds a fixed 200px so
+   *  the identity stays legible and every other value keeps its room. */
   width?: string;
 }
 
@@ -159,25 +160,42 @@ export function rowContext(e: LTEscalationRecord): HelpTokenContext {
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const EM_DASH = '—';
 
+/** Column value formats an author may name. `ago` is the spoken form of `age`. */
+export const FIELD_FORMATS = {
+  AGE: 'age',
+  AGO: 'ago',
+  DATE: 'date',
+  USER: 'user',
+} as const;
+
 /**
- * Render an interpolated field value with a little care: `format: "age"` turns
- * a timestamp into a compact age ("12m", "3h") with the absolute time as its
- * tooltip; `format: "user"` resolves a user-id token to a display name; a full
- * ISO datetime becomes a friendly, hoverable date; an empty value a quiet em
- * dash; anything else plain text. Authors bind tokens; we make the common
- * shapes look right.
+ * Render an interpolated field value with a little care: `format: "age"` (or
+ * `"ago"`) turns a timestamp into a compact age ("12m", "3h") with the
+ * absolute time as its tooltip; `format: "date"` renders the full date the
+ * dashboard uses everywhere, hoverable, and so does any ISO datetime with no
+ * format; `format: "user"` resolves a user-id token to a display name; an
+ * empty value a quiet em dash; anything else plain text. Authors bind
+ * tokens; we make the common shapes look right.
  */
 function FieldValue({ raw, format }: { raw: string; format?: string }) {
   if (!raw || raw === EM_DASH) return <span className="text-text-quaternary">{EM_DASH}</span>;
-  if (format === 'user') return <UserName userId={raw} className="block truncate" />;
-  if (format === 'age') {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) {
-      return <span title={d.toLocaleString()} className="tabular-nums whitespace-nowrap">{formatAgoCompact(raw)}</span>;
-    }
+  if (format === FIELD_FORMATS.USER) return <UserName userId={raw} className="block truncate" />;
+  const isDate = ISO_DATETIME.test(raw) || !Number.isNaN(new Date(raw).getTime()) && (format === FIELD_FORMATS.AGE || format === FIELD_FORMATS.AGO || format === FIELD_FORMATS.DATE);
+  if ((format === FIELD_FORMATS.AGE || format === FIELD_FORMATS.AGO) && isDate) {
+    return <span title={new Date(raw).toLocaleString()} className="tabular-nums whitespace-nowrap">{formatAgoCompact(raw)}</span>;
   }
-  if (ISO_DATETIME.test(raw)) return <DateValue date={raw} format="datetime" className="text-text-primary" />;
+  if (isDate && (format === FIELD_FORMATS.DATE || ISO_DATETIME.test(raw))) {
+    return <DateValue date={raw} format="datetime" className="text-text-primary whitespace-nowrap" />;
+  }
   return <>{raw}</>;
+}
+
+/** The identity column's width when no column declares one: room for a label, no more. */
+const IDENTITY_COLUMN_WIDTH = '200px';
+
+/** The action column sizes to its label so the button never wraps or truncates. */
+function actionColumnWidth(label: string): string {
+  return `${Math.max(6, Math.round(label.length * 0.55 + 3.5))}rem`;
 }
 
 const DEFAULT_CLAIM_MINUTES = 30;
@@ -389,21 +407,34 @@ function HistoryColumn({ role, def, onRowClick }: {
   );
 }
 
+/** A metadata value the faceted query can match on: a scalar with something in it. */
+function isFacetValue(raw: unknown): raw is string | number | boolean {
+  return (typeof raw === 'string' && raw !== '') || typeof raw === 'number' || typeof raw === 'boolean';
+}
+
 /**
- * The refinable facts one row offers: every column the author bound to a pure
- * metadata value, with its authored label and the row's raw value. Feeds the
- * row's RefineDialog.
+ * The refinable facts one row offers: every metadata facet the row carries.
+ * Columns the author bound to a metadata value lead, under their authored
+ * labels; every other scalar facet follows under a label derived from its
+ * key, so the dialog reaches the whole record, not only what the columns
+ * show. Feeds the row's RefineDialog.
  */
 export function rowRefinePairs(row: LTEscalationRecord, columnDefs: ColumnDef[]): RefinePair[] {
   const pairs: RefinePair[] = [];
   const seen = new Set<string>();
+  const metadata = row.metadata ?? {};
   for (const col of columnDefs) {
     const bound = col.value.match(METADATA_TOKEN)?.[1];
     if (!bound || seen.has(bound)) continue;
-    const raw = row.metadata?.[bound];
-    if (raw === undefined || raw === null || raw === '') continue;
+    const raw = metadata[bound];
+    if (!isFacetValue(raw)) continue;
     seen.add(bound);
-    pairs.push({ key: bound, label: col.label, value: raw });
+    pairs.push({ key: bound, label: col.label, value: raw, bound: true });
+  }
+  for (const [key, raw] of Object.entries(metadata)) {
+    if (seen.has(key) || !isFacetValue(raw)) continue;
+    seen.add(key);
+    pairs.push({ key, label: identifierToTitle(key), value: raw });
   }
   return pairs;
 }
@@ -440,20 +471,22 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
   const [refineRow, setRefineRow] = useState<LTEscalationRecord | null>(null);
 
   // The authored columns render through the SAME table the engineer views
-  // use: padded cells, sticky header, and the card fold at narrow widths —
-  // a table never scrolls horizontally, it folds. Authors steer the fold
-  // with `priority` on each column (1 title line, 2 folds, 3 dropped);
-  // undeclared, the first column is the identity.
+  // use, at its dense setting: small type, tight side padding, sticky header,
+  // and the card fold at narrow widths — a table never scrolls horizontally,
+  // it folds. Authors steer the fold with `priority` on each column (1 title
+  // line, 2 folds, 3 dropped); undeclared, the first column is the identity
+  // and holds 200px so every other value keeps its room.
   //
   // Cells carry DATA only — the full column width belongs to the value, with
   // the full text on hover. Refining lives on the row: one magnifier opens
   // the RefineDialog over every metadata-bound value the row carries.
+  const actionLabel = rowAction?.label ?? (forceView ? 'View' : 'Claim');
   const columns: TableColumn<LTEscalationRecord>[] = [
     {
       key: '_status',
       label: '',
       priority: 1,
-      className: 'w-10',
+      className: 'w-8',
       render: (row) => (
         <span
           className={`w-2.5 h-2.5 inline-block rounded-full dot-ring ${escalationDotClass(row)}`}
@@ -465,7 +498,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       key: `col-${i}`,
       label: col.label,
       priority: col.priority ?? (i === 0 ? 1 : 2),
-      width: col.width ?? (i === 0 && !columnDefs.some((c) => c.width) ? '40%' : undefined),
+      width: col.width ?? (i === 0 && !columnDefs.some((c) => c.width) ? IDENTITY_COLUMN_WIDTH : undefined),
       render: (row) => {
         const ctx = rowContext(row);
         const text = interpolateHelp(col.value, ctx);
@@ -480,7 +513,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       key: '_refine',
       label: '',
       priority: 1,
-      className: 'w-9',
+      className: 'w-8 px-1',
       render: (row) =>
         rowRefinePairs(row, columnDefs).length > 0
           ? <RefineTrigger onOpen={() => setRefineRow(row)} />
@@ -494,7 +527,8 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
       key: '_action',
       label: '',
       priority: 1,
-      className: 'w-44 text-right whitespace-nowrap',
+      width: actionColumnWidth(actionLabel),
+      className: 'text-right whitespace-nowrap',
       render: (row) => (
         <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
       ),
@@ -507,6 +541,7 @@ function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
         columns={columns}
         data={rows}
         layout="fixed"
+        density="dense"
         keyFn={(row) => row.id}
         onRowClick={onRowClick}
         emptyMessage="No pending items."

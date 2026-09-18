@@ -864,7 +864,7 @@ export function OperationsPage() {
                       </button>
                     ))}
                   </div>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                  <div className="flex-1 min-h-0 overflow-hidden">
                     <PaceChart
                       stations={chartStations}
                       selectedRole={selectedRole}
@@ -873,6 +873,7 @@ export function OperationsPage() {
                       onCmdClick={(role) => navigate(`/escalations/available?role=${encodeURIComponent(role)}`)}
                       periodHours={PERIOD_HOURS[period]}
                       logScale={logScale}
+                      fill
                     />
                   </div>
                 </div>

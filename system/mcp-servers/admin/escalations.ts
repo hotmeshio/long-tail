@@ -44,6 +44,9 @@ import {
   claimByFacetsSchema,
   aggregateByFacetsSchema,
   timelineByFacetSchema,
+  accumulateItemSchema,
+  removeItemSchema,
+  getEscalationItemsSchema,
 } from './schemas';
 
 let systemPrincipalId: string | null = null;
@@ -279,6 +282,68 @@ export function registerEscalationTools(server: McpServer): void {
         { id: args.id, resolverPayload: args.resolverPayload },
         await systemAuth(),
       );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/:id/accumulate
+  (server as any).registerTool(
+    'accumulate_item',
+    {
+      title: 'Accumulate Item',
+      description:
+        'Add ONE item to an open accumulator escalation. Interim adds answer outcome "accepted" with the ' +
+        'count held and remaining slots; the add that reaches max completes the row and wakes the waiting ' +
+        'workflow with the ordered collection. A reciprocal row is written in the same statement, both or neither.',
+      inputSchema: accumulateItemSchema,
+    },
+    async (args: z.infer<typeof accumulateItemSchema>) => {
+      const result = await escalationApi.accumulateItem(
+        { id: args.id, itemKey: args.itemKey, payload: args.payload, metadata: args.metadata, reciprocal: args.reciprocal },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error, ...(result.data ?? {}) }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors POST /api/escalations/:id/remove-item
+  (server as any).registerTool(
+    'remove_item',
+    {
+      title: 'Remove Item',
+      description:
+        'Remove ONE held item from a pending open accumulator escalation. The row stays pending and the ' +
+        'waiting workflow is never woken.',
+      inputSchema: removeItemSchema,
+    },
+    async (args: z.infer<typeof removeItemSchema>) => {
+      const result = await escalationApi.removeItem(
+        { id: args.id, itemKey: args.itemKey, reciprocal: args.reciprocal },
+        await systemAuth(),
+      );
+      if (result.error) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error, ...(result.data ?? {}) }) }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+    },
+  );
+
+  // mirrors GET /api/escalations/:id/items
+  (server as any).registerTool(
+    'get_escalation_items',
+    {
+      title: 'Get Escalation Items',
+      description: 'The held items of an accumulator or batch escalation in arrival order, with the count and max.',
+      inputSchema: getEscalationItemsSchema,
+    },
+    async (args: z.infer<typeof getEscalationItemsSchema>) => {
+      const result = await escalationApi.getEscalationItems({ id: args.id }, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

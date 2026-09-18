@@ -281,6 +281,7 @@ export function registerUserTools(server: McpServer): void {
         upstream_roles: args.upstream_roles,
         list_schema: args.list_schema as Record<string, any> | null | undefined,
         default_pins: args.default_pins,
+        portals: args.portals,
         change_summary: args.change_summary,
       });
       if (!updated) {

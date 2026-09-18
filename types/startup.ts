@@ -225,6 +225,18 @@ export interface LTRoleConfig {
   escalation_targets?: string[];
   /** Pinned-view seeds handed to members: [{ label, url, badge? }]. */
   default_pins?: { label: string; url: string; badge?: boolean }[];
+  /**
+   * Named portal views: each a matrix of pin cells (1..4 rows of 1..6) rendered
+   * as one page at /portal/:role/:key, with optional count tiles above the
+   * panels (the live total of a list URL, with a blurb). Members pick a portal
+   * from the global menu.
+   */
+  portals?: {
+    key: string;
+    label: string;
+    rows: { label: string; url: string; badge?: boolean }[][];
+    counts?: { label: string; url: string; blurb?: string }[];
+  }[];
   /** Server-side resolver schema validation for this role. */
   enforce_schema?: boolean;
   sla_minutes?: number;

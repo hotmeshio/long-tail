@@ -25,6 +25,7 @@
  */
 
 import { createRole, updateRoleMetadata, listRolesWithDetails } from '../services/role';
+import { fleetTools } from './workflows/fleet-tools';
 import { createEscalation, resolveEscalation, countByFacets } from '../services/escalation';
 import { getPool } from '../lib/db';
 import { loggerRegistry } from '../lib/logger';
@@ -34,16 +35,33 @@ export const PRINTER_HARVEST_ROLE = 'printer-harvest';
 export const PRINTER_SERVICE_ROLE = 'printer-service';
 export const PRINTER_ENTITY_FACET = 'serialNumber';
 
-// The work form for a scanned printer: a checkbox, a required note, and a
-// return-to-list transition after resolve.
+// The work form for a scanned printer: a checkbox, a required note, the fleet
+// tools for this machine, and a return-to-list transition after resolve.
 const PRINTER_FORM_SCHEMA = {
   'x-lt-transition-done': `/escalations/available?role={{escalation.role}}`,
+  'x-lt-order': ['inspected', 'condition_note', 'fleet_tools'],
   properties: {
     inspected: { type: 'boolean', title: 'Machine inspected', default: false },
     condition_note: {
       type: 'string',
       title: 'Condition note',
       'x-lt-widget': 'textarea',
+    },
+    // Opens the fleetTools invoke form with this machine's serial in place;
+    // the serial facet on the row is the one the tools' lookup reads.
+    fleet_tools: {
+      type: 'string',
+      readOnly: true,
+      'x-lt-widget': 'invoke',
+      'x-lt-invoke': {
+        workflow: fleetTools.name,
+        modal: true,
+        data: { printer: { [PRINTER_ENTITY_FACET]: `{{metadata.${PRINTER_ENTITY_FACET}}}` } },
+      },
+      'x-lt-section': 'Tools',
+      'x-lt-span': 2,
+      title: 'Fleet tools',
+      description: 'Reprint a label, change filament, or report this machine offline',
     },
   },
   required: ['condition_note'],
@@ -94,10 +112,36 @@ interface PrinterRoleData {
   list_schema?: Record<string, any>;
   form_schema?: Record<string, any>;
   default_pins?: { label: string; url: string; badge?: boolean }[];
+  // Named portals: each rows of pin cells rendered as one page.
+  portals?: { key: string; label: string; rows: { label: string; url: string; badge?: boolean }[][] }[];
   // Fronts a locked station viewport. The shared 'station' login is a read-only
   // member of all three, so it picks which of these is its kiosk home.
   kiosk?: boolean;
 }
+
+// The fleet's portals. "Floor screen": the board across the top, the two
+// facilities and the harvest queue beneath it. "By model": one panel per
+// printer model, side by side. Every cell is a pin in the nav's vocabulary.
+const facetPin = (facets: Record<string, string>, label: string) => ({
+  label,
+  url: `/escalations/available?role=${PRINTER_FLEET_ROLE}&facets=${encodeURIComponent(JSON.stringify(facets))}&view=table`,
+  badge: true,
+});
+const FLEET_PORTALS = [
+  {
+    key: 'floor',
+    label: 'Floor screen',
+    rows: [
+      [FLEET_DEFAULT_PINS[0]],
+      [facetPin({ facility: 'north' }, 'North facility'), facetPin({ facility: 'south' }, 'South facility'), FLEET_DEFAULT_PINS[1]],
+    ],
+  },
+  {
+    key: 'by-model',
+    label: 'By model',
+    rows: [[facetPin({ model: 'p1s' }, 'P1S'), facetPin({ model: 'h2s' }, 'H2S')]],
+  },
+];
 
 const PRINTER_ROLE_DATA: PrinterRoleData[] = [
   {
@@ -110,6 +154,7 @@ const PRINTER_ROLE_DATA: PrinterRoleData[] = [
     list_schema: FLEET_LIST_SCHEMA,
     form_schema: PRINTER_FORM_SCHEMA,
     default_pins: FLEET_DEFAULT_PINS,
+    portals: FLEET_PORTALS,
     kiosk: true,
   },
   {
@@ -161,6 +206,7 @@ export async function seedPrinterFleetRoles(): Promise<void> {
           ...(data.list_schema ? { list_schema: data.list_schema } : {}),
           ...(data.form_schema ? { form_schema: data.form_schema } : {}),
           ...(data.default_pins ? { default_pins: data.default_pins } : {}),
+          ...(data.portals ? { portals: data.portals } : {}),
         });
       } else if (row != null && row.entity_facet == null) {
         // Self-heal: the role predates the dials (or another seeder configured

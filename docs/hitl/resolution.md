@@ -109,6 +109,47 @@ Each item validates against the same versioned role form a single-item resolve u
 
 Item keys are non-empty strings up to 128 characters; prefer URL-friendly names (`u1-L`). Payload keys inside each item are caller-owned — the platform reserves no names inside `batch_items` values. Every fill stamps `envelope.batch_filled_at[itemKey]` with the database clock in the same statement, so the row carries the collection timeline as row truth. After an SLA expiry (`conditional` returns `false`) the terminal row retains the partial `batch_items` and their timestamps — read them back with `GET /api/escalations/:id` or `getEscalationBySignalKey` from an activity.
 
+### Accumulator items
+
+An accumulator escalation (a `conditionalAccumulator` wait declared with `accumulate: {...}`, see [Creating Escalations](escalation.md#open-accumulation--items-arrive-over-time)) holds items added over time. Add by id, by signal key, or by metadata facet:
+
+```typescript
+const first = await lt.escalations.accumulate({
+  id: binId,
+  itemKey: orderId,
+  payload: { weight: 2 },                  // optional; validates against the bin role's form
+  reciprocal: { id: bagEscalationId },     // optional; the bag's own row is written in the same statement
+});
+// → { outcome: 'accepted', count: 1, remaining: 11, escalationId,
+//     reciprocal: { outcome: 'completed', count: 1, escalationId, signaled: true } }
+
+const second = await lt.escalations.accumulateBySignalKey({
+  signalKey: homeSignalId,
+  itemKey: 'order-2',
+});
+
+const last = await lt.escalations.accumulateByMetadata({
+  key: 'binKey',
+  value: binKey,
+  itemKey: 'order-12',
+});
+// → { outcome: 'completed', count: 12, remaining: 0, signaled: true, workflowId }
+
+await lt.escalations.removeItem({ id: binId, itemKey: 'order-2' });
+// → { outcome: 'removed', count: 11, escalationId }
+
+const held = await lt.escalations.getItems({ id: binId });
+// → { kind: 'accumulate', count, max, items: [{ itemKey, payload?, at, actor?, reciprocalId? }, ...] }
+```
+
+Interim adds return `accepted` with the count held and the slots remaining (`null` when unbounded) and publish `escalation.updated` carrying `item_key`, `count`, `actor`, and `reciprocal_id`; the add that reaches `max` returns `completed`, the row resolved with `{ $accumulated, $trigger: 'count' }` as `resolver_payload` and the workflow woke with it, in the same statement. A key already held returns 409 (`duplicate-item`, safe under scanner double-reads); a full cap returns 409 (`full`); a row that is not an accumulator returns 400. Removals return the new count, publish `escalation.updated` with `removed: true`, and never wake the waiter.
+
+Adds are claim-agnostic, the same rationale as batch fills: a container collects contributions from many hands. `assertClaim: true` (by-id form) opts into the caller's own live-claim assertion inside the guarded statement. Every add records the actor on the entry and merges `resolved_by` into the row's metadata, so the completing add's stamp is the resolution provenance and `$resolution` rides the completing wake.
+
+A reciprocal names a second row by `id`, `signalKey`, or `key`/`value`; it is RBAC-gated before the statement (404 when the caller cannot see it, 403 when they see it but cannot act on it) and written in the same statement as the container, both or neither. The reciprocal row holds the container's id as its item key; a member declared `accumulate: { max: 1 }` completes and wakes on that add. When the reciprocal blocks the add, the response names why (`reciprocal-full`, `reciprocal-duplicate`, `reciprocal-terminal`, `reciprocal-not-accumulator`) and the container is untouched.
+
+Item keys are non-empty strings up to 128 characters. Reserved accumulate keys (`accumulate_count`, `accumulate_max`, `accumulate_keys`) cannot appear in the `metadata` patch. A plain `resolve` on an accumulator row is the hand-close: the workflow receives the collection merged with the resolver payload under `$trigger: 'resolve'`, and the row stores the same. After the window closes the row is `expired` with the collection stored as `resolver_payload`, exactly what the workflow received.
+
 ### Resolving a set atomically
 
 When one decision settles a set of waits — each with its own payload — use `resolveAllOrNone`:

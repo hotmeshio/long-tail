@@ -8,8 +8,6 @@ import { useKioskMode } from '../../hooks/useKioskMode';
 import { isSystemTierRole } from '../../lib/task-queues';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import {
-  useEscalations,
-  useAvailableEscalations,
   useEscalationTypes,
   useFacetKeys,
   useClaimEscalation,
@@ -26,12 +24,15 @@ import { FacetQueryPanel } from './FacetQueryPanel';
 import { useShellPanel } from '../../hooks/useShellPanel';
 import { ConfirmCancelModal } from '../../components/common/modal/ConfirmCancelModal';
 import { readFooterLabels } from '../../lib/x-lt-labels';
-import { useRoles, useRoleDetails, useRoleListSchema, useRoleSchema } from '../../api/roles';
+import { useRoles, useRoleDetails, useRoleSchema } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 import { EscalationTitleSelect } from './EscalationTitleSelect';
 import { EscalationSortControl } from './EscalationSortControl';
 import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { useFilterParams } from '../../hooks/useFilterParams';
+import { useEscalationListQuery } from '../../hooks/useEscalationListQuery';
+import { LIST_VIEWS, isListView, isListLayout, resolveListView, type EscalationListParams } from '../../lib/escalation-list-url';
+import { tableLayoutProps } from '../../components/escalation/EscalationTableView';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
 import { StickyPagination } from '../../components/common/data/StickyPagination';
@@ -47,7 +48,6 @@ import { makeEscalationColumns, EscalationFilterBar } from './escalation-columns
 import { RowAction, RowActionGroup } from '../../components/common/layout/RowActions';
 import { createBulkHandlers } from './helpers';
 import { isEffectivelyClaimed } from '../../lib/escalation';
-import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
 import { ClaimModal } from './ClaimModal';
 import { EscalationTimeline } from '../../components/escalation/EscalationTimeline';
 import type { LTEscalationRecord } from '../../api/types';
@@ -188,6 +188,7 @@ export function AvailableEscalationsPage() {
   // role's rich list view shows when one exists, else the table: the dense,
   // scannable, countable presentation.
   const viewParam = searchParams.get('view');
+  const layoutParam = searchParams.get('layout');
   const setViewParam = useCallback((v: 'table' | 'timeline' | 'rich' | null) => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -234,77 +235,36 @@ export function AvailableEscalationsPage() {
     setSelectedIds(new Set());
   }, [filters.role, filters.type, filters.priority, filters.status, debouncedSearch, pagination.page, pagination.pageSize]);
 
-  const statusFilter = filters.status || '';
-  const isAvailable = statusFilter === 'available';
-  const isClaimed = statusFilter === 'claimed';
-  // `all` and `available` both send no status filter. `available` additionally routes
-  // through the available-only query (pending + unclaimed); `all` spans every status so
-  // a metadata facet search returns an order's escalations regardless of where they are.
-  const apiStatus = isClaimed ? 'pending'
-    : statusFilter === 'resolved' ? 'resolved'
-    : statusFilter === 'cancelled' ? 'cancelled'
-    : statusFilter === 'expired' ? 'expired'
-    : isAvailable ? undefined
-    : undefined;
+  // The list params in the shape the shared query takes; the same reader a
+  // pinned view or a portal panel runs over a saved URL.
+  const listParams = useMemo<EscalationListParams>(() => ({
+    statusFilter: filters.status || '',
+    role: filters.role || undefined,
+    type: filters.type || undefined,
+    priority: filters.priority ? parseInt(filters.priority) : undefined,
+    search: debouncedSearch || undefined,
+    facets: facetFilters,
+    view: isListView(viewParam) ? viewParam : null,
+    layout: isListLayout(layoutParam) ? layoutParam : null,
+  }), [filters.status, filters.role, filters.type, filters.priority, debouncedSearch, facetFilters, viewParam, layoutParam]);
 
-  // The single-role list_schema resolves ahead of the rows queries: it decides
-  // whether the rows request needs the heavy envelope/payload columns.
-  const singleRole = filters.role
-    || (facetFilters.roles?.length === 1 ? facetFilters.roles[0] : null);
-  const listSchemaQuery = useRoleListSchema(singleRole ?? '', undefined, !!singleRole);
+  // Timeline mode fetches 100 per page so the spine has enough story to tell.
+  const timelinePageSize = 100;
+  const {
+    escalations, total, listSchema, singleRole, hasRichView,
+    isLoading, isFetching, error: queryError, refetch,
+  } = useEscalationListQuery(listParams, {
+    limit: showTimeline ? timelinePageSize : pagination.pageSize,
+    offset: pagination.offset,
+  });
   // The queue's cancel vocabulary: when scoped to one role, the bulk Cancel
   // speaks the role form's x-lt-labels.cancel (false hides the verb).
   const roleSchemaQuery = useRoleSchema(singleRole ?? '', undefined, !!singleRole);
   const cancelLabel = singleRole
     ? readFooterLabels(roleSchemaQuery.data?.form_schema).cancel
     : undefined;
-  const listSchema = (listSchemaQuery.data?.list_schema ?? null) as Record<string, any> | null;
-  const schemaSettled = !singleRole || listSchemaQuery.isFetched;
-
-  // Timeline mode fetches 100 per page so the spine has enough story to tell.
-  const timelinePageSize = 100;
-  const sharedFilters = {
-    role: filters.role || undefined,
-    type: filters.type || undefined,
-    priority: filters.priority ? parseInt(filters.priority) : undefined,
-    limit: showTimeline ? timelinePageSize : pagination.pageSize,
-    offset: pagination.offset,
-    // Basic-path fallback only; when orderBy is present (any real sort) the
-    // request routes faceted and orderBy drives the ordering instead.
-    sort_by: 'created_at',
-    order: 'desc',
-    search: debouncedSearch || undefined,
-    // Faceted metadata query (composes with role-scope + the basic filters in SQL).
-    ...facetFilters,
-    include: schemaNeedsEnvelope(listSchema) ? ('envelope' as const) : undefined,
-  };
-
-  const availableQuery = useAvailableEscalations({
-    ...sharedFilters,
-    enabled: isAvailable && schemaSettled,
-  });
-
-  const escalationsQuery = useEscalations({
-    status: apiStatus,
-    claimed: isClaimed || undefined,
-    ...sharedFilters,
-    enabled: !isAvailable && schemaSettled,
-  });
-
-  const activeQuery = isAvailable ? availableQuery : escalationsQuery;
-  const { data, isLoading, error: queryError, refetch, isFetching } = activeQuery;
-
-  // Search is server-side (full result set), so results and total come straight
-  // from the query — no client-side filtering of the current page.
-  const escalations = data?.escalations ?? [];
-  const total = data?.total ?? 0;
-  // Rich view: a single-role list whose role owns a non-table list_schema.
-  const hasRichView = !!singleRole && !!listSchema
-    && !!listSchema['x-lt-layout'] && listSchema['x-lt-layout'] !== 'table';
-  const useRichView = hasRichView && !showTimeline
-    && (viewParam ? viewParam === 'rich' : true);
-  const activeView: 'table' | 'rich' | 'timeline' =
-    showTimeline ? 'timeline' : useRichView ? 'rich' : 'table';
+  const activeView = resolveListView(listParams.view, hasRichView);
+  const useRichView = activeView === LIST_VIEWS.RICH;
 
   // The jeopardy pill names the role's limit so the red filter is self-explaining
   // ("in jeopardy · > 15m"): priority_threshold_minutes, falling back to SLA.
@@ -661,6 +621,7 @@ export function AvailableEscalationsPage() {
             columns={columns}
             data={escalations}
             layout="fixed"
+            {...tableLayoutProps(listParams.layout)}
             keyFn={(row) => row.id}
             onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
             isLoading={isLoading}

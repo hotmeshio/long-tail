@@ -105,3 +105,24 @@ describe('parsePath — safety', () => {
     expect(parsePath('a.b[0].c')).toEqual([{ key: 'a' }, { key: 'b' }, { index: 0 }, { key: 'c' }]);
   });
 });
+
+describe('mapFormToPayload — display-only widgets', () => {
+  const SCHEMA = {
+    properties: {
+      notes: { type: 'string' },
+      queue_link: { type: 'string', readOnly: true, 'x-lt-widget': 'link', 'x-lt-href': '/x' },
+      parent: { type: 'string', readOnly: true, 'x-lt-widget': 'escalation', 'x-lt-source': 'metadata.parent' },
+      siblings: { type: 'string', readOnly: true, 'x-lt-widget': 'escalation-list', 'x-lt-query': { role: 'r' } },
+      print: { type: 'string', readOnly: true, 'x-lt-widget': 'invoke', 'x-lt-invoke': { workflow: 'w' } },
+      guide: { type: 'string', readOnly: true, 'x-lt-widget': 'markdown', default: '# Guide' },
+    },
+  };
+
+  it('drops the widgets that carry no answer and keeps every other field', () => {
+    const payload = mapFormToPayload(
+      { notes: 'hi', queue_link: '', parent: '', siblings: '', print: '', guide: '# Guide' },
+      SCHEMA,
+    );
+    expect(payload).toEqual({ notes: 'hi', guide: '# Guide' });
+  });
+});

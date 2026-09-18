@@ -103,3 +103,36 @@ describe('RichInvokeForm', () => {
     expect(screen.getByRole('link', { name: /View workflow/ })).toHaveAttribute('href', '/workflows/executions/wf-10');
   });
 });
+
+describe('RichInvokeForm hosted in a dialog', () => {
+  // The help trigger renders beside the schema title, so the hosted schema carries one.
+  const TITLED = { ...RICH_SCHEMA, title: 'Fleet tools' };
+  function renderHosted(prefill: Record<string, unknown>) {
+    const sub = submission();
+    render(
+      <MemoryRouter>
+        <RichInvokeForm selected={TOOLS} schema={TITLED} metadata={{ source: 'dashboard' }} submission={sub} prefill={prefill} host="modal" />
+      </MemoryRouter>,
+    );
+    return sub;
+  }
+
+  it('prefills bound fields from the nested payload', () => {
+    renderHosted({ printer: { serialNumber: 'sn-7' }, tool: { action: 'retire' } });
+    expect(screen.getByLabelText(/Serial/)).toHaveValue('sn-7');
+    expect(screen.getByLabelText(/Action/)).toHaveValue('retire');
+  });
+
+  it('shows issues inline and keeps the footer in the flow', () => {
+    renderHosted({});
+    fireEvent.click(screen.getByTestId('invoke-start'));
+    expect(screen.getByTestId('invoke-inline-issues')).toHaveTextContent('Serial');
+    expect(screen.getByTestId('invoke-start').closest('.sticky')).toBeNull();
+  });
+
+  it('toggles the instructions inline from the help control', () => {
+    renderHosted({ printer: { serialNumber: 'sn-7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open instructions' }));
+    expect(screen.getByTestId('invoke-inline-help')).toHaveTextContent('Tool for sn-7');
+  });
+});

@@ -129,6 +129,9 @@ const PersonaDetailPage = lazy(() =>
 const EscalationSchemaPage = lazy(() =>
   import('./pages/admin/roles/EscalationSchemaPage').then((m) => ({ default: m.EscalationSchemaPage })),
 );
+const PortalPage = lazy(() =>
+  import('./pages/operator/PortalPage').then((m) => ({ default: m.PortalPage })),
+);
 const EscalationListSchemaPage = lazy(() =>
   import('./pages/admin/roles/EscalationListSchemaPage').then((m) => ({ default: m.EscalationListSchemaPage })),
 );
@@ -278,6 +281,8 @@ const router = createBrowserRouter([
       { path: 'escalations/available', element: <Lazy><AvailableEscalationsPage /></Lazy> },
       { path: 'escalations/queue', element: <Lazy><OperatorDashboard /></Lazy> },
       { path: 'escalations/detail/:id', element: <Lazy><EscalationDetailPage /></Lazy> },
+      // A role's portal: its matrix of pinned views as one page (all authenticated users; panels are role-scoped server-side)
+      { path: 'portal/:role/:portal?', element: <Lazy><PortalPage /></Lazy> },
 
       // Scan station (all authenticated users) — badge + item surface
       { path: 'scan/station', element: <Lazy><ScanStationPage /></Lazy> },

@@ -35,3 +35,10 @@ export const CRON_PRESETS = [
   { value: '0 2 1 * *', label: 'Monthly (1st at 2 AM)' },
   { value: '0 */6 * * *', label: 'Every 6 hours' },
 ] as const;
+
+export const ESCALATION_STATUS = {
+  PENDING: 'pending',
+  RESOLVED: 'resolved',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+} as const;

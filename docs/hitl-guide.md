@@ -23,6 +23,8 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | A role-authored list page — document views, facet tables, entity card boards | List schema | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
+| Start another workflow from inside the form, mapped from the record, directly or in a prefilled dialog | `x-lt-invoke` | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
+| A role's pinned views laid out as named pages of live panels | `portals` on the role | [portal.md](hitl/portal.md) |
 | A fully custom UI nothing above can express | Iframe viewport | [iframe.md](hitl/iframe.md) |
 | The same rich form for starting a workflow from the Invoke Tool page | `inputSchema` on the worker config | [invoke-form.md](hitl/invoke-form.md) |
 
@@ -91,9 +93,13 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Custom widgets (checklist, file upload, code editor, signature, markdown) | [x-lt-widget.md](hitl/x-lt-widget.md) |
 | List schema (`active-history`, `active`, `facet-table`, `facet-board` cards) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Embedded widgets (`link`, `escalation`, `escalation-list`) and the submit guard | [x-lt-embed.md](hitl/x-lt-embed.md) |
+| Starting a workflow from the form (`x-lt-invoke`) | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
+| Pinned views, role default pins, link variables | [pinned-views.md](hitl/pinned-views.md) |
+| Role portals: named matrices of pins rendered as pages | [portal.md](hitl/portal.md) |
 | Footer labels, claim-and-submit, and the list-driven "start" action | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
+| Open accumulators: the contract, guarantees, and operations for containers that fill over time | [accumulator.md](accumulator.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
 | Pinned views, user preferences, role default pins | [pinned-views.md](hitl/pinned-views.md) |
 | Design principles, error display, instruction copy, custom stylesheets | [design.md](hitl/design.md) |
@@ -105,7 +111,8 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Keyword | Level | Purpose |
 |---------|-------|---------|
 | `input.*` | domain | The live form values on the Invoke surface (alias of `resolver.*`) for `x-lt-showIf`, `x-lt-help`, and `x-lt-options` |
-| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `json`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`) |
+| `x-lt-widget` | field | Rich control: `file-upload`, `code-editor`, `json`, `signature`, `rich-text`, `markdown`, `checklist`, `attachment` (alias `image`); display-only `link`, `escalation`, `escalation-list`, `invoke` |
+| `x-lt-invoke` | field | With `x-lt-widget: "invoke"`: the workflow to start and the `{{domain.path}}` mapping into its payload; `modal` opens the workflow's form prefilled, otherwise the post fires directly and the run reports in place |
 | `x-lt-source` | field | Data path for context-driven widgets: `"domain.path"` or an ordered array of paths (first to resolve wins); may embed `{{domain.path}}` interpolation segments |
 | `x-lt-require-all` | field | Checklist completion guard — every item must be checked, except items declared `required: false` |
 | `x-lt-default-checked` | field | Checklist first-load default — an unanswered field initializes to every item checked (affirm-then-exception); saved answers are never clobbered |

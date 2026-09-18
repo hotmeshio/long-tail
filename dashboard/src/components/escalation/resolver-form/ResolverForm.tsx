@@ -47,7 +47,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         const visible: Record<string, JsonValue> = {};
         const internal: Record<string, JsonValue> = {};
         for (const [k, v] of Object.entries(parsed)) {
-          if (k.startsWith('_')) {
+          if (k.startsWith('_') || k.startsWith('$')) {
             internal[k] = v as JsonValue;
           } else {
             visible[k] = v as JsonValue;

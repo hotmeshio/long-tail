@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Search } from 'lucide-react';
 import { Modal } from '../common/modal/Modal';
 import { metadataFacetsUrl } from '../../lib/facet-url';
 
@@ -8,6 +8,8 @@ export interface RefinePair {
   key: string;
   label: string;
   value: unknown;
+  /** The author put this fact in the row's columns; a lone bound fact arrives preselected. */
+  bound?: boolean;
 }
 
 /**
@@ -16,8 +18,11 @@ export interface RefinePair {
  * toggle. Pick one or several (multi-select ANDs the facets) and drill —
  * filter this role's queue, search every role, or merge into the live filter
  * set. One dialog replaces per-cell icon pairs, so table cells spend their
- * width on data and the affordance stays tappable on the iPad floor.
+ * width on data and the affordance stays tappable on the iPad floor. The
+ * list is the row's whole metadata; past a handful of facts a find box
+ * narrows it by label, key, or value.
  */
+const FIND_THRESHOLD = 6;
 export function RefineDialog({ open, onClose, role, pairs, onNavigate, onAddFacet }: {
   open: boolean;
   onClose: () => void;
@@ -28,13 +33,24 @@ export function RefineDialog({ open, onClose, role, pairs, onNavigate, onAddFace
   /** When provided, "Add to filters" merges the selection into the live set. */
   onAddFacet?: (key: string, value: unknown) => void;
 }) {
-  // A single fact arrives selected — the one-glance, two-tap path.
+  // A single fact, or a single column-bound fact, arrives selected — the
+  // one-glance, two-tap path — while the rest of the record waits below.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [find, setFind] = useState('');
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setSelected(new Set(pairs.length === 1 ? [pairs[0].key] : []));
+    if (open) {
+      const bound = pairs.filter((p) => p.bound);
+      const preset = bound.length === 1 ? [bound[0].key] : pairs.length === 1 ? [pairs[0].key] : [];
+      setSelected(new Set(preset));
+      setFind('');
+    }
   }
+  const needle = find.trim().toLowerCase();
+  const visible = needle
+    ? pairs.filter((p) => [p.label, p.key, String(p.value)].some((t) => t.toLowerCase().includes(needle)))
+    : pairs;
 
   const toggle = (key: string) => {
     setSelected((prev) => {
@@ -60,8 +76,24 @@ export function RefineDialog({ open, onClose, role, pairs, onNavigate, onAddFace
           Pick the facts to match — several combine into one narrower query.
         </p>
 
-        <div className="divide-y divide-surface-border/40 -mx-1">
-          {pairs.map((p) => {
+        {pairs.length > FIND_THRESHOLD && (
+          <label className="flex items-center gap-2 input text-xs py-1.5">
+            <Search className="w-3.5 h-3.5 shrink-0 text-text-quaternary" strokeWidth={1.5} />
+            <input
+              type="text"
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              placeholder="Find a fact…"
+              className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-text-quaternary"
+              aria-label="Find a fact"
+              data-testid="refine-find"
+            />
+            <span className="text-2xs tabular-nums text-text-quaternary">{visible.length}/{pairs.length}</span>
+          </label>
+        )}
+
+        <div className="divide-y divide-surface-border/40 -mx-1 max-h-[50vh] overflow-y-auto">
+          {visible.map((p) => {
             const on = selected.has(p.key);
             return (
               <button

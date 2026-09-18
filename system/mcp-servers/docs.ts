@@ -16,11 +16,15 @@ function docsDir(): string {
   return candidates[0];
 }
 
+/** Folders kept out of the published package; the served set matches it. */
+const UNPUBLISHED_DOC_DIRS = new Set(['donotcommit', 'donotpublish', 'img']);
+
 function listMarkdownFiles(dir: string, prefix = ''): { path: string; title: string }[] {
   if (!fs.existsSync(dir)) return [];
   const results: { path: string; title: string }[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory() && !prefix && UNPUBLISHED_DOC_DIRS.has(entry.name)) continue;
     if (entry.isDirectory()) {
       results.push(...listMarkdownFiles(path.join(dir, entry.name), rel));
     } else if (entry.name.endsWith('.md')) {

@@ -57,3 +57,18 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+
+describe('Modal with closeOnBackdrop off', () => {
+  it('ignores backdrop clicks and still closes on Escape', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open={true} onClose={onClose} title="Form" closeOnBackdrop={false}>
+        <p>Typed input</p>
+      </Modal>,
+    );
+    fireEvent.click(document.body.querySelector('.absolute.inset-0')!);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});

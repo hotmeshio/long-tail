@@ -283,6 +283,44 @@ export function useResolveEscalation() {
   });
 }
 
+export interface AccumulateItemResponse {
+  outcome: 'accepted' | 'completed';
+  count: number;
+  remaining: number | null;
+  escalationId: string;
+  signaled?: boolean;
+}
+
+/** Add one item to an open accumulator escalation (POST /:id/accumulate). */
+export function useAccumulateItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, itemKey, payload }: { id: string; itemKey: string; payload?: Record<string, unknown> }) =>
+      apiFetch<AccumulateItemResponse>(`/escalations/${id}/accumulate`, {
+        method: 'POST',
+        body: JSON.stringify({ itemKey, ...(payload ? { payload } : {}) }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+    },
+  });
+}
+
+/** Remove one held item from an open accumulator escalation (POST /:id/remove-item). */
+export function useRemoveAccumulatedItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, itemKey }: { id: string; itemKey: string }) =>
+      apiFetch<{ outcome: 'removed'; count: number; escalationId: string }>(`/escalations/${id}/remove-item`, {
+        method: 'POST',
+        body: JSON.stringify({ itemKey }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+    },
+  });
+}
+
 export function useEscalateToRole() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -16,7 +16,7 @@
  *     network (refetchType 'none'), and one catch-up refetch runs when the
  *     tab becomes visible again.
  */
-import type { QueryClient } from '@tanstack/react-query';
+import type { QueryClient, QueryKey } from '@tanstack/react-query';
 
 /** Per-tier discipline. Tune here — nothing else in the event path carries a number. */
 export const REALTIME_REFRESH = {
@@ -38,7 +38,7 @@ const TIER_RANK: Record<RefreshTier, number> = { DETAIL: 0, LIST: 1, SUMMARY: 2 
 
 export interface InvalidationScheduler {
   /** Queue query keys for a tier-bounded batch invalidation. */
-  request(tier: RefreshTier, keys: ReadonlyArray<ReadonlyArray<string>>): void;
+  request(tier: RefreshTier, keys: ReadonlyArray<QueryKey>): void;
   /** Detach timers and the visibility listener (tests). */
   dispose(): void;
 }
@@ -84,7 +84,7 @@ function createInvalidationScheduler(qc: QueryClient): InvalidationScheduler {
     timers[tier] = setTimeout(() => flush(tier), delay);
   }
 
-  function request(tier: RefreshTier, keys: ReadonlyArray<ReadonlyArray<string>>): void {
+  function request(tier: RefreshTier, keys: ReadonlyArray<QueryKey>): void {
     for (const key of keys) {
       const raw = JSON.stringify(key);
       const existing = pending.get(raw);

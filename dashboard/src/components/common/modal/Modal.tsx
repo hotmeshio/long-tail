@@ -4,12 +4,14 @@ import { createPortal } from 'react-dom';
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   maxWidth?: string;
+  /** Whether a click on the backdrop closes the dialog. Off for dialogs holding typed input. */
+  closeOnBackdrop?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) {
+export function Modal({ open, onClose, title, children, maxWidth, closeOnBackdrop = true }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -26,7 +28,7 @@ export function Modal({ open, onClose, title, children, maxWidth }: ModalProps) 
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-text-primary/30"
-        onClick={onClose}
+        onClick={closeOnBackdrop ? onClose : undefined}
       />
       {/* Dialog */}
       <div

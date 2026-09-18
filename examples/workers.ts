@@ -11,6 +11,8 @@ import * as basicSignalWorkflow from './workflows/basic-signal';
 import * as efficientSignalWorkflow from './workflows/efficient-signal';
 import * as batchSignalWorkflow from './workflows/batch-signal';
 import * as batchFanoutWorkflow from './workflows/batch-fanout';
+import * as rollupBinWorkflow from './workflows/rollup-bin';
+import { ROLLUP_BIN_ROLE, ROLLUP_MEMBER_ROLE } from './workflows/rollup-bin';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as acmeStationsWorkflow from './workflows/acme-stations';
 import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
@@ -151,6 +153,33 @@ const batchSignalConfig: LTWorkerConfig = {
       ok: { type: 'boolean', default: false, description: 'Did this station complete its item?' },
       notes: { type: 'string', default: '', description: 'Station notes — visible to the workflow author' },
     },
+  },
+};
+
+const rollupBinConfig: LTWorkerConfig = {
+  description: 'Open accumulator — ONE container escalation fills over time (accumulate: { max }); each bag joins it via POST /:id/accumulate, a by-signal-key or by-metadata add, or a scan rule with the accumulate verb. The bin resolves at max, on its SLA timer, or by hand, and on every path the workflow receives the ordered collection plus the trigger that ended the wait.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: ROLLUP_BIN_ROLE,
+  envelopeSchema: {
+    data: { binKey: 'bin-7', max: 4, timeout: '2h', role: ROLLUP_BIN_ROLE, message: 'Scan each bag into the bin' },
+    metadata: { source: 'dashboard' },
+  },
+  resolverSchema: {
+    properties: {
+      shippedBy: { type: 'string', default: '', description: 'Carrier or hand-off note when the bin is closed by hand' },
+    },
+  },
+};
+
+const rollupMemberConfig: LTWorkerConfig = {
+  description: 'The reciprocal side of the rollup bin — a bag\'s own accumulator of one. Adding the bag to a bin with a reciprocal writes both rows in ONE statement; the bag resolves the moment it is placed.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: ROLLUP_MEMBER_ROLE,
+  envelopeSchema: {
+    data: { orderId: 'order-123', binKey: 'bin-7', role: ROLLUP_MEMBER_ROLE },
+    metadata: { source: 'dashboard' },
   },
 };
 
@@ -585,6 +614,8 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: batchSignalWorkflow.batchSignal, config: batchSignalConfig },
   { taskQueue: 'long-tail-examples', workflow: batchFanoutWorkflow.batchFanout, config: batchFanoutConfig },
   { taskQueue: 'long-tail-examples', workflow: batchFanoutWorkflow.batchFanoutChild, config: batchFanoutChildConfig },
+  { taskQueue: 'long-tail-examples', workflow: rollupBinWorkflow.rollupBin, config: rollupBinConfig },
+  { taskQueue: 'long-tail-examples', workflow: rollupBinWorkflow.rollupMember, config: rollupMemberConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },

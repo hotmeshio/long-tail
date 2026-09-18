@@ -234,13 +234,13 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](https
 
 | Guide | What it covers |
 |-------|---------------|
-| [The Long Tail Story](https://github.com/hotmeshio/long-tail/blob/main/docs/story.md) | Why this exists, what accumulates over time |
+| [The Long Tail Story](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/story.md) | Why this exists, what accumulates over time |
 | [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/workflows.md) | Activities, interceptor, escalation lifecycle, composition |
 | [IAM](https://github.com/hotmeshio/long-tail/blob/main/docs/iam.md) | Identity propagation, service accounts, credential exchange |
 | [Dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md) | Navigation, key pages, event feed |
 | [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md) | Server registration, tool calls, human queue |
-| [Compilation](https://github.com/hotmeshio/long-tail/blob/main/docs/compilation.md) | Dynamic to deterministic pipeline wizard |
-| [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
+| [Compilation](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compilation.md) | Dynamic to deterministic pipeline wizard |
+| [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
 | [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
 | [Escalation Strategies](https://github.com/hotmeshio/long-tail/blob/main/docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
 | [Schema Enforcement](https://github.com/hotmeshio/long-tail/blob/main/docs/schema-enforcement.md) | form_schema as an enforced API contract on every resolve surface |
@@ -274,7 +274,7 @@ Open [http://localhost:3000](http://localhost:3000). Example workflows seed the 
 | `engineer` | `l0ngt@1l` | engineer |
 | `reviewer` | `l0ngt@1l` | reviewer |
 
-See [Contributing](https://github.com/hotmeshio/long-tail/blob/main/docs/contributing.md).
+See [Contributing](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/contributing.md).
 
 ## License
 

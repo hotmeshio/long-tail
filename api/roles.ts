@@ -1,4 +1,5 @@
 import * as roleService from '../services/role';
+import { PORTAL_KEY, PORTAL_LIMITS, type PortalCount, type RolePin, type RolePortal } from '../services/role/types';
 import { FACET_KEY } from '../services/escalation/facet-sql';
 import type { LTApiResult } from '../types/sdk';
 
@@ -170,6 +171,50 @@ export async function replaceEscalationTargets(input: {
   }
 }
 
+/** A pinned view: a non-blank label over a dashboard-relative url, optionally badged. */
+function isRolePin(p: unknown): p is RolePin {
+  if (!p || typeof p !== 'object') return false;
+  const pin = p as Record<string, unknown>;
+  return typeof pin.label === 'string' && pin.label.trim() !== ''
+    && typeof pin.url === 'string' && pin.url.startsWith('/')
+    && (pin.badge === undefined || typeof pin.badge === 'boolean');
+}
+
+/** Rows of pin cells within the portal bounds; every row carries at least one pin. */
+function isPortalRows(value: unknown): value is RolePin[][] {
+  return Array.isArray(value)
+    && value.length >= 1 && value.length <= PORTAL_LIMITS.MAX_ROWS
+    && value.every((row) => Array.isArray(row)
+      && row.length >= 1 && row.length <= PORTAL_LIMITS.MAX_COLS
+      && row.every(isRolePin));
+}
+
+/** A count tile: a pin plus an optional blurb. */
+function isPortalCount(value: unknown): value is PortalCount {
+  if (!value || typeof value !== 'object') return false;
+  const blurb = (value as Record<string, unknown>).blurb;
+  return isRolePin(value) && (blurb === undefined || typeof blurb === 'string');
+}
+
+/** A named portal: slug key, non-blank label, a valid matrix, optional bounded counts. */
+function isRolePortal(value: unknown): value is RolePortal {
+  if (!value || typeof value !== 'object') return false;
+  const portal = value as Record<string, unknown>;
+  const countsOk = portal.counts === undefined
+    || (Array.isArray(portal.counts) && portal.counts.length <= PORTAL_LIMITS.MAX_COUNTS && portal.counts.every(isPortalCount));
+  return typeof portal.key === 'string' && PORTAL_KEY.test(portal.key)
+    && typeof portal.label === 'string' && portal.label.trim() !== ''
+    && isPortalRows(portal.rows)
+    && countsOk;
+}
+
+/** The role's portals: bounded in number, every key unique. */
+function isPortalList(value: unknown): value is RolePortal[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > PORTAL_LIMITS.MAX_PORTALS) return false;
+  if (!value.every(isRolePortal)) return false;
+  return new Set(value.map((p) => p.key)).size === value.length;
+}
+
 /**
  * Update role metadata. Fields omitted from input are left unchanged.
  * form_schema, metadata_schema, and parent_role can be set to null to clear them.
@@ -184,7 +229,9 @@ export async function updateRole(input: {
   /** The escalation LIST schema — rich formatting for this role's list page. */
   list_schema?: Record<string, any> | null;
   /** Pinned-view seeds for the role's members: [{ label, url, badge? }] or null to clear. */
-  default_pins?: { label: string; url: string; badge?: boolean }[] | null;
+  default_pins?: RolePin[] | null;
+  /** The role's named portals, each rows of pin cells; null to clear. */
+  portals?: RolePortal[] | null;
   properties?: Record<string, any> | null;
   ops_visible?: boolean;
   /** Make this role's sequence the home Pace Board's default segment (single-holder: setting it clears the previous holder). */
@@ -243,15 +290,16 @@ export async function updateRole(input: {
       return { status: 400, error: 'parent_role must reference a different role' };
     }
     if (input.default_pins != null) {
-      const pinsValid = Array.isArray(input.default_pins) && input.default_pins.every(
-        (p) => p && typeof p === 'object'
-          && typeof p.label === 'string' && p.label.trim() !== ''
-          && typeof p.url === 'string' && p.url.startsWith('/')
-          && (p.badge === undefined || typeof p.badge === 'boolean'),
-      );
+      const pinsValid = Array.isArray(input.default_pins) && input.default_pins.every(isRolePin);
       if (!pinsValid) {
         return { status: 400, error: 'default_pins must be [{ label, url, badge? }] with dashboard-relative urls' };
       }
+    }
+    if (input.portals != null && !isPortalList(input.portals)) {
+      return {
+        status: 400,
+        error: `portals must be 1..${PORTAL_LIMITS.MAX_PORTALS} of { key (slug, unique), label, rows, counts? }, rows being 1..${PORTAL_LIMITS.MAX_ROWS} rows of 1..${PORTAL_LIMITS.MAX_COLS} pins [{ label, url, badge? }] with dashboard-relative urls, counts up to ${PORTAL_LIMITS.MAX_COUNTS} of { label, url, blurb? }`,
+      };
     }
     if (input.upstream_roles != null) {
       if (!Array.isArray(input.upstream_roles) || input.upstream_roles.some((u) => typeof u !== 'string' || !u.trim())) {
@@ -273,6 +321,7 @@ export async function updateRole(input: {
       metadata_schema: input.metadata_schema,
       list_schema: input.list_schema,
       default_pins: input.default_pins,
+      portals: input.portals,
       properties: input.properties,
       ops_visible: input.ops_visible,
       ops_home_default: input.ops_home_default,

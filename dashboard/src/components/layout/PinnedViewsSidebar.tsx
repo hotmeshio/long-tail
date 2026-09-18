@@ -1,9 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Pin, X, EyeOff, Plus } from 'lucide-react';
+import { Pin, X, EyeOff, Plus, LayoutGrid } from 'lucide-react';
 import { useSidebar } from '../../hooks/useSidebar';
 import { useAuth } from '../../hooks/useAuth';
-import { useRoleDetails } from '../../api/roles';
+import { useRoleDetails, type RolePortal } from '../../api/roles';
 import { usePreferences, usePatchPreferences, type PinnedView } from '../../api/preferences';
 import { useEscalations, useAvailableEscalations } from '../../api/escalations';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
@@ -12,6 +12,7 @@ import { useThrottledInvalidation } from '../../hooks/useEventHooks';
 import { displayRoleTitle } from '../../lib/role-display';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
+import { hasPortals, portalPath, portalsOf } from '../../lib/portal-path';
 
 /**
  * "Pinned" — the persona's exact queries, one click away. The user's own pins
@@ -67,15 +68,23 @@ export function PinnedViewsSidebar() {
     [roleData],
   );
   const ownResolved = useMemo(() => pins.filter((p) => !p.fromRole), [pins]);
+  // A role's group leads with its portals when it declares any, then its
+  // pins; a role with portals and no visible pins still gets its heading.
+  const portalRoles = useMemo(
+    () => new Set((roleData?.roles ?? []).filter((r) => memberRoles.has(r.role) && hasPortals(r)).map((r) => r.role)),
+    [roleData, memberRoles],
+  );
   const groups = useMemo(
-    () => roleDefaults
-      .map(({ role }) => ({
-        role,
-        title: titleByRole.get(role) ?? role,
-        pins: pins.filter((p) => p.fromRole === role),
+    () => (roleData?.roles ?? [])
+      .filter((r) => portalRoles.has(r.role) || roleDefaults.some((d) => d.role === r.role))
+      .map((r) => ({
+        role: r.role,
+        title: titleByRole.get(r.role) ?? r.role,
+        portals: portalRoles.has(r.role) ? portalsOf(r) : [],
+        pins: pins.filter((p) => p.fromRole === r.role),
       }))
-      .filter((g) => g.pins.length > 0),
-    [roleDefaults, titleByRole, pins],
+      .filter((g) => g.portals.length > 0 || g.pins.length > 0),
+    [roleData, roleDefaults, portalRoles, titleByRole, pins],
   );
 
   const ownPins = prefs?.pinnedViews ?? [];
@@ -100,7 +109,7 @@ export function PinnedViewsSidebar() {
     saveOwn(next);
   };
 
-  if (pins.length === 0) return null;
+  if (pins.length === 0 && portalRoles.size === 0) return null;
 
   // Each group is a first-class nav section — the same heading recipe as
   // Monitor/Orchestrate/Storage. No "Pinned" umbrella; the role names ARE
@@ -146,6 +155,7 @@ export function PinnedViewsSidebar() {
               {g.title}
             </p>
           )}
+          {g.portals.map((portal) => <PortalItem key={portal.key} role={g.role} portal={portal} collapsed={collapsed} />)}
           {g.pins.map((pin) => (
             <PinnedItem
               key={pin.id}
@@ -161,6 +171,31 @@ export function PinnedViewsSidebar() {
         </div>
       ))}
     </div>
+  );
+}
+
+/** One of the role's portals: a matrix of its pinned views as one page. */
+function PortalItem({ role, portal, collapsed }: { role: string; portal: RolePortal; collapsed: boolean }) {
+  const to = portalPath(role, portal.key);
+  const base = 'flex items-center rounded-md transition-colors duration-150 text-text-secondary hover:text-text-primary hover:bg-surface-hover';
+  const testId = `portal-link-${role}-${portal.key}`;
+  if (collapsed) {
+    return (
+      <NavLink to={to} className={`${base} justify-center w-10 h-10 mx-auto`} title={portal.label} data-testid={testId}>
+        <LayoutGrid className="w-5 h-5 shrink-0 text-accent/75" strokeWidth={1.5} />
+      </NavLink>
+    );
+  }
+  return (
+    <NavLink
+      to={to}
+      title={portal.label}
+      className={({ isActive }) => `${base} gap-2.5 pl-4 pr-3 py-1.5 text-[0.7875rem] ${isActive ? 'bg-surface-hover text-text-primary font-medium' : ''}`}
+      data-testid={testId}
+    >
+      <LayoutGrid className="w-4 h-4 shrink-0 text-accent/75" strokeWidth={1.5} />
+      <span className="truncate flex-1 min-w-0">{portal.label}</span>
+    </NavLink>
   );
 }
 

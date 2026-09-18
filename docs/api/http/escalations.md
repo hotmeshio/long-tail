@@ -1122,6 +1122,95 @@ Single atomic query finds the pending escalation by metadata, auto-claims if unc
 }
 ```
 
+## Batch items
+
+```
+POST /api/escalations/:id/resolve-batch-item
+POST /api/escalations/resolve-batch-item-by-signal-key
+POST /api/escalations/resolve-batch-item-by-metadata
+```
+
+Submit ONE declared item of a batch escalation (a `conditional` wait created with `batch: [...]`). Interim items answer `{ outcome: 'accepted', remaining }`; the LAST item answers `{ outcome: 'completed', remaining: 0, signaled, escalationId, workflowId }` and the waiting workflow resumes with the full collection, in the same statement. Each item validates against the row's versioned role form (canonical 422). Duplicates answer 409 (`Batch item already submitted`), undeclared keys 400, a non-batch row 400.
+
+**Body (by id):** `{ itemKey, resolverPayload, metadata?, assertClaim? }`. **By signal key:** `{ signalKey, itemKey, resolverPayload, metadata? }`. **By metadata:** `{ key, value, itemKey, resolverPayload, metadata?, restrictRoles? }`.
+
+Claim semantics: claim-agnostic by default; `assertClaim: true` (by id) requires the caller's own live claim, asserted atomically. RBAC mirrors the single-resolve forms: the by-id form answers 404 for rows outside the caller's read scope and 403 inside it but outside write scope; the ingress forms collapse a write denial to 404.
+
+## Accumulate items
+
+```
+POST /api/escalations/:id/accumulate
+POST /api/escalations/accumulate-by-signal-key
+POST /api/escalations/accumulate-by-metadata
+```
+
+Add ONE item to an open accumulator escalation (a `conditionalAccumulator` wait declared with `accumulate: {...}`). Interim adds are atomic row appends; the add that reaches `max` completes the escalation and the waiting workflow resumes with the ordered collection, in the same statement.
+
+**Body (by id):**
+
+```json
+{
+  "itemKey": "ORD-9",
+  "payload": { "weight": 2 },
+  "metadata": { "lane": "A" },
+  "assertClaim": false,
+  "reciprocal": { "id": "…" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `itemKey` | `string` | **Required.** The key the item is held under (1 to 128 characters) |
+| `payload` | `object` | Stored on the entry and delivered inside `$accumulated`; validates against the row's versioned role form when present (canonical 422) |
+| `metadata` | `object` | Merge patch for the container's GIN-indexed metadata, same statement; reserved `accumulate_*` keys are rejected |
+| `assertClaim` | `boolean` | By id only. Require the caller's own live claim, asserted atomically |
+| `reciprocal` | `object` | A second accumulator row written in the same statement, both or neither. Exactly one of `id`, `signalKey`, or `key` + `value`; optional `payload` stored on its entry |
+
+**By signal key:** `{ signalKey, itemKey, payload?, metadata?, reciprocal? }`. **By metadata:** `{ key, value, itemKey, payload?, metadata?, restrictRoles?, reciprocal? }` selects the highest priority pending accumulator whose metadata contains the key/value, within the caller's write scope intersected with `restrictRoles`.
+
+**Response 200 (interim):**
+
+```json
+{ "outcome": "accepted", "count": 3, "remaining": 9, "escalationId": "…",
+  "reciprocal": { "outcome": "completed", "count": 1, "remaining": 0, "escalationId": "…", "signaled": true } }
+```
+
+`remaining` is `null` on an unbounded accumulator. `reciprocal` is present only when one was named.
+
+**Response 200 (completed):**
+
+```json
+{ "outcome": "completed", "count": 12, "remaining": 0, "signaled": true, "escalationId": "…", "workflowId": "…" }
+```
+
+**Errors:** 400 `itemKey is required`, `Escalation is not an accumulator`, `payload must be an object`, `reciprocal requires exactly one of id, signalKey, or key/value`; 404 `Escalation not found` (unknown, or outside the caller's scope on the ingress forms), `Reciprocal escalation not found`; 409 `Item already held` (`{ itemKey }`), `Accumulator is full`, `Escalation is claimed by another user`, `Your claim has expired`, `Escalation not available for accumulation` (resolved, cancelled, or expired), and the reciprocal blocks `Reciprocal escalation already holds this container`, `Reciprocal accumulator is full`, `Reciprocal escalation is no longer pending` (each with `outcome`); 422 payload violations.
+
+```
+POST /api/escalations/:id/remove-item
+POST /api/escalations/remove-item-by-signal-key
+POST /api/escalations/remove-item-by-metadata
+```
+
+Remove ONE held item from a pending accumulator in one guarded statement. The row stays pending and the waiter never wakes. **Body:** `{ itemKey, reciprocal? }` (plus the selector fields of the ingress forms). **Response 200:** `{ "outcome": "removed", "count": 2, "escalationId": "…", "reciprocal"?: { "count", "escalationId" } }`. **Errors:** 404 `Item not held by this escalation` (`{ itemKey }`), `Reciprocal escalation does not hold this container`; 400 and 409 as above.
+
+```
+GET /api/escalations/:id/items
+```
+
+The held items of an accumulator or batch row in arrival order. Read access; 404 non-disclosure.
+
+```json
+{
+  "escalationId": "…", "kind": "accumulate", "status": "pending", "count": 2, "max": 12,
+  "items": [
+    { "itemKey": "ORD-9", "payload": { "weight": 2 }, "at": "2026-09-18T14:02:11.402Z", "actor": "…", "reciprocalId": "…" },
+    { "itemKey": "ORD-12", "at": "2026-09-18T14:03:40.118Z", "actor": "…" }
+  ]
+}
+```
+
+A batch row answers `kind: "batch"`, `max` = the declared size, and `pending` = the keys still awaiting submission. A row that holds no items answers 400 `Escalation holds no items`.
+
 ## Resolve a set of escalations
 
 ```

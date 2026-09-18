@@ -98,12 +98,24 @@ Verbs are the canonical escalation actions:
 | `resolve` | Atomic claim + resolve with a canned payload | `resolverPayload`, `metadata` |
 | `escalate` | Create an escalation in another queue, optionally closing the located one | `targetRole`, `closeCurrent`, `escalationType`, `description`, `metadata` |
 | `cancel` | Claim-as-lock, then cancel | — |
+| `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey`, `resolverPayload`, `metadata`, `accumulate: { containerFacet, containerRoles, reciprocal }` |
 
 String values inside `resolverPayload` and `metadata` interpolate
 `{scan.target}`, `{scan.category}`, and `{scan.scannedAt}`. Every mutating
 verb stamps provenance facets onto the row it touches — `scanScheme`,
 `scanCategory`, `scanActionName`, `scannedAt` — so scan-driven transitions
 stay queryable.
+
+`accumulate` has two modes. With `params.accumulate.containerFacet` the
+scanned target is the ITEM: the step locates the item's own pending row
+through the scheme facet, reads that facet from the row (a bag row carrying
+`binKey: "B-7"`), and adds the target to the pending accumulator whose
+metadata carries the same value, writing the item's row as the reciprocal in
+the same statement (`reciprocal: false` skips it; `containerRoles` names the
+container queues). Without it the scanned target is the CONTAINER and the step
+adds `params.itemKey` (a template) to it. An item with no row or no container
+facet falls through to the next step; a container already holding the item
+reports a conflict.
 
 Ordering is the power move: put the expected state first and a broad
 `show-detail` last. A machine whose twin is in the wrong queue still answers
@@ -229,8 +241,9 @@ set with the same `PATCH /api/roles/:role` as every other dial). When the
 signed-in user is a **member of exactly that one role** — the station-login
 shape — the dashboard locks the viewport: the left nav is gone entirely, the
 role's escalation list is home (`/` and every other surface redirect to it),
-and the session is held to the list, the escalation detail page, and the scan
-screens (choice, badge). The header toolbar and event feed remain. A user
+and the session is held to the list, the escalation detail page, the role's
+portals, and the scan screens (choice, badge). A role that declares
+[portals](./hitl/portal.md) lands on its first one as home instead of the list. The header toolbar and event feed remain. A user
 holding more than one role, or an admin-type grant, always gets full chrome —
 kiosk is for the single-role floor login, never a way to hide the product from
 a real operator.

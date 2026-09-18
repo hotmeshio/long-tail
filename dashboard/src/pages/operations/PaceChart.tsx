@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { StationMetric } from '../../api/escalations';
+import { useContainerSize } from '../../hooks/useContainerWidth';
 import { displayRoleTitle } from '../../lib/role-display';
 
 export interface ChartStation {
@@ -24,24 +25,33 @@ interface PaceChartProps {
   periodHours: number;
   /** Use a logarithmic Y axis. Reveals shape across a wide dynamic range (7d/30d). */
   logScale?: boolean;
-  /** Fill the parent container — SVG uses h-full + preserveAspectRatio meet.
-      Default: auto-height (scales by width). Use when the parent has a defined height. */
+  /** Fill the parent container: the drawing takes the box's height and widens
+      its own coordinate space to the box's aspect, so stations spread across
+      the full width. Default: auto-height (scales by width). Use when the
+      parent has a defined height. */
   fill?: boolean;
 }
 
 // ── SVG layout ────────────────────────────────────────────────────────────────
 
-const W = 800;
+// The designed coordinate space. In fill mode the width grows with the box's
+// aspect so a wide, short panel spreads its stations instead of centering a
+// letterboxed drawing; it never shrinks below the designed width.
+const BASE_W = 800;
 const H = 270;
 const ML = 28;
 const MR = 60;
 const MT = 24;
 const MB = 72;
 
-const chartW = W - ML - MR;
 const chartH = H - MT - MB;
 const bottom = MT + chartH;
-const right = ML + chartW;
+
+/** The viewBox width for a box of the given size, or the designed width without one. */
+export function viewBoxWidth(size: { width: number; height: number } | null, fill: boolean): number {
+  if (!fill || !size || size.height <= 0 || size.width <= 0) return BASE_W;
+  return Math.max(BASE_W, Math.round((H * size.width) / size.height));
+}
 
 // Smooth transition applied when the window changes and values re-scale.
 const EASE = '0.5s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -160,9 +170,14 @@ function spreadLabels<T extends { y: number }>(labels: T[], maxY: number): (T & 
 
 export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, onCmdClick, periodHours, logScale = false, fill = false }: PaceChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [boxRef, boxSize] = useContainerSize<HTMLDivElement>();
 
   const n = stations.length;
   if (n === 0) return null;
+
+  const W = viewBoxWidth(boxSize, fill);
+  const chartW = W - ML - MR;
+  const right = ML + chartW;
 
   const xOf = (i: number) => (n === 1 ? ML + chartW / 2 : ML + (i / (n - 1)) * chartW);
   const xMap = new Map(stations.map((s, i) => [s.role, xOf(i)]));
@@ -256,6 +271,7 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
   );
 
   return (
+    <div ref={boxRef} className={fill ? 'w-full h-full min-h-0' : 'w-full'}>
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className={fill ? 'w-full h-full' : 'w-full'}
@@ -520,5 +536,6 @@ export function PaceChart({ stations, selectedRole, onSelect, onUpstreamSelect, 
         </text>
       ))}
     </svg>
+    </div>
   );
 }

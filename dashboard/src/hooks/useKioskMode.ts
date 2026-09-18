@@ -4,12 +4,21 @@ import { isReadOnlyLogin } from '../lib/station-login';
 import { useMyRoles } from '../api/users';
 import { useRoleDetails } from '../api/roles';
 import { setSelectedRole, useStationRole } from '../lib/station-role-store';
+import { PORTAL_PATH_PREFIX, portalPath, portalsOf } from '../lib/portal-path';
+import type { RolePortal } from '../api/roles';
+
+/** The locked station home: the role's first portal when it declares one, else its escalation list. */
+export function kioskHomePath(role: string, portals: RolePortal[]): string {
+  return portals.length > 0
+    ? portalPath(role, portals[0].key)
+    : `/escalations/available?role=${encodeURIComponent(role)}&status=available`;
+}
 
 export interface KioskState {
   kiosk: boolean;
   /** The role driving the kiosk home, when engaged. */
   role: string | null;
-  /** The locked home: the role's escalation list. */
+  /** The locked home: the role's portal when declared, else its escalation list. */
   homePath: string | null;
   /** Kiosk-flagged member roles selectable as the station home. */
   targets: string[];
@@ -64,14 +73,14 @@ export function useKioskMode(): KioskState {
     // Any admin/superadmin grant always gets the full chrome.
     if (memberships.some((m) => m.type !== 'member')) return off;
 
-    const isTarget = (role: string) =>
-      roleDetails?.roles?.find((r) => r.role === role)?.properties?.kiosk === true;
+    const detailOf = (role: string) => roleDetails?.roles?.find((r) => r.role === role);
+    const isTarget = (role: string) => detailOf(role)?.properties?.kiosk === true;
     const targets = memberships.map((m) => m.role).filter(isTarget);
 
     const home = (role: string): KioskState => ({
       kiosk: true,
       role,
-      homePath: `/escalations/available?role=${encodeURIComponent(role)}&status=available`,
+      homePath: kioskHomePath(role, portalsOf(detailOf(role))),
       targets,
       selectable: targets.length >= 2,
       selectRole,
@@ -100,8 +109,9 @@ export function useKioskMode(): KioskState {
 
 /** Path prefixes a kiosk session may occupy; everything else redirects home. */
 export const KIOSK_ALLOWED_PREFIXES = [
-  '/escalations', // the role list + escalation detail
-  '/scan',        // the scan station (choice screen, badge prompt)
+  '/escalations',       // the role list + escalation detail
+  PORTAL_PATH_PREFIX,   // the role's portal, its home when declared
+  '/scan',              // the scan station (choice screen, badge prompt)
   '/login',
 ];
 

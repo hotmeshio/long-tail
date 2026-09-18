@@ -40,6 +40,20 @@ describe('ResolverForm', () => {
     expect(screen.getByText('enterprise')).toBeInTheDocument();
   });
 
+  it('hides $-prefixed control keys and keeps them in the emitted JSON', () => {
+    const onChange = vi.fn();
+    const json = JSON.stringify({ shippedBy: 'carrier-x', $trigger: 'resolve', $accumulated: [{ itemKey: 'a' }] });
+    render(<ResolverForm value={json} onChange={onChange} />);
+    expect(screen.getByDisplayValue('carrier-x')).toBeInTheDocument();
+    expect(screen.queryByText(/\$trigger/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$accumulated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue('carrier-x'), { target: { value: 'carrier-y' } });
+    const emitted = JSON.parse(onChange.mock.calls[onChange.mock.calls.length - 1][0]);
+    expect(emitted.$trigger).toBe('resolve');
+    expect(emitted.shippedBy).toBe('carrier-y');
+  });
+
   it('hides keys starting with underscore', () => {
     const json = JSON.stringify({ visible: 'yes', _internal: 'hidden' });
     render(<ResolverForm value={json} onChange={vi.fn()} />);

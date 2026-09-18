@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Tag, Inbox, GitBranch, Check, Braces, Users, BookOpen, LayoutDashboard, Pin as PinIcon,
-  MonitorSmartphone,
+  MonitorSmartphone, LayoutGrid,
 } from 'lucide-react';
 import { useRoleDetails, useUpdateRole } from '../../../api/roles';
 import { RoleMembersSection } from './RoleMembersSection';
@@ -22,6 +22,7 @@ import { IdentitySection } from './sections/IdentitySection';
 import { PaceBoardSection } from './sections/PaceBoardSection';
 import { SchemasSection } from './sections/SchemasSection';
 import { PinsSection } from './sections/PinsSection';
+import { PortalSection } from './sections/PortalSection';
 
 // ── Sub-nav sections — the role's configuration, organized by concern ─────────
 
@@ -31,6 +32,7 @@ const SECTIONS = [
   { key: 'schemas',    label: 'Schemas',    icon: Braces },
   { key: 'members',    label: 'Members',    icon: Users },
   { key: 'pins',       label: 'Pins',       icon: PinIcon },
+  { key: 'portal',     label: 'Portal',     icon: LayoutGrid },
 ] as const;
 
 type SectionKey = (typeof SECTIONS)[number]['key'];
@@ -121,6 +123,7 @@ export function RoleDetailPage() {
         priority_facet: facet || null,
         entity_facet: entityFacet || null,
         entity_state_source: draft.entity_state_source,
+        portals: draft.portals.length ? draft.portals : null,
       },
       {
         onSuccess: () => {
@@ -230,8 +233,9 @@ export function RoleDetailPage() {
           </div>
         </nav>
 
-        {/* Section content — readable single-column measure */}
-        <div className="flex-1 min-w-0 pt-2 max-w-3xl">
+        {/* Section content — a readable single-column measure, except the
+            portal editor, which lays out grids and takes the full width. */}
+        <div className={`flex-1 min-w-0 pt-2 ${section === 'portal' ? '' : 'max-w-3xl'}`}>
           {section === 'identity' && (
             <IdentitySection role={role} draft={draft} update={update} errors={errors} />
           )}
@@ -289,6 +293,7 @@ export function RoleDetailPage() {
             </div>
           )}
           {section === 'pins' && <PinsSection role={role} />}
+          {section === 'portal' && <PortalSection role={role} draft={draft} update={update} />}
         </div>
       </div>
     </div>

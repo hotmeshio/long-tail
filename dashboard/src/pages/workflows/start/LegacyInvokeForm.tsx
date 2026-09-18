@@ -3,36 +3,49 @@ import type { LTWorkflowConfig } from '../../../api/types';
 import { DEFAULT_ENVELOPE, extractDataFields, dataToFields, fieldsToJson } from './helpers';
 import { EnvelopeEditor } from './EnvelopeEditor';
 import { InvokeFooter } from './InvokeFooter';
-import type { InvokeSubmission } from './use-invoke-submit';
+import { INVOKE_HOSTS, type InvokeHost, type InvokeSubmission } from './use-invoke-submit';
 
 const PREFILL_KEY = 'lt:invoke:prefill';
 
 /**
  * The template-driven envelope form: fields inferred from envelope_schema
  * values, with a JSON view for anything the template cannot express. The
- * surface every workflow gets until it declares an input_schema.
+ * surface every workflow gets until it declares an input_schema. A prefill
+ * merges over the template's `data`, so a caller can hand the form values it
+ * already knows.
  */
 export function LegacyInvokeForm({
   selected,
   metadata,
   submission,
   lead,
+  prefill,
+  host = INVOKE_HOSTS.PAGE,
 }: {
   selected: LTWorkflowConfig;
   metadata: Record<string, unknown>;
   submission: InvokeSubmission;
   /** Content that scrolls with the form ahead of its fields: description, identity, options. */
   lead?: ReactNode;
+  /** `data` values merged over the envelope template. */
+  prefill?: Record<string, unknown>;
+  host?: InvokeHost;
 }) {
   const [jsonInput, setJsonInput] = useState(DEFAULT_ENVELOPE);
   const [parseError, setParseError] = useState('');
   const [formFields, setFormFields] = useState<Record<string, unknown>>({});
   const [isJsonMode, setIsJsonMode] = useState(false);
 
-  const dataFields = useMemo(
-    () => extractDataFields(selected.envelope_schema ?? null),
-    [selected.envelope_schema],
-  );
+  // The template with the prefill folded into its data: the shape the fields and the JSON view both start from.
+  const envelope = useMemo<Record<string, unknown> | null>(() => {
+    const template = selected.envelope_schema ?? null;
+    if (!prefill || Object.keys(prefill).length === 0) return template;
+    const templateData = template?.data;
+    const data = { ...(templateData && typeof templateData === 'object' ? (templateData as Record<string, unknown>) : {}), ...prefill };
+    return { ...(template ?? {}), data };
+  }, [selected.envelope_schema, prefill]);
+
+  const dataFields = useMemo(() => extractDataFields(envelope), [envelope]);
   const hasFormView = dataFields.length > 0;
 
   useEffect(() => {
@@ -40,12 +53,12 @@ export function LegacyInvokeForm({
     submission.reset();
 
     // A registry hand-off arrives through sessionStorage and opens in JSON view.
-    const prefill = sessionStorage.getItem(PREFILL_KEY);
-    if (prefill) {
+    const handoff = host === INVOKE_HOSTS.PAGE ? sessionStorage.getItem(PREFILL_KEY) : null;
+    if (handoff) {
       sessionStorage.removeItem(PREFILL_KEY);
-      setJsonInput(prefill);
+      setJsonInput(handoff);
       try {
-        const parsed = JSON.parse(prefill);
+        const parsed = JSON.parse(handoff);
         const data = parsed?.data ?? parsed;
         if (data && typeof data === 'object') setFormFields(dataToFields(data));
       } catch { /* use as-is */ }
@@ -53,10 +66,10 @@ export function LegacyInvokeForm({
       return;
     }
 
-    setJsonInput(selected.envelope_schema ? JSON.stringify(selected.envelope_schema, null, 2) : DEFAULT_ENVELOPE);
-    const data = selected.envelope_schema?.data;
+    setJsonInput(envelope ? JSON.stringify(envelope, null, 2) : DEFAULT_ENVELOPE);
+    const data = envelope?.data;
     setFormFields(data && typeof data === 'object' ? dataToFields(data as Record<string, unknown>) : {});
-    setIsJsonMode(!extractDataFields(selected.envelope_schema ?? null).length);
+    setIsJsonMode(!extractDataFields(envelope).length);
   }, [selected.workflow_type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleMode = () => {
@@ -124,6 +137,7 @@ export function LegacyInvokeForm({
         error={parseError || submission.error}
         startedId={submission.startedId}
         executionPath={submission.executionPath}
+        host={host}
       />
     </div>
   );

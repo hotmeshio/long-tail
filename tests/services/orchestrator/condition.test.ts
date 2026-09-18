@@ -10,7 +10,7 @@ vi.mock('@hotmeshio/hotmesh', () => ({
   },
 }));
 
-import { conditional, conditionLT } from '../../../services/orchestrator/condition';
+import { conditional, conditionLT, conditionalAccumulator } from '../../../services/orchestrator/condition';
 import { Durable } from '@hotmeshio/hotmesh';
 
 const mockCondition = Durable.workflow.condition as ReturnType<typeof vi.fn>;
@@ -185,5 +185,39 @@ describe('conditional', () => {
       batch: ['cut'],
       metadata: { schema_version: 2 },
     });
+  });
+
+  // ── Open accumulation (hotmesh 0.29.0) ──────────────────────────────────────
+
+  it('forwards accumulate and partialOnTimeout to the SDK verbatim — the SDK owns the fold', async () => {
+    const collection = { $accumulated: [{ itemKey: 'a', at: 't' }], $trigger: 'count' };
+    mockCondition.mockResolvedValue(collection);
+    const config = { role: 'bin', metadata: { binKey: 'b-1' }, accumulate: { max: 3 }, timeout: '4h' };
+    const result = await conditional('sig-acc', config);
+    expect(mockCondition).toHaveBeenCalledWith('sig-acc', config);
+    expect(result).toEqual(collection);
+
+    mockCondition.mockResolvedValue({ cut: { ok: true }, $trigger: 'timeout' });
+    const batch = { role: 'assembly', batch: ['cut', 'weld'], partialOnTimeout: true, timeout: '1h' };
+    await conditional('sig-batch-partial', batch);
+    expect(mockCondition).toHaveBeenCalledWith('sig-batch-partial', batch);
+  });
+
+  it('conditionalAccumulator returns the collection and null, and folds the sugar', async () => {
+    const collection = { $accumulated: [], $trigger: 'timeout' };
+    mockCondition.mockResolvedValue(collection);
+    const result = await conditionalAccumulator('sig-acc', { role: 'bin', accumulate: {}, schemaVersion: 2 });
+    expect(result).toEqual(collection);
+    expect(mockCondition).toHaveBeenCalledWith('sig-acc', {
+      role: 'bin', accumulate: {}, metadata: { schema_version: 2 },
+    });
+
+    mockCondition.mockResolvedValue(null);
+    expect(await conditionalAccumulator('sig-acc', { role: 'bin', accumulate: { max: 1 } })).toBeNull();
+  });
+
+  it('conditionalAccumulator fails loud on a false resume', async () => {
+    mockCondition.mockResolvedValue(false);
+    await expect(conditionalAccumulator('sig-acc', { role: 'bin', accumulate: {} })).rejects.toThrow(/resumed with false/);
   });
 });

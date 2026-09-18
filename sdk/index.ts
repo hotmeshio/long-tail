@@ -131,6 +131,14 @@ export function createClient(options: LTClientOptions = {}) {
       resolveBatchItem: bindAuth(escalationsApi.resolveBatchItem, auth),
       resolveBatchItemBySignalKey: bindAuth(escalationsApi.resolveBatchItemBySignalKey, auth),
       resolveBatchItemByMetadata: bindAuth(escalationsApi.resolveBatchItemByMetadata, auth),
+      // Open accumulation: add and remove held items, read the ordered collection.
+      accumulate: bindAuth(escalationsApi.accumulateItem, auth),
+      accumulateBySignalKey: bindAuth(escalationsApi.accumulateItemBySignalKey, auth),
+      accumulateByMetadata: bindAuth(escalationsApi.accumulateItemByMetadata, auth),
+      removeItem: bindAuth(escalationsApi.removeItem, auth),
+      removeItemBySignalKey: bindAuth(escalationsApi.removeItemBySignalKey, auth),
+      removeItemByMetadata: bindAuth(escalationsApi.removeItemByMetadata, auth),
+      getItems: bindAuth(escalationsApi.getEscalationItems, auth),
       // Faceted-routing surface (pond search + batch claim), RBAC-scoped to the caller's role.
       searchByFacets: bindAuth(escalationsApi.searchByFacets, auth),
       claimGroups: bindAuth(escalationsApi.claimGroups, auth),

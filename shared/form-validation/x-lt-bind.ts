@@ -11,6 +11,7 @@
  *                       (server-side: to validate a submitted payload)
  *   mapFormToPayload  — flat form values → payload, the shape submitted/stored
  */
+import { isDisplayOnlyField } from './display-only-widgets';
 
 type PathSeg = { key: string } | { index: number };
 
@@ -70,7 +71,8 @@ export function bindPathFor(propName: string, propDef: Record<string, any> | und
 /**
  * Assemble the payload from the form's flat values. A field absent from
  * `formValues` is omitted (so clearing/deleting a field drops it from the
- * payload). Unknown keys not declared in the schema are dropped. With no schema
+ * payload). Unknown keys not declared in the schema are dropped, and so are
+ * display-only widget fields, which carry no answer. With no schema
  * properties, values pass through unchanged.
  */
 export function mapFormToPayload(
@@ -82,6 +84,7 @@ export function mapFormToPayload(
   const payload: Record<string, any> = {};
   for (const [name, def] of Object.entries(props)) {
     if (!(name in formValues)) continue;
+    if (isDisplayOnlyField(def as Record<string, unknown>)) continue;
     setDeep(payload, bindPathFor(name, def as Record<string, any>), formValues[name]);
   }
   return payload;

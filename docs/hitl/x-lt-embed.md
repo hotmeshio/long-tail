@@ -1,6 +1,6 @@
 # Embed and Navigation Widgets
 
-Three display-only widgets that surface related information inside an escalation's resolver form without leaving the page. All three produce **no resolver payload** — they must never appear in the schema's `required` array and are always declared `readOnly: true`.
+Three display-only widgets that surface related information inside an escalation's resolver form without leaving the page. All three produce **no resolver payload**: their keys are dropped from the submitted payload, they must never appear in the schema's `required` array, and they are always declared `readOnly: true`. The [`invoke`](x-lt-invoke.md) widget, which starts a workflow from the form, follows the same rules.
 
 | Widget | Token | What it shows |
 |--------|-------|---------------|

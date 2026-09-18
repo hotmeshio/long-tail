@@ -84,6 +84,18 @@ interface DataTableProps<T> {
   layout?: 'auto' | 'fixed';
   /** Force console-card rendering regardless of measured width (tests). */
   forceCardMode?: boolean;
+  /**
+   * When the table folds into console cards: `auto` below the card threshold
+   * (default), `never` to stay a table however narrow, `always` to fold.
+   */
+  fold?: 'auto' | 'never' | 'always';
+  /**
+   * `dense` tightens every cell (smaller type, less side padding) and keeps
+   * every column. `compact` goes further and holds non-identity columns
+   * back until the container clears the split threshold, so a narrow table
+   * reads as a tight list of identities rather than a squeeze of every column.
+   */
+  density?: 'default' | 'dense' | 'compact';
 }
 
 /** The @table threshold in rem — below this the table folds into cards. */
@@ -159,9 +171,25 @@ export function DataTable<T>({
   inline,
   layout = 'auto',
   forceCardMode,
+  fold = 'auto',
+  density = 'default',
 }: DataTableProps<T>) {
   const [wrapRef, width] = useContainerWidth<HTMLDivElement>();
-  const cardMode = forceCardMode ?? (width !== null && width < CARD_FOLD_REM * rootFontPx());
+  const cardMode = forceCardMode
+    ?? (fold === 'always' ? true : fold === 'never' ? false : width !== null && width < CARD_FOLD_REM * rootFontPx());
+  const compact = density === 'compact';
+  const anyPriority = columns.some((c) => c.priority !== undefined);
+  // In compact density a non-identity column without its own disclosure
+  // threshold waits for the split width, as the enrichment columns already do.
+  const discloseClass = (col: Column<T>, index: number): string => {
+    if (col.showFrom) return SHOW_FROM_CLASS[col.showFrom];
+    if (!compact) return '';
+    const priority = col.priority ?? (anyPriority ? 2 : index === 0 ? 1 : 2);
+    return priority === 1 ? '' : SHOW_FROM_CLASS.split;
+  };
+  const tight = density !== 'default';
+  const headPad = compact ? 'px-3 py-1.5' : tight ? 'px-3 py-2' : 'px-6 py-3';
+  const cellPad = compact ? 'px-3 py-1.5 text-xs' : tight ? 'px-3 py-2 text-xs' : 'px-6 py-2.5 text-sm';
 
   if (isLoading) {
     return (
@@ -234,7 +262,7 @@ export function DataTable<T>({
       <table className={`w-full ${layout === 'fixed' ? 'table-fixed' : ''}`}>
         <thead>
           <tr className="border-b">
-            {columns.map((col) => {
+            {columns.map((col, colIndex) => {
               const isSortable = col.sortable && onSort;
               const isActive = sort?.sort_by === col.key;
 
@@ -243,7 +271,7 @@ export function DataTable<T>({
                   key={col.key}
                   onClick={isSortable ? () => onSort(col.key) : undefined}
                   style={col.width ? { width: col.width } : undefined}
-                  className={`${inline ? '' : 'sticky top-[var(--lt-sticky-top,60px)] z-10 '}bg-surface px-6 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''} ${
+                  className={`${inline ? '' : 'sticky top-[var(--lt-sticky-top,60px)] z-10 '}bg-surface ${headPad} text-left text-2xs font-semibold uppercase tracking-widest text-text-tertiary whitespace-nowrap ${discloseClass(col, colIndex)} ${col.className ?? ''} ${
                     isSortable ? 'cursor-pointer select-none group/sorthead hover:text-text-secondary transition-colors' : ''
                   }`}
                 >
@@ -269,10 +297,10 @@ export function DataTable<T>({
                 onRowClick ? 'cursor-pointer row-hover' : ''
               } ${isActive ? 'border-l-2 border-l-accent' : ''} ${rowClassName ? rowClassName(row) : ''}`}
             >
-              {columns.map((col) => (
+              {columns.map((col, colIndex) => (
                 <td
                   key={col.key}
-                  className={`px-6 py-2.5 text-sm overflow-hidden ${col.showFrom ? SHOW_FROM_CLASS[col.showFrom] : ''} ${col.className ?? ''}`}
+                  className={`${cellPad} overflow-hidden ${discloseClass(col, colIndex)} ${col.className ?? ''}`}
                 >
                   {col.render(row, index)}
                 </td>

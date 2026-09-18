@@ -180,3 +180,49 @@ describe('role service — createRole reports creation', () => {
     expect(await roleService.createRole(FRESH)).toBe(false);
   });
 });
+
+describe('role service — portals round trip', () => {
+  const PORTAL_ROLE = `portal-role-${Date.now()}`;
+  const portals = [
+    {
+      key: 'fleet',
+      label: 'Fleet',
+      rows: [
+        [{ label: 'Board', url: `/escalations/available?role=${PORTAL_ROLE}&view=rich`, badge: false }],
+        [
+          { label: 'North', url: `/escalations/available?role=${PORTAL_ROLE}&facets=%7B%22facility%22%3A%22north%22%7D&view=table`, badge: true },
+          { label: 'South', url: `/escalations/available?role=${PORTAL_ROLE}&facets=%7B%22facility%22%3A%22south%22%7D&view=table`, badge: true },
+        ],
+      ],
+    },
+    {
+      key: 'focus',
+      label: 'Focus of the day',
+      counts: [{ label: 'Waiting', url: `/escalations/available?role=${PORTAL_ROLE}`, blurb: 'Unclaimed items' }],
+      rows: [[{ label: 'Jim', url: `/escalations/available?role=${PORTAL_ROLE}` }]],
+    },
+  ];
+
+  beforeAll(async () => {
+    await roleService.createRole(PORTAL_ROLE);
+  });
+
+  afterAll(async () => {
+    const { getPool } = await import('../../../lib/db');
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [PORTAL_ROLE]);
+  });
+
+  it('stores the portals in order and reads them back on every role read', async () => {
+    const updated = await roleService.updateRoleMetadata(PORTAL_ROLE, { portals });
+    expect(updated!.portals).toEqual(portals);
+    const listed = (await roleService.listRolesWithDetails()).find((r) => r.role === PORTAL_ROLE);
+    expect(listed?.portals).toEqual(portals);
+  });
+
+  it('an update omitting portals preserves them, and null clears them', async () => {
+    const renamed = await roleService.updateRoleMetadata(PORTAL_ROLE, { title: 'Portal Role' });
+    expect(renamed!.portals).toEqual(portals);
+    const cleared = await roleService.updateRoleMetadata(PORTAL_ROLE, { portals: null });
+    expect(cleared!.portals).toBeNull();
+  });
+});

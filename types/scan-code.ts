@@ -41,6 +41,14 @@ export const SCAN_VERBS = {
   RESOLVE: 'resolve',
   ESCALATE: 'escalate',
   CANCEL: 'cancel',
+  /**
+   * Add the scanned item to an accumulator escalation. With
+   * `params.accumulate.containerFacet` the scan locates the ITEM's own row
+   * and joins it to the container that shares that facet value, writing
+   * both rows in one statement; without it the scan locates the CONTAINER
+   * and adds `params.itemKey`.
+   */
+  ACCUMULATE: 'accumulate',
   /** Locate the row, then PRESENT its reality + the step's labeled choices. */
   PRESENT: 'present',
 } as const;
@@ -54,6 +62,7 @@ export const SCAN_MUTATING_VERBS: readonly ScanVerb[] = [
   SCAN_VERBS.RESOLVE,
   SCAN_VERBS.ESCALATE,
   SCAN_VERBS.CANCEL,
+  SCAN_VERBS.ACCUMULATE,
 ];
 
 export const SCAN_OUTCOMES = {
@@ -171,6 +180,23 @@ export interface ScanStepParams {
   closeCurrent?: 'resolve' | 'cancel';
   /** Claim window (claim verbs). */
   durationMinutes?: number;
+  /** Item key template (accumulate, container-locate mode). Defaults to `{scan.target}`. */
+  itemKey?: string;
+  /** Accumulate verb options. */
+  accumulate?: ScanAccumulateParams;
+}
+
+export interface ScanAccumulateParams {
+  /**
+   * Item-locate mode: the scanned target is the item's own escalation (found
+   * by the scheme facet); the container is the pending accumulator whose
+   * metadata carries this facet with the same value the item row holds.
+   */
+  containerFacet?: string;
+  /** Expected container queue(s); intersects with the actor's write scope. */
+  containerRoles?: string[];
+  /** Item-locate mode: also write the item's row as the reciprocal (default true). */
+  reciprocal?: boolean;
 }
 
 export interface ScanStep {

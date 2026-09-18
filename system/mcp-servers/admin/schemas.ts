@@ -93,6 +93,32 @@ export const resolveBySignalKeySchema = z.object({
   resolverPayload: z.record(z.any()).describe('Resolution payload'),
 });
 
+const adminReciprocalSchema = z.object({
+  id: z.string().optional(),
+  signalKey: z.string().optional(),
+  key: z.string().optional(),
+  value: z.string().optional(),
+  payload: z.record(z.any()).optional(),
+}).describe('A second accumulator row written in the same statement, both or neither. Exactly one of id, signalKey, or key/value.');
+
+export const accumulateItemSchema = z.object({
+  id: z.string().describe('Accumulator escalation UUID (the container)'),
+  itemKey: z.string().describe('The key this item is held under'),
+  payload: z.record(z.any()).optional().describe('Optional item payload, delivered inside $accumulated'),
+  metadata: z.record(z.any()).optional().describe('Merge patch for the container metadata, same statement'),
+  reciprocal: adminReciprocalSchema.optional(),
+});
+
+export const removeItemSchema = z.object({
+  id: z.string().describe('Accumulator escalation UUID'),
+  itemKey: z.string().describe('The held item key to remove'),
+  reciprocal: adminReciprocalSchema.omit({ payload: true }).optional(),
+});
+
+export const getEscalationItemsSchema = z.object({
+  id: z.string().describe('Accumulator or batch escalation UUID'),
+});
+
 export const escalateEscalationSchema = z.object({
   id: z.string().describe('Escalation UUID'),
   targetRole: z.string().describe('Role to route the escalation to'),
@@ -345,6 +371,20 @@ export const updateRoleSchema = z.object({
     url: z.string().describe('Dashboard-relative deep link (must start with /)'),
     badge: z.boolean().optional().describe('Render a live count beside the label (escalations-list URLs)'),
   })).nullable().optional().describe('Pinned-view seeds handed to every member of this role. Members promote, hide, or reorder them via their own preferences. Null clears.'),
+  portals: z.array(z.object({
+    key: z.string().describe('Slug, unique within the role; the portal\'s address segment'),
+    label: z.string().describe('Portal name shown in the global menu and the nav'),
+    rows: z.array(z.array(z.object({
+      label: z.string().describe('Panel title'),
+      url: z.string().describe('Dashboard-relative escalations-list deep link (must start with /)'),
+      badge: z.boolean().optional(),
+    })).min(1).max(6)).min(1).max(4).describe('Rows of pin cells; up to 4 rows of up to 6 cells'),
+    counts: z.array(z.object({
+      label: z.string().describe('Tile title'),
+      url: z.string().describe('Dashboard-relative escalations-list deep link whose total the tile shows'),
+      blurb: z.string().optional().describe('One line under the number'),
+    })).max(8).optional().describe('Count tiles above the panels'),
+  })).min(1).max(12).nullable().optional().describe('The role\'s named portal views, each a matrix of pin cells rendered as one page of live list panels at /portal/:role/:key. Null clears.'),
   change_summary: z.string().optional().describe('Recorded on the schema version snapshot when this update changes form_schema or metadata_schema'),
 });
 
