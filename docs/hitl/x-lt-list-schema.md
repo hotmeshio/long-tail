@@ -21,7 +21,9 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 | `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
 | `x-lt-row-action` | schema | The per-row action button: `{ action?, label?, durationMinutes? }` — see below |
 
-`format: "age"` on a `facet-table` column or `facet-board` field renders a timestamp as a compact age (`12m`, `3h`, `2d`) with the absolute time as its tooltip, repainted each minute — aging interim states are scannable at a glance.
+`format: "age"` (or its spoken twin `"ago"`) on a `facet-table` column or `facet-board` field renders a timestamp as a compact age (`12m`, `3h`, `2d`) with the absolute time as its tooltip, repainted each minute — aging interim states are scannable at a glance. `format: "date"` renders the full date the dashboard uses everywhere, hoverable for the exact time; a bare ISO timestamp with no format renders the same way. Both readings of a date column are useful: age for pace, date for the record.
+
+The `facet-table` renders at the table's dense setting: small type and tight side padding, so a row of six values fits without truncating. When no column declares a `width`, the first column holds 200px and the rest share the remainder; the row action sizes to its label.
 
 `format: "user"` resolves a user-id token — `{{escalation.assigned_to}}` — to that person's display name. Resolution is batched: every id on a page is coalesced into one `POST /api/users/names` request returning display fields only (no secrets, scopes, or metadata), cached by id for the session and not refetched on window focus; a user edit invalidates the cache. It truncates with an ellipsis and carries the full name on hover; an unassigned row shows a quiet em dash. `assigned_to` is the claimant while the item is worked and stays as the resolver once it is resolved, so one column reads correctly across the row's whole life. The built-in table and timeline views carry this user column by default; authored templates opt in per column.
 

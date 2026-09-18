@@ -5,9 +5,8 @@ import { useRoleDetails } from '../../api/roles';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
 import { useThrottledInvalidation } from '../../hooks/useEventHooks';
-import { escalationPattern } from '../../lib/events/subjects';
-import { parseEscalationListUrl, singleRoleOf } from '../../lib/escalation-list-url';
 import { portalPath, portalsOf } from '../../lib/portal-path';
+import { portalRefreshPlan } from '../../lib/portal-refresh';
 import { displayRoleTitle } from '../../lib/role-display';
 import { PortalGrid } from '../../components/portal/PortalGrid';
 import { PortalCounts } from '../../components/portal/PortalCounts';
@@ -26,8 +25,8 @@ function EmptyPortal({ text }: { text: string }) {
  * page of live panels. Any signed-in user may open it; every panel reads
  * through the same role-scoped list endpoints as the list page, so each
  * viewer sees what their read scope returns. With no portal key the role's
- * first portal shows. One subscription over the queues the cells name keeps
- * every panel current.
+ * first portal shows. One subscription per queue the cells and tiles name
+ * keeps them current, each event refreshing only the queue that moved.
  */
 export function PortalPage() {
   const { role = '', portal: portalKey } = useParams<{ role: string; portal?: string }>();
@@ -41,22 +40,11 @@ export function PortalPage() {
   const counts = portal?.counts ?? [];
   const from = portal ? portalPath(role, portal.key) : portalPath(role);
 
-  // The queues the cells and count tiles name, each subscribed once; a URL
-  // scoped to no single role widens the subscription to the whole family.
-  const patterns = useMemo(() => {
-    if (!rows) return [];
-    const roles = new Set<string>();
-    let wide = false;
-    for (const pin of [...rows.flat(), ...counts]) {
-      const params = parseEscalationListUrl(resolveUrl(pin.url));
-      if (!params) continue;
-      const scoped = singleRoleOf(params);
-      if (scoped) roles.add(scoped); else wide = true;
-    }
-    return wide ? [escalationPattern({})] : [...roles].sort().map((r) => escalationPattern({ role: r }));
-  }, [rows, counts, resolveUrl]);
+  // One subscription per queue the cells and tiles name; an event refreshes
+  // only that queue's panels and tiles, through the LIST-tier scheduler.
+  const plan = useMemo(() => portalRefreshPlan(rows ? [...rows.flat(), ...counts] : [], resolveUrl), [rows, counts, resolveUrl]);
   const invalidate = useThrottledInvalidation('LIST');
-  useEventSubscriptions(patterns, () => { invalidate([['escalations']]); });
+  useEventSubscriptions(plan.patterns, (event) => { invalidate(plan.keysFor(event.type)); });
 
   const cellCount = rows ? rows.reduce((n, r) => n + r.length, 0) : 0;
   const empty = !isFetched ? null

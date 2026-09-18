@@ -7,12 +7,16 @@ const state = vi.hoisted(() => ({
   fetched: true,
   user: { userId: 'u1', roles: [{ role: 'fleet' }] } as Record<string, unknown>,
   patterns: [] as string[],
+  handler: null as ((event: { type: string }) => void) | null,
+  invalidate: vi.fn(),
 }));
 
 vi.mock('../../../api/roles', () => ({ useRoleDetails: () => ({ data: { roles: state.roles }, isFetched: state.fetched }) }));
 vi.mock('../../../hooks/useLinkVariables', () => ({ useLinkVariables: () => ({ resolveUrl: (u: string) => u }) }));
-vi.mock('../../../hooks/useEventContext', () => ({ useEventSubscriptions: (p: string[]) => { state.patterns = p; } }));
-vi.mock('../../../hooks/useEventHooks', () => ({ useThrottledInvalidation: () => vi.fn() }));
+vi.mock('../../../hooks/useEventContext', () => ({
+  useEventSubscriptions: (p: string[], h: (event: { type: string }) => void) => { state.patterns = p; state.handler = h; },
+}));
+vi.mock('../../../hooks/useEventHooks', () => ({ useThrottledInvalidation: () => state.invalidate }));
 vi.mock('../../../components/portal/PortalGrid', () => ({
   PortalGrid: ({ rows }: { rows: unknown[][] }) => <div data-testid="grid">{rows.map((r) => r.length).join('/')}</div>,
 }));
@@ -57,6 +61,8 @@ beforeEach(() => {
   state.fetched = true;
   state.user = { userId: 'u1', roles: [{ role: 'fleet' }] };
   state.patterns = [];
+  state.handler = null;
+  state.invalidate.mockClear();
 });
 
 describe('PortalPage', () => {
@@ -81,11 +87,16 @@ describe('PortalPage', () => {
     expect(screen.getByText(/no portal by that name/)).toBeInTheDocument();
   });
 
-  it('subscribes once per queue the cells name', () => {
+  it('subscribes once per queue the cells name and refreshes only the moved queue', () => {
     renderPage();
     expect(state.patterns).toEqual([
       'lt.events.system.escalation.fleet.*.>',
       'lt.events.system.escalation.harvest.*.>',
+    ]);
+    state.handler!({ type: 'system.escalation.harvest.e1.claimed' });
+    expect(state.invalidate).toHaveBeenLastCalledWith([
+      ['escalations', { role: 'harvest' }],
+      ['escalations', 'available', { role: 'harvest' }],
     ]);
   });
 

@@ -41,7 +41,7 @@ function headerFor(label: string): HTMLElement {
 }
 
 describe('facet-table column widths', () => {
-  it('gives the first column 40% when no column declares a width', () => {
+  it('holds the first column at 200px when no column declares a width', () => {
     render(
       <EscalationListView
         role="policy-document"
@@ -52,8 +52,11 @@ describe('facet-table column widths', () => {
         activeEscalations={[makeRow()]}
       />,
     );
-    expect(headerFor('Title')).toHaveStyle({ width: '40%' });
+    expect(headerFor('Title')).toHaveStyle({ width: '200px' });
     expect(headerFor('Station').style.width).toBe('');
+    // Dense setting: small type and tight side padding on every cell.
+    expect(headerFor('Title').className).toContain('px-3');
+    expect(screen.getByText('Refund Policy').closest('td')!.className).toContain('text-xs');
   });
 
   it('an authored width wins and suppresses the identity default', () => {
@@ -69,5 +72,30 @@ describe('facet-table column widths', () => {
     );
     expect(headerFor('Title').style.width).toBe('');
     expect(headerFor('Station')).toHaveStyle({ width: '12rem' });
+  });
+});
+
+describe('facet-table date formats', () => {
+  const dated = () => ({ ...makeRow(), metadata: { title: 'Refund Policy', when: '2026-07-14T12:30:00.000Z' } });
+
+  it('age and ago render the compact age; date renders the full date; a bare ISO value renders the full date', () => {
+    render(
+      <EscalationListView
+        role="policy-document"
+        listSchema={schema([
+          { label: 'Title', value: '{{metadata.title}}' },
+          { label: 'Age', value: '{{metadata.when}}', format: 'age' },
+          { label: 'Ago', value: '{{metadata.when}}', format: 'ago' },
+          { label: 'When', value: '{{metadata.when}}', format: 'date' },
+          { label: 'Plain', value: '{{metadata.when}}' },
+        ])}
+        activeEscalations={[dated()]}
+      />,
+    );
+    const cells = screen.getAllByRole('cell').map((c) => c.textContent);
+    const ages = cells.filter((t) => /^\d+(mo|[smhdwy])$/.test(t ?? ''));
+    expect(ages).toHaveLength(2);
+    const full = cells.filter((t) => t && /2026|Jul/.test(t));
+    expect(full.length).toBeGreaterThanOrEqual(2);
   });
 });

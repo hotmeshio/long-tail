@@ -94,3 +94,13 @@ describe('DataTable — fold policy and density', () => {
     expect(screen.getByText('ID').closest('th')!.className).toContain('py-3');
   });
 });
+
+describe('DataTable — dense density', () => {
+  it('tightens cells and keeps every column', () => {
+    render(<DataTable columns={columns} data={rows} keyFn={(r) => r.id} fold="never" density="dense" />);
+    const nameHeader = screen.getByText('Name').closest('th')!;
+    expect(nameHeader.className).toContain('px-3');
+    expect(nameHeader.className).not.toContain('hidden');
+    expect(screen.getByText('Alice').closest('td')!.className).toContain('text-xs');
+  });
+});

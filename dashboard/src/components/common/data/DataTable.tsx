@@ -90,11 +90,12 @@ interface DataTableProps<T> {
    */
   fold?: 'auto' | 'never' | 'always';
   /**
-   * `compact` tightens every cell and holds non-identity columns back until
-   * the container clears the split threshold, so a narrow table reads as a
-   * tight list of identities rather than a squeeze of every column.
+   * `dense` tightens every cell (smaller type, less side padding) and keeps
+   * every column. `compact` goes further and holds non-identity columns
+   * back until the container clears the split threshold, so a narrow table
+   * reads as a tight list of identities rather than a squeeze of every column.
    */
-  density?: 'default' | 'compact';
+  density?: 'default' | 'dense' | 'compact';
 }
 
 /** The @table threshold in rem — below this the table folds into cards. */
@@ -186,8 +187,9 @@ export function DataTable<T>({
     const priority = col.priority ?? (anyPriority ? 2 : index === 0 ? 1 : 2);
     return priority === 1 ? '' : SHOW_FROM_CLASS.split;
   };
-  const headPad = compact ? 'px-3 py-1.5' : 'px-6 py-3';
-  const cellPad = compact ? 'px-3 py-1.5 text-xs' : 'px-6 py-2.5 text-sm';
+  const tight = density !== 'default';
+  const headPad = compact ? 'px-3 py-1.5' : tight ? 'px-3 py-2' : 'px-6 py-3';
+  const cellPad = compact ? 'px-3 py-1.5 text-xs' : tight ? 'px-3 py-2 text-xs' : 'px-6 py-2.5 text-sm';
 
   if (isLoading) {
     return (
