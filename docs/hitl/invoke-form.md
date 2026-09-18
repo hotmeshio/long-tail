@@ -70,6 +70,10 @@ An array of conditions requires every one, so the prompt belongs to its tool and
 
 `x-lt-help` on the schema root is the longer reference for the side panel: markdown, tables, and `{{input.*}}` tokens that re-interpolate as the operator types.
 
+## From an escalation form
+
+A role's `form_schema` can offer the same invoke from inside the work item: an `x-lt-invoke` field names the workflow and maps the escalation's values into its payload, then either posts directly or opens this form in a dialog with those values in place. Visibility follows the same per-caller list, the payload meets the same gate, and the run reports over the same events. See [x-lt-invoke.md](x-lt-invoke.md).
+
 ## The Invoke Tool page
 
 The page is open to anyone the server lists an invokable workflow for. Builders reach **Invoke Tool** under Orchestrate; every other persona gets a **Tools** section in the nav that appears only when there is something to invoke. Each invokable workflow is a tool; the list sits on the left, grouped by task queue, with the first workflow preselected; the form takes the rest of the row. Below 1280px the list folds into a select and the form takes the full width.

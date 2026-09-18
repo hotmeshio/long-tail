@@ -49,3 +49,12 @@ describe('InvokeFooter', () => {
     expect(screen.queryByTestId('events-warning')).not.toBeInTheDocument();
   });
 });
+
+describe('InvokeFooter in a dialog', () => {
+  it('sits in the flow instead of sticking to the shell scroll', () => {
+    renderFooter({ host: 'modal' });
+    const footer = screen.getByTestId('invoke-start').closest('div.border-t')!;
+    expect(footer.className).not.toContain('sticky');
+    expect(footer.className).not.toContain('-mb-16');
+  });
+});

@@ -25,6 +25,7 @@
  */
 
 import { createRole, updateRoleMetadata, listRolesWithDetails } from '../services/role';
+import { fleetTools } from './workflows/fleet-tools';
 import { createEscalation, resolveEscalation, countByFacets } from '../services/escalation';
 import { getPool } from '../lib/db';
 import { loggerRegistry } from '../lib/logger';
@@ -34,16 +35,33 @@ export const PRINTER_HARVEST_ROLE = 'printer-harvest';
 export const PRINTER_SERVICE_ROLE = 'printer-service';
 export const PRINTER_ENTITY_FACET = 'serialNumber';
 
-// The work form for a scanned printer: a checkbox, a required note, and a
-// return-to-list transition after resolve.
+// The work form for a scanned printer: a checkbox, a required note, the fleet
+// tools for this machine, and a return-to-list transition after resolve.
 const PRINTER_FORM_SCHEMA = {
   'x-lt-transition-done': `/escalations/available?role={{escalation.role}}`,
+  'x-lt-order': ['inspected', 'condition_note', 'fleet_tools'],
   properties: {
     inspected: { type: 'boolean', title: 'Machine inspected', default: false },
     condition_note: {
       type: 'string',
       title: 'Condition note',
       'x-lt-widget': 'textarea',
+    },
+    // Opens the fleetTools invoke form with this machine's serial in place;
+    // the serial facet on the row is the one the tools' lookup reads.
+    fleet_tools: {
+      type: 'string',
+      readOnly: true,
+      'x-lt-widget': 'invoke',
+      'x-lt-invoke': {
+        workflow: fleetTools.name,
+        modal: true,
+        data: { printer: { [PRINTER_ENTITY_FACET]: `{{metadata.${PRINTER_ENTITY_FACET}}}` } },
+      },
+      'x-lt-section': 'Tools',
+      'x-lt-span': 2,
+      title: 'Fleet tools',
+      description: 'Reprint a label, change filament, or report this machine offline',
     },
   },
   required: ['condition_note'],

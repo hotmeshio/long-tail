@@ -8,6 +8,13 @@ import type { LTWorkflowConfig } from '../../../api/types';
 
 export const EXECUTIONS_PATH = '/workflows/executions';
 
+/** Where an invoke form is hosted: the Invoke Tool page, or a dialog opened from another surface. */
+export const INVOKE_HOSTS = {
+  PAGE: 'page',
+  MODAL: 'modal',
+} as const;
+export type InvokeHost = (typeof INVOKE_HOSTS)[keyof typeof INVOKE_HOSTS];
+
 /** What a form needs from the submission: the call, its state, and the outcome. */
 export interface InvokeSubmission {
   submit: (data: Record<string, unknown>, metadata: Record<string, unknown>) => Promise<void>;
