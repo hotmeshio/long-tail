@@ -3,7 +3,7 @@ import { actingIdentitySatisfied, executeIdentityScan, resolveActingAuth } from 
 import { notPrimed, type StepContext } from './context';
 import { locateStep } from './locate';
 import { presentStep } from './present';
-import { cancelStep, claimStep, escalateStep, releaseStep, resolveStep } from './verbs';
+import { accumulateStep, cancelStep, claimStep, escalateStep, releaseStep, resolveStep } from './verbs';
 import {
   SCAN_OUTCOMES,
   SCAN_SCHEME_KINDS,
@@ -164,6 +164,8 @@ async function executeStep(
       return releaseStep(step, ctx);
     case SCAN_VERBS.CANCEL:
       return cancelStep(step, ctx);
+    case SCAN_VERBS.ACCUMULATE:
+      return accumulateStep(step, ctx);
     default:
       throw new Error(`unknown scan verb "${step.verb}"`);
   }

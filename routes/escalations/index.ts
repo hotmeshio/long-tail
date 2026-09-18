@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { registerListRoutes } from './list';
 import { registerBulkRoutes } from './bulk';
 import { registerMetadataRoutes } from './metadata';
+import { registerAccumulateRoutes } from './accumulate';
 import { registerSingleRoutes } from './single';
 import { registerResolveRoutes } from './resolve';
 import { registerFacetRoutes } from './facets';
@@ -21,6 +22,11 @@ registerBulkRoutes(router);
 
 // GET /by-metadata, POST /claim-by-metadata, POST /resolve-by-metadata
 registerMetadataRoutes(router);
+
+// POST /accumulate-by-signal-key, /accumulate-by-metadata,
+// /remove-item-by-signal-key, /remove-item-by-metadata,
+// POST /:id/accumulate, POST /:id/remove-item, GET /:id/items
+registerAccumulateRoutes(router);
 
 // POST /search-by-facets, /claim-groups, /claim-by-facets
 registerFacetRoutes(router);

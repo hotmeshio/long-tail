@@ -15,6 +15,8 @@ import {
   resolveEscalationSchema,
   resolveBatchItemSchema,
   escalateAndWaitSchema,
+  accumulateItemSchema,
+  removeItemSchema,
 } from './human-queue-schemas';
 
 let server: McpServer | null = null;
@@ -55,6 +57,8 @@ async function checkResolveToolPayload(
  * - claim_and_resolve — claim + resolve in one step
  * - resolve_escalation — resolve an already-claimed escalation
  * - resolve_batch_item — submit one declared item of a batch escalation
+ * - accumulate_item — add one item to an open accumulator escalation
+ * - remove_item — remove one held item from an open accumulator escalation
  * - escalate_and_wait — create escalation and return signal for durable wait
  *
  * The server is created with tools registered but no transport
@@ -315,6 +319,90 @@ export async function createHumanQueueServer(options?: {
             remaining: result.remaining,
             status: result.escalation?.status,
           }),
+        }],
+      };
+    },
+  );
+
+  // ── accumulate_item ────────────────────────────────────────────────
+  (server as any).registerTool(
+    'accumulate_item',
+    {
+      title: 'Accumulate Item',
+      description: 'Add ONE item to an open accumulator escalation (a wait declared with accumulate). '
+        + 'Interim adds return outcome "accepted" with the count held and the remaining slots; the add that '
+        + 'reaches max completes the escalation and wakes the waiting workflow with the ordered collection. '
+        + 'A key already held is rejected. Name a reciprocal to write a second accumulator row (for example '
+        + 'the item\'s own escalation) in the same statement, both or neither.',
+      inputSchema: accumulateItemSchema,
+    },
+    async (args: z.infer<typeof accumulateItemSchema>) => {
+      if (args.payload) {
+        const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+        if (rejected) return rejected;
+      }
+      const result = await escalationService.accumulateItem(args.escalation_id, {
+        itemKey: args.item_key,
+        payload: args.payload,
+        metadata: { source: 'mcp_server' },
+        actor: 'mcp_server',
+        reciprocal: args.reciprocal,
+      });
+      if (result.outcome !== 'accepted' && result.outcome !== 'completed') {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `Item not accepted: ${result.outcome}`, outcome: result.outcome }),
+          }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            escalation_id: args.escalation_id,
+            outcome: result.outcome,
+            count: result.count,
+            remaining: result.remaining,
+            status: result.escalation?.status,
+            ...(result.reciprocal
+              ? { reciprocal: { escalation_id: result.reciprocal.escalation.id, outcome: result.reciprocal.outcome, count: result.reciprocal.count } }
+              : {}),
+          }),
+        }],
+      };
+    },
+  );
+
+  // ── remove_item ────────────────────────────────────────────────────
+  (server as any).registerTool(
+    'remove_item',
+    {
+      title: 'Remove Item',
+      description: 'Remove ONE held item from a pending open accumulator escalation. The row stays pending and the '
+        + 'waiting workflow is never woken. Name a reciprocal to remove the container from that row in the same statement.',
+      inputSchema: removeItemSchema,
+    },
+    async (args: z.infer<typeof removeItemSchema>) => {
+      const result = await escalationService.removeAccumulatedItem(args.escalation_id, {
+        itemKey: args.item_key,
+        actor: 'mcp_server',
+        reciprocal: args.reciprocal,
+      });
+      if (result.outcome !== 'removed') {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: `Item not removed: ${result.outcome}`, outcome: result.outcome }),
+          }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({ escalation_id: args.escalation_id, outcome: 'removed', count: result.count }),
         }],
       };
     },

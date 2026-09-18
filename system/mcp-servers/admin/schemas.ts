@@ -93,6 +93,32 @@ export const resolveBySignalKeySchema = z.object({
   resolverPayload: z.record(z.any()).describe('Resolution payload'),
 });
 
+const adminReciprocalSchema = z.object({
+  id: z.string().optional(),
+  signalKey: z.string().optional(),
+  key: z.string().optional(),
+  value: z.string().optional(),
+  payload: z.record(z.any()).optional(),
+}).describe('A second accumulator row written in the same statement, both or neither. Exactly one of id, signalKey, or key/value.');
+
+export const accumulateItemSchema = z.object({
+  id: z.string().describe('Accumulator escalation UUID (the container)'),
+  itemKey: z.string().describe('The key this item is held under'),
+  payload: z.record(z.any()).optional().describe('Optional item payload, delivered inside $accumulated'),
+  metadata: z.record(z.any()).optional().describe('Merge patch for the container metadata, same statement'),
+  reciprocal: adminReciprocalSchema.optional(),
+});
+
+export const removeItemSchema = z.object({
+  id: z.string().describe('Accumulator escalation UUID'),
+  itemKey: z.string().describe('The held item key to remove'),
+  reciprocal: adminReciprocalSchema.omit({ payload: true }).optional(),
+});
+
+export const getEscalationItemsSchema = z.object({
+  id: z.string().describe('Accumulator or batch escalation UUID'),
+});
+
 export const escalateEscalationSchema = z.object({
   id: z.string().describe('Escalation UUID'),
   targetRole: z.string().describe('Role to route the escalation to'),

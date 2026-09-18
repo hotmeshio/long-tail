@@ -17,6 +17,36 @@ export type EscalationResolution = Types.EscalationResolution;
 export type BatchItemOutcome = Types.BatchItemOutcome;
 
 /**
+ * The open accumulator's declaration (`conditional`'s `accumulate` field):
+ * `max` is the count trigger (absent = unbounded), `resolveAtMax: false`
+ * makes it a cap only, `unique: false` lets a repeated key replace its
+ * entry. Re-exported from the HotMesh SDK.
+ */
+export type AccumulateConfig = Types.AccumulateConfig;
+
+/**
+ * What an accumulator wait resolves with on every terminal path except
+ * cancel: the ordered `$accumulated` collection and the `$trigger` that
+ * ended the wait (`count` | `timeout` | `resolve`). `P` types each item's
+ * payload; `R` types the manual resolver payload merged in on `resolve`.
+ */
+export type AccumulatorResult<
+  P = Record<string, unknown>,
+  R extends Record<string, unknown> = Record<string, unknown>,
+> = Types.AccumulatorResult<P, R>;
+export type AccumulatedItem<P = Record<string, unknown>> = Types.AccumulatedItem<P>;
+export type AccumulatorTrigger = Types.AccumulatorTrigger;
+
+/**
+ * Outcome vocabulary for accumulator adds (`accumulateItem`). `completed` =
+ * this add reached `max`: the row resolved and the waiting workflow woke
+ * with the collection. `accepted` = the item landed; the row stays pending.
+ * `reciprocal-*` = the second row blocked the add and neither row changed.
+ */
+export type AccumulateItemOutcome = Types.AccumulateItemOutcome;
+export type RemoveAccumulatedItemOutcome = Types.RemoveAccumulatedItemOutcome;
+
+/**
  * Reserved batch-accumulator keys, written by the SDK's `batch` fold at
  * escalation creation. Facets (`batch_pending`, `batch_count`, `batch_keys`)
  * live on the GIN-indexed metadata surface; the payload accumulator
@@ -32,6 +62,36 @@ export const ESCALATION_BATCH_KEYS = {
   KEYS: 'batch_keys',
   /** Envelope: the accumulated `Record<itemKey, payload>` map. */
   ITEMS: 'batch_items',
+  /** Envelope: `Record<itemKey, iso8601>` fill timestamps from the database clock. */
+  FILLED_AT: 'batch_filled_at',
+  /** Envelope: set by `partialOnTimeout`; the timer delivers the filled items. */
+  PARTIAL_ON_TIMEOUT: 'batch_partial_on_timeout',
+} as const;
+
+/**
+ * Reserved open-accumulator keys, written by the SDK's `accumulate` fold at
+ * escalation creation. Facets (`accumulate_count`, `accumulate_max`,
+ * `accumulate_keys`) live on the GIN-indexed metadata surface; the item
+ * store (`accumulate_items`) and the folded options (`accumulate_config`)
+ * live on the unindexed envelope.
+ */
+export const ESCALATION_ACCUMULATE_KEYS = {
+  /** Metadata: items held right now. */
+  COUNT: 'accumulate_count',
+  /** Metadata: the count trigger, or null when unbounded. */
+  MAX: 'accumulate_max',
+  /** Metadata: held item keys (queryable via `@>`). */
+  KEYS: 'accumulate_keys',
+  /** Envelope: `Record<itemKey, { payload?, at, actor?, reciprocalId? }>`. */
+  ITEMS: 'accumulate_items',
+  /** Envelope: the folded `{ unique, resolveAtMax }` options. */
+  CONFIG: 'accumulate_config',
+} as const;
+
+/** Reserved `$`-prefixed keys on a delivered accumulator collection. */
+export const ACCUMULATOR_RESULT_KEYS = {
+  ACCUMULATED: '$accumulated',
+  TRIGGER: '$trigger',
 } as const;
 
 /**

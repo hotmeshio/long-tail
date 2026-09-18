@@ -70,6 +70,62 @@ export const HUMAN_QUEUE_TOOLS = [
     },
   },
   {
+    name: 'resolve_escalation',
+    description: 'Resolve an already-claimed escalation with a payload. The payload validates against the role form schema.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The escalation ID to resolve' },
+        payload: { type: 'object', description: 'Resolution payload data' },
+      },
+      required: ['escalation_id', 'payload'],
+    },
+  },
+  {
+    name: 'resolve_batch_item',
+    description: 'Submit ONE declared item of a batch escalation. Interim items return outcome "accepted" with the count remaining; the LAST item completes the escalation and wakes the waiting workflow with the full collection.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The batch escalation ID' },
+        item_key: { type: 'string', description: 'The declared batch item key this submission fills' },
+        payload: { type: 'object', description: 'The item payload' },
+      },
+      required: ['escalation_id', 'item_key', 'payload'],
+    },
+  },
+  {
+    name: 'accumulate_item',
+    description: 'Add ONE item to an open accumulator escalation. Interim adds return outcome "accepted" with the count held; the add that reaches max completes the escalation and wakes the waiting workflow with the ordered collection. Optionally write a reciprocal row in the same statement.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The accumulator escalation ID (the container)' },
+        item_key: { type: 'string', description: 'The key this item is held under' },
+        payload: { type: 'object', description: 'Optional item payload, delivered inside $accumulated' },
+        reciprocal: { type: 'object', description: 'A second accumulator row written in the same statement, both or neither. Exactly one of id, signalKey, or key/value.', properties: { id: { type: 'string' }, signalKey: { type: 'string' }, key: { type: 'string' }, value: { type: 'string' }, payload: { type: 'object' } } },
+      },
+      required: ['escalation_id', 'item_key'],
+    },
+  },
+  {
+    name: 'remove_item',
+    description: 'Remove ONE held item from a pending open accumulator escalation. The row stays pending and the waiting workflow is never woken.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The accumulator escalation ID' },
+        item_key: { type: 'string', description: 'The held item key to remove' },
+        reciprocal: { type: 'object', description: 'A second accumulator row written in the same statement, both or neither. Exactly one of id, signalKey, or key/value.', properties: { id: { type: 'string' }, signalKey: { type: 'string' }, key: { type: 'string' }, value: { type: 'string' } } },
+      },
+      required: ['escalation_id', 'item_key'],
+    },
+  },
+  {
     name: 'escalate_and_wait',
     description: 'Create an escalation and pause the workflow until a human responds. Returns a signal ID that the workflow uses to wait durably. Preferred over escalate_to_human + check_resolution polling.',
     read_safe: false,

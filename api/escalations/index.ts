@@ -6,6 +6,11 @@ export { claimEscalation, releaseEscalation } from './claim';
 export { releaseExpiredClaims, updatePriority, bulkClaim, bulkAssign, bulkUnassign, bulkEscalate, bulkTriage } from './bulk';
 export { resolveEscalation, resolveBySignalKey, resolveByIds, resolveAllOrNone } from './resolve';
 export { resolveBatchItem, resolveBatchItemBySignalKey, resolveBatchItemByMetadata } from './resolve-batch';
+export {
+  accumulateItem, accumulateItemBySignalKey, accumulateItemByMetadata,
+  removeItem, removeItemBySignalKey, removeItemByMetadata,
+  getEscalationItems, itemsView,
+} from './accumulate';
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';
 export { searchByFacets, claimGroups, claimByFacets } from './facets';

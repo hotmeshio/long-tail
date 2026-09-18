@@ -1,6 +1,7 @@
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
 import { claimByMetadata, resolveByMetadata, restrictScopeRoles } from '../escalations/metadata';
+import { accumulateItemByMetadata } from '../escalations/accumulate';
 import { createEscalation } from '../escalations/create';
 import { releaseEscalation } from '../escalations/claim';
 import { getEscalationReadScope, getEscalationWriteScope } from '../escalations/helpers';
@@ -21,6 +22,7 @@ import {
   templateContext,
   type StepContext,
 } from './context';
+import { locateForStep } from './locate';
 
 // ── Mutating verbs — each a single atomic operation under the ACTOR's RBAC ──
 // ctx.auth is the effective actor: the badged person when a grant rode the
@@ -188,4 +190,65 @@ export async function cancelStep(
   const cancelled = await escalationService.cancelEscalation(claimed.data.escalation.id);
   if (!cancelled) return conflict('Escalation is not cancellable (already terminal)');
   return executed(cancelled, step);
+}
+
+/**
+ * Adds the scanned item to an accumulator. Two modes, one atomic write:
+ *
+ * - Item-locate (`params.accumulate.containerFacet`): the scan locates the
+ *   item's own pending row through the scheme facet, reads the container
+ *   facet value it carries, and adds the target to the container that shares
+ *   it, writing the item row as the reciprocal in the same statement. An
+ *   item with no row, or no container facet, falls through.
+ * - Container-locate (no `containerFacet`): the scan locates the container
+ *   by the scheme facet and adds `params.itemKey` (template).
+ *
+ * The write is the SDK's guarded statement; the locate only picks ids. A
+ * container already holding the item answers conflict, never a second add.
+ */
+export async function accumulateStep(
+  step: ScanStep,
+  ctx: StepContext,
+): Promise<LTApiResult<ScanExecuteResponse> | null> {
+  const tpl = templateContext(ctx);
+  const payload = step.params?.resolverPayload
+    ? scanCodeService.interpolateScanTemplate(step.params.resolverPayload, tpl)
+    : undefined;
+  const metadata = { ...interpolatedMetadata(step, ctx), ...provenance(ctx) };
+  const options = step.params?.accumulate;
+
+  let request: Parameters<typeof accumulateItemByMetadata>[0];
+  if (options?.containerFacet) {
+    const located = await locateForStep(step, ctx, 1);
+    const item = located?.escalations[0];
+    if (!item) return null;
+    const containerValue = (item.metadata as Record<string, any> | null)?.[options.containerFacet];
+    if (containerValue === undefined || containerValue === null || containerValue === '') return null;
+    request = {
+      key: options.containerFacet,
+      value: String(containerValue),
+      itemKey: ctx.parsed.target,
+      payload,
+      metadata,
+      restrictRoles: options.containerRoles,
+      ...(options.reciprocal === false ? {} : { reciprocal: { id: item.id } }),
+    };
+  } else {
+    request = {
+      key: ctx.scheme.target_facet,
+      value: ctx.parsed.target,
+      itemKey: scanCodeService.interpolateScanTemplate(step.params!.itemKey!, tpl),
+      payload,
+      metadata,
+      restrictRoles: step.query?.roles,
+    };
+  }
+
+  const result = await accumulateItemByMetadata(request, ctx.auth);
+  if (result.status === 404) return null;
+  if (result.status === 403) return forbidden(result.error);
+  if (result.status === 409) return conflict(result.error);
+  if (result.status !== 200) return result;
+  const escalation = result.data.escalationId ? { id: result.data.escalationId, ...result.data } : undefined;
+  return executed(escalation, step);
 }

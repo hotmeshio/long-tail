@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User, ListFilter, Search, AlertCircle } from 'lucide-react';
+import { HelpCircle, Info, Tags, Layers, Braces, Sparkles, User, ListFilter, Search, AlertCircle, Boxes } from 'lucide-react';
 import { SlidePanel, SlidePanelViews, PanelField, type SlidePanelView } from '../common/layout/SlidePanel';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 import { JsonViewer } from '../common/data/JsonViewer';
@@ -17,6 +17,8 @@ import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
 import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import { displayMetadataEntries } from '../../lib/metadata-display';
+import { escalationItems } from '../../lib/escalation-items';
+import { EscalationItemsPanel } from './EscalationItemsPanel';
 import type { LTEscalationRecord } from '../../api/types';
 import type { FieldError } from '../../lib/field-validator';
 
@@ -25,6 +27,7 @@ export const ESCALATION_PANEL_VIEWS = {
   DETAILS: 'details',
   TRIAGE: 'triage',
   METADATA: 'metadata',
+  ITEMS: 'items',
   CONTEXT: 'context',
   RECORD: 'record',
   ERRORS: 'errors',
@@ -169,6 +172,8 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
  *   AI Analysis — what triage diagnosed and corrected (when AI is enabled and
  *               the payload carries triage data)
  *   Metadata  — the row's metadata values, the facts stamped at enqueue
+ *   Items     — the held items of an accumulator or batch row, with add and
+ *               remove on a pending accumulator
  *   Context   — the expanded surface: input envelope, escalation context, and
  *               resolver payload
  *   Record    — the raw escalation record (builders only)
@@ -191,6 +196,7 @@ export function EscalationSidePanel({
   formErrors,
   activePanel,
   onPanelChange,
+  canWriteItems,
 }: {
   esc: LTEscalationRecord;
   schema: Record<string, unknown> | null;
@@ -213,6 +219,8 @@ export function EscalationSidePanel({
   activePanel?: string;
   /** Called when the user changes the active panel view. */
   onPanelChange?: (id: string) => void;
+  /** The actor may add and remove items on a pending accumulator row. */
+  canWriteItems?: boolean;
 }) {
   const navigate = useNavigate();
   const ALL_VIEW_IDS = Object.values(ESCALATION_PANEL_VIEWS) as readonly string[];
@@ -254,6 +262,8 @@ export function EscalationSidePanel({
     }
   }, [navigate]);
 
+  const items = useMemo(() => escalationItems(esc, envelope), [esc, envelope]);
+
   const views: SlidePanelView[] = [
     {
       id: ESCALATION_PANEL_VIEWS.HELP,
@@ -281,6 +291,20 @@ export function EscalationSidePanel({
       label: 'Metadata',
       content: <MetadataList metadata={esc.metadata} role={esc.role} />,
     },
+    ...(items
+      ? [{
+          id: ESCALATION_PANEL_VIEWS.ITEMS,
+          icon: Boxes,
+          label: 'Items',
+          content: (
+            <EscalationItemsPanel
+              escalationId={esc.id}
+              items={items}
+              canWrite={!!canWriteItems && esc.status === 'pending'}
+            />
+          ),
+        }]
+      : []),
     {
       id: ESCALATION_PANEL_VIEWS.CONTEXT,
       icon: Layers,

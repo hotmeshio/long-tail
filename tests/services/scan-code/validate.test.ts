@@ -106,3 +106,31 @@ describe('assertValidSteps', () => {
     ).not.toThrow();
   });
 });
+
+describe('assertValidSteps — accumulate', () => {
+  const base = { query: {}, verb: SCAN_VERBS.ACCUMULATE } as ScanStep;
+
+  it('accepts item-locate mode with a container facet', () => {
+    expect(() => assertValidSteps([{ ...base, params: { accumulate: { containerFacet: 'binKey' } } }])).not.toThrow();
+  });
+
+  it('accepts container-locate mode with an item key template', () => {
+    expect(() => assertValidSteps([{ ...base, params: { itemKey: 'inspection-{scan.category}' } }])).not.toThrow();
+  });
+
+  it('rejects a step with neither an item key nor a container facet', () => {
+    expect(() => assertValidSteps([base])).toThrow(/itemKey or params.accumulate.containerFacet/);
+    expect(() => assertValidSteps([{ ...base, params: { accumulate: {} } }])).toThrow(/itemKey or/);
+  });
+
+  it('rejects a malformed facet key and non-array container roles', () => {
+    expect(() => assertValidSteps([{ ...base, params: { accumulate: { containerFacet: 'bin key' } } }])).toThrow(/facet key/);
+    expect(() => assertValidSteps([{ ...base, params: { accumulate: { containerFacet: 'binKey', containerRoles: 'bin' as any } } }])).toThrow(/containerRoles/);
+    expect(() => assertValidSteps([{ ...base, params: { accumulate: [] as any } }])).toThrow(/must be an object/);
+  });
+
+  it('is a mutating verb: confirm is allowed', () => {
+    expect(() => assertValidSteps([{ ...base, confirm: { prompt: 'Add to bin?' }, params: { itemKey: 'x' } }])).not.toThrow();
+  });
+});
+

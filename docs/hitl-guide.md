@@ -99,6 +99,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Footer labels, claim-and-submit, and the list-driven "start" action | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Iframe viewport protocol | [iframe.md](hitl/iframe.md) |
 | Claim lifecycle, resolving from system code, outcome recording, cancellation | [resolution.md](hitl/resolution.md) |
+| Open accumulators: the contract, guarantees, and operations for containers that fill over time | [accumulator.md](accumulator.md) |
 | Role routing, RBAC, scope, chains | [roles.md](hitl/roles.md) |
 | Pinned views, user preferences, role default pins | [pinned-views.md](hitl/pinned-views.md) |
 | Design principles, error display, instruction copy, custom stylesheets | [design.md](hitl/design.md) |

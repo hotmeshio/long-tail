@@ -7,6 +7,7 @@ import {
   type ScanScheme,
   type ScanStep,
 } from '../../types';
+import { FACET_KEY } from '../escalation/facet-sql';
 
 const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
 /** Double-scan selection tokens — short, label-printable, never scheme-shaped. */
@@ -138,6 +139,21 @@ export function assertValidSteps(steps: ScanStep[]): void {
     }
     if (step.verb === SCAN_VERBS.RESOLVE && !step.params?.resolverPayload) {
       throw new Error(`${at}: resolve requires params.resolverPayload`);
+    }
+    if (step.verb === SCAN_VERBS.ACCUMULATE) {
+      const options = step.params?.accumulate;
+      if (options !== undefined && (!options || typeof options !== 'object' || Array.isArray(options))) {
+        throw new Error(`${at}: params.accumulate must be an object`);
+      }
+      if (options?.containerFacet !== undefined && !FACET_KEY.test(String(options.containerFacet))) {
+        throw new Error(`${at}: params.accumulate.containerFacet must be a facet key`);
+      }
+      if (options?.containerRoles !== undefined && !Array.isArray(options.containerRoles)) {
+        throw new Error(`${at}: params.accumulate.containerRoles must be an array`);
+      }
+      if (!options?.containerFacet && !step.params?.itemKey) {
+        throw new Error(`${at}: accumulate requires params.itemKey or params.accumulate.containerFacet`);
+      }
     }
     if (step.query && step.query.roles && !Array.isArray(step.query.roles)) {
       throw new Error(`${at}: query.roles must be an array`);

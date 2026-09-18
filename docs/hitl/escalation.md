@@ -103,7 +103,43 @@ The declaration folds into the row at creation, inside the same Leg1 commit:
 
 Items are submitted via `POST /api/escalations/:id/resolve-batch-item`, `POST /api/escalations/resolve-batch-item-by-signal-key` (the deterministic home signal id — no UUID lookup, no facet duplication), or `POST /api/escalations/resolve-batch-item-by-metadata` (see [Resolution — Batch items](resolution.md)). Each item validates against the same versioned role form a single-item resolver gets, `schemaVersion` pins included. Each fill is one guarded statement: the payload lands only while its key is still pending (duplicates return `duplicate-item` untouched), and the LAST fill resolves the row, stores the assembled collection as `resolver_payload`, and wakes this wait — atomically. The completing submission's `$resolution` rides the delivered collection.
 
-`timeout` and cancellation keep their standard semantics (`false` / `null`); a plain resolve on a batch row remains an admin override that resolves the whole row with the payload given.
+`timeout` and cancellation keep their standard semantics (`false` / `null`); a plain resolve on a batch row remains an admin override that resolves the whole row with the payload given. Add `partialOnTimeout: true` (hotmesh 0.29.0+) and the timer instead resumes the wait with the items filled so far plus `$trigger: 'timeout'`, the same value the expired row stores as `resolver_payload`.
+
+### Open accumulation — items arrive over time
+
+Declare `accumulate` and the escalation becomes an open container: items join it one at a time through `accumulateItem` while the row stays pending, and the wait resumes with the ordered collection when the container is full, when its window closes, or when someone resolves it by hand. A timeout is a delivery, never a failure, so the wait has no `false` branch; `conditionalAccumulator` types that contract.
+
+```typescript
+import { conditionalAccumulator } from '@hotmeshio/long-tail';
+
+const bin = await conditionalAccumulator<BagV1, { shippedBy?: string }>(signalId, {
+  role: 'bin',
+  description: 'Scan each bag into the bin',
+  metadata: { binKey },
+  accumulate: { max: 12 },   // count trigger; omit for an unbounded window
+  timeout: '4h',             // the window
+});
+if (bin === null) { /* cancelled */ }
+bin.$trigger;      // 'count' | 'timeout' | 'resolve'
+bin.$accumulated;  // [{ itemKey, payload?, at, actor?, reciprocalId? }, ...] in arrival order
+bin.shippedBy;     // present only when $trigger is 'resolve' (the resolver's payload merges in)
+```
+
+`accumulate` takes three dials. `max` is the count trigger; absent, only the timer or a manual resolve ends the wait. `resolveAtMax: false` makes `max` a cap: the last slot answers `accepted`, further adds answer `full`, and the wait still ends by timer or resolve. `unique: false` lets a repeated item key replace its entry in place; the default answers `duplicate-item` and leaves the row untouched.
+
+The declaration folds into the row at creation, inside the same Leg1 commit:
+
+- `metadata.accumulate_count` — items held right now, recomputed in every add and remove
+- `metadata.accumulate_max` — the count trigger, or `null` when unbounded
+- `metadata.accumulate_keys` — the held item keys (`@>`-queryable: `{"accumulate_keys":["ORD-9"]}` finds the container holding that order)
+- `envelope.accumulate_items` — `Record<itemKey, { payload?, at, actor?, reciprocalId? }>`, with `at` stamped by the database clock in the add statement
+- `envelope.accumulate_config` — the folded `{ unique, resolveAtMax }`
+
+Items are added via `POST /api/escalations/:id/accumulate`, `POST /api/escalations/accumulate-by-signal-key`, or `POST /api/escalations/accumulate-by-metadata`, removed via the matching `remove-item` forms, and read in arrival order via `GET /api/escalations/:id/items` (see [Resolution — Accumulator items](resolution.md#accumulator-items)). Each add is one guarded statement: the entry lands only while the row is pending and the key is not already held, the facets recompute, and the add that reaches `max` resolves the row, stores `{ $accumulated, $trigger: 'count' }` as `resolver_payload`, and wakes this wait, atomically. When the timer fires first the expiry statement stores and delivers `{ $accumulated, $trigger: 'timeout' }` and the row is `expired`; a manual `resolve` stores and delivers the collection merged with the resolver's payload under `$trigger: 'resolve'`. Cancellation still yields `null` with the held items preserved on the row.
+
+A **reciprocal** add writes two accumulator rows in that same statement, both or neither: the container gains the item, and a second row (the item's own escalation, declared `accumulate: { max: 1 }`) gains the container's id as its item key. Each entry carries the other row's id as `reciprocalId`, so "which bin holds this bag" reads from the bag's row and "which bags are in this bin" from the bin's, both as row truth. A blocked reciprocal (already resolved, full, already holding this container) answers `reciprocal-*` and the container is untouched. The `rollupBin` and `rollupMember` examples show both sides.
+
+`accumulate` and `batch` are mutually exclusive on one wait. The full contract, guarantees, and what is deferred are collected in [Open accumulator](../accumulator.md).
 
 ### Row completeness guarantee
 

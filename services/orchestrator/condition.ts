@@ -1,7 +1,14 @@
 import { Durable } from '@hotmeshio/hotmesh';
 import type { Types } from '@hotmeshio/hotmesh';
 
-import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs, type EscalationLookupRef } from '../../types/escalation';
+import {
+  ESCALATION_METADATA_KEYS,
+  ESCALATION_ENVELOPE_KEYS,
+  assertLookupRefs,
+  type AccumulateConfig,
+  type AccumulatorResult,
+  type EscalationLookupRef,
+} from '../../types/escalation';
 import * as interceptorActivities from '../interceptor/activities';
 
 type ActivitiesType = typeof interceptorActivities;
@@ -150,8 +157,32 @@ function toEngineConfig(
  * ```
  *
  * `timeout`/cancel semantics are unchanged (`false`/`null`); partially filled
- * items persist on the terminal row for audit. A plain resolve on a batch row
- * remains an admin override that resolves the whole row with its payload.
+ * items persist on the terminal row for audit. Add `partialOnTimeout: true`
+ * (hotmesh 0.29.0+) and the timer instead resumes with the items filled so
+ * far plus `$trigger: 'timeout'`. A plain resolve on a batch row remains an
+ * admin override that resolves the whole row with its payload.
+ *
+ * **Open accumulation — items arrive over time (hotmesh 0.29.0+).** Declare
+ * `accumulate` and the escalation holds items added via `accumulateItem`
+ * (HTTP: POST /:id/accumulate, /accumulate-by-signal-key,
+ * /accumulate-by-metadata) until `max` items are held, the `timeout` fires,
+ * or someone resolves the row. Every path except cancel delivers the ordered
+ * collection with the trigger that ended the wait, so a timeout is a
+ * delivery window, never a failure. Progress rides `metadata.accumulate_count`
+ * / `accumulate_max` / `accumulate_keys` as queryable facets; entries live in
+ * `envelope.accumulate_items`. Use {@link conditionalAccumulator} for the
+ * typed form:
+ *
+ * ```typescript
+ * const bin = await conditionalAccumulator<BagV1>(signalId, {
+ *   role: 'bin',
+ *   metadata: { binKey },
+ *   accumulate: { max: 12 },
+ *   timeout: '4h',
+ * });
+ * if (bin === null) { /* cancelled *​/ }
+ * else bin.$trigger; // 'count' | 'timeout' | 'resolve'
+ * ```
  *
  * **Resolution provenance — the reserved `$resolution` key.** When the resolve
  * carries the resolver's identity (the API layer supplies it for interactive
@@ -231,3 +262,28 @@ export async function conditional<T = Record<string, any>>(
 
 /** @deprecated Alias of {@link conditional}. */
 export const conditionLT = conditional;
+
+/** {@link ConditionEscalationConfig} with the accumulator declaration required. */
+export type ConditionAccumulatorConfig = ConditionEscalationConfig & { accumulate: AccumulateConfig };
+
+/**
+ * {@link conditional} for an open accumulator: the same wait, typed for the
+ * contract an accumulator row keeps. It resolves with the ordered
+ * `$accumulated` collection and its `$trigger` on every terminal path
+ * (`count`, `timeout`, `resolve`), so `false` is not in the return type;
+ * cancellation still yields `null`. `P` types each item's payload, `R` the
+ * manual resolver payload merged in on `resolve`.
+ */
+export async function conditionalAccumulator<
+  P = Record<string, any>,
+  R extends Record<string, any> = Record<string, any>,
+>(
+  signalId: string,
+  escalation: ConditionAccumulatorConfig,
+): Promise<AccumulatorResult<P, R> | null> {
+  const result = await conditional<AccumulatorResult<P, R>>(signalId, escalation);
+  if (result === false) {
+    throw new Error(`Accumulator wait ${signalId} resumed with false; expected a delivered collection`);
+  }
+  return result;
+}

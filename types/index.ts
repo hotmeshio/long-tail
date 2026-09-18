@@ -15,6 +15,12 @@ export type {
   LTEscalationRecord,
   EscalationResolution,
   BatchItemOutcome,
+  AccumulateConfig,
+  AccumulatorResult,
+  AccumulatedItem,
+  AccumulatorTrigger,
+  AccumulateItemOutcome,
+  RemoveAccumulatedItemOutcome,
 } from './escalation';
 
 export {
@@ -22,6 +28,8 @@ export {
   isAvailable,
   ESCALATION_METADATA_KEYS,
   ESCALATION_BATCH_KEYS,
+  ESCALATION_ACCUMULATE_KEYS,
+  ACCUMULATOR_RESULT_KEYS,
 } from './escalation';
 
 export type {

@@ -111,6 +111,37 @@ async function main() {
           },
         ],
       },
+      {
+        // The rollup-bin example's container queue: the list shows each
+        // bin's fill level from the accumulator facets.
+        role: 'bin',
+        title: 'Bin',
+        description: 'Open containers filling with scanned bags. Ships at max or when the window closes.',
+        reset: true,
+        list_schema: {
+          'x-lt-layout': 'facet-table',
+          'x-lt-columns': [
+            { label: 'Bin', value: '{{metadata.binKey}}' },
+            { label: 'Held', value: '{{metadata.accumulate_count}}' },
+            { label: 'Max', value: '{{metadata.accumulate_max}}', priority: 2 },
+            { label: 'Open since', value: '{{escalation.created_at}}', format: 'age', priority: 2 },
+          ],
+        },
+      },
+      {
+        role: 'bag',
+        title: 'Bag',
+        description: 'Bags waiting to be scanned into a bin.',
+        reset: true,
+        list_schema: {
+          'x-lt-layout': 'facet-table',
+          'x-lt-columns': [
+            { label: 'Order', value: '{{metadata.orderId}}' },
+            { label: 'Bin', value: '{{metadata.binKey}}', priority: 2 },
+            { label: 'Waiting', value: '{{escalation.created_at}}', format: 'age', priority: 2 },
+          ],
+        },
+      },
     ],
     features: {
       // The examples ship the full scan demo (schemes 10/11); surface it.

@@ -787,6 +787,7 @@ function EscalationDetailView({ id }: { id: string }) {
         formErrors={formErrors}
         activePanel={panelActiveView}
         onPanelChange={setPanelActiveView}
+        canWriteItems={actionBarMode === 'available' || claimedByMe || canManage}
       />
 
       {/* The admin hand-off: the gesture IS reassign, so takeover is implied. */}

@@ -49,6 +49,27 @@ export const resolveBatchItemSchema = z.object({
   payload: z.record(z.any()).describe(RESOLVER_PAYLOAD_DESC),
 });
 
+const reciprocalSchema = z.object({
+  id: z.string().optional().describe('Reciprocal escalation UUID'),
+  signalKey: z.string().optional().describe('Reciprocal escalation signal_key'),
+  key: z.string().optional().describe('Facet key selecting the reciprocal row'),
+  value: z.string().optional().describe('Facet value selecting the reciprocal row'),
+  payload: z.record(z.any()).optional().describe('Stored as the reciprocal entry payload'),
+}).describe('A second accumulator row written in the same statement, both or neither. Exactly one of id, signalKey, or key/value.');
+
+export const accumulateItemSchema = z.object({
+  escalation_id: z.string().describe('The accumulator escalation ID (the container)'),
+  item_key: z.string().describe('The key this item is held under (an order id, a bag id)'),
+  payload: z.record(z.any()).optional().describe('Optional item payload, delivered inside $accumulated'),
+  reciprocal: reciprocalSchema.optional(),
+});
+
+export const removeItemSchema = z.object({
+  escalation_id: z.string().describe('The accumulator escalation ID'),
+  item_key: z.string().describe('The held item key to remove'),
+  reciprocal: reciprocalSchema.omit({ payload: true }).optional(),
+});
+
 export const escalateAndWaitSchema = z.object({
   role: z.string().describe('Target role for the escalation (e.g., "reviewer")'),
   message: z.string().describe('Description of what input is needed from the human'),

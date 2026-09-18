@@ -175,6 +175,9 @@ export function EscalationFormSection({
     const payload = typeof resolverPayload === 'object' && resolverPayload !== null
       ? resolverPayload as Record<string, unknown>
       : {};
+    // `$`-prefixed keys are control data ($accumulated, $trigger); the Items
+    // view renders a collection, so a payload with nothing else shows no form.
+    if (!Object.keys(payload).some((k) => !k.startsWith('$') && !k.startsWith('_'))) return null;
     const formSchema = (effectiveSchema ?? (metadataFormSchema as Record<string, any> | null));
     const value = formSchema?.properties
       ? { ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
