@@ -1195,9 +1195,10 @@ Remove ONE held item from a pending accumulator in one guarded statement. The ro
 
 ```
 GET /api/escalations/:id/items
+GET /api/escalations/items-by-signal-key?signalKey=…
 ```
 
-The held items of an accumulator or batch row in arrival order. Read access; 404 non-disclosure.
+The held items of an accumulator or batch row in arrival order, by row id or by the `signal_key` a workflow already knows. Read access; 404 non-disclosure.
 
 ```json
 {

@@ -8,6 +8,7 @@ import { getEscalationReadScope, getEscalationWriteScope } from '../escalations/
 import {
   SCAN_OUTCOMES,
   SCAN_VERBS,
+  type LTEscalationRecord,
   type ScanExecuteResponse,
   type ScanStep,
 } from '../../types';
@@ -18,8 +19,8 @@ import {
   forbidden,
   interpolatedMetadata,
   provenance,
+  stepTemplate,
   targetFilter,
-  templateContext,
   type StepContext,
 } from './context';
 import { locateForStep } from './locate';
@@ -29,15 +30,36 @@ import { locateForStep } from './locate';
 // request, otherwise the authenticated principal. Attribution and write
 // scoping both derive from it, live, inside the escalation APIs.
 
+/**
+ * Interpolates a step's params, or falls through when a `{claim.…}` or
+ * `{item.…}` token has nothing to read: a literal token never reaches a row.
+ */
+async function templated<T>(
+  step: ScanStep,
+  ctx: StepContext,
+  render: (tpl: scanCodeService.ScanTemplateContext) => T,
+  item?: LTEscalationRecord,
+): Promise<T | null> {
+  const tpl = await stepTemplate(step, ctx, item);
+  try {
+    return render(tpl);
+  } catch (err) {
+    if (err instanceof scanCodeService.ScanTemplateError) return null;
+    throw err;
+  }
+}
+
 export async function claimStep(
   step: ScanStep,
   ctx: StepContext,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
+  const metadata = await templated(step, ctx, (tpl) => interpolatedMetadata(step, ctx, tpl));
+  if (metadata === null) return null;
   const result = await claimByMetadata({
     key: ctx.scheme.target_facet,
     value: ctx.parsed.target,
     durationMinutes: step.params?.durationMinutes,
-    metadata: { ...interpolatedMetadata(step, ctx), ...provenance(ctx) },
+    metadata: { ...metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
   }, ctx.auth);
   if (result.status === 404) return null;
@@ -50,13 +72,16 @@ export async function resolveStep(
   step: ScanStep,
   ctx: StepContext,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
+  const rendered = await templated(step, ctx, (tpl) => ({
+    resolverPayload: scanCodeService.interpolateScanTemplate(step.params?.resolverPayload ?? {}, tpl),
+    metadata: interpolatedMetadata(step, ctx, tpl),
+  }));
+  if (rendered === null) return null;
   const result = await resolveByMetadata({
     key: ctx.scheme.target_facet,
     value: ctx.parsed.target,
-    resolverPayload: scanCodeService.interpolateScanTemplate(
-      step.params?.resolverPayload ?? {}, templateContext(ctx),
-    ),
-    metadata: { ...interpolatedMetadata(step, ctx), ...provenance(ctx) },
+    resolverPayload: rendered.resolverPayload,
+    metadata: { ...rendered.metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
     extraFacets: step.query?.facets,
   }, ctx.auth);
@@ -199,37 +224,53 @@ export async function cancelStep(
  *   item's own pending row through the scheme facet, reads the container
  *   facet value it carries, and adds the target to the container that shares
  *   it, writing the item row as the reciprocal in the same statement. An
- *   item with no row, or no container facet, falls through.
+ *   item with no row, or no container facet, falls through. An item whose
+ *   container has closed and whose successor has not parked yet answers
+ *   `no_open_container` with the item row, so the station can say "scan
+ *   again" instead of showing the bag with no hint.
  * - Container-locate (no `containerFacet`): the scan locates the container
  *   by the scheme facet and adds `params.itemKey` (template).
  *
- * The write is the SDK's guarded statement; the locate only picks ids. A
- * container already holding the item answers conflict, never a second add.
+ * Templates may read `{claim.<facet>}` (the actor's live claim) and, in item
+ * mode, `{item.<facet>}` (the located row); an unresolvable token falls
+ * through. The write is the SDK's guarded statement; the locate only picks
+ * ids. A container already holding the item answers conflict, never a
+ * second add.
  */
 export async function accumulateStep(
   step: ScanStep,
   ctx: StepContext,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
-  const tpl = templateContext(ctx);
-  const payload = step.params?.resolverPayload
-    ? scanCodeService.interpolateScanTemplate(step.params.resolverPayload, tpl)
-    : undefined;
-  const metadata = { ...interpolatedMetadata(step, ctx), ...provenance(ctx) };
   const options = step.params?.accumulate;
-
-  let request: Parameters<typeof accumulateItemByMetadata>[0];
+  let item: LTEscalationRecord | undefined;
   if (options?.containerFacet) {
     const located = await locateForStep(step, ctx, 1);
-    const item = located?.escalations[0];
+    item = located?.escalations[0];
     if (!item) return null;
+  }
+  const rendered = await templated(step, ctx, (tpl) => ({
+    payload: step.params?.resolverPayload
+      ? scanCodeService.interpolateScanTemplate(step.params.resolverPayload, tpl)
+      : undefined,
+    metadata: { ...interpolatedMetadata(step, ctx, tpl), ...provenance(ctx) },
+    itemKey: options?.containerFacet
+      ? ctx.parsed.target
+      : scanCodeService.interpolateScanTemplate(step.params!.itemKey!, tpl),
+  }), item);
+  if (rendered === null) return null;
+
+  let request: Parameters<typeof accumulateItemByMetadata>[0];
+  let container: { facet: string; value: string } | undefined;
+  if (options?.containerFacet && item) {
     const containerValue = (item.metadata as Record<string, any> | null)?.[options.containerFacet];
     if (containerValue === undefined || containerValue === null || containerValue === '') return null;
+    container = { facet: options.containerFacet, value: String(containerValue) };
     request = {
-      key: options.containerFacet,
-      value: String(containerValue),
-      itemKey: ctx.parsed.target,
-      payload,
-      metadata,
+      key: container.facet,
+      value: container.value,
+      itemKey: rendered.itemKey,
+      payload: rendered.payload,
+      metadata: rendered.metadata,
       restrictRoles: options.containerRoles,
       ...(options.reciprocal === false ? {} : { reciprocal: { id: item.id } }),
     };
@@ -237,15 +278,28 @@ export async function accumulateStep(
     request = {
       key: ctx.scheme.target_facet,
       value: ctx.parsed.target,
-      itemKey: scanCodeService.interpolateScanTemplate(step.params!.itemKey!, tpl),
-      payload,
-      metadata,
+      itemKey: rendered.itemKey,
+      payload: rendered.payload,
+      metadata: rendered.metadata,
       restrictRoles: step.query?.roles,
     };
   }
 
   const result = await accumulateItemByMetadata(request, ctx.auth);
-  if (result.status === 404) return null;
+  if (result.status === 404) {
+    if (!container || !item) return null;
+    return {
+      status: 200,
+      data: {
+        outcome: SCAN_OUTCOMES.NO_OPEN_CONTAINER,
+        verb: step.verb,
+        escalation: item,
+        container,
+        fallback: ctx.rule.fallback,
+        error: `No open container carries ${container.facet} = ${container.value}`,
+      },
+    };
+  }
   if (result.status === 403) return forbidden(result.error);
   if (result.status === 409) return conflict(result.error);
   if (result.status !== 200) return result;

@@ -427,6 +427,30 @@ export async function getEscalationItems(
   }
 }
 
+/**
+ * GET the held items of an accumulator or batch row by its `signal_key`, the
+ * deterministic home signal id a workflow knows without a row id. Read scope
+ * gates it; anything the caller may not see answers 404.
+ */
+export async function getEscalationItemsBySignalKey(
+  input: { signalKey: string },
+  auth: LTApiAuth,
+): Promise<LTApiResult<EscalationItemsView>> {
+  try {
+    if (!input.signalKey) return { status: 400, error: 'signalKey is required' };
+    const escalation = await escalationService.getEscalationBySignalKey(input.signalKey);
+    if (!escalation) return { status: 404, error: 'Escalation not found' };
+    if (await assertReadAccess(auth.userId, escalation)) {
+      return { status: 404, error: 'Escalation not found' };
+    }
+    const view = itemsView(escalation);
+    if (!view) return { status: 400, error: 'Escalation holds no items' };
+    return { status: 200, data: view };
+  } catch (err: any) {
+    return { status: 500, error: err.message };
+  }
+}
+
 function sideData(side: { outcome: string; count: number; remaining: number | null; escalation: LTEscalationRecord }) {
   return {
     outcome: side.outcome,

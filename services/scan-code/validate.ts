@@ -155,6 +155,7 @@ export function assertValidSteps(steps: ScanStep[]): void {
         throw new Error(`${at}: accumulate requires params.itemKey or params.accumulate.containerFacet`);
       }
     }
+    assertValidTemplateTokens(step, at);
     if (step.query && step.query.roles && !Array.isArray(step.query.roles)) {
       throw new Error(`${at}: query.roles must be an array`);
     }
@@ -172,3 +173,24 @@ export function assertValidSteps(steps: ScanStep[]): void {
     }
   });
 }
+
+const BAG_TOKEN = /\{(claim|item)\.([^}]*)\}/g;
+
+/**
+ * `{claim.<facet>}` and `{item.<facet>}` name facet keys; `{item.…}` reads
+ * the located row, which only an item-mode accumulate step has.
+ */
+function assertValidTemplateTokens(step: ScanStep, at: string): void {
+  const text = JSON.stringify(step.params ?? {});
+  const itemMode = step.verb === SCAN_VERBS.ACCUMULATE && !!step.params?.accumulate?.containerFacet;
+  for (const match of text.matchAll(BAG_TOKEN)) {
+    const [token, bag, facet] = match;
+    if (!FACET_KEY.test(facet)) {
+      throw new Error(`${at}: template token ${token} must name a facet key`);
+    }
+    if (bag === 'item' && !itemMode) {
+      throw new Error(`${at}: ${token} reads the located item row, which only an item-mode accumulate step has`);
+    }
+  }
+}
+

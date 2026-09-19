@@ -1,6 +1,8 @@
 import {
   SCAN_ENCODINGS,
   SCAN_TEMPLATE_TOKENS,
+  SCAN_TEMPLATE_BAGS,
+  type ScanTemplateBag,
   type ParsedScanCode,
   type ScanScheme,
 } from '../../types';
@@ -105,19 +107,56 @@ export interface ScanTemplateContext {
   target: string;
   category: string;
   scannedAt: string;
+  /** The acting user's single live claim, its metadata; absent when none or ambiguous. */
+  claim?: Record<string, unknown>;
+  /** The row an item-mode accumulate step located, its metadata. */
+  item?: Record<string, unknown>;
+}
+
+/** A `{claim.x}` or `{item.x}` token the context cannot resolve. */
+export class ScanTemplateError extends Error {
+  constructor(readonly token: string, readonly reason: string) {
+    super(`scan template ${token}: ${reason}`);
+    this.name = 'ScanTemplateError';
+  }
+}
+
+const BAG_TOKEN = /\{(claim|item)\.([a-zA-Z0-9_]+)\}/g;
+
+/** True when any string in the params mentions a `{claim.…}` token. */
+export function mentionsClaimToken(value: unknown): boolean {
+  return JSON.stringify(value ?? null).includes(`{${SCAN_TEMPLATE_BAGS.CLAIM}.`);
+}
+
+function resolveBagToken(ctx: ScanTemplateContext, bag: ScanTemplateBag, facet: string, token: string): string {
+  const source = bag === SCAN_TEMPLATE_BAGS.CLAIM ? ctx.claim : ctx.item;
+  if (!source) {
+    throw new ScanTemplateError(token, bag === SCAN_TEMPLATE_BAGS.CLAIM
+      ? 'the actor holds no single live claim'
+      : 'no located item row on this step');
+  }
+  const v = source[facet];
+  if (v === undefined || v === null || v === '') {
+    throw new ScanTemplateError(token, `facet ${facet} is absent`);
+  }
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
 }
 
 /**
- * Replace SCAN_TEMPLATE_TOKENS inside string values of a params object.
- * Deep, pure, non-mutating. Only exact-token and in-string replacement of
- * the three known tokens — no expression language.
+ * Replace the template tokens inside string values of a params object.
+ * Deep, pure, non-mutating. The three scan tokens are plain text
+ * replacement; `{claim.<facet>}` and `{item.<facet>}` read the context's
+ * facet bags and throw {@link ScanTemplateError} when they cannot resolve,
+ * so a literal token never reaches a row. No expression language.
  */
 export function interpolateScanTemplate<T>(value: T, ctx: ScanTemplateContext): T {
   if (typeof value === 'string') {
-    return value
+    const scanned = value
       .split(SCAN_TEMPLATE_TOKENS.TARGET).join(ctx.target)
       .split(SCAN_TEMPLATE_TOKENS.CATEGORY).join(ctx.category)
-      .split(SCAN_TEMPLATE_TOKENS.SCANNED_AT).join(ctx.scannedAt) as unknown as T;
+      .split(SCAN_TEMPLATE_TOKENS.SCANNED_AT).join(ctx.scannedAt);
+    return scanned.replace(BAG_TOKEN, (token, bag: ScanTemplateBag, facet: string) =>
+      resolveBagToken(ctx, bag, facet, token)) as unknown as T;
   }
   if (Array.isArray(value)) {
     return value.map((v) => interpolateScanTemplate(v, ctx)) as unknown as T;

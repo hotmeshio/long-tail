@@ -116,7 +116,8 @@ export const removeItemSchema = z.object({
 });
 
 export const getEscalationItemsSchema = z.object({
-  id: z.string().describe('Accumulator or batch escalation UUID'),
+  id: z.string().optional().describe('Accumulator or batch escalation UUID'),
+  signalKey: z.string().optional().describe('The row signal_key, when the caller knows the home signal id rather than the row id'),
 });
 
 export const escalateEscalationSchema = z.object({

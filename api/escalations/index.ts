@@ -9,7 +9,7 @@ export { resolveBatchItem, resolveBatchItemBySignalKey, resolveBatchItemByMetada
 export {
   accumulateItem, accumulateItemBySignalKey, accumulateItemByMetadata,
   removeItem, removeItemBySignalKey, removeItemByMetadata,
-  getEscalationItems, itemsView,
+  getEscalationItems, getEscalationItemsBySignalKey, itemsView,
 } from './accumulate';
 export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';

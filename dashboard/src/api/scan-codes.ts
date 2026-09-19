@@ -16,6 +16,7 @@ export const SCAN_OUTCOMES = {
   IDENTITY_UNKNOWN: 'identity_unknown',
   NOT_PRIMED: 'not_primed',
   CHOICES: 'choices',
+  NO_OPEN_CONTAINER: 'no_open_container',
 } as const;
 export type ScanOutcome = (typeof SCAN_OUTCOMES)[keyof typeof SCAN_OUTCOMES];
 
@@ -28,6 +29,7 @@ export const SCAN_VERBS = {
   RESOLVE: 'resolve',
   ESCALATE: 'escalate',
   CANCEL: 'cancel',
+  ACCUMULATE: 'accumulate',
   PRESENT: 'present',
 } as const;
 export type ScanVerb = (typeof SCAN_VERBS)[keyof typeof SCAN_VERBS];
@@ -83,6 +85,17 @@ export interface ScanStepParams {
   description?: string;
   closeCurrent?: 'resolve' | 'cancel';
   durationMinutes?: number;
+  /** Item key template (accumulate, container mode). Defaults to `{scan.target}`. */
+  itemKey?: string;
+  /** Accumulate verb options. */
+  accumulate?: {
+    /** Item mode: the facet the located item row and its container share. */
+    containerFacet?: string;
+    /** Expected container queue(s). */
+    containerRoles?: string[];
+    /** Item mode: also write the item's own row as the reciprocal (default true). */
+    reciprocal?: boolean;
+  };
 }
 
 /** One labeled choice on a PRESENT step. */
@@ -149,6 +162,8 @@ export interface ScanExecuteResponse {
   choices?: ScanPresentedChoice[];
   /** CHOICES only: the server would have executed the single choice, but identity stopped it. */
   autoSelect?: boolean;
+  /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */
+  container?: { facet: string; value: string };
   /** The badged person (IDENTITY_PRIMED). */
   actor?: { id: string; displayName: string };
   /** The minted acting grant (IDENTITY_PRIMED). */

@@ -906,12 +906,13 @@ await lt.escalations.removeItem({ id: binId, itemKey: orderId, reciprocal: { id:
 
 **Auth:** Required
 
-## getItems
+## getItems / getItemsBySignalKey
 
-The held items of an accumulator or batch row in arrival order.
+The held items of an accumulator or batch row in arrival order, by row id or by the `signal_key` the parked workflow knows.
 
 ```typescript
 const { data } = await lt.escalations.getItems({ id: binId });
+const same = await lt.escalations.getItemsBySignalKey({ signalKey: `bin-${binKey}` });
 // data → { escalationId, kind: 'accumulate' | 'batch', status, count, max, items: [{ itemKey, payload?, at, actor?, reciprocalId? }], pending? }
 ```
 

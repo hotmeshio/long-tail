@@ -1,7 +1,9 @@
 import * as scanCodeService from '../../services/scan-code';
+import * as escalationService from '../../services/escalation';
 import {
   SCAN_OUTCOMES,
   SCAN_PROVENANCE_KEYS,
+  isEffectivelyClaimed,
   type LTEscalationRecord,
   type ParsedScanCode,
   type ScanExecuteResponse,
@@ -33,6 +35,37 @@ export function templateContext(ctx: StepContext): scanCodeService.ScanTemplateC
   return { target: ctx.parsed.target, category: ctx.parsed.category, scannedAt: ctx.scannedAt };
 }
 
+/**
+ * The metadata of the acting user's single live claim, or undefined when
+ * they hold none or more than one. One scoped list query, read before the
+ * guarded write; the write re-checks everything under lock.
+ */
+export async function liveClaimMetadata(ctx: StepContext): Promise<Record<string, unknown> | undefined> {
+  const { escalations } = await escalationService.listEscalations({
+    assigned_to: ctx.auth.userId,
+    status: 'pending',
+    limit: 2,
+  });
+  const live = escalations.filter(isEffectivelyClaimed);
+  return live.length === 1 ? (live[0].metadata ?? {}) : undefined;
+}
+
+/**
+ * The template context for one step: the scan tokens, the located item row's
+ * metadata when the verb has one, and the actor's live claim when the step's
+ * params mention `{claim.…}` (the lookup costs one query, so it runs only
+ * then).
+ */
+export async function stepTemplate(
+  step: ScanStep,
+  ctx: StepContext,
+  item?: LTEscalationRecord,
+): Promise<scanCodeService.ScanTemplateContext> {
+  const base = templateContext(ctx);
+  const claim = scanCodeService.mentionsClaimToken(step.params) ? await liveClaimMetadata(ctx) : undefined;
+  return { ...base, ...(item ? { item: item.metadata ?? {} } : {}), ...(claim ? { claim } : {}) };
+}
+
 export function provenance(ctx: StepContext): Record<string, any> {
   return {
     [SCAN_PROVENANCE_KEYS.SCHEME]: ctx.scheme.version,
@@ -45,9 +78,13 @@ export function provenance(ctx: StepContext): Record<string, any> {
   };
 }
 
-export function interpolatedMetadata(step: ScanStep, ctx: StepContext): Record<string, any> {
+export function interpolatedMetadata(
+  step: ScanStep,
+  ctx: StepContext,
+  tpl: scanCodeService.ScanTemplateContext = templateContext(ctx),
+): Record<string, any> {
   return step.params?.metadata
-    ? scanCodeService.interpolateScanTemplate(step.params.metadata, templateContext(ctx))
+    ? scanCodeService.interpolateScanTemplate(step.params.metadata, tpl)
     : {};
 }
 
