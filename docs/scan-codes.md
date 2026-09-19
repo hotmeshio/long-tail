@@ -212,7 +212,7 @@ scheme's policy:
 | Scheme field | Meaning |
 |---|---|
 | `grant_ttl_seconds` | How long the grant lives (1–86400). |
-| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n scan requests (a strict one-scan policy is `1`). |
+| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n requests that carry it, scans and work verbs alike (a strict one-request policy is `1`). The primed response carries `maxUses`; a single-shot grant is retired on the device the moment its one request returns, and a scan that comes back `not_primed` while a grant is held drops that grant, so the next scan runs unprimed instead of repeating the badge screen. A badge-gated submit likewise retires its badge once the write lands. |
 
 The grant rides subsequent scans as `actingToken`. Verbs then run **as the
 badged person under their own live RBAC** — the grant confers attribution,

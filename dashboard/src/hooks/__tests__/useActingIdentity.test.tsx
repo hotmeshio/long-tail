@@ -6,19 +6,29 @@ import type { ReactNode } from 'react';
 vi.mock('../../api/client', () => ({
   setActingTokenProvider: vi.fn(),
   setActingIdentityClear: vi.fn(),
+  setActingIdentitySpent: vi.fn(),
 }));
 
 import { ActingIdentityProvider, useActingIdentity } from '../useActingIdentity';
-import { setActingTokenProvider, setActingIdentityClear } from '../../api/client';
+import { setActingTokenProvider, setActingIdentityClear, setActingIdentitySpent } from '../../api/client';
 import type { ScanExecuteResponse } from '../../api/scan-codes';
 
-function primedResponse(token: string, displayName: string, ttlMs: number): ScanExecuteResponse {
+function primedResponse(token: string, displayName: string, ttlMs: number, maxUses?: number): ScanExecuteResponse {
   return {
     outcome: 'identity_primed',
     actor: { id: `id-${displayName}`, displayName },
     actingToken: token,
     expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+    ...(maxUses !== undefined ? { maxUses } : {}),
   };
+}
+
+/** The spent callback the provider registered with the API client. */
+function spentHook(): (token: string) => void {
+  const calls = vi.mocked(setActingIdentitySpent).mock.calls;
+  const fn = calls[calls.length - 1]?.[0];
+  if (!fn) throw new Error('provider did not register a spent hook');
+  return fn;
 }
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -129,5 +139,35 @@ describe('useActingIdentity', () => {
     act(() => { result.current.clear(); });
     expect(result.current.identity).toBeNull();
     expect(result.current.remainingSeconds()).toBe(0);
+  });
+
+  // ── Single-shot grants ──────────────────────────────────────────────────────
+  // The server exchanges a max-uses-1 grant exactly once. Holding the client
+  // copy past that request leaves every later scan carrying a dead token.
+
+  it('marks a maxUses 1 grant single-use and a TTL grant not', () => {
+    const { result } = renderHook(() => useActingIdentity(), { wrapper });
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1)); });
+    expect(result.current.identity?.singleUse).toBe(true);
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:b', 'Sam', 60_000, 0)); });
+    expect(result.current.identity?.singleUse).toBe(false);
+  });
+
+  it('retires a single-use grant the moment a request carrying it returns', () => {
+    const { result } = renderHook(() => useActingIdentity(), { wrapper });
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1)); });
+    act(() => { spentHook()('eph:v1:acting_identity:a'); });
+    expect(result.current.identity).toBeNull();
+  });
+
+  it('keeps a TTL grant across requests and never drops a newer grant on a stale token', () => {
+    const { result } = renderHook(() => useActingIdentity(), { wrapper });
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 0)); });
+    act(() => { spentHook()('eph:v1:acting_identity:a'); });
+    expect(result.current.identity?.displayName).toBe('Dana');
+
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:b', 'Sam', 60_000, 1)); });
+    act(() => { spentHook()('eph:v1:acting_identity:a'); });
+    expect(result.current.identity?.displayName).toBe('Sam');
   });
 });

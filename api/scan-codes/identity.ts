@@ -80,6 +80,7 @@ export async function executeIdentityScan(
       actor: { id: user.id, displayName: user.display_name || user.external_id },
       actingToken: formatEphemeralToken(uuid, ACTING_IDENTITY_LABEL),
       expiresAt,
+      maxUses: scheme.grant_max_uses ?? 0,
     },
   };
 }

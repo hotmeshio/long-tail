@@ -350,14 +350,18 @@ function EscalationDetailView({ id }: { id: string }) {
     autoResolveActionRef.current?.();
   }, [submitGuard.confirmedEmpty, submitGuardDef, esc, json, effectiveActorId]);
 
+  // The badge was for this one write: run it, then retire the identity so the
+  // next scan starts unprimed, the same cadence as before the challenge.
   useEffect(() => {
     if (!pendingWrite || !esc) return;
     if (acting && acting.actorId === esc.assigned_to) {
       const { run } = pendingWrite;
       setPendingWrite(null);
-      void run();
+      void Promise.resolve()
+        .then(run)
+        .finally(() => clearActing());
     }
-  }, [acting, pendingWrite, esc?.assigned_to]);
+  }, [acting, pendingWrite, esc?.assigned_to, clearActing]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 

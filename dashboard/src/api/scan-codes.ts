@@ -170,6 +170,8 @@ export interface ScanExecuteResponse {
   actingToken?: string;
   /** Display copy of the grant's expiry (the keystore enforces it). */
   expiresAt?: string;
+  /** IDENTITY_PRIMED: the scheme's grant_max_uses; 1 is a single-shot grant, 0 lives to its TTL. */
+  maxUses?: number;
   error?: string;
 }
 
