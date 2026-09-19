@@ -887,7 +887,7 @@ await lt.escalations.accumulateByMetadata({ key: 'binKey', value: binKey, itemKe
 | `metadata` | `object` | No | Merge patch for the container metadata, same statement; reserved `accumulate_*` keys rejected |
 | `assertClaim` | `boolean` | No | By id only: require the caller's own live claim |
 | `reciprocal` | `object` | No | `{ id \| signalKey \| key + value, payload? }`: a second accumulator row written in the same statement, both or neither |
-| `restrictRoles` | `string[]` | No | By metadata only: expected queues, intersected with the caller's write scope |
+| `restrictRoles` | `string[]` | No | By metadata only: expected queues, intersected with the caller's write scope. The facet selects among pending accumulator rows only; other rows sharing it are never candidates, and none open answers 404 |
 
 **Returns:** `LTApiResult<{ outcome: 'accepted' \| 'completed', count, remaining, escalationId, signaled?, workflowId?, reciprocal? }>`. `remaining` is `null` on an unbounded accumulator. 409 on `Item already held`, `Accumulator is full`, claim blocks, terminal rows, and reciprocal blocks; 400 on a non-accumulator; 404 non-disclosure.
 

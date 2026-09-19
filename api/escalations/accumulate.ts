@@ -51,6 +51,30 @@ function isBatch(escalation: LTEscalationRecord): boolean {
   return Array.isArray((escalation.metadata as any)?.[ESCALATION_BATCH_KEYS.PENDING]);
 }
 
+const NO_ACCUMULATOR_FOR_FACET = 'No pending accumulator found for this metadata';
+
+/**
+ * The container a facet names: the highest priority pending row that carries
+ * the facet AND the accumulator declaration, within the given roles (null =
+ * unscoped). A release or remediation row sharing the facet is never a
+ * candidate, so a by-facet add lands on the open container or nowhere.
+ */
+async function pickAccumulatorByFacet(
+  key: string,
+  value: string,
+  roles: string[] | null,
+): Promise<LTEscalationRecord | null> {
+  if (roles !== null && roles.length === 0) return null;
+  const found = await escalationService.searchByFacets({
+    roles: roles ?? undefined,
+    facets: { [key]: value },
+    status: 'pending',
+    exists: [ESCALATION_ACCUMULATE_KEYS.COUNT],
+    limit: 1,
+  });
+  return found.escalations[0] ?? null;
+}
+
 function reciprocalSelectorCount(r: ReciprocalInput): number {
   return (r.id ? 1 : 0) + (r.signalKey ? 1 : 0) + (r.key !== undefined ? 1 : 0);
 }
@@ -76,11 +100,7 @@ async function gateReciprocal(
     row = await escalationService.getEscalationBySignalKey(input.signalKey);
   } else {
     const writeScope = await getEscalationWriteScope(auth.userId);
-    const found = await escalationService.findByMetadata(
-      input.key!, String(input.value), 'pending', 1, 0,
-      writeScope.global ? undefined : { allRoles: writeScope.allRoles, meUserId: auth.userId },
-    );
-    row = found.escalations[0] ?? null;
+    row = await pickAccumulatorByFacet(input.key!, String(input.value), writeScope.global ? null : writeScope.allRoles);
   }
   if (!row) return { error: { status: 404, error: 'Reciprocal escalation not found' } };
   if (input.id) {
@@ -209,8 +229,11 @@ export async function accumulateItemBySignalKey(
 
 /**
  * Add selecting the container by metadata facet, the faceted sibling of
- * {@link accumulateItem}. RBAC folds into the SDK's atomic facet selection
- * as a flat role filter. Schema enforcement is two-phase when enforcing
+ * {@link accumulateItem}. The facet names a container, so only pending rows
+ * carrying the accumulator declaration are candidates: a release or
+ * remediation row that shares the facet is never picked, and when no open
+ * container shares it the answer is 404. RBAC folds into the SDK's atomic
+ * facet selection as a flat role filter. Schema enforcement is two-phase when enforcing
  * roles exist and a payload is present: the row is picked first, validated
  * against ITS schema, then written by asserted id; a row that went terminal
  * between phases surfaces as a 409.
@@ -242,15 +265,12 @@ export async function accumulateItemByMetadata(
         roles: allowedRoles ?? undefined,
         reciprocal: reciprocal.reciprocal,
       });
+      if (result.outcome === 'not-found') return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
       return accumulateOutcomeResult(result, itemKey, result.escalation?.workflow_id ?? null);
     }
 
-    const found = await escalationService.findByMetadata(
-      key, value, 'pending', 1, 0,
-      allowedRoles === null ? undefined : { allRoles: allowedRoles, meUserId: auth.userId },
-    );
-    const row = found.escalations[0];
-    if (!row) return { status: 404, error: 'No pending escalation found for this metadata' };
+    const row = await pickAccumulatorByFacet(key, value, allowedRoles);
+    if (!row) return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
     if (!isAccumulator(row)) return { status: 400, error: 'Escalation is not an accumulator' };
     const payload = await gatePayload(row, input.payload, auth.userId);
     if ('error' in payload) return payload.error;
@@ -351,6 +371,7 @@ export async function removeItemByMetadata(
     const result = await escalationService.removeAccumulatedItemByMetadata(key, value, {
       itemKey, actor: auth.userId, roles: allowedRoles ?? undefined, reciprocal: reciprocal.reciprocal,
     });
+    if (result.outcome === 'not-found') return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
     return removeOutcomeResult(result, itemKey);
   } catch (err: any) {
     return { status: 500, error: err.message };

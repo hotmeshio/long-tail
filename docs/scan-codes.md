@@ -118,7 +118,9 @@ through the scheme facet, reads that facet from the row (a bag row carrying
 `binKey: "B-7"`), and adds the target to the pending accumulator whose
 metadata carries the same value, writing the item's row as the reciprocal in
 the same statement (`reciprocal: false` skips it; `containerRoles` names the
-container queues). Without it the scanned target is the CONTAINER and the step
+container queues). The container pick considers only pending rows that carry
+the accumulator declaration, so a release row sharing the facet during a
+pack-out is never the target. Without it the scanned target is the CONTAINER and the step
 adds `params.itemKey` (a template) to it. An item with no row or no container
 facet falls through to the next step; a container already holding the item
 reports a conflict. When the item's row exists but no pending container
