@@ -45,6 +45,18 @@ export function setActingTokenProvider(fn: (() => string | null) | null) {
   actingTokenProvider = fn;
 }
 
+let actingIdentitySpent: ((token: string) => void) | null = null;
+
+/**
+ * Called after every response to a request that carried the acting token.
+ * The identity provider uses it to retire a single-shot grant the moment its
+ * one exchange has happened, so the client never holds a token the server
+ * has already consumed.
+ */
+export function setActingIdentitySpent(fn: ((token: string) => void) | null) {
+  actingIdentitySpent = fn;
+}
+
 export function setActingIdentityClear(fn: (() => void) | null) {
   actingIdentityClear = fn;
 }
@@ -124,6 +136,10 @@ export async function apiFetch<T>(
     ...options,
     headers,
   });
+
+  // The server exchanged the grant on this request; a single-shot grant is
+  // spent now, whatever the response said.
+  if (actingToken) actingIdentitySpent?.(actingToken);
 
   // A dead badge grant answers 401 with an acting-identity error — the session
   // itself is fine, so this never enters the refresh/logout path. Clear the

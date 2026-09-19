@@ -219,6 +219,18 @@ describe('EscalationDetailPage — acting identity on the work surface', () => {
     );
   });
 
+  it('retires the badge once the stashed submit lands, so the next scan starts unprimed', async () => {
+    renderPage();
+    await screen.findByText('Plate check');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    await screen.findByTestId('station-write-challenge');
+
+    primeLive('badge-user-1', 'Dana Reviewer');
+    await waitFor(() => expect(state.resolve.mutateAsync).toHaveBeenCalled());
+    await waitFor(() => expect(state.acting).toBeNull());
+    expect(screen.queryByTestId('station-write-challenge')).not.toBeInTheDocument();
+  });
+
   it('names a wrong badge and holds the submit', async () => {
     renderPage();
 

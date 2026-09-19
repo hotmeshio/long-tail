@@ -210,6 +210,7 @@ export type {
   ScanEncoding,
   ScanSchemeKind,
   ScanVerb,
+  ScanTemplateBag,
   ScanOutcome,
   ScanAvailability,
   ScanCardinality,
@@ -241,6 +242,7 @@ export {
   SCAN_CARDINALITY,
   SCAN_PROVENANCE_KEYS,
   SCAN_TEMPLATE_TOKENS,
+  SCAN_TEMPLATE_BAGS,
   ACTING_IDENTITY_LABEL,
 } from './scan-code';
 

@@ -134,3 +134,17 @@ describe('assertValidSteps — accumulate', () => {
   });
 });
 
+describe('assertValidSteps — template tokens', () => {
+  it('accepts {claim.<facet>} on any step and {item.<facet>} on item-mode accumulate', () => {
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.RESOLVE, params: { resolverPayload: { order: '{claim.orderId}' } } } as ScanStep])).not.toThrow();
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.ACCUMULATE, params: { itemKey: '{claim.orderId}' } } as ScanStep])).not.toThrow();
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.ACCUMULATE, params: { accumulate: { containerFacet: 'binKey' }, metadata: { lane: '{item.lane}' } } } as ScanStep])).not.toThrow();
+  });
+
+  it('rejects {item.<facet>} outside item mode and malformed facet keys', () => {
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.RESOLVE, params: { resolverPayload: { x: '{item.binKey}' } } } as ScanStep])).toThrow(/item-mode accumulate/);
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.ACCUMULATE, params: { itemKey: '{item.binKey}' } } as ScanStep])).toThrow(/item-mode accumulate/);
+    expect(() => assertValidSteps([{ query: {}, verb: SCAN_VERBS.CLAIM, params: { metadata: { x: '{claim.order id}' } } } as ScanStep])).toThrow(/facet key/);
+  });
+});
+

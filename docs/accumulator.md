@@ -64,8 +64,8 @@ A batch wait may add `partialOnTimeout: true`; it stores `envelope.batch_partial
 | Add by facet | `POST /api/escalations/accumulate-by-metadata` | `accumulateByMetadata` | |
 | Remove by id | `POST /api/escalations/:id/remove-item` | `removeItem` | `remove_item` |
 | Remove by signal key / facet | `POST /api/escalations/remove-item-by-signal-key`, `/remove-item-by-metadata` | `removeItemBySignalKey`, `removeItemByMetadata` | |
-| Read the collection | `GET /api/escalations/:id/items` | `getItems` | `get_escalation_items` (admin) |
-| Scan | the `accumulate` verb | | |
+| Read the collection | `GET /api/escalations/:id/items`, `GET /api/escalations/items-by-signal-key` | `getItems`, `getItemsBySignalKey` | `get_escalation_items` (admin; `id` or `signalKey`) |
+| Scan | the `accumulate` verb; item mode answers `no_open_container` when the container closed; templates read `{claim.<facet>}` and `{item.<facet>}` | | |
 
 An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated against the container role's versioned form when present), an optional `metadata` patch (reserved keys rejected), `assertClaim` (by id), and an optional `reciprocal`.
 
@@ -110,4 +110,4 @@ Every accepted add and removal publishes `escalation.updated` for the container 
 
 ## Versions
 
-HotMesh 0.29.0 (`accumulate`, `partialOnTimeout`, timeout delivery, reciprocal statement) and long-tail 0.21.0.
+HotMesh 0.29.0 (`accumulate`, `partialOnTimeout`, timeout delivery, reciprocal statement) and long-tail 0.21.1 (root export of `conditionalAccumulator`, `no_open_container`, claim and item template tokens, items by signal key).

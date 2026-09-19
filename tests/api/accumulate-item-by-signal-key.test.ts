@@ -22,7 +22,7 @@ vi.mock('../../workers', () => ({
 
 import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
-import { accumulateItemBySignalKey, removeItemBySignalKey } from '../../api/escalations/accumulate';
+import { accumulateItemBySignalKey, removeItemBySignalKey, getEscalationItemsBySignalKey } from '../../api/escalations/accumulate';
 
 const mockGetBySignalKey = vi.mocked(escalationService.getEscalationBySignalKey);
 const mockAdd = vi.mocked(escalationService.accumulateItemBySignalKey);
@@ -97,3 +97,25 @@ describe('removeItemBySignalKey (api)', () => {
     expect((await removeItemBySignalKey({ signalKey: 'sig-bin-1', itemKey: 'bag-1' }, AUTH)).status).toBe(404);
   });
 });
+
+describe('getEscalationItemsBySignalKey (api)', () => {
+  it('returns the ordered items for a readable row and 404 otherwise', async () => {
+    mockGetBySignalKey.mockResolvedValue(makeBin({
+      envelope: JSON.stringify({ accumulate_items: { b: { at: '2026-01-01T00:00:02Z' }, a: { at: '2026-01-01T00:00:01Z' } } }),
+      metadata: { accumulate_count: 2, accumulate_max: null, accumulate_keys: ['b', 'a'] },
+    }));
+    const result = await getEscalationItemsBySignalKey({ signalKey: 'sig-bin-1' }, AUTH);
+    expect(result.status).toBe(200);
+    expect(result.data).toMatchObject({ kind: 'accumulate', count: 2, max: null });
+    expect(result.data!.items.map((i) => i.itemKey)).toEqual(['a', 'b']);
+
+    expect((await getEscalationItemsBySignalKey({ signalKey: '' }, AUTH)).status).toBe(400);
+    mockGetBySignalKey.mockResolvedValue(null);
+    expect((await getEscalationItemsBySignalKey({ signalKey: 'nope' }, AUTH)).status).toBe(404);
+    mockHasGlobal.mockResolvedValue(false);
+    vi.mocked(userService.getRoleScope).mockResolvedValue({ allRoles: [], selfRoles: [] } as any);
+    mockGetBySignalKey.mockResolvedValue(makeBin());
+    expect((await getEscalationItemsBySignalKey({ signalKey: 'sig-bin-1' }, AUTH)).status).toBe(404);
+  });
+});
+

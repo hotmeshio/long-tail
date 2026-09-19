@@ -343,7 +343,12 @@ export function registerEscalationTools(server: McpServer): void {
       inputSchema: getEscalationItemsSchema,
     },
     async (args: z.infer<typeof getEscalationItemsSchema>) => {
-      const result = await escalationApi.getEscalationItems({ id: args.id }, await systemAuth());
+      if (!args.id && !args.signalKey) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'id or signalKey is required' }) }], isError: true };
+      }
+      const result = args.id
+        ? await escalationApi.getEscalationItems({ id: args.id }, await systemAuth())
+        : await escalationApi.getEscalationItemsBySignalKey({ signalKey: args.signalKey! }, await systemAuth());
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

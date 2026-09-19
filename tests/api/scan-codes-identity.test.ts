@@ -55,6 +55,16 @@ describe('executeIdentityScan', () => {
     expect(result.data?.actor).toEqual({ id: 'user-1', displayName: 'Maria' });
     expect(result.data?.actingToken).toBe(`eph:v1:acting_identity:${UUID}`);
     expect(result.data?.expiresAt).toBeDefined();
+    // the client learns the grant's shape so a single-shot grant never outlives its use
+    expect(result.data?.maxUses).toBe(0);
+  });
+
+  it('reports a single-shot policy as maxUses 1', async () => {
+    users.getUserByMetadataValue.mockResolvedValue({ id: 'user-1', display_name: 'Maria', external_id: 'maria' } as any);
+    eph.storeEphemeral.mockResolvedValue(UUID);
+    const result = await executeIdentityScan(parsed, { ...scheme, grant_max_uses: 1 }, rule);
+    expect(eph.storeEphemeral).toHaveBeenCalledWith('user-1', expect.objectContaining({ maxUses: 1 }));
+    expect(result.data?.maxUses).toBe(1);
   });
 
   it('an unknown badge is IDENTITY_UNKNOWN with the rule fallback — never a lookup by external_id', async () => {

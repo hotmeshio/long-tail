@@ -73,6 +73,15 @@ export function registerAccumulateRoutes(router: Router): void {
   });
 
   /**
+   * GET /api/escalations/items-by-signal-key?signalKey=…
+   * The held items of an accumulator or batch row by its signal_key.
+   */
+  router.get('/items-by-signal-key', async (req, res) => {
+    const result = await api.getEscalationItemsBySignalKey({ signalKey: String(req.query.signalKey ?? '') }, req.auth!);
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * POST /api/escalations/:id/accumulate
    * Add one item. Interim adds answer { outcome: 'accepted', count, remaining };
    * the add that reaches max answers { outcome: 'completed', signaled } and the

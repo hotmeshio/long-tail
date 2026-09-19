@@ -13,6 +13,7 @@ export const VERB_LABELS: Record<ScanVerb, string> = {
   [SCAN_VERBS.RESOLVE]: 'Resolve with a canned payload',
   [SCAN_VERBS.ESCALATE]: 'Send to another queue',
   [SCAN_VERBS.CANCEL]: 'Cancel',
+  [SCAN_VERBS.ACCUMULATE]: 'Add to an accumulator',
   [SCAN_VERBS.PRESENT]: 'Show reality + choices',
 };
 
@@ -58,8 +59,13 @@ export function StepRow({
 
   const isPresent = step.verb === SCAN_VERBS.PRESENT;
   const needsTargetRole = step.verb === SCAN_VERBS.ESCALATE;
+  const isAccumulate = step.verb === SCAN_VERBS.ACCUMULATE;
+  const itemMode = isAccumulate && !!step.params?.accumulate?.containerFacet;
+  const patchAccumulate = (patch: Partial<NonNullable<NonNullable<ScanStep['params']>['accumulate']>>) =>
+    patchParams({ accumulate: { ...step.params?.accumulate, ...patch } });
   const needsPayload = step.verb === SCAN_VERBS.RESOLVE
-    || (step.verb === SCAN_VERBS.ESCALATE && step.params?.closeCurrent === 'resolve');
+    || (step.verb === SCAN_VERBS.ESCALATE && step.params?.closeCurrent === 'resolve')
+    || isAccumulate;
 
   return (
     <div className="py-4 space-y-3">
@@ -147,6 +153,62 @@ export function StepRow({
             </select>
           </label>
         )}
+        {isAccumulate && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Container facet</span>
+            <span className="block text-2xs text-text-tertiary mb-1">
+              Item mode: the scanned item's row carries this facet, and the container that shares its value receives the item. Empty means the scan names the container.
+            </span>
+            <input
+              value={step.params?.accumulate?.containerFacet ?? ''}
+              onChange={(e) => patchAccumulate({ containerFacet: e.target.value || undefined })}
+              className="input w-full min-w-[12rem] font-mono"
+              placeholder="binKey"
+              aria-label="Container facet"
+            />
+          </label>
+        )}
+        {isAccumulate && !itemMode && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Item key <span className="text-status-error">*</span></span>
+            <span className="block text-2xs text-text-tertiary mb-1">
+              The key the item is held under. {'{scan.target}'} fills from the scan; {'{claim.orderId}'} reads the acting user's live claim.
+            </span>
+            <input
+              value={step.params?.itemKey ?? ''}
+              onChange={(e) => patchParams({ itemKey: e.target.value || undefined })}
+              className="input w-full min-w-[16rem] font-mono"
+              placeholder="{claim.orderId}"
+              aria-label="Item key"
+            />
+          </label>
+        )}
+        {itemMode && (
+          <div className="block">
+            <span className="block text-xs text-text-secondary mb-1">Container queues</span>
+            <span className="block text-2xs text-text-tertiary mb-1">The queues the container is expected in — empty means any I can act on.</span>
+            <PillMultiSelect
+              values={step.params?.accumulate?.containerRoles ?? []}
+              options={roleKeys}
+              onChange={(next) => patchAccumulate({ containerRoles: next.length ? next : undefined })}
+              addLabel="Add a queue…"
+              emptyText="Any queue I can act on"
+              ariaLabel="Add a container queue"
+            />
+          </div>
+        )}
+        {itemMode && (
+          <label className="flex items-end gap-2 pb-2">
+            <input
+              type="checkbox"
+              checked={step.params?.accumulate?.reciprocal !== false}
+              onChange={(e) => patchAccumulate({ reciprocal: e.target.checked ? undefined : false })}
+            />
+            <span className="text-xs text-text-secondary" title="Write the item's own row in the same statement, so it records which container holds it.">
+              Also record the container on the item
+            </span>
+          </label>
+        )}
         {!isPresent && (
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Confirmation</span>
@@ -186,10 +248,10 @@ export function StepRow({
       {needsPayload && (
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">
-            Resolver payload <span className="text-status-error">*</span>
+            {isAccumulate ? 'Item payload' : 'Resolver payload'} {!isAccumulate && <span className="text-status-error">*</span>}
           </span>
           <span className="block text-2xs text-text-tertiary mb-1">
-            JSON submitted as the resolution. {'{scan.target}'}, {'{scan.category}'} and {'{scan.scannedAt}'} fill in from the scan.
+            {isAccumulate ? 'Optional JSON stored on the item.' : 'JSON submitted as the resolution.'} {'{scan.target}'}, {'{scan.category}'} and {'{scan.scannedAt}'} fill in from the scan; {'{claim.<facet>}'} reads the acting user's live claim{itemMode ? <>, {'{item.<facet>}'} the scanned item's row</> : null}.
           </span>
           <textarea
             value={payloadText}

@@ -108,7 +108,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const enabled = useScanEnabled();
   const navigate = useNavigate();
-  const { identity, prime } = useActingIdentity();
+  const { identity, prime, clear } = useActingIdentity();
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [wedgeConfig, setWedgeConfig] = useState<WedgeConfig>(() => loadWedgeConfig());
@@ -179,12 +179,20 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     const at = Date.now();
     try {
+      const sentToken = actingTokenRef.current;
       const response = await executeScanCode(code, {
-        actingToken: actingTokenRef.current ?? undefined,
+        actingToken: sentToken ?? undefined,
         previousActingToken: previousTokenRef.current ?? undefined,
       });
       if (response.outcome === SCAN_OUTCOMES.IDENTITY_PRIMED) {
         previousTokenRef.current = prime(response);
+      }
+      // A live grant always satisfies the identity check, so not_primed on a
+      // scan that carried one means the server found it dead. Drop the stale
+      // copy so the next scan runs unprimed instead of repeating the badge
+      // screen until the TTL lapses.
+      if (response.outcome === SCAN_OUTCOMES.NOT_PRIMED && sentToken) {
+        clear();
       }
       const navigated = navigateForResponse(response);
       setLastResult({ code, source, at, response, error: null, navigated });
@@ -193,7 +201,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [navigateForResponse, prime]);
+  }, [navigateForResponse, prime, clear]);
 
   // Live refs so the capture listener stays installed across renders.
   const submitRef = useRef(submitCode);

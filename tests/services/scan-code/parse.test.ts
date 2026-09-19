@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { parseScanCode, interpolateScanTemplate } from '../../../services/scan-code/parse';
+import { parseScanCode, interpolateScanTemplate, mentionsClaimToken, ScanTemplateError } from '../../../services/scan-code/parse';
 import { SCAN_ENCODINGS, type ScanScheme } from '../../../types';
 
 const delimited: ScanScheme = {
@@ -159,5 +159,27 @@ describe('interpolateScanTemplate', () => {
     const input = { serial: '{scan.target}' };
     interpolateScanTemplate(input, ctx);
     expect(input.serial).toBe('{scan.target}');
+  });
+
+  it('reads {claim.<facet>} and {item.<facet>} from the context bags', () => {
+    const out = interpolateScanTemplate(
+      { itemKey: '{claim.orderId}', note: 'bin {item.binKey} for {claim.orderId}', n: { w: '{item.weight}' } },
+      { ...ctx, claim: { orderId: 'ORD-9' }, item: { binKey: 'B-7', weight: 2 } },
+    );
+    expect(out).toEqual({ itemKey: 'ORD-9', note: 'bin B-7 for ORD-9', n: { w: '2' } });
+  });
+
+  it('fails loud when a bag or facet is missing, never writing the literal', () => {
+    expect(() => interpolateScanTemplate({ k: '{claim.orderId}' }, ctx)).toThrow(ScanTemplateError);
+    expect(() => interpolateScanTemplate({ k: '{claim.orderId}' }, ctx)).toThrow(/no single live claim/);
+    expect(() => interpolateScanTemplate({ k: '{item.binKey}' }, { ...ctx, item: {} })).toThrow(/facet binKey is absent/);
+    expect(() => interpolateScanTemplate({ k: '{claim.orderId}' }, { ...ctx, claim: { orderId: '' } })).toThrow(ScanTemplateError);
+  });
+
+  it('mentionsClaimToken spots a claim token anywhere in the params', () => {
+    expect(mentionsClaimToken({ itemKey: '{claim.orderId}' })).toBe(true);
+    expect(mentionsClaimToken({ nested: { list: ['{claim.x}'] } })).toBe(true);
+    expect(mentionsClaimToken({ itemKey: '{item.orderId}' })).toBe(false);
+    expect(mentionsClaimToken(undefined)).toBe(false);
   });
 });

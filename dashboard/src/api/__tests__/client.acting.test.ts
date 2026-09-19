@@ -4,6 +4,7 @@ import {
   setToken,
   setActingTokenProvider,
   setActingIdentityClear,
+  setActingIdentitySpent,
   ACTING_TOKEN_HEADER,
   ApiError,
 } from '../client';
@@ -42,7 +43,32 @@ afterEach(() => {
   setToken(null);
   setActingTokenProvider(null);
   setActingIdentityClear(null);
+  setActingIdentitySpent(null);
   sessionStorage.clear();
+});
+
+describe('apiFetch — acting identity spent hook', () => {
+  it('reports the token after any response to a request that carried it', async () => {
+    const spent = vi.fn();
+    setActingTokenProvider(() => 'eph:v1:acting_identity:one');
+    setActingIdentitySpent(spent);
+    fetchSpy.mockResolvedValue(jsonResponse({ ok: true }));
+    await apiFetch('/escalations/e-1/resolve', { method: 'POST' });
+    expect(spent).toHaveBeenCalledWith('eph:v1:acting_identity:one');
+
+    fetchSpy.mockResolvedValue(jsonResponse({ error: 'nope' }, 409));
+    await apiFetch('/escalations/e-1/resolve', { method: 'POST' }).catch(() => {});
+    expect(spent).toHaveBeenCalledTimes(2);
+  });
+
+  it('stays silent when no acting token rode the request', async () => {
+    const spent = vi.fn();
+    setActingTokenProvider(() => null);
+    setActingIdentitySpent(spent);
+    fetchSpy.mockResolvedValue(jsonResponse({ ok: true }));
+    await apiFetch('/escalations');
+    expect(spent).not.toHaveBeenCalled();
+  });
 });
 
 // ── Tests ───────────────────────────────────────────────────────────────────

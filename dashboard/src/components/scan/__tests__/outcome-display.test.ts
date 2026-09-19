@@ -17,6 +17,16 @@ describe('outcome-display', () => {
     expect(OUTCOME_TONE[SCAN_OUTCOMES.NOT_PRIMED]).toBe('text-status-warning');
   });
 
+  it('renders no_open_container as a warning with the rule fallback markdown', () => {
+    expect(OUTCOME_LABELS[SCAN_OUTCOMES.NO_OPEN_CONTAINER]).toMatch(/scan again/i);
+    expect(OUTCOME_TONE[SCAN_OUTCOMES.NO_OPEN_CONTAINER]).toBe('text-status-warning');
+    expect(outcomeMarkdown({
+      outcome: SCAN_OUTCOMES.NO_OPEN_CONTAINER,
+      fallback: { markdown: 'Wait for the next bin.' },
+      container: { facet: 'binKey', value: 'B-7' },
+    })).toBe('Wait for the next bin.');
+  });
+
   it('greets the badge holder on identity_primed', () => {
     expect(outcomeHeadline({
       outcome: SCAN_OUTCOMES.IDENTITY_PRIMED,

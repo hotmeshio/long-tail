@@ -98,13 +98,19 @@ Verbs are the canonical escalation actions:
 | `resolve` | Atomic claim + resolve with a canned payload | `resolverPayload`, `metadata` |
 | `escalate` | Create an escalation in another queue, optionally closing the located one | `targetRole`, `closeCurrent`, `escalationType`, `description`, `metadata` |
 | `cancel` | Claim-as-lock, then cancel | — |
-| `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey`, `resolverPayload`, `metadata`, `accumulate: { containerFacet, containerRoles, reciprocal }` |
+| `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey` (template), `resolverPayload`, `metadata`, `accumulate: { containerFacet, containerRoles, reciprocal }` |
 
-String values inside `resolverPayload` and `metadata` interpolate
-`{scan.target}`, `{scan.category}`, and `{scan.scannedAt}`. Every mutating
-verb stamps provenance facets onto the row it touches — `scanScheme`,
-`scanCategory`, `scanActionName`, `scannedAt` — so scan-driven transitions
-stay queryable.
+String values inside `itemKey`, `resolverPayload`, and `metadata` interpolate
+`{scan.target}`, `{scan.category}`, and `{scan.scannedAt}`. Two facet bags
+extend them: `{claim.<facet>}` reads the acting user's single live claim
+(one scoped query, run only when a step mentions it; zero or two live claims
+make the step fall through), and `{item.<facet>}` reads the row an item-mode
+`accumulate` step located. A token that cannot resolve falls through instead
+of writing the literal, and the rule editor rejects `{item.…}` on any other
+step. A bag-first ladder therefore names the order from the claim:
+`"itemKey": "{claim.orderId}"` on the shelf scan. Every mutating verb stamps
+provenance facets onto the row it touches — `scanScheme`, `scanCategory`,
+`scanActionName`, `scannedAt` — so scan-driven transitions stay queryable.
 
 `accumulate` has two modes. With `params.accumulate.containerFacet` the
 scanned target is the ITEM: the step locates the item's own pending row
@@ -115,7 +121,11 @@ the same statement (`reciprocal: false` skips it; `containerRoles` names the
 container queues). Without it the scanned target is the CONTAINER and the step
 adds `params.itemKey` (a template) to it. An item with no row or no container
 facet falls through to the next step; a container already holding the item
-reports a conflict.
+reports a conflict. When the item's row exists but no pending container
+carries its facet (the previous container closed and its successor has not
+parked yet), the step answers `no_open_container` with the item row, the
+facet, and the rule's fallback markdown, so the station reads "Container
+closing, scan again" instead of the bag with no hint.
 
 Ordering is the power move: put the expected state first and a broad
 `show-detail` last. A machine whose twin is in the wrong queue still answers
@@ -202,7 +212,7 @@ scheme's policy:
 | Scheme field | Meaning |
 |---|---|
 | `grant_ttl_seconds` | How long the grant lives (1–86400). |
-| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n scan requests (a strict one-scan policy is `1`). |
+| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n requests that carry it, scans and work verbs alike (a strict one-request policy is `1`). The primed response carries `maxUses`; a single-shot grant is retired on the device the moment its one request returns, and a scan that comes back `not_primed` while a grant is held drops that grant, so the next scan runs unprimed instead of repeating the badge screen. A badge-gated submit likewise retires its badge once the write lands. |
 
 The grant rides subsequent scans as `actingToken`. Verbs then run **as the
 badged person under their own live RBAC** — the grant confers attribution,
@@ -312,6 +322,7 @@ as the calling user under normal RBAC. Every terminal state is a structured
 | `matched_list` | A `show-list` step matched; `escalations` + `listQuery` included |
 | `confirm_required` | A confirm step located its target; `pendingAction` included |
 | `no_match_fallback` | No step matched; `fallback` included |
+| `no_open_container` | An item-mode `accumulate` step located the item but no pending container carries its facet; `escalation` (the item row), `container`, and `fallback` included |
 | `unconfigured` | Unknown or disabled scheme version / category |
 | `invalid_code` | The string parses under no enabled scheme |
 | `forbidden` | The caller's roles bar the matched action |

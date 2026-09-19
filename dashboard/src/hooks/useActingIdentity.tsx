@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { ScanExecuteResponse } from '../api/scan-codes';
-import { setActingTokenProvider, setActingIdentityClear } from '../api/client';
+import { setActingTokenProvider, setActingIdentityClear, setActingIdentitySpent } from '../api/client';
 
 /** The primed badge holder — who scans act as until the grant lapses. */
 export interface ActingIdentity {
@@ -19,6 +19,8 @@ export interface ActingIdentity {
   displayName: string;
   /** ISO expiry copy; the keystore enforces the real one. */
   expiresAt: string | null;
+  /** A one-exchange grant: retired after the first request that carries it. */
+  singleUse: boolean;
 }
 
 interface ActingIdentityContextValue {
@@ -73,11 +75,20 @@ export function ActingIdentityProvider({ children }: { children: ReactNode }) {
       actorId: response.actor.id,
       displayName: response.actor.displayName,
       expiresAt: response.expiresAt ?? null,
+      singleUse: response.maxUses === 1,
     });
     return previous;
   }, []);
 
   const clear = useCallback(() => setIdentity(null), []);
+
+  // A single-shot grant dies on the server at its first exchange; retire the
+  // client copy at the same moment, matched by token so a newer grant primed
+  // in the meantime is never dropped.
+  const spent = useCallback((token: string) => {
+    const current = identityRef.current;
+    if (current?.singleUse && current.actingToken === token) setIdentity(null);
+  }, []);
 
   // Register the grant with the API client: every request carries the acting
   // token while primed, and an acting-identity 401 clears this state so the
@@ -85,11 +96,13 @@ export function ActingIdentityProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setActingTokenProvider(() => identityRef.current?.actingToken ?? null);
     setActingIdentityClear(clear);
+    setActingIdentitySpent(spent);
     return () => {
       setActingTokenProvider(null);
       setActingIdentityClear(null);
+      setActingIdentitySpent(null);
     };
-  }, [clear]);
+  }, [clear, spent]);
 
   const remainingSeconds = useCallback((): number => {
     const expiresAt = identityRef.current?.expiresAt;

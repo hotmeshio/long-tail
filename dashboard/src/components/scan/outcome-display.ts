@@ -14,6 +14,7 @@ export const OUTCOME_LABELS: Record<ScanOutcome, string> = {
   [SCAN_OUTCOMES.IDENTITY_UNKNOWN]: 'Badge not recognized',
   [SCAN_OUTCOMES.NOT_PRIMED]: 'Badge required',
   [SCAN_OUTCOMES.CHOICES]: 'Choices presented',
+  [SCAN_OUTCOMES.NO_OPEN_CONTAINER]: 'Container closing, scan again',
 };
 
 /** Status tone per outcome (text-safe tokens). */
@@ -30,6 +31,7 @@ export const OUTCOME_TONE: Record<ScanOutcome, string> = {
   [SCAN_OUTCOMES.IDENTITY_UNKNOWN]: 'text-status-warning',
   [SCAN_OUTCOMES.NOT_PRIMED]: 'text-status-warning',
   [SCAN_OUTCOMES.CHOICES]: 'text-status-success',
+  [SCAN_OUTCOMES.NO_OPEN_CONTAINER]: 'text-status-warning',
 };
 
 /**
@@ -48,5 +50,6 @@ export function outcomeMarkdown(response: ScanExecuteResponse): string | null {
   if (response.outcome === SCAN_OUTCOMES.NO_MATCH_FALLBACK) return response.fallback?.markdown ?? null;
   if (response.outcome === SCAN_OUTCOMES.IDENTITY_UNKNOWN) return response.fallback?.markdown ?? null;
   if (response.outcome === SCAN_OUTCOMES.NOT_PRIMED) return response.notPrimed?.markdown ?? null;
+  if (response.outcome === SCAN_OUTCOMES.NO_OPEN_CONTAINER) return response.fallback?.markdown ?? null;
   return null;
 }

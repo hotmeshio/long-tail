@@ -95,6 +95,13 @@ export const SCAN_OUTCOMES = {
   NOT_PRIMED: 'not_primed',
   /** A PRESENT step located its row; the response carries reality + choices. */
   CHOICES: 'choices',
+  /**
+   * An accumulate step in item mode located the item's row, but no pending
+   * container carries its facet: the previous container closed and its
+   * successor has not parked yet. The response carries the item row and the
+   * facet so the station can say "container closing, scan again".
+   */
+  NO_OPEN_CONTAINER: 'no_open_container',
 } as const;
 export type ScanOutcome = (typeof SCAN_OUTCOMES)[keyof typeof SCAN_OUTCOMES];
 
@@ -125,12 +132,25 @@ export const SCAN_PROVENANCE_KEYS = {
 /** The ephemeral-keystore label acting-identity grants are minted under. */
 export const ACTING_IDENTITY_LABEL = 'acting_identity';
 
-/** Template tokens usable inside step params (resolver payload, metadata). */
+/**
+ * Template tokens usable inside step params (item key, resolver payload,
+ * metadata). Beyond the three scan tokens, `{claim.<facet>}` reads the
+ * acting user's single live claim and `{item.<facet>}` reads the row an
+ * item-mode accumulate step located; a token that cannot resolve fails the
+ * step instead of writing the literal.
+ */
 export const SCAN_TEMPLATE_TOKENS = {
   TARGET: '{scan.target}',
   CATEGORY: '{scan.category}',
   SCANNED_AT: '{scan.scannedAt}',
 } as const;
+
+/** Facet-bag token prefixes: `{claim.orderId}`, `{item.binKey}`. */
+export const SCAN_TEMPLATE_BAGS = {
+  CLAIM: 'claim',
+  ITEM: 'item',
+} as const;
+export type ScanTemplateBag = (typeof SCAN_TEMPLATE_BAGS)[keyof typeof SCAN_TEMPLATE_BAGS];
 
 export interface ScanScheme {
   version: number;
@@ -285,6 +305,8 @@ export interface ScanExecuteResponse {
   notPrimed?: ScanRuleFallback;
   /** The labeled choice set (CHOICES). */
   choices?: ScanPresentedChoice[];
+  /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */
+  container?: { facet: string; value: string };
   /** CHOICES: the step would auto-execute its single choice — only identity stopped it. */
   autoSelect?: boolean;
   /** The badged person (IDENTITY_PRIMED) — id lets the client recognize its own claims. */
@@ -293,5 +315,11 @@ export interface ScanExecuteResponse {
   actingToken?: string;
   /** Display copy of the grant's expiry (the keystore enforces it). */
   expiresAt?: string;
+  /**
+   * IDENTITY_PRIMED: the scheme's `grant_max_uses`. `1` is a single-shot
+   * grant the client drops after the first request that carries it; `0`
+   * lives until its TTL.
+   */
+  maxUses?: number;
   error?: string;
 }

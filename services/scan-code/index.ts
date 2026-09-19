@@ -21,6 +21,8 @@ export {
 export {
   parseScanCode,
   interpolateScanTemplate,
+  mentionsClaimToken,
+  ScanTemplateError,
   type ScanParseResult,
   type ScanParseFailure,
   type ScanTemplateContext,
