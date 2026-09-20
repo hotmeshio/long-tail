@@ -67,6 +67,8 @@ A batch wait may add `partialOnTimeout: true`; it stores `envelope.batch_partial
 | Read the collection | `GET /api/escalations/:id/items`, `GET /api/escalations/items-by-signal-key` | `getItems`, `getItemsBySignalKey` | `get_escalation_items` (admin; `id` or `signalKey`) |
 | Scan | the `accumulate` verb; item mode answers `no_open_container` when the container closed; templates read `{claim.<facet>}` and `{item.<facet>}` | | |
 
+A facet selector (`accumulateByMetadata`, `removeItemByMetadata`, a reciprocal named by `key` + `value`, the scan verb's item mode) considers only pending rows that carry the accumulator declaration, ordered by priority then age. A release or remediation row sharing the container's facet is never picked; with no open container the answer is `not-found`, and the scan answers `no_open_container`.
+
 An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated against the container role's versioned form when present), an optional `metadata` patch (reserved keys rejected), `assertClaim` (by id), and an optional `reciprocal`.
 
 ### Outcomes
@@ -78,7 +80,7 @@ An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated a
 | `duplicate-item` | 409 | the key is already held (`unique`), row untouched |
 | `full` | 409 | `max` held and the key is new (`resolveAtMax: false`, or a race with the completing add) |
 | `not-accumulator` | 400 | the row carries no `accumulate` declaration |
-| `not-found` | 404 | unknown row, or outside the caller's scope on the ingress forms |
+| `not-found` | 404 | unknown row, outside the caller's scope on the ingress forms, or (by facet) no pending accumulator shares the facet; rows without the declaration are never candidates |
 | `already-resolved`, `already-expired`, `already-cancelled` | 409 | the row is terminal |
 | `claimed-by-other`, `claim-expired` | 409 | the `assertClaim` assertion failed |
 | `reciprocal-not-found` | 404 | the reciprocal selector matched nothing the caller may act on |
@@ -110,4 +112,4 @@ Every accepted add and removal publishes `escalation.updated` for the container 
 
 ## Versions
 
-HotMesh 0.29.0 (`accumulate`, `partialOnTimeout`, timeout delivery, reciprocal statement) and long-tail 0.21.1 (root export of `conditionalAccumulator`, `no_open_container`, claim and item template tokens, items by signal key).
+HotMesh 0.29.0 (`accumulate`, `partialOnTimeout`, timeout delivery, reciprocal statement) and long-tail 0.21.1 (root export of `conditionalAccumulator`, `no_open_container`, claim and item template tokens, items by signal key); HotMesh 0.29.1 and long-tail 0.21.2 (facet selectors pick pending accumulators only).

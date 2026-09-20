@@ -32,7 +32,7 @@ import { accumulateItemByMetadata, removeItemByMetadata } from '../../api/escala
 
 const mockByMeta = vi.mocked(escalationService.accumulateItemByMetadata);
 const mockById = vi.mocked(escalationService.accumulateItem);
-const mockFind = vi.mocked(escalationService.findByMetadata);
+const mockSearch = vi.mocked(escalationService.searchByFacets);
 const mockRemoveByMeta = vi.mocked(escalationService.removeAccumulatedItemByMetadata);
 const mockHasGlobal = vi.mocked(userService.hasGlobalEscalationAccess);
 const mockGetUserRoles = vi.mocked(userService.getUserRoles);
@@ -82,17 +82,19 @@ describe('accumulateItemByMetadata (api)', () => {
     expect([key, value]).toEqual(['binKey', 'b-1']);
     expect(input.roles).toEqual(['bin']);
     expect(input.actor).toBe(AUTH.userId);
-    expect(mockFind).not.toHaveBeenCalled();
+    expect(mockSearch).not.toHaveBeenCalled();
   });
 
-  it('maps a not-found selection to 404', async () => {
+  it('maps a not-found selection to 404 naming the facet, never a 400 for a non-accumulator neighbor', async () => {
     mockByMeta.mockResolvedValue({ outcome: 'not-found', count: -1, remaining: null, escalation: null });
-    expect((await accumulateItemByMetadata({ key: 'binKey', value: 'nope', itemKey: 'x' }, AUTH)).status).toBe(404);
+    const result = await accumulateItemByMetadata({ key: 'binKey', value: 'nope', itemKey: 'x' }, AUTH);
+    expect(result.status).toBe(404);
+    expect(result.error).toBe('No pending accumulator found for this metadata');
   });
 
-  it('with enforcing roles and a payload, picks the row, validates it, then writes by id', async () => {
+  it('with enforcing roles and a payload, picks the pending accumulator by facet, validates it, then writes by id', async () => {
     enforcing.roles = new Set(['bin']);
-    mockFind.mockResolvedValue({ escalations: [makeBin()], total: 1 });
+    mockSearch.mockResolvedValue({ escalations: [makeBin()], total: 1 });
     mockById.mockResolvedValue({ outcome: 'completed', count: 2, remaining: 0, escalation: makeBin({ status: 'resolved' }) });
     const result = await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'bag-2', payload: { w: 2 } }, AUTH);
     expect(result.status).toBe(200);
@@ -100,6 +102,19 @@ describe('accumulateItemByMetadata (api)', () => {
     expect(checkResolverPayload).toHaveBeenCalledTimes(1);
     expect(mockById.mock.calls[0][0]).toBe(BIN_ID);
     expect(mockByMeta).not.toHaveBeenCalled();
+    // the pick itself excludes non-accumulators: pending, facet, and the declaration key
+    expect(mockSearch.mock.calls[0][0]).toMatchObject({
+      facets: { binKey: 'b-1' }, status: 'pending', exists: ['accumulate_count'], limit: 1,
+    });
+  });
+
+  it('with enforcing roles and a payload, answers 404 when only non-accumulator rows share the facet', async () => {
+    enforcing.roles = new Set(['bin']);
+    mockSearch.mockResolvedValue({ escalations: [], total: 0 });
+    const result = await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'x', payload: {} }, AUTH);
+    expect(result.status).toBe(404);
+    expect(result.error).toBe('No pending accumulator found for this metadata');
+    expect(mockById).not.toHaveBeenCalled();
   });
 
   it('with enforcing roles but no payload, stays single-statement', async () => {
@@ -107,12 +122,12 @@ describe('accumulateItemByMetadata (api)', () => {
     mockByMeta.mockResolvedValue({ outcome: 'accepted', count: 1, remaining: 1, escalation: makeBin() });
     await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'bag-1' }, AUTH);
     expect(mockByMeta).toHaveBeenCalledTimes(1);
-    expect(mockFind).not.toHaveBeenCalled();
+    expect(mockSearch).not.toHaveBeenCalled();
   });
 
   it('surfaces a row that went terminal between the two phases as 409', async () => {
     enforcing.roles = new Set(['bin']);
-    mockFind.mockResolvedValue({ escalations: [makeBin()], total: 1 });
+    mockSearch.mockResolvedValue({ escalations: [makeBin()], total: 1 });
     mockById.mockResolvedValue({ outcome: 'not-found', count: -1, remaining: null, escalation: null });
     const result = await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'x', payload: {} }, AUTH);
     expect(result.status).toBe(409);
@@ -126,5 +141,20 @@ describe('removeItemByMetadata (api)', () => {
     const result = await removeItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'bag-1' }, AUTH);
     expect(result.status).toBe(200);
     expect(mockRemoveByMeta.mock.calls[0][2]).toMatchObject({ itemKey: 'bag-1', roles: ['bin'], actor: AUTH.userId });
+  });
+
+  it('answers 404 naming the facet when no pending accumulator shares it', async () => {
+    mockRemoveByMeta.mockResolvedValue({ outcome: 'not-found', count: -1, escalation: null });
+    const result = await removeItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'bag-1' }, AUTH);
+    expect(result.status).toBe(404);
+    expect(result.error).toBe('No pending accumulator found for this metadata');
+  });
+
+  it('a reciprocal named by facet is picked among pending accumulators only', async () => {
+    mockSearch.mockResolvedValue({ escalations: [makeBin({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', role: 'bag' })], total: 1 });
+    mockByMeta.mockResolvedValue({ outcome: 'accepted', count: 1, remaining: 1, escalation: makeBin() });
+    await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'o-1', reciprocal: { key: 'orderId', value: 'o-1' } }, AUTH);
+    expect(mockSearch.mock.calls[0][0]).toMatchObject({ facets: { orderId: 'o-1' }, status: 'pending', exists: ['accumulate_count'] });
+    expect(mockByMeta.mock.calls[0][2].reciprocal).toEqual({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', payload: undefined });
   });
 });

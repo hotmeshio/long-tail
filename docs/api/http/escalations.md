@@ -1166,7 +1166,7 @@ Add ONE item to an open accumulator escalation (a `conditionalAccumulator` wait 
 | `assertClaim` | `boolean` | By id only. Require the caller's own live claim, asserted atomically |
 | `reciprocal` | `object` | A second accumulator row written in the same statement, both or neither. Exactly one of `id`, `signalKey`, or `key` + `value`; optional `payload` stored on its entry |
 
-**By signal key:** `{ signalKey, itemKey, payload?, metadata?, reciprocal? }`. **By metadata:** `{ key, value, itemKey, payload?, metadata?, restrictRoles?, reciprocal? }` selects the highest priority pending accumulator whose metadata contains the key/value, within the caller's write scope intersected with `restrictRoles`.
+**By signal key:** `{ signalKey, itemKey, payload?, metadata?, reciprocal? }`. **By metadata:** `{ key, value, itemKey, payload?, metadata?, restrictRoles?, reciprocal? }` selects the highest priority pending accumulator whose metadata contains the key/value, within the caller's write scope intersected with `restrictRoles`. Only rows carrying the accumulator declaration are candidates: a release or remediation row that shares the facet is never picked, and when no open container shares it the answer is 404 `No pending accumulator found for this metadata`. The same rule selects a reciprocal named by `key` + `value`.
 
 **Response 200 (interim):**
 
