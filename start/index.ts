@@ -12,10 +12,8 @@ import { applyDatabaseConfig, applyServerAuthConfig } from './config';
 import { registerAdapters } from './adapters';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
-import { SocketIOEventAdapter } from '../lib/events/socketio';
+import { LTExpressAdapter } from '../adapters/express';
 import { systemEventsConfig } from '../lib/events/system-events';
-import { NatsEventAdapter } from '../lib/events/nats';
-import { attachNatsWsProxy } from '../lib/events/nats-ws-proxy';
 
 import type { LTStartConfig, LTInstance } from '../types/startup';
 
@@ -81,27 +79,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   const serverEnabled = startConfig.server?.enabled !== false;
   let httpServer: ReturnType<typeof startServer> | null = null;
   if (serverEnabled) {
-    httpServer = startServer();
-
-    // Attach socket.io adapter to the HTTP server (if registered)
-    const socketAdapter = eventRegistry.getAdapter(SocketIOEventAdapter);
-    if (socketAdapter && httpServer) {
-      socketAdapter.attachServer(httpServer);
-      await socketAdapter.connect();
-    }
-
-    // Attach NATS WebSocket proxy (if configured)
-    const natsAdapter = eventRegistry.getAdapter(NatsEventAdapter);
-    if (natsAdapter?.wsProxyTarget && httpServer) {
-      attachNatsWsProxy(httpServer, natsAdapter.wsProxyTarget, {
-        onWsUrlDerived: (url) => {
-          // Auto-set wsUrl if not explicitly configured
-          if (!natsAdapter.wsUrl) {
-            natsAdapter.setWsUrl(url);
-          }
-        },
-      });
-    }
+    const adapter = new LTExpressAdapter();
+    httpServer = startServer(adapter);
+    await adapter.attachServer(httpServer);
   }
 
   // 7. Return instance
