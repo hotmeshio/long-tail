@@ -7,6 +7,7 @@
  *
  * Stateless mode — each POST creates a fresh server+transport pair.
  * Auth via Bearer token (JWT or bot API key) in the Authorization header.
+ * The caller sees only the tools whose manifest gate they hold.
  *
  * Mount at /mcp:
  *   POST /mcp  → JSON-RPC messages (initialize, tools/list, tools/call)
@@ -18,6 +19,7 @@ import { Router } from '../lib/http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { requireAuth } from '../modules/auth';
+import { resolveCapabilities } from '../modules/capabilities';
 import { loggerRegistry } from '../lib/logger';
 import { createUnifiedMcpServer } from '../services/mcp/external-server';
 import { getExposureConfig } from '../services/mcp/exposure';
@@ -29,7 +31,8 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const exposure = getExposureConfig();
     const callerScopes = (req.auth as any)?.scopes as string[] | undefined;
-    const server = await createUnifiedMcpServer(exposure, callerScopes);
+    const capabilities = await resolveCapabilities(req.auth);
+    const server = await createUnifiedMcpServer(capabilities, exposure, callerScopes);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless

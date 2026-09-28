@@ -1,5 +1,5 @@
 import { isSuperAdmin } from '../services/user';
-import type { AuthPayload } from '../types';
+import type { AuthPayload, CapabilitySet } from '../types';
 
 /**
  * Capability predicates shared by every entry point that faces people.
@@ -62,4 +62,23 @@ export async function mayGrantRole(granterId: string, grant: RoleGrant): Promise
   const { hasRole } = await import('../services/user/roles');
   if (await hasRole(granterId, grant.role)) return { allowed: true };
   return { allowed: false, error: `You can only assign roles you hold. You do not have the '${grant.role}' role.` };
+}
+
+const NO_CAPABILITIES: CapabilitySet = {
+  caller: false, admin: false, builder: false, roleManager: false, superadmin: false,
+};
+
+/**
+ * Every capability the principal holds, with the same outcomes as the
+ * predicates above. A superadmin claim costs no lookup; anyone else costs
+ * at most one superadmin lookup and one engineer-role lookup.
+ */
+export async function resolveCapabilities(principal: CapabilityPrincipal | undefined): Promise<CapabilitySet> {
+  if (!principal?.userId) return NO_CAPABILITIES;
+  if (principal.role === 'superadmin' || (await isSuperAdmin(principal.userId))) {
+    return { caller: true, admin: true, builder: true, roleManager: true, superadmin: true };
+  }
+  const admin = principal.role === 'admin';
+  const engineer = await hasBuilderRole(principal.userId);
+  return { caller: true, admin, builder: engineer, roleManager: admin || engineer, superadmin: false };
 }

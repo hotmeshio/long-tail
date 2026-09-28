@@ -14,7 +14,7 @@ vi.mock('../../services/user/roles', async (importOriginal) => ({
   hasRole: lookups.hasRole,
 }));
 
-import { mayAdminister, mayBuild, mayManageRoles, mayGrantRole } from '../../modules/capabilities';
+import { mayAdminister, mayBuild, mayManageRoles, mayGrantRole, resolveCapabilities } from '../../modules/capabilities';
 
 const USER = '00000000-0000-4000-8000-0000000000c1';
 
@@ -95,5 +95,52 @@ describe('mayGrantRole', () => {
       allowed: false,
       error: "You can only assign roles you hold. You do not have the 'billing' role.",
     });
+  });
+});
+
+describe('resolveCapabilities', () => {
+  const PRINCIPALS: Array<[string, { userId: string; role?: string }, () => void]> = [
+    ['member', { userId: USER, role: 'member' }, () => {}],
+    ['admin claim', { userId: USER, role: 'admin' }, () => {}],
+    ['superadmin claim', { userId: USER, role: 'superadmin' }, () => {}],
+    ['database superadmin', { userId: USER, role: 'member' }, () => lookups.isSuperAdmin.mockResolvedValue(true)],
+    ['engineer', { userId: USER, role: 'member' }, () => holdRoles('engineer')],
+    ['admin claim and engineer', { userId: USER, role: 'admin' }, () => holdRoles('engineer')],
+  ];
+
+  for (const [label, principal, arrange] of PRINCIPALS) {
+    it(`agrees with the predicates for a ${label}`, async () => {
+      arrange();
+      const set = await resolveCapabilities(principal);
+      expect(set.caller).toBe(true);
+      expect(set.admin).toBe(await mayAdminister(principal));
+      expect(set.builder).toBe(await mayBuild(principal));
+      expect(set.roleManager).toBe(await mayManageRoles(principal));
+    });
+  }
+
+  it('grants nothing without a user id', async () => {
+    expect(Object.values(await resolveCapabilities(undefined)).some(Boolean)).toBe(false);
+  });
+
+  it('marks superadmin from the claim or the database only', async () => {
+    expect((await resolveCapabilities({ userId: USER, role: 'admin' })).superadmin).toBe(false);
+    expect((await resolveCapabilities({ userId: USER, role: 'superadmin' })).superadmin).toBe(true);
+    lookups.isSuperAdmin.mockResolvedValue(true);
+    expect((await resolveCapabilities({ userId: USER, role: 'member' })).superadmin).toBe(true);
+  });
+
+  it('costs no lookup for a superadmin claim and at most two otherwise', async () => {
+    await resolveCapabilities({ userId: USER, role: 'superadmin' });
+    expect(lookups.isSuperAdmin).not.toHaveBeenCalled();
+    expect(lookups.hasRole).not.toHaveBeenCalled();
+    await resolveCapabilities({ userId: USER, role: 'member' });
+    expect(lookups.isSuperAdmin).toHaveBeenCalledTimes(1);
+    expect(lookups.hasRole).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates lookup errors', async () => {
+    lookups.isSuperAdmin.mockRejectedValue(new Error('lookup failed'));
+    await expect(resolveCapabilities({ userId: USER })).rejects.toThrow('lookup failed');
   });
 });

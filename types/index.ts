@@ -90,6 +90,8 @@ export type {
   LTSSOConfig,
 } from './auth';
 
+export type { CapabilityGate, CapabilitySet } from './capability';
+
 export type {
   LTUserStatus,
   LTRoleType,
@@ -151,6 +153,7 @@ export type {
 } from './export';
 
 export type {
+  LTToolManifestEntry,
   LTStartConfig,
   LTInstance,
   LTWorkerConfig,
