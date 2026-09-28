@@ -14,7 +14,7 @@
  *   DELETE /mcp → 405 (no sessions in stateless mode)
  */
 
-import { Router } from 'express';
+import { Router } from '../lib/http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { requireAuth } from '../modules/auth';

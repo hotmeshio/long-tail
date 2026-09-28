@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { eventRegistry } from '../lib/events';
 import { NatsEventAdapter } from '../lib/events/nats';

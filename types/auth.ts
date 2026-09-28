@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response } from '../lib/http';
 
 /**
  * The identity payload extracted from an authenticated request.

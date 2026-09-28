@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { requireAdmin, requireBuilder, requireRoleManager } from '../modules/auth';
 import * as api from '../api/users';
