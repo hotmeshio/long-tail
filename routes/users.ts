@@ -1,6 +1,7 @@
 import { Router } from '../lib/http';
 
 import { requireAdmin, requireBuilder, requireRoleManager } from '../modules/auth';
+import { mayGrantRole } from '../modules/capabilities';
 import * as api from '../api/users';
 import * as personasApi from '../api/personas';
 
@@ -127,29 +128,10 @@ router.get('/:id/roles', async (req, res) => {
  */
 router.post('/:id/roles', requireAdmin, async (req, res) => {
   const { role, type, read_scope, write_scope } = req.body || {};
-  const userId = req.auth!.userId;
-
-  // Superadmin bypasses all scoping
-  const { isSuperAdmin } = await import('../services/user/rbac');
-  if (!(await isSuperAdmin(userId))) {
-    // Non-superadmin can never assign superadmin type
-    if (type === 'superadmin') {
-      res.status(403).json({ error: 'Only superadmin can assign superadmin role type' });
-      return;
-    }
-
-    // Check if caller has the engineer role (builder) — can assign any non-superadmin role
-    const { hasRole: checkRole } = await import('../services/user/roles');
-    const isEngineer = await checkRole(userId, 'engineer');
-
-    if (!isEngineer) {
-      // Non-builder admin: can only assign roles they themselves hold
-      const callerHasRole = await checkRole(userId, role);
-      if (!callerHasRole) {
-        res.status(403).json({ error: `You can only assign roles you hold. You do not have the '${role}' role.` });
-        return;
-      }
-    }
+  const decision = await mayGrantRole(req.auth!.userId, { role, type });
+  if (!decision.allowed) {
+    res.status(403).json({ error: decision.error });
+    return;
   }
 
   const result = await api.addUserRole({ id: req.params.id as string, role, type, read_scope, write_scope });
