@@ -127,8 +127,10 @@ export class LTExpressAdapter {
     if (dashboardDist) {
       router.use(serveStatic(dashboardDist, { index: false }));
 
-      // SPA fallback — inject base path into index.html
-      const indexHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
+      // SPA fallback — inject base path into index.html. Outside production
+      // the file is re-read per request so dashboard rebuilds show without a restart.
+      const indexPath = path.join(dashboardDist, 'index.html');
+      const cachedIndex = process.env.NODE_ENV === 'production' ? readFileSync(indexPath, 'utf-8') : null;
       const basePath = this.basePath;
 
       // Serve __LT_BASE__ as external script (CSP-safe, no inline scripts)
@@ -137,7 +139,7 @@ export class LTExpressAdapter {
       });
 
       router.get('/{*splat}', (_req, res) => {
-        const html = indexHtml.replace(
+        const html = (cachedIndex ?? readFileSync(indexPath, 'utf-8')).replace(
           '<head>',
           '<head>' +
           `<base href="${basePath}/">` +
@@ -148,6 +150,11 @@ export class LTExpressAdapter {
     }
 
     return router;
+  }
+
+  /** Whether a built dashboard was found to serve. */
+  hasDashboard(): boolean {
+    return this.resolveDashboardDist() !== null;
   }
 
   private resolveDashboardDist(): string | null {
