@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
-import express, { Router } from 'express';
+import { Router, jsonBody, serveStatic } from '../lib/http';
 import type { Server as HttpServer } from 'http';
 
 import routes from '../routes';
@@ -109,7 +109,7 @@ export class LTExpressAdapter {
   getRouter(): Router {
     const router = Router();
 
-    router.use(express.json());
+    router.use(jsonBody());
 
     // Health check
     router.get('/health', (_req, res) => {
@@ -125,7 +125,7 @@ export class LTExpressAdapter {
     // Dashboard static assets
     const dashboardDist = this.resolveDashboardDist();
     if (dashboardDist) {
-      router.use(express.static(dashboardDist, { index: false }));
+      router.use(serveStatic(dashboardDist, { index: false }));
 
       // SPA fallback — inject base path into index.html
       const indexHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');

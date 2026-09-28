@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { signToken, requireAuth } from '../modules/auth';
 import { loggerRegistry } from '../lib/logger';

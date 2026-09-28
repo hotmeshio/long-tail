@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from '../lib/http';
 import jwt from 'jsonwebtoken';
 
 import { config } from './config';

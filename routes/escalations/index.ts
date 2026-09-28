@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
 
 import { registerListRoutes } from './list';
 import { registerBulkRoutes } from './bulk';

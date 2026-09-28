@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { requireAuth } from '../modules/auth';
 import authRouter from './auth';

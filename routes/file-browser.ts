@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 import path from 'path';
 
 import * as api from '../api/files';
