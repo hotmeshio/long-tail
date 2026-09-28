@@ -166,9 +166,21 @@ Two things decide what a connected agent can do, and both must pass.
 
 A deployment can also be set read-only as a whole, which holds every key to read access whatever its scope, and can hide entire groups of tools. Production is the place to do this by default.
 
-**Role decides which records.** Scope opens a tool; the account's role decides whether the action is allowed on a given target. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations — it cannot route work to finance or manage users. Administrative tools (users, roles, configuration, pruning) require an admin or superadmin role.
+**Role decides which tools and which records.** Each tool declares the capability its caller needs, the same gates the dashboard's REST routes use, and a tool appears only to accounts that hold it:
 
-Put plainly: **scope is which tools, role is which records.** A read key answers questions; a full key with the right role also acts.
+| Capability | Who holds it | Tools |
+|---|---|---|
+| Caller | Any account | Escalations, tasks, workflow invocation and status, exports, scan codes, docs, reads of users, roles and configuration |
+| Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, removing a user's role |
+| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, terminating workflows, HTTP requests, file writes, Claude Code tasks |
+| Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
+| Superadmin | Superadmin | Assigning roles, stored OAuth credentials |
+
+Within a tool, the account's role decides whether the action is allowed on a given target. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations; it cannot route work to finance or manage users.
+
+A built-in tool declares its capability with `gate` on its manifest entry. A tool whose entry has no `gate` is not exposed at `/mcp`.
+
+Put plainly: **scope is read or write; role is which tools and which records.** A read key answers questions; a full key with the right role also acts.
 
 Creating an escalation shows both at work. `escalate_to_human` changes state, so the key needs `mcp:full`, and the account needs a role allowed to route to that queue. Reading the same queue back — `get_available_work`, `check_resolution` — needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
 

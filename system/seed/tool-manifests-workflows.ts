@@ -1,3 +1,5 @@
+import type { LTToolManifestEntry } from '../../types';
+
 // ── Workflow and compiler tool manifests ─────────────────────────────────────
 
 export const MCP_WORKFLOW_TOOLS = [
@@ -86,9 +88,10 @@ export const WORKFLOW_COMPILER_TOOLS = [
   },
 ];
 
-export const CLAUDE_CODE_TOOLS = [
+export const CLAUDE_CODE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'execute_task',
+    gate: 'builder',
     description:
       'Run a task using Claude Code CLI. Claude Code is an agentic coding assistant with terminal access, ' +
       'file I/O, code search, and editing. Returns structured output with result text, cost, and duration.',
@@ -142,6 +145,7 @@ export const CLAUDE_CODE_TOOLS = [
   },
   {
     name: 'check_availability',
+    gate: 'caller',
     description: 'Check if Claude Code CLI is installed and an API key is available. Returns version and readiness status.',
     read_safe: true,
     inputSchema: {

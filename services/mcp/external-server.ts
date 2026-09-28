@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loggerRegistry } from '../../lib/logger';
 import { builtinMcpServerFactories } from '../../system';
 import { getDomainIndex } from '../domain';
+import type { CapabilitySet } from '../../types';
 import type { ExposureConfig } from './exposure';
 
 /**
@@ -46,7 +47,7 @@ async function buildInstructions(): Promise<string | undefined> {
 // Only these servers are exposed via the /mcp endpoint.
 // Example servers (playwright, gmail, image-tools) are excluded.
 
-const SHIPPED_SERVERS = new Set([
+export const SHIPPED_SERVERS = new Set([
   'long-tail-admin',
   'long-tail-human-queue',
   'long-tail-file-storage',
@@ -99,6 +100,16 @@ function isServerAllowed(name: string, exposure?: ExposureConfig): boolean {
   return true;
 }
 
+/**
+ * Whether the caller holds the capability the tool's manifest entry declares.
+ * Fails closed: a tool without a manifest entry or a gate is never exposed.
+ */
+function isToolPermitted(toolName: string, serverName: string, capabilities: CapabilitySet): boolean {
+  const manifest = builtinMcpServerFactories[serverName]?.config?.toolManifest;
+  const gate = manifest?.find((t) => t.name === toolName)?.gate;
+  return gate !== undefined && capabilities[gate] === true;
+}
+
 function isToolAllowed(
   toolName: string,
   serverName: string,
@@ -127,11 +138,14 @@ function isToolAllowed(
 // ── Unified server creation ──────────────────────────────────────────────────
 
 /**
- * Create a unified McpServer with tools from all qualifying shipped servers.
- * Called per-request in stateless mode. Server instances are cached; only
- * the McpServer wrapper and tool registrations are fresh (pure in-memory).
+ * Create a unified McpServer with the tools this caller may use from all
+ * qualifying shipped servers. Called per-request in stateless mode, so a tool
+ * the caller lacks the capability for is neither listed nor callable. Server
+ * instances are cached; only the McpServer wrapper and tool registrations are
+ * fresh (pure in-memory).
  */
 export async function createUnifiedMcpServer(
+  capabilities: CapabilitySet,
   exposure?: ExposureConfig,
   callerScopes?: string[],
 ): Promise<McpServer> {
@@ -156,6 +170,7 @@ export async function createUnifiedMcpServer(
 
       for (const [toolName, tool] of Object.entries(tools)) {
         if (!tool?.handler || !tool.enabled) continue;
+        if (!isToolPermitted(toolName, name, capabilities)) continue;
         if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
 
         // Deduplicate: prefix with server short name on collision

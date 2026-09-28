@@ -9,6 +9,7 @@ vi.mock('../../../services/domain', () => ({
 }));
 
 import { createUnifiedMcpServer } from '../../../services/mcp/external-server';
+import { ALL_CAPABILITIES } from '../../helpers/capability-sets';
 
 describe('createUnifiedMcpServer', () => {
   beforeEach(() => {
@@ -16,7 +17,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('carries no instructions when no dictionary is registered (fail-soft)', async () => {
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     expect((server as any).server._instructions).toBeUndefined();
   });
 
@@ -28,7 +29,7 @@ describe('createUnifiedMcpServer', () => {
       terms: { entity: ['printer', 'order'], rule: ['claims-expire-is-recovery'] },
       runbooks: ['kill a test order'],
     };
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const instructions = (server as any).server._instructions as string;
     expect(instructions).toContain('acme farm');
     expect(instructions).toContain('A print farm.');
@@ -37,7 +38,7 @@ describe('createUnifiedMcpServer', () => {
     expect(instructions).toContain('get_domain_context');
   });
   it('creates a server with tools from shipped servers', async () => {
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const tools = (server as any)._registeredTools as Record<string, any>;
     const toolNames = Object.keys(tools);
 
@@ -68,7 +69,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('excludes example servers (playwright, gmail, image-tools)', async () => {
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const toolNames = Object.keys((server as any)._registeredTools);
 
     // Playwright tools should NOT be present
@@ -79,7 +80,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('respects allowServers filter', async () => {
-    const server = await createUnifiedMcpServer({
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES, {
       allowServers: ['long-tail-knowledge'],
     });
     const toolNames = Object.keys((server as any)._registeredTools);
@@ -95,7 +96,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('respects denyServers filter', async () => {
-    const server = await createUnifiedMcpServer({
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES, {
       denyServers: ['long-tail-admin'],
     });
     const toolNames = Object.keys((server as any)._registeredTools);
@@ -111,7 +112,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('respects readOnly filter — only read_safe tools', async () => {
-    const server = await createUnifiedMcpServer({
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES, {
       readOnly: true,
       allowServers: ['long-tail-admin'],
     });
@@ -132,7 +133,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('deduplicates colliding tool names with server prefix', async () => {
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const toolNames = Object.keys((server as any)._registeredTools);
 
     // If list_topics appears in both admin and events, the second
@@ -143,8 +144,8 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('filters to read_safe tools for mcp:read scope (no mcp:full)', async () => {
-    const full = await createUnifiedMcpServer(undefined, ['mcp:read', 'mcp:full']);
-    const readOnly = await createUnifiedMcpServer(undefined, ['mcp:read']);
+    const full = await createUnifiedMcpServer(ALL_CAPABILITIES, undefined, ['mcp:read', 'mcp:full']);
+    const readOnly = await createUnifiedMcpServer(ALL_CAPABILITIES, undefined, ['mcp:read']);
 
     const fullNames = Object.keys((full as any)._registeredTools);
     const readNames = Object.keys((readOnly as any)._registeredTools);
@@ -164,8 +165,8 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('mcp:full scope sees all tools', async () => {
-    const full = await createUnifiedMcpServer(undefined, ['mcp:read', 'mcp:full']);
-    const unscoped = await createUnifiedMcpServer();
+    const full = await createUnifiedMcpServer(ALL_CAPABILITIES, undefined, ['mcp:read', 'mcp:full']);
+    const unscoped = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const fullNames = Object.keys((full as any)._registeredTools);
     const unscopedNames = Object.keys((unscoped as any)._registeredTools);
 
@@ -174,7 +175,7 @@ describe('createUnifiedMcpServer', () => {
   });
 
   it('all registered tools have handlers', async () => {
-    const server = await createUnifiedMcpServer();
+    const server = await createUnifiedMcpServer(ALL_CAPABILITIES);
     const tools = (server as any)._registeredTools as Record<string, any>;
 
     for (const [name, tool] of Object.entries(tools)) {
