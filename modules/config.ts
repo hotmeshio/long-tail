@@ -19,6 +19,9 @@ export const config = {
 
   JWT_SECRET: process.env.JWT_SECRET || '',
 
+  // Enables the OAuth authorization server for /mcp when start() passes no auth.oauthServer.
+  LT_OAUTH_ISSUER: process.env.LT_OAUTH_ISSUER || '',
+
   HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
 
   // Resolver schema enforcement: TTL for the cached enforcing-role set and
