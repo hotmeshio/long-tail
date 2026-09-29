@@ -153,6 +153,7 @@ export async function createUnifiedMcpServer(
     { name: 'long-tail', version: '1.0.0' },
     { instructions: await buildInstructions() },
   );
+  const named = new Set<string>();
   const registered = new Set<string>();
 
   for (const [name] of Object.entries(builtinMcpServerFactories)) {
@@ -170,16 +171,19 @@ export async function createUnifiedMcpServer(
 
       for (const [toolName, tool] of Object.entries(tools)) {
         if (!tool?.handler || !tool.enabled) continue;
-        if (!isToolPermitted(toolName, name, capabilities)) continue;
-        if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
 
-        // Deduplicate: prefix with server short name on collision
+        // Deduplicate: prefix with server short name on collision. Names are
+        // claimed before filtering so a tool keeps its name for every caller.
         let finalName = toolName;
-        if (registered.has(toolName)) {
+        if (named.has(toolName)) {
           const prefix = name.replace('long-tail-', '').replace(/-/g, '_');
           finalName = `${prefix}_${toolName}`;
-          if (registered.has(finalName)) continue; // still a collision — skip
+          if (named.has(finalName)) continue; // still a collision — skip
         }
+        named.add(finalName);
+
+        if (!isToolPermitted(toolName, name, capabilities)) continue;
+        if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
         registered.add(finalName);
 
         // Re-register the tool handler on the unified server.

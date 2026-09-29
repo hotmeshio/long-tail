@@ -170,19 +170,19 @@ A deployment can also be set read-only as a whole, which holds every key to read
 
 | Capability | Who holds it | Tools |
 |---|---|---|
-| Caller | Any account | Escalations, tasks, workflow invocation and status, exports, scan codes, docs, reads of users, roles and configuration |
-| Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, removing a user's role |
+| Caller | Any account | Escalations, tasks, workflow invocation and status, exports, scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
+| Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, assigning and removing a user's roles |
 | Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, terminating workflows, HTTP requests, file writes, Claude Code tasks |
 | Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
-| Superadmin | Superadmin | Assigning roles, stored OAuth credentials |
+| Superadmin | Superadmin | Other users' OAuth connections, the human-queue tools workflows use to create and resolve escalations |
 
-Within a tool, the account's role decides whether the action is allowed on a given target. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations; it cannot route work to finance or manage users.
+Within a tool, the account's role decides whether the action is allowed on a given target. Workflow invocation runs as the account and follows the workflow's invocation roles. Assigning a role follows the same rule as the dashboard: only a superadmin assigns the superadmin type, and an admin without the `engineer` role assigns only roles they hold. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations; it cannot route work to finance or manage users.
 
 A built-in tool declares its capability with `gate` on its manifest entry. A tool whose entry has no `gate` is not exposed at `/mcp`.
 
 Put plainly: **scope is read or write; role is which tools and which records.** A read key answers questions; a full key with the right role also acts.
 
-Creating an escalation shows both at work. `escalate_to_human` changes state, so the key needs `mcp:full`, and the account needs a role allowed to route to that queue. Reading the same queue back — `get_available_work`, `check_resolution` — needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
+Resolving an escalation shows both at work. `admin_resolve_escalation` changes state, so the key needs `mcp:full`, and the account needs write access to that escalation's role. Reading the same queue first, with `find_escalations` or `search_by_facets`, needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
 
 **Read-safe workflow invocation.** A workflow registered with `read_safe: true` in its config (a side-effect-free lookup) is invocable by read-scoped callers through `invoke_workflow_read_safe` — the read-safe variant of `invoke_workflow`. Any workflow may be attempted; one without the flag fails with a clear error, so the flag on the config is the whole contract. Declare it on the worker profile (`readSafe: true`) or set it through the workflow-config admin surface; the flag is fail-closed and defaults off.
 
@@ -261,6 +261,8 @@ The full tool reference is in [the admin server doc](api/mcp/admin.md). A read k
 ## Human Queue Server
 
 The Human Queue is a built-in MCP server that exposes Long Tail's escalation API as standard MCP tools. Any MCP-compatible client — Claude, LangGraph, CrewAI, a custom agent — can connect and work the queue.
+
+These tools act with full authority, so at `/mcp` they are listed for superadmin accounts. Workflows and agents inside Long Tail call them directly. An external agent with any other role works the queue through the role-checked escalation tools: `find_escalations`, `claim_escalation`, `admin_resolve_escalation`.
 
 ### Tools
 

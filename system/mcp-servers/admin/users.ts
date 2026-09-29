@@ -7,6 +7,8 @@ import { z } from 'zod';
 import * as userService from '../../../services/user';
 import * as roleService from '../../../services/role';
 import { patchUserProperties as patchUserPropertiesApi } from '../../../api/users';
+import { mayGrantRole } from '../../../modules/capabilities';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import {
   listUsersSchema,
   createUserSchema,
@@ -104,7 +106,14 @@ export function registerUserTools(server: McpServer): void {
         'their own pre-assigned escalation).',
       inputSchema: addUserRoleSchema,
     },
-    async (args: z.infer<typeof addUserRoleSchema>) => {
+    async (args: z.infer<typeof addUserRoleSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      if (caller) {
+        const decision = await mayGrantRole(caller.userId, { role: args.role, type: args.type });
+        if (!decision.allowed) {
+          return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: decision.error }) }] };
+        }
+      }
       const read = args.read_scope ?? userService.DEFAULT_READ_SCOPE;
       const write = args.write_scope ?? userService.DEFAULT_WRITE_SCOPE;
       if (!userService.isValidScopePair(read, write)) {

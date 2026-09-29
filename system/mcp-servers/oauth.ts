@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import * as oauth from '../activities/oauth';
+import { resolveCapabilities } from '../../modules/capabilities';
+import { externalCaller, type ToolCallExtra } from './caller-auth';
 
 const getAccessTokenSchema = z.object({
   provider: z.string().describe('OAuth provider name (google, github, microsoft, anthropic, etc.)'),
@@ -19,6 +21,20 @@ const revokeConnectionSchema = z.object({
   user_id: z.string().describe('User ID to revoke connection for'),
   label: z.string().optional().describe('Credential label to revoke (default: "default")'),
 });
+
+/**
+ * A `/mcp` caller may use their own connections; another user's need
+ * superadmin. Internal calls from workflows are unrestricted.
+ */
+async function refuseOtherUser(userId: string, extra?: ToolCallExtra) {
+  const caller = externalCaller(extra);
+  if (!caller || caller.userId === userId) return null;
+  if ((await resolveCapabilities(caller)).superadmin) return null;
+  return {
+    isError: true,
+    content: [{ type: 'text' as const, text: JSON.stringify({ error: 'You can only use your own OAuth connections' }) }],
+  };
+}
 
 /**
  * Create an OAuth MCP server.
@@ -43,7 +59,9 @@ export async function createOAuthServer(): Promise<McpServer> {
         'Use the label parameter to select a specific credential when multiple exist.',
       inputSchema: getAccessTokenSchema,
     },
-    async (args: z.infer<typeof getAccessTokenSchema>) => {
+    async (args: z.infer<typeof getAccessTokenSchema>, extra?: ToolCallExtra) => {
+      const refused = await refuseOtherUser(args.user_id, extra);
+      if (refused) return refused;
       const result = await oauth.getAccessToken(args);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
@@ -58,7 +76,9 @@ export async function createOAuthServer(): Promise<McpServer> {
       description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
       inputSchema: listConnectionsSchema,
     },
-    async (args: z.infer<typeof listConnectionsSchema>) => {
+    async (args: z.infer<typeof listConnectionsSchema>, extra?: ToolCallExtra) => {
+      const refused = await refuseOtherUser(args.user_id, extra);
+      if (refused) return refused;
       const result = await oauth.listConnections(args);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
@@ -73,7 +93,9 @@ export async function createOAuthServer(): Promise<McpServer> {
       description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
       inputSchema: revokeConnectionSchema,
     },
-    async (args: z.infer<typeof revokeConnectionSchema>) => {
+    async (args: z.infer<typeof revokeConnectionSchema>, extra?: ToolCallExtra) => {
+      const refused = await refuseOtherUser(args.user_id, extra);
+      if (refused) return refused;
       const result = await oauth.revokeConnection(args);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result) }],
