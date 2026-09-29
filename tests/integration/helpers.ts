@@ -344,7 +344,7 @@ export class NatsWaiter {
     return this.waitForEvent(
       (e) =>
         e.type === 'workflow.completed' &&
-        (e.workflowId === workflowId || e.workflowId?.includes(workflowId)),
+        (e.workflowId === workflowId || (e.workflowId?.includes(workflowId) ?? false)),
       timeoutMs,
     );
   }
@@ -356,7 +356,7 @@ export class NatsWaiter {
         e.type === 'escalation.created' &&
         (e.workflowId === workflowIdOrOriginId ||
           e.originId === workflowIdOrOriginId ||
-          e.workflowId?.includes(workflowIdOrOriginId)),
+          (e.workflowId?.includes(workflowIdOrOriginId) ?? false)),
       timeoutMs,
     );
   }
