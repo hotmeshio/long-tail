@@ -19,20 +19,26 @@ import { Router } from '../lib/http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { requireAuth } from '../modules/auth';
-import { resolveCapabilities } from '../modules/capabilities';
+import { capabilityAccess } from '../modules/capabilities';
 import { loggerRegistry } from '../lib/logger';
 import { createUnifiedMcpServer } from '../services/mcp/external-server';
 import { getExposureConfig } from '../services/mcp/exposure';
 
 const router = Router();
 
+/** The tool a single `tools/call` message names; undefined for anything else. */
+function requestedToolName(body: unknown): string | undefined {
+  const message = body as { method?: unknown; params?: { name?: unknown } } | undefined;
+  if (message?.method !== 'tools/call') return undefined;
+  return typeof message.params?.name === 'string' ? message.params.name : undefined;
+}
+
 // POST /mcp — JSON-RPC messages
 router.post('/', requireAuth, async (req, res) => {
   try {
     const exposure = getExposureConfig();
     const callerScopes = (req.auth as any)?.scopes as string[] | undefined;
-    const capabilities = await resolveCapabilities(req.auth);
-    const server = await createUnifiedMcpServer(capabilities, exposure, callerScopes);
+    const server = await createUnifiedMcpServer(capabilityAccess(req.auth), exposure, callerScopes, requestedToolName(req.body));
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless

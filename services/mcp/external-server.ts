@@ -11,7 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loggerRegistry } from '../../lib/logger';
 import { builtinMcpServerFactories } from '../../system';
 import { getDomainIndex } from '../domain';
-import type { CapabilitySet } from '../../types';
+import type { CapabilityAccess } from '../../types';
 import type { ExposureConfig } from './exposure';
 
 /**
@@ -104,10 +104,10 @@ function isServerAllowed(name: string, exposure?: ExposureConfig): boolean {
  * Whether the caller holds the capability the tool's manifest entry declares.
  * Fails closed: a tool without a manifest entry or a gate is never exposed.
  */
-function isToolPermitted(toolName: string, serverName: string, capabilities: CapabilitySet): boolean {
+async function isToolPermitted(toolName: string, serverName: string, access: CapabilityAccess): Promise<boolean> {
   const manifest = builtinMcpServerFactories[serverName]?.config?.toolManifest;
   const gate = manifest?.find((t) => t.name === toolName)?.gate;
-  return gate !== undefined && capabilities[gate] === true;
+  return gate !== undefined && (await access(gate));
 }
 
 function isToolAllowed(
@@ -140,14 +140,16 @@ function isToolAllowed(
 /**
  * Create a unified McpServer with the tools this caller may use from all
  * qualifying shipped servers. Called per-request in stateless mode, so a tool
- * the caller lacks the capability for is neither listed nor callable. Server
- * instances are cached; only the McpServer wrapper and tool registrations are
- * fresh (pure in-memory).
+ * the caller lacks the capability for is neither listed nor callable. When
+ * the request calls one tool, only that tool is registered and only its gate
+ * is checked. Server instances are cached; only the McpServer wrapper and
+ * tool registrations are fresh (pure in-memory).
  */
 export async function createUnifiedMcpServer(
-  capabilities: CapabilitySet,
+  access: CapabilityAccess,
   exposure?: ExposureConfig,
   callerScopes?: string[],
+  requestedTool?: string,
 ): Promise<McpServer> {
   const unified = new McpServer(
     { name: 'long-tail', version: '1.0.0' },
@@ -182,7 +184,8 @@ export async function createUnifiedMcpServer(
         }
         named.add(finalName);
 
-        if (!isToolPermitted(toolName, name, capabilities)) continue;
+        if (requestedTool !== undefined && finalName !== requestedTool) continue;
+        if (!(await isToolPermitted(toolName, name, access))) continue;
         if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
         registered.add(finalName);
 
@@ -205,6 +208,10 @@ export async function createUnifiedMcpServer(
       );
     }
   }
+
+  // A call to one denied or unknown tool registers none; the tool handlers
+  // still answer it the way the SDK answers any unknown tool.
+  (unified as any).setToolRequestHandlers();
 
   loggerRegistry.info(`[lt-mcp:endpoint] unified server ready (${registered.size} tools)`);
   return unified;

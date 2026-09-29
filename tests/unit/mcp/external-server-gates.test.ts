@@ -9,14 +9,14 @@ vi.mock('../../../services/domain', () => ({
 
 import { createUnifiedMcpServer, SHIPPED_SERVERS } from '../../../services/mcp/external-server';
 import { builtinMcpServerFactories } from '../../../system';
-import { ALL_CAPABILITIES, MEMBER_CAPABILITIES } from '../../helpers/capability-sets';
+import { ALL_CAPABILITIES, MEMBER_CAPABILITIES, accessFor } from '../../helpers/capability-sets';
 import type { CapabilitySet } from '../../../types';
 
 const NONE: CapabilitySet = { ...MEMBER_CAPABILITIES, caller: false };
 const ONLY = (gate: keyof CapabilitySet): CapabilitySet => ({ ...MEMBER_CAPABILITIES, [gate]: true });
 
 async function toolNames(capabilities: CapabilitySet, scopes?: string[]): Promise<string[]> {
-  const server = await createUnifiedMcpServer(capabilities, undefined, scopes);
+  const server = await createUnifiedMcpServer(accessFor(capabilities), undefined, scopes);
   return Object.keys((server as any)._registeredTools);
 }
 
@@ -107,7 +107,7 @@ describe('/mcp tool gates', () => {
   });
 
   it('a member cannot call a tool they cannot see', async () => {
-    const server = await createUnifiedMcpServer(MEMBER_CAPABILITIES);
+    const server = await createUnifiedMcpServer(accessFor(MEMBER_CAPABILITIES));
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'gate-test', version: '1.0.0' });
     await server.connect(serverTransport);
