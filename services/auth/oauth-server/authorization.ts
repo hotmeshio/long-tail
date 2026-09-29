@@ -66,3 +66,12 @@ export function withQuery(uri: string, params: Record<string, string | undefined
   for (const [key, value] of Object.entries(params)) if (value !== undefined) url.searchParams.set(key, value);
   return url.toString();
 }
+
+/**
+ * The presets the person may grant. Read-only always; Just be me only when it
+ * adds something: a membership that can write, or an admin tier.
+ */
+export function grantablePresets(roles: Array<{ type: string; write_scope?: string | null }>): LTGrantPreset[] {
+  const canWrite = roles.some((r) => r.type === 'admin' || r.type === 'superadmin' || (r.write_scope ?? 'all') !== 'none');
+  return canWrite ? ['read_only', 'just_me'] : ['read_only'];
+}

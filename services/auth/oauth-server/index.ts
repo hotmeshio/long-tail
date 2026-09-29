@@ -10,6 +10,7 @@ export {
   rotateRefreshToken,
   revokeByRefreshToken,
   revokeGrant,
+  listGrants,
   type RevokedGrant,
 } from './store';
 export {

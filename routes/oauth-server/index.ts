@@ -4,6 +4,7 @@ import { authorizationServerMetadata } from '../../services/auth/oauth-server/me
 import registrationRouter from './registration';
 import authorizeRouter from './authorize';
 import tokenRouter from './token';
+import grantsRouter from './grants';
 
 /**
  * OAuth authorization server endpoints under /api/oauth. The public ones
@@ -33,5 +34,6 @@ router.get('/metadata', allowAnyOrigin(['GET']), (_req, res) => {
 router.use(registrationRouter);
 router.use(authorizeRouter);
 router.use(tokenRouter);
+router.use(grantsRouter);
 
 export default router;

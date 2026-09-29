@@ -36,6 +36,17 @@ export interface LTGrantSnapshot {
   roles: LTGrantRole[];
 }
 
+/** A grant as the person sees it in Connected apps. */
+export interface LTGrantSummary {
+  grant_id: string;
+  client_id: string;
+  client_name: string | null;
+  policy: LTGrantPolicy;
+  scope: string;
+  created_at: Date;
+  last_used_at: Date | null;
+}
+
 /** The OAuth authorization server for `/mcp`. Absent: `/mcp` accepts only today's credentials. */
 export interface LTOAuthServerConfig {
   /** Public base URL Long Tail is served under, e.g. `https://api.example.com/longtail`. */
