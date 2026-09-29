@@ -136,3 +136,9 @@ export const OAUTH_REFRESH_TOKEN_TTL_SECONDS = envInt('LT_OAUTH_REFRESH_TOKEN_TT
 
 /** Authorization-code lifetime, from consent to the client's token request. */
 export const OAUTH_CODE_TTL_SECONDS = envInt('LT_OAUTH_CODE_TTL_SECONDS', 60);
+
+/** Client registrations allowed per address in each window. */
+export const OAUTH_REGISTRATIONS_PER_WINDOW = envInt('LT_OAUTH_REGISTRATIONS_PER_WINDOW', 20);
+
+/** Registration rate-limit window. */
+export const OAUTH_REGISTRATION_WINDOW_SECONDS = envInt('LT_OAUTH_REGISTRATION_WINDOW_SECONDS', 600);
