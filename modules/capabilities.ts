@@ -1,5 +1,5 @@
 import { isSuperAdmin } from '../services/user';
-import type { AuthPayload, CapabilitySet } from '../types';
+import type { AuthPayload, CapabilityAccess, CapabilitySet } from '../types';
 
 /**
  * Capability predicates shared by every entry point that faces people.
@@ -81,4 +81,19 @@ export async function resolveCapabilities(principal: CapabilityPrincipal | undef
   const admin = principal.role === 'admin';
   const engineer = await hasBuilderRole(principal.userId);
   return { caller: true, admin, builder: engineer, roleManager: admin || engineer, superadmin: false };
+}
+
+/**
+ * Capability checks for one request. `caller` needs only an authenticated
+ * principal; any other gate resolves the principal's capabilities once, on
+ * first need, so a request that checks only `caller` gates makes no lookup.
+ */
+export function capabilityAccess(principal: CapabilityPrincipal | undefined): CapabilityAccess {
+  let resolved: Promise<CapabilitySet> | undefined;
+  return async (gate) => {
+    if (!principal?.userId) return false;
+    if (gate === 'caller') return true;
+    resolved ??= resolveCapabilities(principal);
+    return (await resolved)[gate];
+  };
 }

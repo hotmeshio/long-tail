@@ -11,3 +11,6 @@ export type CapabilityGate = 'caller' | 'admin' | 'builder' | 'roleManager' | 's
 
 /** The capabilities a caller holds, resolved once per `/mcp` request. */
 export type CapabilitySet = Record<CapabilityGate, boolean>;
+
+/** Whether the caller holds a capability. `caller` is free; the rest may cost a lookup. */
+export type CapabilityAccess = (gate: CapabilityGate) => Promise<boolean>;

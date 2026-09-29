@@ -7,11 +7,13 @@ import type { AddressInfo } from 'net';
 
 const mocks = vi.hoisted(() => ({
   listEscalations: vi.fn(async () => ({ status: 200, data: { escalations: [], total: 0 } })),
+  isSuperAdmin: vi.fn(async () => false),
+  hasRole: vi.fn(async () => false),
 }));
 
 vi.mock('../../services/domain', () => ({ getDomainIndex: vi.fn(async () => null), getDomainDictionary: vi.fn(async () => null) }));
-vi.mock('../../services/user', async (io) => ({ ...(await io<typeof import('../../services/user')>()), isSuperAdmin: vi.fn(async () => false) }));
-vi.mock('../../services/user/roles', async (io) => ({ ...(await io<typeof import('../../services/user/roles')>()), hasRole: vi.fn(async () => false) }));
+vi.mock('../../services/user', async (io) => ({ ...(await io<typeof import('../../services/user')>()), isSuperAdmin: mocks.isSuperAdmin }));
+vi.mock('../../services/user/roles', async (io) => ({ ...(await io<typeof import('../../services/user/roles')>()), hasRole: mocks.hasRole }));
 vi.mock('../../api/escalations', async (io) => ({
   ...(await io<typeof import('../../api/escalations')>()),
   listEscalations: mocks.listEscalations,
@@ -69,5 +71,31 @@ describe('/mcp caller identity', () => {
     expect(names).toContain('find_escalations');
     expect(names).not.toContain('create_user');
     expect(names).not.toContain('prune');
+  });
+
+  it('a call to a caller-gated tool makes no capability lookup', async () => {
+    mocks.isSuperAdmin.mockClear();
+    mocks.hasRole.mockClear();
+    const token = signToken({ userId: MEMBER, role: 'member' });
+    await rpc(token, 'tools/call', { name: 'find_escalations', arguments: {} });
+    expect(mocks.isSuperAdmin).not.toHaveBeenCalled();
+    expect(mocks.hasRole).not.toHaveBeenCalled();
+  });
+
+  it('listing tools resolves the caller\'s capabilities once', async () => {
+    mocks.isSuperAdmin.mockClear();
+    mocks.hasRole.mockClear();
+    await rpc(signToken({ userId: MEMBER, role: 'member' }), 'tools/list', {});
+    expect(mocks.isSuperAdmin).toHaveBeenCalledTimes(1);
+    expect(mocks.hasRole).toHaveBeenCalledTimes(1);
+  });
+
+  it('a hidden tool gets the same reply as an unknown one', async () => {
+    const token = signToken({ userId: MEMBER, role: 'member' });
+    const hidden = await rpc(token, 'tools/call', { name: 'prune', arguments: {} });
+    const unknown = await rpc(token, 'tools/call', { name: 'no_such_tool', arguments: {} });
+    expect(hidden.error?.code).not.toBe(-32601);
+    expect(hidden.result?.content?.[0]?.text).toBe('MCP error -32602: Tool prune not found');
+    expect(unknown.result?.content?.[0]?.text).toBe('MCP error -32602: Tool no_such_tool not found');
   });
 });

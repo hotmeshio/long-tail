@@ -91,7 +91,7 @@ export type {
   LTSSOConfig,
 } from './auth';
 
-export type { CapabilityGate, CapabilitySet } from './capability';
+export type { CapabilityAccess, CapabilityGate, CapabilitySet } from './capability';
 
 export type {
   LTUserStatus,

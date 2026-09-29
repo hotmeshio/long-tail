@@ -14,7 +14,7 @@ vi.mock('../../services/user/roles', async (importOriginal) => ({
   hasRole: lookups.hasRole,
 }));
 
-import { mayAdminister, mayBuild, mayManageRoles, mayGrantRole, resolveCapabilities } from '../../modules/capabilities';
+import { mayAdminister, mayBuild, mayManageRoles, mayGrantRole, resolveCapabilities, capabilityAccess } from '../../modules/capabilities';
 
 const USER = '00000000-0000-4000-8000-0000000000c1';
 
@@ -142,5 +142,30 @@ describe('resolveCapabilities', () => {
   it('propagates lookup errors', async () => {
     lookups.isSuperAdmin.mockRejectedValue(new Error('lookup failed'));
     await expect(resolveCapabilities({ userId: USER })).rejects.toThrow('lookup failed');
+  });
+});
+
+describe('capabilityAccess', () => {
+  it('answers caller without a lookup', async () => {
+    const access = capabilityAccess({ userId: USER, role: 'member' });
+    expect(await access('caller')).toBe(true);
+    expect(lookups.isSuperAdmin).not.toHaveBeenCalled();
+    expect(lookups.hasRole).not.toHaveBeenCalled();
+  });
+
+  it('resolves the other gates once, on first need', async () => {
+    holdRoles('engineer');
+    const access = capabilityAccess({ userId: USER, role: 'member' });
+    expect(await access('builder')).toBe(true);
+    expect(await access('admin')).toBe(false);
+    expect(await access('roleManager')).toBe(true);
+    expect(lookups.isSuperAdmin).toHaveBeenCalledTimes(1);
+    expect(lookups.hasRole).toHaveBeenCalledTimes(1);
+  });
+
+  it('denies every gate without a user id', async () => {
+    const access = capabilityAccess(undefined);
+    expect(await access('caller')).toBe(false);
+    expect(await access('admin')).toBe(false);
   });
 });
