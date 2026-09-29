@@ -15,6 +15,7 @@ export function startServer(adapter: LTExpressAdapter): Server {
   if (process.env.NODE_ENV !== 'production') {
     app.disable('etag');
   }
+  app.use(adapter.getWellKnownRouter());
   app.use(adapter.getRouter());
 
   const httpServer = app.listen(config.PORT, () => {

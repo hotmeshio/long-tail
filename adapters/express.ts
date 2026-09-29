@@ -5,6 +5,7 @@ import type { Server as HttpServer } from 'http';
 
 import routes from '../routes';
 import mcpEndpoint from '../routes/mcp-endpoint';
+import { createWellKnownRouter } from '../routes/oauth-well-known';
 import { eventRegistry } from '../lib/events';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { NatsEventAdapter } from '../lib/events/nats';
@@ -150,6 +151,15 @@ export class LTExpressAdapter {
     }
 
     return router;
+  }
+
+  /**
+   * The OAuth well-known documents. Mount at the host's root, not under the
+   * base path: clients look for them at the origin. It answers only its two
+   * paths and passes everything else on.
+   */
+  getWellKnownRouter(): Router {
+    return createWellKnownRouter();
   }
 
   /** Whether a built dashboard was found to serve. */

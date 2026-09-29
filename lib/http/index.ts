@@ -36,3 +36,21 @@ export function jsonBody(options?: JsonBodyOptions): express.RequestHandler {
 export function serveStatic(root: string, options?: StaticFilesOptions): express.RequestHandler {
   return express.static(root, options);
 }
+
+/**
+ * Non-credentialed CORS for public endpoints: any origin may call them, and
+ * preflight requests are answered here.
+ */
+export function allowAnyOrigin(methods: string[] = ['GET', 'POST']): express.RequestHandler {
+  const allowMethods = [...methods, 'OPTIONS'].join(', ');
+  return (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', allowMethods);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, MCP-Protocol-Version');
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  };
+}
