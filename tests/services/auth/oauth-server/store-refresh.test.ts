@@ -23,7 +23,7 @@ async function grantWithRefreshToken(): Promise<{ grantId: string; refreshToken:
   return { grantId, refreshToken: exchanged!.refreshToken };
 }
 
-const rotate = (refreshToken: string) => rotateRefreshToken({ refreshToken, refreshTtlSeconds: 3600 });
+const rotate = (refreshToken: string, clientId = fixture.clientId) => rotateRefreshToken({ refreshToken, clientId, refreshTtlSeconds: 3600 });
 
 beforeAll(async () => {
   await migrate();
@@ -49,6 +49,12 @@ describe('OAuth store: refresh rotation', () => {
     const first = await rotate(refreshToken);
     expect((await rotate(refreshToken)).snapshot).toBeNull();
     expect((await rotate((first as { refreshToken: string }).refreshToken)).snapshot).not.toBeNull();
+  });
+
+  it('only the client that holds the token can rotate it, and a wrong client does not spend it', async () => {
+    const { refreshToken } = await grantWithRefreshToken();
+    expect((await rotate(refreshToken, 'ltc_someone-else')).snapshot).toBeNull();
+    expect((await rotate(refreshToken)).snapshot).not.toBeNull();
   });
 
   it('two concurrent refreshes of one token: exactly one succeeds', async () => {

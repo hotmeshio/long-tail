@@ -54,3 +54,10 @@ export function allowAnyOrigin(methods: string[] = ['GET', 'POST']): express.Req
     next();
   };
 }
+
+type FormBodyOptions = Parameters<typeof express.urlencoded>[0];
+
+/** URL-encoded form body parsing. A body the host already parsed is left as is. */
+export function formBody(options: FormBodyOptions = { extended: false }): express.RequestHandler {
+  return express.urlencoded(options);
+}

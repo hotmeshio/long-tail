@@ -92,18 +92,20 @@ export async function exchangeAuthorizationCode(input: {
 }
 
 /**
- * Rotate a refresh token. Null when it is unknown, used, expired, or its grant
- * or owner is no longer active. A used token presented again outside the
+ * Rotate a refresh token for the client that holds it. Null when it is
+ * unknown, used, expired, another client's, or its grant or owner is no
+ * longer active. A used token presented again outside the
  * grace window revokes its grant, and `revoked` reports it.
  */
 export async function rotateRefreshToken(input: {
   refreshToken: string;
+  clientId: string;
   refreshTtlSeconds: number;
 }): Promise<{ snapshot: LTGrantSnapshot; refreshToken: string } | { snapshot: null; revoked: RevokedGrant | null }> {
   const pool = getPool();
   const next = createSecret();
   const oldHash = hashSecret(input.refreshToken);
-  const { rows } = await pool.query(ROTATE_REFRESH_TOKEN, [oldHash, hashSecret(next), input.refreshTtlSeconds]);
+  const { rows } = await pool.query(ROTATE_REFRESH_TOKEN, [oldHash, hashSecret(next), input.refreshTtlSeconds, input.clientId]);
   if (rows[0]) return { snapshot: rows[0], refreshToken: next };
   const reuse = await pool.query(REVOKE_ON_REFRESH_REUSE, [oldHash, REFRESH_REUSE_GRACE_SECONDS]);
   return { snapshot: null, revoked: reuse.rows[0] ?? null };
