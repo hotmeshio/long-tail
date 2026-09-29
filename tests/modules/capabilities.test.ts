@@ -169,3 +169,20 @@ describe('capabilityAccess', () => {
     expect(await access('admin')).toBe(false);
   });
 });
+
+describe('resolveCapabilities for an OAuth caller', () => {
+  const member = (role: string, type: 'member' | 'admin' | 'superadmin' = 'member') =>
+    ({ role, type, read_scope: 'all' as const, write_scope: 'all' as const });
+
+  it('reads the token\'s memberships with no lookup', async () => {
+    expect(await resolveCapabilities({ userId: USER, role: 'member', grantRoles: [member('engineer')] })).toEqual(
+      { caller: true, admin: false, builder: true, roleManager: true, superadmin: false },
+    );
+    expect(await resolveCapabilities({ userId: USER, role: 'admin', grantRoles: [member('ops', 'admin')] })).toEqual(
+      { caller: true, admin: true, builder: false, roleManager: true, superadmin: false },
+    );
+    expect((await resolveCapabilities({ userId: USER, role: 'superadmin', grantRoles: [member('x', 'superadmin')] })).builder).toBe(true);
+    expect(lookups.isSuperAdmin).not.toHaveBeenCalled();
+    expect(lookups.hasRole).not.toHaveBeenCalled();
+  });
+});

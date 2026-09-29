@@ -1,5 +1,5 @@
 import { isSuperAdmin } from '../services/user';
-import type { AuthPayload, CapabilityAccess, CapabilitySet } from '../types';
+import type { AuthPayload, CapabilityAccess, CapabilitySet, LTGrantRole } from '../types';
 
 /**
  * Capability predicates shared by every entry point that faces people.
@@ -8,7 +8,10 @@ import type { AuthPayload, CapabilityAccess, CapabilitySet } from '../types';
  * consults the database. Lookup errors propagate so callers can deny.
  */
 
-export type CapabilityPrincipal = Pick<AuthPayload, 'userId' | 'role'>;
+export type CapabilityPrincipal = Pick<AuthPayload, 'userId' | 'role'> & {
+  /** Present for OAuth callers: the memberships the access token carries. */
+  grantRoles?: LTGrantRole[];
+};
 
 export interface RoleGrant {
   role: string;
@@ -64,6 +67,14 @@ export async function mayGrantRole(granterId: string, grant: RoleGrant): Promise
   return { allowed: false, error: `You can only assign roles you hold. You do not have the '${grant.role}' role.` };
 }
 
+/** Capabilities from memberships carried by the caller's token: the same outcomes, no lookup. */
+function capabilitiesFromRoles(roles: LTGrantRole[]): CapabilitySet {
+  const superadmin = roles.some((r) => r.type === 'superadmin');
+  const admin = superadmin || roles.some((r) => r.type === 'admin');
+  const engineer = roles.some((r) => r.role === BUILDER_ROLE);
+  return { caller: true, admin, builder: superadmin || engineer, roleManager: admin || engineer, superadmin };
+}
+
 const NO_CAPABILITIES: CapabilitySet = {
   caller: false, admin: false, builder: false, roleManager: false, superadmin: false,
 };
@@ -75,6 +86,7 @@ const NO_CAPABILITIES: CapabilitySet = {
  */
 export async function resolveCapabilities(principal: CapabilityPrincipal | undefined): Promise<CapabilitySet> {
   if (!principal?.userId) return NO_CAPABILITIES;
+  if (principal.grantRoles) return capabilitiesFromRoles(principal.grantRoles);
   if (principal.role === 'superadmin' || (await isSuperAdmin(principal.userId))) {
     return { caller: true, admin: true, builder: true, roleManager: true, superadmin: true };
   }

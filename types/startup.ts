@@ -6,6 +6,7 @@ import type { LTAuthAdapter, LTSSOConfig } from './auth';
 import type { CapabilityGate } from './capability';
 import type { ScanEncoding, ScanGrantScope, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
 import type { LTOAuthStartConfig } from './oauth';
+import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
@@ -484,6 +485,8 @@ export interface LTStartConfig {
     /** SSO for embedded deployments. Host auth is trusted; users are
      *  JIT-provisioned in lt_users from the resolved identity. */
     sso?: LTSSOConfig;
+    /** OAuth authorization server for MCP clients connecting to `/mcp`. */
+    oauthServer?: LTOAuthServerConfig;
   };
 
   /** OpenTelemetry. Register before workers start. */
