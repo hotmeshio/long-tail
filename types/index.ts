@@ -98,6 +98,7 @@ export type {
   LTGrantPolicy,
   LTGrantRole,
   LTGrantSnapshot,
+  LTGrantSummary,
   LTOAuthClient,
   LTOAuthServerConfig,
 } from './oauth-server';

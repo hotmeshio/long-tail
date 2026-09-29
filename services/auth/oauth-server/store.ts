@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 
 import { getPool } from '../../../lib/db';
 import { isUuid } from '../../../lib/uuid';
-import type { LTGrantPolicy, LTGrantSnapshot, LTOAuthClient } from '../../../types/oauth-server';
+import type { LTGrantPolicy, LTGrantSnapshot, LTGrantSummary, LTOAuthClient } from '../../../types/oauth-server';
 import {
   INSERT_CLIENT,
   GET_CLIENT,
@@ -12,6 +12,7 @@ import {
   REVOKE_ON_REFRESH_REUSE,
   REVOKE_BY_REFRESH_TOKEN,
   REVOKE_GRANT,
+  LIST_GRANTS,
 } from './sql';
 
 /** A refresh token reused within this many seconds is treated as a client retry. */
@@ -122,4 +123,11 @@ export async function revokeGrant(grantId: string, userId?: string): Promise<Rev
   if (!isUuid(grantId) || (userId !== undefined && !isUuid(userId))) return null;
   const { rows } = await getPool().query(REVOKE_GRANT, [grantId, userId ?? null]);
   return rows[0] ?? null;
+}
+
+/** The person's live grants that a client has put to use. */
+export async function listGrants(userId: string): Promise<LTGrantSummary[]> {
+  if (!isUuid(userId)) return [];
+  const { rows } = await getPool().query(LIST_GRANTS, [userId]);
+  return rows;
 }

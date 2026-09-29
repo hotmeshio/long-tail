@@ -107,3 +107,13 @@ export const REVOKE_GRANT = `
   UPDATE lt_oauth_grants SET revoked_at = NOW()
   WHERE id = $1 AND ($2::uuid IS NULL OR user_id = $2) AND revoked_at IS NULL
   RETURNING id AS grant_id, user_id`;
+
+/** A person's live grants that a client has put to use, newest first. */
+export const LIST_GRANTS = `
+  SELECT g.id AS grant_id, g.client_id, c.client_name, g.policy, g.scope, g.created_at,
+         (SELECT MAX(t.created_at) FROM lt_oauth_refresh_tokens t WHERE t.grant_id = g.id) AS last_used_at
+  FROM lt_oauth_grants g
+  JOIN lt_oauth_clients c ON c.client_id = g.client_id
+  WHERE g.user_id = $1 AND g.revoked_at IS NULL
+    AND EXISTS (SELECT 1 FROM lt_oauth_refresh_tokens t WHERE t.grant_id = g.id)
+  ORDER BY g.created_at DESC`;
