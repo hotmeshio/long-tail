@@ -24,7 +24,7 @@ A role is a task queue with four verbs — **search** (list/get), **claim**, **a
 
 - `read_scope` governs which escalations a member **sees** — list, `/available`, get-by-id, find-by-metadata, and stats. `self` means escalations assigned to the member (`assigned_to = user`); `all` means the whole role queue.
 - `write_scope` governs which escalations a member may **act on** — claim, resolve, cancel. `self` means only items already assigned to them; `none` is read-only.
-- Releasing and escalating are queue-management verbs and require `write_scope=all`. Creating a standalone escalation (`POST /api/escalations`) requires `write_scope=all` or global escalation access.
+- Releasing, escalating and assigning by query are queue-management verbs and require `write_scope=all`. Creating a standalone escalation (`POST /api/escalations`) requires `write_scope=all` or global escalation access.
 
 Defaults are `read_scope=all` and `write_scope=all` — the full-queue worker — so a plain `member` works the whole queue. See [Work-Surface Scope](roles.md#work-surface-scope) in the Roles API for the five member profiles and the **write ⊆ read** constraint.
 
@@ -648,7 +648,7 @@ Assign multiple escalations to a specific user, by id-set or by query (exactly o
 
 **Rows under a live claim are skipped** by a plain assign and counted in the response's `skipped` — assignment is claim-on-behalf, and an active claim wins. To take over live claims, pass `reassign: true` (ids form; admin/superadmin only): the takeover is one guarded statement, the displaced holder's in-flight resolve fails its claim assertion, and each taken row's `claimed` event carries `reassigned_from`.
 
-The query form is one atomic statement: selection and claim happen in the same UPDATE, so a row that re-parks between a search and an ids-assign is still captured. Use it whenever the population is describable by role + facets.
+The query form is one atomic statement: selection and claim happen in the same UPDATE, so a row that re-parks between a search and an ids-assign is still captured. Use it whenever the population is describable by role + facets. A member may use the query form only with `write_scope=all` on the queried role; the target user must hold that role.
 
 **Request body:**
 

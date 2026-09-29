@@ -10,6 +10,7 @@ vi.mock('../../../services/escalation', () => ({
 
 vi.mock('../../../services/user', () => ({
   hasRole: vi.fn(),
+  getRoleScope: vi.fn(),
 }));
 
 vi.mock('../../../api/escalations/helpers', () => ({
@@ -32,6 +33,7 @@ import { bulkAssign } from '../../../api/escalations/bulk';
 
 const mockByQuery = vi.mocked(svc.bulkAssignEscalationsByQuery);
 const mockHasRole = vi.mocked(userService.hasRole);
+const mockRoleScope = vi.mocked(userService.getRoleScope);
 const mockGlobal = vi.mocked(hasGlobalEscalationAccess);
 const mockPublish = vi.mocked(publishBulkClaimEvents);
 
@@ -89,7 +91,7 @@ describe('bulkAssign — query form', () => {
 
   it('non-global caller must hold the queried role (404 non-disclosure)', async () => {
     mockGlobal.mockResolvedValue(false);
-    mockHasRole.mockResolvedValueOnce(false); // caller lacks the role
+    mockRoleScope.mockResolvedValueOnce(null); // caller lacks the role
     const result = await bulkAssign(
       { query: { role: 'harvester' }, targetUserId: 'u1' },
       AUTH,
@@ -98,11 +100,31 @@ describe('bulkAssign — query form', () => {
     expect(mockByQuery).not.toHaveBeenCalled();
   });
 
+  it('non-global: read-only and self-scope members may not assign', async () => {
+    mockGlobal.mockResolvedValue(false);
+    for (const write of ['none', 'self'] as const) {
+      mockRoleScope.mockResolvedValueOnce({ read: 'all', write });
+      const result = await bulkAssign({ query: { role: 'harvester' }, targetUserId: 'u1' }, AUTH);
+      expect(result.status).toBe(403);
+      expect(result.error).toBe('You do not have permission to manage the "harvester" queue');
+    }
+    expect(mockByQuery).not.toHaveBeenCalled();
+  });
+
+  it('non-global: a write-all member may assign within the role', async () => {
+    mockGlobal.mockResolvedValue(false);
+    mockRoleScope.mockResolvedValueOnce({ read: 'all', write: 'all' });
+    mockHasRole.mockResolvedValueOnce(true); // target holds it
+    const result = await bulkAssign({ query: { role: 'harvester' }, targetUserId: 'u1' }, AUTH);
+    expect(result.status).toBe(200);
+    expect(mockRoleScope).toHaveBeenCalledWith(AUTH.userId, 'harvester');
+    expect(mockHasRole).toHaveBeenCalledWith('u1', 'harvester');
+  });
+
   it('non-global: target user must hold the queried role', async () => {
     mockGlobal.mockResolvedValue(false);
-    mockHasRole
-      .mockResolvedValueOnce(true)   // caller holds it
-      .mockResolvedValueOnce(false); // target does not
+    mockRoleScope.mockResolvedValueOnce({ read: 'all', write: 'all' });
+    mockHasRole.mockResolvedValueOnce(false); // target does not
     const result = await bulkAssign(
       { query: { role: 'harvester' }, targetUserId: 'u1' },
       AUTH,
