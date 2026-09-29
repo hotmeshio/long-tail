@@ -94,6 +94,14 @@ export type {
 export type { CapabilityAccess, CapabilityGate, CapabilitySet } from './capability';
 
 export type {
+  LTGrantPreset,
+  LTGrantPolicy,
+  LTGrantRole,
+  LTGrantSnapshot,
+  LTOAuthClient,
+} from './oauth-server';
+
+export type {
   LTUserStatus,
   LTRoleType,
   LTReadScope,
