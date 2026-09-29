@@ -6,6 +6,7 @@ import { EventTransportProvider } from './hooks/useEventTransport';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
+import { OAuthConsentPage } from './pages/OAuthConsentPage';
 import { RequireRole } from './components/layout/RequireRole';
 import { RequireInvocable } from './components/layout/RequireInvocable';
 import { RequireAI } from './components/layout/RequireAI';
@@ -160,6 +161,9 @@ const StreamMessagesPage = lazy(() =>
 const CredentialsPage = lazy(() =>
   import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
 );
+const ConnectedAppsPage = lazy(() =>
+  import('./pages/settings/ConnectedAppsPage').then((m) => ({ default: m.ConnectedAppsPage })),
+);
 const FilesPage = lazy(() =>
   import('./pages/files').then((m) => ({ default: m.FilesPage })),
 );
@@ -261,6 +265,7 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/connect/anthropic', element: <ConnectAnthropicPage /> },
   { path: '/connect/:provider', element: <ConnectAnthropicPage /> },
+  { path: '/oauth/consent', element: <OAuthConsentPage /> },
   {
     path: '/',
     element: <Shell />,
@@ -274,6 +279,7 @@ const router = createBrowserRouter([
 
       // Credentials (all authenticated users) — legacy path redirects
       { path: 'credentials', element: <Lazy><CredentialsPage /></Lazy> },
+      { path: 'connected-apps', element: <Lazy><ConnectedAppsPage /></Lazy> },
       { path: 'connections', element: <Navigate to="/credentials" replace /> },
 
       // Escalation section (all authenticated users)

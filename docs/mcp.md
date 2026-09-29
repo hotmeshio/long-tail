@@ -153,7 +153,7 @@ Long Tail is itself an MCP server. Any MCP-aware client — Claude Code, Claude 
 |---|---|
 | URL | `POST https://<host>/mcp` |
 | Transport | Streamable HTTP, stateless — one request and one response per call |
-| Auth | `Authorization: Bearer <token>` — a signed user token (JWT) or a service-account key |
+| Auth | `Authorization: Bearer <token>`: an OAuth access token (people, see below), a service-account key (machines), or a signed user token (JWT) |
 
 ### Access: which tools, and which records
 
@@ -185,6 +185,46 @@ Put plainly: **scope is read or write; role is which tools and which records.** 
 Resolving an escalation shows both at work. `admin_resolve_escalation` changes state, so the key needs `mcp:full`, and the account needs write access to that escalation's role. Reading the same queue first, with `find_escalations` or `search_by_facets`, needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
 
 **Read-safe workflow invocation.** A workflow registered with `read_safe: true` in its config (a side-effect-free lookup) is invocable by read-scoped callers through `invoke_workflow_read_safe` — the read-safe variant of `invoke_workflow`. Any workflow may be attempted; one without the flag fails with a clear error, so the flag on the config is the whole contract. Declare it on the worker profile (`readSafe: true`) or set it through the workflow-config admin surface; the flag is fail-closed and defaults off.
+
+### Connect with OAuth
+
+People connect with OAuth: add the URL to the client, sign in once in the browser, and pick what the client may do. No key goes in any file.
+
+```bash
+claude mcp add --transport http long-tail https://<host>/mcp
+```
+
+Then run `/mcp` in Claude Code and pick Authenticate. The browser opens the consent page, which shows the app, the account and where it returns, and offers two choices:
+
+| Choice | The client may |
+|---|---|
+| Allow read-only | Read what you can read, and run workflows marked read-safe |
+| Allow as me | Do anything you can do: claim, resolve, invoke and administer wherever your roles allow |
+
+Allow as me appears only when it grants more than read-only: when you can write in some role, or hold an admin tier. Either way the client acts as you, so every result is limited to your roles, and every action is recorded as you.
+
+Access tokens last 5 minutes and carry your roles as of issue; the client refreshes them silently with a refresh token that rotates on each use and lasts 30 days. A refresh re-reads your roles and account status, so a role change reaches the client within one token lifetime. Disconnect a client under **Connected apps** in the user menu to end its access at once; the same happens when the client revokes its token.
+
+**Enable it** with `auth.oauthServer` in `start()`, or `LT_OAUTH_ISSUER` in the environment:
+
+```typescript
+start({
+  auth: {
+    oauthServer: {
+      issuer: 'https://api.example.com/longtail', // the public base URL Long Tail is served under
+      allowedRedirectHosts: ['claude.ai'],        // https redirect hosts, beyond loopback
+    },
+  },
+});
+```
+
+Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, `localhost`, `[::1]`, any port) are always allowed, which covers Claude Code and Claude Desktop; an `https` redirect is allowed only on a host in `allowedRedirectHosts`.
+
+**Embedded deployments** mount two routers, and let four paths reach Long Tail without the host's login:
+
+- `adapter.getRouter()` under the base path, as today, and `adapter.getWellKnownRouter()` at the host's root. The well-known router answers only its two documents and passes every other request on.
+- Let these through the host's session gate: `/mcp`, `/api/oauth/register`, `/api/oauth/token`, `/api/oauth/revoke` (and `/api/oauth/metadata` if used). They carry their own credentials.
+- Keep `/api/oauth/authorize` and the dashboard behind the host's login: that is where the person signs in before consenting.
 
 ### 1. Create a service account
 

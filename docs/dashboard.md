@@ -86,7 +86,7 @@ The top navigation bar contains:
 - **scan** (Barcode icon) — opens the scan panel for manual code entry and capture settings, shown when `features.scanCodes` stands. See [Scan Codes](#scan-codes).
 - **events** — toggles the live event feed (builders and ops; doubles as the connection indicator).
 - **docs** (BookOpen icon) — toggles the in-app documentation drawer. Each page also has a contextual docs link next to its title that opens the drawer to the relevant section.
-- **User menu** — **Credentials** (OAuth connections and API keys), **Link variables** (per-device facet bindings that scope pins and the Pace Board — see [Faceted Routing](faceted-routing.md#link-variables)), the **theme picker** (five accent themes), and **Sign Out**.
+- **User menu** — **Credentials** (OAuth connections and API keys), **Connected apps** (MCP clients connected with OAuth, when the OAuth server is enabled), **Link variables** (per-device facet bindings that scope pins and the Pace Board — see [Faceted Routing](faceted-routing.md#link-variables)), the **theme picker** (five accent themes), and **Sign Out**.
 
 ## Home — Recent Activity
 
@@ -533,6 +533,14 @@ Accessible via the user menu (or at `/credentials`). Manage OAuth provider conne
 - **API keys** — view and manage service account API keys for programmatic access.
 
 Credentials flow through the system via the `_scope` identity context — workflows inherit the invoking user's credentials for authenticated tool calls.
+
+### Connected apps
+
+Accessible via the user menu (or at `/connected-apps`) when the OAuth server is enabled. Lists the MCP clients you connected with OAuth, the access each holds (Read-only or As me), when you connected it and when it last refreshed. **Disconnect** ends a client's access at once.
+
+### Consent
+
+`/oauth/consent` is where an MCP client's sign-in lands. It shows the app, your account, where the browser returns and the deployment, then offers **Allow read-only**, **Allow as me** (when it grants more than read-only) and **Deny**. Signed-out visitors sign in first and return to it. See [Connect with OAuth](mcp.md#connect-with-oauth).
 
 ## Realtime Refresh Strategy
 
