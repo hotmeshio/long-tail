@@ -40,17 +40,17 @@ describe('/mcp tool gates', () => {
 
   it('a member sees role-scoped and reference tools only', async () => {
     const names = await toolNames(MEMBER_CAPABILITIES);
-    expect(names).toEqual(expect.arrayContaining(['find_escalations', 'resolve_escalation', 'invoke_workflow', 'list_users', 'read_doc']));
+    expect(names).toEqual(expect.arrayContaining(['find_escalations', 'admin_resolve_escalation', 'invoke_workflow', 'list_users', 'read_doc']));
     for (const hidden of ['create_user', 'add_user_role', 'remove_user_role', 'prune', 'create_persona', 'list_bot_accounts',
       'deploy_yaml_workflow', 'terminate_workflow', 'store_knowledge', 'get_knowledge', 'http_request', 'write_file',
-      'execute_task', 'get_access_token', 'list_connections', 'publish_event']) {
+      'execute_task', 'publish_event', 'escalate_to_human']) {
       expect(names, hidden).not.toContain(hidden);
     }
   });
 
   it('admin, builder and role-manager capabilities follow their REST gates', async () => {
     const admin = await toolNames(ONLY('admin'));
-    expect(admin).toEqual(expect.arrayContaining(['prune', 'remove_user_role', 'upsert_workflow_config', 'diagnose_job']));
+    expect(admin).toEqual(expect.arrayContaining(['prune', 'add_user_role', 'remove_user_role', 'upsert_workflow_config', 'diagnose_job']));
     expect(admin).not.toContain('create_user');
     expect(admin).not.toContain('create_persona');
 
@@ -63,13 +63,29 @@ describe('/mcp tool gates', () => {
     expect(roleManager).not.toContain('create_user');
   });
 
-  it('assigning roles and reading stored credentials need superadmin', async () => {
+  it('assigning roles needs admin and OAuth connection tools are open to every caller', async () => {
+    expect(await toolNames(ONLY('admin'))).toContain('add_user_role');
+    expect(await toolNames(MEMBER_CAPABILITIES)).toEqual(expect.arrayContaining(['get_access_token', 'list_connections', 'revoke_connection']));
+  });
+
+  it('human-queue tools act with full authority, so they need superadmin', async () => {
+    const humanQueue = ['escalate_to_human', 'claim_and_resolve', 'resolve_batch_item', 'get_available_work', 'check_resolution', 'escalate_and_wait'];
     const everythingButSuperadmin = await toolNames({ ...ALL_CAPABILITIES, superadmin: false });
     const superadmin = await toolNames(ALL_CAPABILITIES);
-    for (const tool of ['add_user_role', 'get_access_token', 'list_connections', 'revoke_connection']) {
+    for (const tool of humanQueue) {
       expect(everythingButSuperadmin).not.toContain(tool);
       expect(superadmin).toContain(tool);
     }
+  });
+
+  it('a tool keeps the same name for every caller', async () => {
+    const superadmin = new Set(await toolNames(ALL_CAPABILITIES));
+    for (const set of [MEMBER_CAPABILITIES, ONLY('admin'), ONLY('builder'), ONLY('roleManager')]) {
+      for (const name of await toolNames(set)) expect(superadmin.has(name), name).toBe(true);
+    }
+    const member = await toolNames(MEMBER_CAPABILITIES);
+    expect(member).toContain('admin_resolve_escalation');
+    expect(member).not.toContain('resolve_escalation');
   });
 
   it('hides a tool whose manifest entry has no gate', async () => {

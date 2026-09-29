@@ -5,7 +5,7 @@ import type { LTToolManifestEntry } from '../../types';
 export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'escalate_to_human',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Create a new escalation for human review. Returns the escalation ID.',
     read_safe: false,
     inputSchema: {
@@ -23,7 +23,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'check_resolution',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Check the status of an escalation. Returns status and resolver payload if resolved.',
     read_safe: true,
     inputSchema: {
@@ -36,7 +36,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'get_escalation_lookups',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Resolve the versioned knowledge lookups pinned on an escalation (envelope.lookups). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with missing: true.',
     read_safe: true,
     inputSchema: {
@@ -49,7 +49,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'get_available_work',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'List available escalations for a role. Returns pending, unassigned escalations.',
     read_safe: true,
     inputSchema: {
@@ -63,7 +63,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'claim_and_resolve',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Claim an escalation and immediately resolve it with a payload. Atomic operation.',
     read_safe: false,
     inputSchema: {
@@ -78,7 +78,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'resolve_escalation',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Resolve an already-claimed escalation with a payload. The payload validates against the role form schema.',
     read_safe: false,
     inputSchema: {
@@ -92,7 +92,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'resolve_batch_item',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Submit ONE declared item of a batch escalation. Interim items return outcome "accepted" with the count remaining; the LAST item completes the escalation and wakes the waiting workflow with the full collection.',
     read_safe: false,
     inputSchema: {
@@ -107,7 +107,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'accumulate_item',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Add ONE item to an open accumulator escalation. Interim adds return outcome "accepted" with the count held; the add that reaches max completes the escalation and wakes the waiting workflow with the ordered collection. Optionally write a reciprocal row in the same statement.',
     read_safe: false,
     inputSchema: {
@@ -123,7 +123,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'remove_item',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Remove ONE held item from a pending open accumulator escalation. The row stays pending and the waiting workflow is never woken.',
     read_safe: false,
     inputSchema: {
@@ -138,7 +138,7 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'escalate_and_wait',
-    gate: 'caller',
+    gate: 'superadmin',
     description: 'Create an escalation and pause the workflow until a human responds. Returns a signal ID that the workflow uses to wait durably. Preferred over escalate_to_human + check_resolution polling.',
     read_safe: false,
     inputSchema: {

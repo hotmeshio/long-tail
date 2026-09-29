@@ -246,7 +246,7 @@ export const DOCS_TOOLS: LTToolManifestEntry[] = [
 export const OAUTH_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'get_access_token',
-    gate: 'superadmin',
+    gate: 'caller',
     description: 'Get a fresh OAuth access token for an external service. Automatically refreshes expired tokens.',
     read_safe: true,
     inputSchema: {
@@ -261,7 +261,7 @@ export const OAUTH_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'list_connections',
-    gate: 'superadmin',
+    gate: 'caller',
     description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
     read_safe: true,
     inputSchema: {
@@ -274,7 +274,7 @@ export const OAUTH_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'revoke_connection',
-    gate: 'superadmin',
+    gate: 'caller',
     description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
     read_safe: false,
     inputSchema: {
