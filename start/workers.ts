@@ -559,6 +559,10 @@ export async function startWorkers(
   // from other containers so agent triggers fire locally.
   eventRegistry.bridgeCallbackAdapter(callbackAdapter);
 
+  // OAuth grant revocations published by any process stop its tokens here too.
+  const { listenForRevocations } = await import('../services/auth/oauth-server/revocation-events');
+  listenForRevocations(callbackAdapter);
+
   // Connect event adapters (outside workers guard so API-only containers
   // still connect to NATS and can publish/receive events)
   if (eventRegistry.hasAdapters) {

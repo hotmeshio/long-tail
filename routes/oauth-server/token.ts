@@ -5,7 +5,7 @@ import {
   exchangeAuthorizationCode, rotateRefreshToken, revokeByRefreshToken, revokeGrant,
   signAccessToken, verifyAccessToken,
 } from '../../services/auth/oauth-server';
-import { markRevoked } from '../../services/auth/oauth-server/revocations';
+import { revokeEverywhere } from '../../services/auth/oauth-server/revocation-events';
 import type { LTGrantSnapshot } from '../../types';
 
 const router = Router();
@@ -67,7 +67,7 @@ router.post('/token', ...tokenEndpoint, async (req, res) => {
     if (!refreshToken) return tokenError(res, 'invalid_request', 'refresh_token is required');
     const rotated = await rotateRefreshToken({ refreshToken, clientId, refreshTtlSeconds: OAUTH_REFRESH_TOKEN_TTL_SECONDS });
     if (rotated.snapshot === null) {
-      if ('revoked' in rotated && rotated.revoked) markRevoked({ grantId: rotated.revoked.grant_id });
+      if ('revoked' in rotated && rotated.revoked) revokeEverywhere(rotated.revoked.grant_id);
       return tokenError(res, 'invalid_grant', 'the refresh token is invalid, expired or revoked');
     }
     return sendTokens(res, rotated.snapshot, rotated.refreshToken);
@@ -91,7 +91,7 @@ router.post('/revoke', ...tokenEndpoint, async (req, res) => {
     const revoked = claims
       ? (claims.client_id === clientId ? await revokeGrant(claims.gid) : null)
       : await revokeByRefreshToken(token, clientId);
-    if (revoked) markRevoked({ grantId: revoked.grant_id });
+    if (revoked) revokeEverywhere(revoked.grant_id);
   }
   res.status(200).end();
 });
