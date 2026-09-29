@@ -10,7 +10,9 @@ import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../../services/worker
 import {
   invokeWorkflow,
   checkInvocationRoles,
+  type InvocationAuthContext,
 } from '../../../services/workflow-invocation';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import * as workflowApi from '../../../api/workflows';
 import { WORKFLOW_STATES } from '../../../shared/workflow-state';
 import type { LTWorkflowConfig } from '../../../types/config';
@@ -20,6 +22,21 @@ import {
   getWorkflowStatusSchema,
   terminateWorkflowSchema,
 } from './schemas';
+
+const SYSTEM_INVOKER: InvocationAuthContext = { userId: 'lt-system', role: 'superadmin' };
+
+/**
+ * Who a workflow is invoked as. A `/mcp` caller must satisfy the workflow's
+ * invocation roles and becomes the envelope identity. Key scopes are left
+ * off: at `/mcp` they decide which invoke tool is listed, not whether the
+ * invocation is allowed. Internal calls invoke as lt-system.
+ */
+async function resolveInvoker(workflowType: string, extra?: ToolCallExtra): Promise<InvocationAuthContext> {
+  const caller = externalCaller(extra);
+  if (!caller) return SYSTEM_INVOKER;
+  await checkInvocationRoles(workflowType, caller.userId, caller.role);
+  return { userId: caller.userId, role: caller.role };
+}
 
 export function registerWorkflowTools(server: McpServer): void {
 
@@ -98,8 +115,9 @@ export function registerWorkflowTools(server: McpServer): void {
         'workflow runs durably in the background.',
       inputSchema: invokeWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+    async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const config = await configService.getWorkflowConfig(args.workflow_type);
+      const invoker = await resolveInvoker(args.workflow_type, extra);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
@@ -110,7 +128,7 @@ export function registerWorkflowTools(server: McpServer): void {
         // WorkflowOptions passthrough — parity with the HTTP invoke route, which
         // spreads extra body keys into options. signalIn stays service-forced.
         options: args.options,
-        auth: { userId: 'lt-system', role: 'superadmin' },
+        auth: invoker,
       });
       return {
         content: [{
@@ -136,7 +154,7 @@ export function registerWorkflowTools(server: McpServer): void {
         'input_schema the payload must satisfy.',
       inputSchema: invokeWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+    async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const config = await configService.getWorkflowConfig(args.workflow_type);
       if (!config?.invocable) {
         return {
@@ -156,6 +174,7 @@ export function registerWorkflowTools(server: McpServer): void {
           isError: true,
         };
       }
+      const invoker = await resolveInvoker(args.workflow_type, extra);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
@@ -164,7 +183,7 @@ export function registerWorkflowTools(server: McpServer): void {
         metadata: args.metadata,
         executeAs: args.execute_as,
         options: args.options,
-        auth: { userId: 'lt-system', role: 'superadmin' },
+        auth: invoker,
       });
       return {
         content: [{
