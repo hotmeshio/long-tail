@@ -58,13 +58,16 @@ export const EXCHANGE_CODE = `
 
 /**
  * Rotate a refresh token: mark the old one used and issue its successor, only
- * while the grant is live and its owner active. Returns current roles.
+ * for the client that holds it and while the grant is live and its owner
+ * active. Returns current roles.
  */
 export const ROTATE_REFRESH_TOKEN = `
   WITH old AS (
-    UPDATE lt_oauth_refresh_tokens SET used_at = NOW()
-    WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
-    RETURNING grant_id
+    UPDATE lt_oauth_refresh_tokens t SET used_at = NOW()
+    FROM lt_oauth_grants og
+    WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > NOW()
+      AND og.id = t.grant_id AND og.client_id = $4
+    RETURNING t.grant_id
   ),
   g AS (
     SELECT g.* FROM lt_oauth_grants g
