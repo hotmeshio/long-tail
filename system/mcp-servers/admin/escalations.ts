@@ -1,11 +1,9 @@
 /**
  * Escalation tools — mirrors routes/escalations/
  *
- * Every tool runs as the `lt-system` bot. The escalation RBAC helpers
- * (getVisibleRoles / getUserRoles / hasGlobalEscalationAccess) query a uuid
- * column, so the bot's external_id string ('lt-system') would blow up with
- * `invalid input syntax for type uuid`. `systemAuth()` resolves the bot's real
- * UUID once and caches it; that UUID (a superadmin) is passed as the principal.
+ * A call that arrived at `/mcp` runs as its caller, so the escalation RBAC in
+ * api/ applies to them exactly as it does over REST. Internal calls from
+ * workflows and agents run as the `lt-system` bot.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -14,8 +12,8 @@ import * as escalationService from '../../../services/escalation';
 import * as escalationApi from '../../../api/escalations';
 import * as escalationMetaApi from '../../../api/escalations/metadata';
 import * as escalationBulkApi from '../../../api/escalations/bulk';
-import { ensureSystemBot } from '../../../services/iam';
-import type { LTApiAuth } from '../../../types/sdk';
+import { callerAuth, externalCaller, type ToolCallExtra } from '../caller-auth';
+import { checkBulkPermission } from '../../../api/escalations/helpers';
 import {
   findEscalationsSchema,
   getEscalationSchema,
@@ -48,19 +46,6 @@ import {
   removeItemSchema,
   getEscalationItemsSchema,
 } from './schemas';
-
-let systemPrincipalId: string | null = null;
-
-/**
- * Resolve (and cache) the lt-system bot's real UUID. The escalation RBAC helpers
- * query the uuid `user_id` column, so the external_id string 'lt-system' would
- * raise `invalid input syntax for type uuid`. The bot is a superadmin, so it has
- * global escalation access.
- */
-async function systemAuth(): Promise<LTApiAuth> {
-  if (!systemPrincipalId) systemPrincipalId = await ensureSystemBot();
-  return { userId: systemPrincipalId, role: 'superadmin' };
-}
 
 /** Project the full escalation record to the MCP-facing shape, including metadata. */
 function projectEscalation(e: any) {
@@ -104,7 +89,7 @@ export function registerEscalationTools(server: McpServer): void {
         'assignment, and signal_key.',
       inputSchema: findEscalationsSchema,
     },
-    async (args: z.infer<typeof findEscalationsSchema>) => {
+    async (args: z.infer<typeof findEscalationsSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.listEscalations(
         {
           status: args.status,
@@ -127,7 +112,7 @@ export function registerEscalationTools(server: McpServer): void {
           available: args.available,
           orderBy: args.orderBy,
         },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -156,8 +141,8 @@ export function registerEscalationTools(server: McpServer): void {
         'linkage, resolver/escalation payloads, signal_key, and assignment state.',
       inputSchema: getEscalationSchema,
     },
-    async (args: z.infer<typeof getEscalationSchema>) => {
-      const result = await escalationApi.getEscalation({ id: args.id }, await systemAuth());
+    async (args: z.infer<typeof getEscalationSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.getEscalation({ id: args.id }, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -194,7 +179,15 @@ export function registerEscalationTools(server: McpServer): void {
         'resolved counts with breakdown by role and type.',
       inputSchema: getEscalationStatsSchema,
     },
-    async (args: z.infer<typeof getEscalationStatsSchema>) => {
+    async (args: z.infer<typeof getEscalationStatsSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      if (caller) {
+        const result = await escalationApi.getEscalationStats({ period: args.period }, caller);
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
+      }
       const stats = await escalationService.getEscalationStats(undefined, args.period);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(stats) }],
@@ -212,8 +205,8 @@ export function registerEscalationTools(server: McpServer): void {
         'into metadata when the escalation was raised).',
       inputSchema: findByMetadataSchema,
     },
-    async (args: z.infer<typeof findByMetadataSchema>) => {
-      const result = await escalationMetaApi.findByMetadata(args, await systemAuth());
+    async (args: z.infer<typeof findByMetadataSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationMetaApi.findByMetadata(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -234,10 +227,10 @@ export function registerEscalationTools(server: McpServer): void {
         'the escalation returns to the queue.',
       inputSchema: claimEscalationSchema,
     },
-    async (args: z.infer<typeof claimEscalationSchema>) => {
+    async (args: z.infer<typeof claimEscalationSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.claimEscalation(
         { id: args.id, durationMinutes: args.duration_minutes },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -256,8 +249,8 @@ export function registerEscalationTools(server: McpServer): void {
         'claim_escalation so another holder can pick it up.',
       inputSchema: releaseEscalationSchema,
     },
-    async (args: z.infer<typeof releaseEscalationSchema>) => {
-      const result = await escalationApi.releaseEscalation({ id: args.id }, await systemAuth());
+    async (args: z.infer<typeof releaseEscalationSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.releaseEscalation({ id: args.id }, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -277,10 +270,10 @@ export function registerEscalationTools(server: McpServer): void {
         'Password fields in the payload are replaced with ephemeral tokens.',
       inputSchema: resolveEscalationSchema,
     },
-    async (args: z.infer<typeof resolveEscalationSchema>) => {
+    async (args: z.infer<typeof resolveEscalationSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.resolveEscalation(
         { id: args.id, resolverPayload: args.resolverPayload },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -300,10 +293,10 @@ export function registerEscalationTools(server: McpServer): void {
         'workflow with the ordered collection. A reciprocal row is written in the same statement, both or neither.',
       inputSchema: accumulateItemSchema,
     },
-    async (args: z.infer<typeof accumulateItemSchema>) => {
+    async (args: z.infer<typeof accumulateItemSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.accumulateItem(
         { id: args.id, itemKey: args.itemKey, payload: args.payload, metadata: args.metadata, reciprocal: args.reciprocal },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error, ...(result.data ?? {}) }) }], isError: true };
@@ -322,10 +315,10 @@ export function registerEscalationTools(server: McpServer): void {
         'waiting workflow is never woken.',
       inputSchema: removeItemSchema,
     },
-    async (args: z.infer<typeof removeItemSchema>) => {
+    async (args: z.infer<typeof removeItemSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.removeItem(
         { id: args.id, itemKey: args.itemKey, reciprocal: args.reciprocal },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error, ...(result.data ?? {}) }) }], isError: true };
@@ -342,13 +335,13 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'The held items of an accumulator or batch escalation in arrival order, with the count and max.',
       inputSchema: getEscalationItemsSchema,
     },
-    async (args: z.infer<typeof getEscalationItemsSchema>) => {
+    async (args: z.infer<typeof getEscalationItemsSchema>, extra?: ToolCallExtra) => {
       if (!args.id && !args.signalKey) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'id or signalKey is required' }) }], isError: true };
       }
       const result = args.id
-        ? await escalationApi.getEscalationItems({ id: args.id }, await systemAuth())
-        : await escalationApi.getEscalationItemsBySignalKey({ signalKey: args.signalKey! }, await systemAuth());
+        ? await escalationApi.getEscalationItems({ id: args.id }, await callerAuth(extra))
+        : await escalationApi.getEscalationItemsBySignalKey({ signalKey: args.signalKey! }, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -367,10 +360,10 @@ export function registerEscalationTools(server: McpServer): void {
         'to skip the id lookup.',
       inputSchema: resolveBySignalKeySchema,
     },
-    async (args: z.infer<typeof resolveBySignalKeySchema>) => {
+    async (args: z.infer<typeof resolveBySignalKeySchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.resolveBySignalKey(
         { signalKey: args.signalKey, resolverPayload: args.resolverPayload },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -390,10 +383,10 @@ export function registerEscalationTools(server: McpServer): void {
         'collectively (no per-row signal delivery).',
       inputSchema: resolveByIdsSchema,
     },
-    async (args: z.infer<typeof resolveByIdsSchema>) => {
+    async (args: z.infer<typeof resolveByIdsSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.resolveByIds(
         { ids: args.ids, resolverPayload: args.resolverPayload, metadata: args.metadata },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -412,8 +405,8 @@ export function registerEscalationTools(server: McpServer): void {
         'availability, and metadata facets; sort by columns; page with limit/offset.',
       inputSchema: searchByFacetsSchema,
     },
-    async (args: z.infer<typeof searchByFacetsSchema>) => {
-      const result = await escalationApi.searchByFacets(args as any, await systemAuth());
+    async (args: z.infer<typeof searchByFacetsSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.searchByFacets(args as any, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -436,8 +429,8 @@ export function registerEscalationTools(server: McpServer): void {
         'fields only — status/available/jeopardy are rejected (liveness derives from the measure).',
       inputSchema: aggregateByFacetsSchema,
     },
-    async (args: z.infer<typeof aggregateByFacetsSchema>) => {
-      const result = await escalationApi.aggregateByFacets(args as any, await systemAuth());
+    async (args: z.infer<typeof aggregateByFacetsSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.aggregateByFacets(args as any, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -458,8 +451,8 @@ export function registerEscalationTools(server: McpServer): void {
         'must be stored as a JSON string (GIN containment match).',
       inputSchema: timelineByFacetSchema,
     },
-    async (args: z.infer<typeof timelineByFacetSchema>) => {
-      const result = await escalationApi.timelineByFacet(args as any, await systemAuth());
+    async (args: z.infer<typeof timelineByFacetSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.timelineByFacet(args as any, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -477,10 +470,10 @@ export function registerEscalationTools(server: McpServer): void {
         'assigned to the calling principal. RBAC-scoped to the pond role.',
       inputSchema: claimGroupsSchema,
     },
-    async (args: z.infer<typeof claimGroupsSchema>) => {
+    async (args: z.infer<typeof claimGroupsSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.claimGroups(
         { query: args.query as any, limit: args.limit, durationMinutes: args.durationMinutes, sizeFacet: args.sizeFacet },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -500,10 +493,10 @@ export function registerEscalationTools(server: McpServer): void {
         'RBAC-scoped to the pond role.',
       inputSchema: claimByFacetsSchema,
     },
-    async (args: z.infer<typeof claimByFacetsSchema>) => {
+    async (args: z.infer<typeof claimByFacetsSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.claimByFacets(
         { query: args.query as any, limit: args.limit, durationMinutes: args.durationMinutes, allOrNone: args.allOrNone },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -522,10 +515,10 @@ export function registerEscalationTools(server: McpServer): void {
         'role becomes responsible for resolving it.',
       inputSchema: escalateEscalationSchema,
     },
-    async (args: z.infer<typeof escalateEscalationSchema>) => {
+    async (args: z.infer<typeof escalateEscalationSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.escalateToRole(
         { id: args.id, targetRole: args.targetRole },
-        await systemAuth(),
+        await callerAuth(extra),
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -544,8 +537,8 @@ export function registerEscalationTools(server: McpServer): void {
         'terminated and can never receive the resolution signal. Preserved for audit.',
       inputSchema: cancelEscalationSchema,
     },
-    async (args: z.infer<typeof cancelEscalationSchema>) => {
-      const result = await escalationApi.cancelSingleEscalation({ id: args.id }, await systemAuth());
+    async (args: z.infer<typeof cancelEscalationSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.cancelSingleEscalation({ id: args.id }, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -582,7 +575,14 @@ export function registerEscalationTools(server: McpServer): void {
         'a triage workflow is started to remediate the issue.',
       inputSchema: bulkTriageSchema,
     },
-    async (args: z.infer<typeof bulkTriageSchema>) => {
+    async (args: z.infer<typeof bulkTriageSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      if (caller) {
+        const perm = await checkBulkPermission(caller.userId, args.ids);
+        if (!perm.allowed) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: perm.error }) }], isError: true };
+        }
+      }
       const resolved = await escalationService.bulkResolveForTriage(args.ids, args.hint);
       return {
         content: [{
@@ -605,8 +605,8 @@ export function registerEscalationTools(server: McpServer): void {
         'Find and claim an escalation by metadata key-value pair.',
       inputSchema: claimByMetadataSchema,
     },
-    async (args: z.infer<typeof claimByMetadataSchema>) => {
-      const result = await escalationMetaApi.claimByMetadata(args, await systemAuth());
+    async (args: z.infer<typeof claimByMetadataSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationMetaApi.claimByMetadata(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -623,8 +623,8 @@ export function registerEscalationTools(server: McpServer): void {
         'Find and resolve an escalation by metadata key-value pair.',
       inputSchema: resolveByMetadataSchema,
     },
-    async (args: z.infer<typeof resolveByMetadataSchema>) => {
-      const result = await escalationMetaApi.resolveByMetadata(args, await systemAuth());
+    async (args: z.infer<typeof resolveByMetadataSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationMetaApi.resolveByMetadata(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -642,8 +642,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Claim multiple escalations in a single operation.',
       inputSchema: bulkClaimSchema,
     },
-    async (args: z.infer<typeof bulkClaimSchema>) => {
-      const result = await escalationBulkApi.bulkClaim(args, await systemAuth());
+    async (args: z.infer<typeof bulkClaimSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationBulkApi.bulkClaim(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -659,8 +659,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Assign multiple escalations to a specific user. Rows under a live claim are skipped unless reassign=true (the admin takeover).',
       inputSchema: bulkAssignSchema,
     },
-    async (args: z.infer<typeof bulkAssignSchema>) => {
-      const result = await escalationBulkApi.bulkAssign(args, await systemAuth());
+    async (args: z.infer<typeof bulkAssignSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationBulkApi.bulkAssign(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -676,8 +676,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Return claimed escalations to the available pool — the admin override of a live claim. Unclaimed and terminal rows are skipped.',
       inputSchema: bulkUnassignSchema,
     },
-    async (args: z.infer<typeof bulkUnassignSchema>) => {
-      const result = await escalationBulkApi.bulkUnassign(args, await systemAuth());
+    async (args: z.infer<typeof bulkUnassignSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationBulkApi.bulkUnassign(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -693,8 +693,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Escalate multiple escalations to a different role.',
       inputSchema: bulkEscalateSchema,
     },
-    async (args: z.infer<typeof bulkEscalateSchema>) => {
-      const result = await escalationBulkApi.bulkEscalate(args, await systemAuth());
+    async (args: z.infer<typeof bulkEscalateSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationBulkApi.bulkEscalate(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -710,8 +710,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Cancel multiple pending escalations in a single operation.',
       inputSchema: bulkCancelSchema,
     },
-    async (args: z.infer<typeof bulkCancelSchema>) => {
-      const result = await escalationApi.bulkCancel(args, await systemAuth());
+    async (args: z.infer<typeof bulkCancelSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.bulkCancel(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
@@ -727,8 +727,8 @@ export function registerEscalationTools(server: McpServer): void {
       description: 'Update the priority of multiple escalations.',
       inputSchema: updatePrioritySchema,
     },
-    async (args: z.infer<typeof updatePrioritySchema>) => {
-      const result = await escalationBulkApi.updatePriority(args, await systemAuth());
+    async (args: z.infer<typeof updatePrioritySchema>, extra?: ToolCallExtra) => {
+      const result = await escalationBulkApi.updatePriority(args, await callerAuth(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }
