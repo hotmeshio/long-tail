@@ -39,7 +39,7 @@ export function DictionaryList({ items, columns = 1 }: {
             <dt className="text-2xs font-semibold uppercase tracking-wide text-text-secondary mt-2 first:mt-0 @dict-inline:mt-0">
               {label}
             </dt>
-            <dd className="text-sm text-text-primary break-words min-w-0" data-field-key={key}>
+            <dd className="text-sm text-text-primary break-words whitespace-pre-wrap min-w-0" data-field-key={key}>
               {formatDictionaryValue(value)}
             </dd>
           </Fragment>
