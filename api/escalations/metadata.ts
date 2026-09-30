@@ -9,6 +9,8 @@ import { checkResolverPayload } from '../../services/escalation/resolver-validat
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import { validationFailure } from './resolve';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
+import type { ScanAvailability } from '../../types';
+import { isUuid } from '../../lib/uuid';
 
 /**
  * Intersect the caller's scope roles with an optional caller-supplied
@@ -121,7 +123,14 @@ export async function claimByMetadata(
  * claim + resolve (or signal detection) in one round-trip.
  */
 export async function resolveByMetadata(
-  input: { key: string; value: string; resolverPayload: Record<string, any>; assignee?: string; metadata?: Record<string, any>; restrictRoles?: string[]; extraFacets?: Record<string, any> },
+  input: {
+    key: string; value: string; resolverPayload: Record<string, any>; assignee?: string;
+    metadata?: Record<string, any>; restrictRoles?: string[]; extraFacets?: Record<string, any>;
+    /** Narrows the pick to a claim state; 'mine' is the resolver's live claim. */
+    availability?: ScanAvailability;
+    /** Resolves only this row, when it still matches every other condition. */
+    assertId?: string;
+  },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
@@ -130,6 +139,9 @@ export async function resolveByMetadata(
     }
     if (!input.resolverPayload) {
       return { status: 400, error: 'resolverPayload is required' };
+    }
+    if (input.assertId !== undefined && !isUuid(input.assertId)) {
+      return { status: 404, error: 'No pending escalation found for this metadata, or insufficient role permissions' };
     }
 
     const resolved = await resolveAssignee(input.assignee, auth);
@@ -160,7 +172,7 @@ export async function resolveByMetadata(
       input.key, input.value, resolveUserId,
       input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
       enforcing.size > 0 ? [...enforcing] : null,
-      null, input.extraFacets,
+      input.assertId ?? null, input.extraFacets, input.availability,
     );
 
     if (result.outcome === 'validation_required' && result.row) {
@@ -169,7 +181,7 @@ export async function resolveByMetadata(
       result = await escalationService.resolveByMetadataAtomic(
         input.key, input.value, resolveUserId,
         input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
-        null, result.row.id, input.extraFacets,
+        null, result.row.id, input.extraFacets, input.availability,
       );
       // The asserted row left pending between the two passes — a concurrent
       // resolution won the row; surface it as the conflict it is.
