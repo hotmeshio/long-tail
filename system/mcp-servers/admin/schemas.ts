@@ -797,6 +797,8 @@ export const findOrphanedSignalsSchema = z.object({
 /** A faceted query over a pond — filter/sort by columns and metadata facets. */
 export const facetQuerySchema = z.object({
   role: z.string().describe('Pond role to target (the escalation role)'),
+  types: z.array(z.string()).optional().describe('Only rows whose escalation type is one of these'),
+  subtypes: z.array(z.string()).optional().describe('Only rows whose escalation subtype is one of these'),
   status: z.string().optional().describe("Status filter (e.g. 'pending')"),
   available: z.boolean().optional().describe('Only rows not currently claimed'),
   facets: z.record(z.any()).optional().describe('Metadata facet equality filters'),

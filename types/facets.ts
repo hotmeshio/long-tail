@@ -34,6 +34,10 @@ export interface FacetOrder {
 export interface FacetQuery {
   role?: string;
   roles?: string[];
+  /** type = ANY(types) — the escalation's declared type. */
+  types?: string[];
+  /** subtype = ANY(subtypes) — the escalation's declared subtype. */
+  subtypes?: string[];
   /** metadata @> facets — required facets (AND), GIN-served. */
   facets?: Record<string, any>;
   /**
