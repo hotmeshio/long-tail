@@ -18,9 +18,10 @@ vi.mock('../../../../services/workers/registry', () => ({
   SYSTEM_WORKFLOWS: new Set(),
 }));
 const mockCheckInvokeInput = vi.fn();
+const mockGetWorkflowResult = vi.fn();
 vi.mock('../../../../api/workflows', () => ({
   getWorkflowStatus: vi.fn(),
-  getWorkflowResult: vi.fn(),
+  getWorkflowResult: (...a: unknown[]) => mockGetWorkflowResult(...a),
   terminateWorkflow: (...a: unknown[]) => mockTerminateWorkflow(...a),
   checkInvokeInput: (...a: unknown[]) => mockCheckInvokeInput(...a),
   mergeDeclaredMetadata: (config: any, metadata: any) => ({ ...(config?.envelope_schema?.metadata ?? {}), ...(metadata ?? {}) }),
@@ -130,4 +131,22 @@ describe('admin workflow MCP tools', () => {
     expect(mockInvokeWorkflow).not.toHaveBeenCalled();
   });
 
+  it('get_workflow_status reports a running run', async () => {
+    mockGetWorkflowResult.mockResolvedValue({ status: 202, data: { workflowId: 'wf-1', status: 'running' } });
+    expect(parse(await tools.get('get_workflow_status')!({ workflow_id: 'wf-1' }))).toEqual({ workflow_id: 'wf-1', status: 'running' });
+  });
+
+  it('get_workflow_status reports a completed run with its result', async () => {
+    mockGetWorkflowResult.mockResolvedValue({ status: 200, data: { workflowId: 'wf-2', state: 'completed', result: { ok: 1 } } });
+    expect(parse(await tools.get('get_workflow_status')!({ workflow_id: 'wf-2' })))
+      .toEqual({ workflow_id: 'wf-2', status: 'complete', result: { ok: 1 } });
+  });
+
+  it('get_workflow_status reports a terminated run as failed with its error', async () => {
+    mockGetWorkflowResult.mockResolvedValue({
+      status: 200, data: { workflowId: 'wf-3', state: 'failed', terminated: true, error: 'Job Interrupted', result: null },
+    });
+    expect(parse(await tools.get('get_workflow_status')!({ workflow_id: 'wf-3' })))
+      .toEqual({ workflow_id: 'wf-3', status: 'failed', terminated: true, error: 'Job Interrupted' });
+  });
 });

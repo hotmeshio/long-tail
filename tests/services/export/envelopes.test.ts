@@ -15,6 +15,7 @@ function handleWith(overrides: Record<string, unknown>) {
     status: vi.fn(),
     input: vi.fn(),
     output: vi.fn(),
+    state: vi.fn().mockResolvedValue({}),
     ...overrides,
   };
 }
@@ -72,16 +73,30 @@ describe('getWorkflowEnvelopes', () => {
 
   it('a failed workflow surfaces its own error as the outcome', async () => {
     const handle = handleWith({
-      status: vi.fn().mockResolvedValue(-1),
+      status: vi.fn().mockResolvedValue(0),
       input: vi.fn().mockResolvedValue([{ data: {} }]),
-      output: vi.fn().mockRejectedValue(new Error('boom at step 3')),
+      state: vi.fn().mockResolvedValue({ $error: { message: 'boom at step 3', code: 500 } }),
     });
     mockGetHandle.mockResolvedValue(handle);
 
     const result = await getWorkflowEnvelopes('wf-3', 'q', 'flaky');
     expect(result.status).toBe('failed');
+    expect(result.terminated).toBeUndefined();
     expect(result.output).toBeNull();
     expect(result.error).toBe('boom at step 3');
+    expect(handle.output).not.toHaveBeenCalled();
+  });
+
+  it('a terminated workflow is failed and flagged terminated', async () => {
+    const handle = handleWith({
+      status: vi.fn().mockResolvedValue(-1_000_000_001),
+      input: vi.fn().mockResolvedValue([{ data: {} }]),
+      state: vi.fn().mockResolvedValue({ $error: { message: 'Job Interrupted', code: 410 } }),
+    });
+    mockGetHandle.mockResolvedValue(handle);
+
+    const result = await getWorkflowEnvelopes('wf-5', 'q', 'flaky');
+    expect(result).toMatchObject({ status: 'failed', terminated: true, error: 'Job Interrupted', output: null });
   });
 
   it('an unreadable input degrades to null rather than failing the read', async () => {

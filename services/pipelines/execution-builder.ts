@@ -11,6 +11,7 @@ import { fetchActivityInputs, fetchActivityDetails } from './enrichment';
 import { buildEvents } from './events';
 import { GET_JOB, GET_JOB_ATTRIBUTES } from './sql';
 import type { JobContext, ExecutionExport } from './types';
+import { workflowStateFromStatus } from '../workflow-state';
 
 /**
  * Build a complete execution export for a YAML engine workflow job.
@@ -122,7 +123,7 @@ function assembleExport(
     workflow_type: ctx.workflowTopic,
     workflow_name: ctx.workflowName,
     task_queue: ctx.appId,
-    status: ctx.job.status > 0 ? 'running' : ctx.job.status === 0 ? 'completed' : 'failed',
+    status: workflowStateFromStatus(ctx.job.status),
     start_time: startTime,
     close_time: closeTime,
     duration_ms: durationMs,
