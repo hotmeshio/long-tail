@@ -84,6 +84,17 @@ export interface FacetQuery {
   offset?: number;
 }
 
+/**
+ * Narrows which pending accumulator a by-facet add may choose as its
+ * container. The add's own facet always applies; these guards compose with it.
+ */
+export interface ContainerSelector {
+  types?: string[];
+  subtypes?: string[];
+  /** Extra metadata guards the container must also carry. */
+  facets?: Record<string, any>;
+}
+
 /** Result of an atomic group claim — all members of one order (origin), or empty. */
 export interface ClaimedGroup {
   originId: string | null;

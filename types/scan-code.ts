@@ -1,3 +1,5 @@
+import type { ContainerSelector } from './facets';
+
 /**
  * Scan-code types: schemes, rules, and execute outcomes.
  *
@@ -213,8 +215,14 @@ export interface ScanAccumulateParams {
    * metadata carries this facet with the same value the item row holds.
    */
   containerFacet?: string;
-  /** Expected container queue(s); intersects with the actor's write scope. */
+  /** Expected container queue(s); intersects with the actor's write scope. Alias of `container.roles`. */
   containerRoles?: string[];
+  /**
+   * Item-locate mode: which pending accumulator may be the container, beyond
+   * sharing the facet. Types, subtypes and extra facet guards narrow the pick;
+   * the item's own row is never its container.
+   */
+  container?: ContainerSelector & { roles?: string[] };
   /** Item-locate mode: also write the item's row as the reciprocal (default true). */
   reciprocal?: boolean;
 }

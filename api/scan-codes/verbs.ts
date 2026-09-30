@@ -279,7 +279,10 @@ export async function accumulateStep(
       itemKey: rendered.itemKey,
       payload: rendered.payload,
       metadata: rendered.metadata,
-      restrictRoles: options.containerRoles,
+      restrictRoles: options.container?.roles ?? options.containerRoles,
+      container: options.container
+        ? { types: options.container.types, subtypes: options.container.subtypes, facets: options.container.facets }
+        : undefined,
       ...(options.reciprocal === false ? {} : { reciprocal: { id: item.id } }),
     };
   } else {

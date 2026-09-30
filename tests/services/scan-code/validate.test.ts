@@ -114,6 +114,21 @@ describe('assertValidSteps — accumulate', () => {
     expect(() => assertValidSteps([{ ...base, params: { accumulate: { containerFacet: 'binKey' } } }])).not.toThrow();
   });
 
+  it('accepts a container selector in item-locate mode', () => {
+    const accumulate = { containerFacet: 'boxKey', container: { roles: ['match-filling'], types: ['matchBox'], subtypes: ['box'], facets: { open: true } } };
+    expect(() => assertValidSteps([{ ...base, params: { accumulate } }])).not.toThrow();
+  });
+
+  it('rejects a malformed container selector, or one without a container facet', () => {
+    const bad = (container: unknown, extra: Record<string, unknown> = { containerFacet: 'boxKey' }) =>
+      () => assertValidSteps([{ ...base, params: { accumulate: { ...extra, container } as any } }]);
+    expect(bad('box')).toThrow(/container must be an object/);
+    expect(bad({ types: 'matchBox' })).toThrow(/container.types must be an array of strings/);
+    expect(bad({ subtypes: [''] })).toThrow(/container.subtypes/);
+    expect(bad({ facets: [] })).toThrow(/container.facets must be an object/);
+    expect(bad({ types: ['matchBox'] }, { })).toThrow(/requires params.accumulate.containerFacet/);
+  });
+
   it('accepts container-locate mode with an item key template', () => {
     expect(() => assertValidSteps([{ ...base, params: { itemKey: 'inspection-{scan.category}' } }])).not.toThrow();
   });

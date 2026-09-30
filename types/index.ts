@@ -46,6 +46,7 @@ export type {
   FacetRange,
   FacetOrder,
   FacetQuery,
+  ContainerSelector,
   ClaimedGroup,
   GroupSummary,
 } from './facets';

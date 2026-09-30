@@ -29,7 +29,7 @@ export function registerAccumulateRoutes(router: Router): void {
    * POST /api/escalations/accumulate-by-metadata
    * Add one item to the highest priority pending accumulator whose metadata
    * contains the key/value.
-   * Body: { key, value, itemKey, payload?, metadata?, restrictRoles?, reciprocal? }
+   * Body: { key, value, itemKey, payload?, metadata?, restrictRoles?, container?, reciprocal? }
    */
   router.post('/accumulate-by-metadata', async (req, res) => {
     const result = await api.accumulateItemByMetadata({
@@ -39,6 +39,7 @@ export function registerAccumulateRoutes(router: Router): void {
       payload: req.body?.payload,
       metadata: req.body?.metadata,
       restrictRoles: req.body?.restrictRoles,
+      container: req.body?.container,
       reciprocal: req.body?.reciprocal,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
