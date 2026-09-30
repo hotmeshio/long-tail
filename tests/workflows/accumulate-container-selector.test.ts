@@ -116,6 +116,26 @@ describe('accumulate by metadata with a container selector (ask 0)', () => {
     expect(await countOf(mine.id)).toBe(0);
   }, 30_000);
 
+  it('initiatedBy is stored as the entry actor; the caller stays resolved_by', async () => {
+    const person = (await userService.createUser({
+      external_id: `initiator-${Date.now()}`, email: 'initiator@example.com', roles: [],
+    })).id;
+    try {
+      const binKey = `K-${randomUUID()}`;
+      const box = await park('rollupBin', { binKey, max: 4 }, `bin-${binKey}`);
+      const result = await accumulateItemByMetadata({
+        key: 'binKey', value: binKey, itemKey: 'bag-1', restrictRoles: [ROLE], initiatedBy: person,
+      }, auth());
+      expect(result.status).toBe(200);
+      const row = await escalationService.getEscalation(box.id);
+      const entry = JSON.parse(row!.envelope).accumulate_items['bag-1'];
+      expect(entry.actor).toBe(person);
+      expect(row!.metadata?.resolved_by).toBe(operatorId);
+    } finally {
+      await userService.deleteUser(person);
+    }
+  }, 30_000);
+
   it('a malformed selector is refused before any read', async () => {
     const result = await accumulateItemByMetadata({
       key: 'binKey', value: 'x', itemKey: 'y', container: { types: 'matchBox' as any },
