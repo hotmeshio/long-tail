@@ -17,7 +17,7 @@ import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
 import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import { displayMetadataEntries } from '../../lib/metadata-display';
-import { escalationItems } from '../../lib/escalation-items';
+import { ITEM_LABEL_KEY, escalationItems } from '../../lib/escalation-items';
 import { EscalationItemsPanel } from './EscalationItemsPanel';
 import type { LTEscalationRecord } from '../../api/types';
 import type { FieldError } from '../../lib/field-validator';
@@ -301,6 +301,8 @@ export function EscalationSidePanel({
               escalationId={esc.id}
               items={items}
               canWrite={!!canWriteItems && esc.status === 'pending'}
+              labelTemplate={schema?.[ITEM_LABEL_KEY]}
+              labelContext={{ escalation: esc as unknown as Record<string, unknown>, metadata: esc.metadata ?? null, envelope, payload }}
             />
           ),
         }]

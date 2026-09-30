@@ -10,6 +10,7 @@
  *   {{payload.category}}                       — the escalation context payload
  *   {{resolver.notes}}                         — the submitted resolver payload
  *   {{lookup.materials.items}}                 — versioned knowledge lookups pinned on the row
+ *   {{item.payload.stickerCode}}               — one held accumulator item (x-lt-item-label)
  *
  * Paths reuse the x-lt-bind syntax (`a.b[0].c`). A missing value renders as an
  * em dash. `x-lt-context` is accepted as the plain-text fallback source when
@@ -17,8 +18,12 @@
  */
 import { getDeep } from './x-lt-bind';
 
-/** The token domains a help template may reference. `input` is the invoke-form name for the live values `resolver` also carries. */
-export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver', 'lookup', 'input'] as const;
+/**
+ * The token domains a help template may reference. `input` is the invoke-form
+ * name for the live values `resolver` also carries; `item` is one held
+ * accumulator item (itemKey, payload, actor, at).
+ */
+export const HELP_DOMAINS = ['escalation', 'metadata', 'envelope', 'payload', 'resolver', 'lookup', 'input', 'item'] as const;
 export type HelpDomain = (typeof HELP_DOMAINS)[number];
 
 export type HelpTokenContext = Partial<Record<HelpDomain, Record<string, unknown> | null>>;
