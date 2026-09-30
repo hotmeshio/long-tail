@@ -107,12 +107,14 @@ export const accumulateItemSchema = z.object({
   payload: z.record(z.any()).optional().describe('Optional item payload, delivered inside $accumulated'),
   metadata: z.record(z.any()).optional().describe('Merge patch for the container metadata, same statement'),
   reciprocal: adminReciprocalSchema.optional(),
+  initiatedBy: z.string().optional().describe('lt_users.id of the person the add is for; recorded as the entry actor (attribution only)'),
 });
 
 export const removeItemSchema = z.object({
   id: z.string().describe('Accumulator escalation UUID'),
   itemKey: z.string().describe('The held item key to remove'),
   reciprocal: adminReciprocalSchema.omit({ payload: true }).optional(),
+  initiatedBy: z.string().optional().describe('lt_users.id of the person the removal is for; recorded as the entry actor (attribution only)'),
 });
 
 export const getEscalationItemsSchema = z.object({

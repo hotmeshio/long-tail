@@ -60,4 +60,23 @@ describe('accumulateStep container selector', () => {
     await accumulateStep(step({ containerFacet: 'boxKey', containerRoles: ['old'], container: { roles: ['new'] } }), ctx);
     expect(add.mock.calls[0][0].restrictRoles).toEqual(['new']);
   });
+
+  it('an item-mode payload template reads the located row, so the add can carry the label field', async () => {
+    locate.mockResolvedValue({
+      escalations: [{ id: SLOT_ID, metadata: { bagCode: 'VC531C38', boxKey: 'BX-1', orderSlug: 'VC531C38' } } as any], total: 1,
+    });
+    const labelled = { ...step({ containerFacet: 'boxKey' }), params: {
+      accumulate: { containerFacet: 'boxKey' }, resolverPayload: { stickerCode: '{item.orderSlug}' },
+    } } as ScanStep;
+    await accumulateStep(labelled, ctx);
+    expect(add.mock.calls[0][0].payload).toEqual({ stickerCode: 'VC531C38' });
+  });
+
+  it('a payload token the located row cannot fill falls through without adding', async () => {
+    const labelled = { ...step({ containerFacet: 'boxKey' }), params: {
+      accumulate: { containerFacet: 'boxKey' }, resolverPayload: { stickerCode: '{item.orderSlug}' },
+    } } as ScanStep;
+    expect(await accumulateStep(labelled, ctx)).toBeNull();
+    expect(add).not.toHaveBeenCalled();
+  });
 });

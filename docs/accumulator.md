@@ -84,7 +84,7 @@ An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated a
 
 ### Attribution
 
-Each entry records its `actor`: the caller, or the user named by `initiatedBy`. A trusted service that adds or removes an item because a person acted elsewhere (submitted their row, scanned at another station) passes that person's `lt_users.id`, so the Items panel and the `escalation.updated` event credit the person. Only callers with global escalation access may name someone else, and the id must be a known user. `initiatedBy` is attribution only: the caller's rights gate the write, and the caller stays `metadata.resolved_by`. All six add and remove forms accept it.
+Each entry records its `actor`: the caller, or the user named by `initiatedBy`. A trusted service that adds or removes an item because a person acted elsewhere (submitted their row, scanned at another station) passes that person's `lt_users.id`, so the Items panel and the `escalation.updated` event credit the person. Only callers with global escalation access may name someone else, and the id must be a known user. `initiatedBy` is attribution only: the caller's rights gate the write, and the caller stays `metadata.resolved_by`. All six add and remove forms accept it, as do the admin MCP tools `accumulate_item` and `remove_item`.
 
 ### Item labels
 
@@ -95,6 +95,17 @@ The Items panel lists each held item by its key. A container role's `form_schema
 ```
 
 The panel shows the label with the key as its tooltip and still removes by key. When the template's tokens all resolve to nothing, the item shows its key.
+
+A scan's item-mode `accumulate` step fills the same payload field from the row it located, through a `{item.<facet>}` token in `params.resolverPayload`:
+
+```jsonc
+"params": {
+  "accumulate": { "containerFacet": "boxKey" },
+  "resolverPayload": { "stickerCode": "{item.orderSlug}" }
+}
+```
+
+A located row that lacks the facet makes the step fall through, so every row the step can locate carries it. When the container role enforces its form, declare the payload field there.
 
 ### Outcomes
 
