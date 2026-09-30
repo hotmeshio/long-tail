@@ -38,6 +38,8 @@ count lives in a metadata facet so a group can be claimed all-or-nothing only wh
 interface FacetQuery {
   role?: string;                    // hard isolation (exact)
   roles?: string[];                 // role = ANY(...)
+  types?: string[];                 // type = ANY(...)
+  subtypes?: string[];              // subtype = ANY(...)
   facets?: Record<string, any>;     // metadata @> facets  — required (AND), GIN-served
   block?: Record<string, any>[];    // NOT (metadata @> ANY(block)) — exclusion list
   range?: { facet: string; op: '<' | '<=' | '>' | '>=' | '='; value: number }[];

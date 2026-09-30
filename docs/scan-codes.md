@@ -98,7 +98,21 @@ Verbs are the canonical escalation actions:
 | `resolve` | Atomic claim + resolve with a canned payload | `resolverPayload`, `metadata` |
 | `escalate` | Create an escalation in another queue, optionally closing the located one | `targetRole`, `closeCurrent`, `escalationType`, `description`, `metadata` |
 | `cancel` | Claim-as-lock, then cancel | — |
-| `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey` (template), `resolverPayload`, `metadata`, `accumulate: { containerFacet, containerRoles, reciprocal }` |
+| `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey` (template), `resolverPayload`, `metadata`, `accumulate: { containerFacet, container, containerRoles, reciprocal }` |
+
+`availability` names the claim state a step's row must be in:
+
+| `availability` | Matches |
+|---|---|
+| `mine` | a row under a live claim held by the acting identity (the badged user, else the session user) |
+| `available` | an unclaimed row, or one whose claim has lapsed |
+| `claimed` | a row under anyone's live claim |
+| `any` (default) | every row the rest of the query matches |
+
+A `resolve` step applies it inside the atomic resolve: `mine` resolves the
+actor's own claim, the most recently claimed first when there are several,
+so a shelf scan bins the bag in the associate's hand even when another bag
+for the same shelf is waiting. With no matching row the step falls through.
 
 String values inside `itemKey`, `resolverPayload`, and `metadata` interpolate
 `{scan.target}`, `{scan.category}`, and `{scan.scannedAt}`. Two facet bags
@@ -117,10 +131,27 @@ scanned target is the ITEM: the step locates the item's own pending row
 through the scheme facet, reads that facet from the row (a bag row carrying
 `binKey: "B-7"`), and adds the target to the pending accumulator whose
 metadata carries the same value, writing the item's row as the reciprocal in
-the same statement (`reciprocal: false` skips it; `containerRoles` names the
-container queues). The container pick considers only pending rows that carry
-the accumulator declaration, so a release row sharing the facet during a
-pack-out is never the target. Without it the scanned target is the CONTAINER and the step
+the same statement (`reciprocal: false` skips it). The container pick
+considers only pending rows that carry the accumulator declaration, so a
+release row sharing the facet during a pack-out is never the target.
+`container` narrows the pick further:
+
+```jsonc
+"accumulate": {
+  "containerFacet": "boxKey",
+  "container": {
+    "roles": ["match-filling"],   // container queues (containerRoles is an alias)
+    "types": ["matchBox"],        // escalation type
+    "subtypes": ["box"],          // escalation subtype
+    "facets": { "open": true }    // extra metadata guards
+  }
+}
+```
+
+A design that parks each item as its own accumulator in the same queue as
+its container (a bag's slot beside its box, both carrying `boxKey`) declares
+the container's type or subtype, so the add lands in the box and never in a
+sibling's slot. The item's own row is never its container. Without it the scanned target is the CONTAINER and the step
 adds `params.itemKey` (a template) to it. An item with no row or no container
 facet falls through to the next step; a container already holding the item
 reports a conflict. When the item's row exists but no pending container
@@ -178,8 +209,10 @@ unsatisfied. Picking one calls `POST /api/scan-codes/execute-choice` with a
 pointer (scheme, category, step index, choice index, escalation id) — and a
 pointer is never authority: the server re-reads live config, re-locates the
 row under the step's query, re-applies the identity gate, and runs the verb
-through the same atomic executors a direct scan uses. A row that moved on
-between render and tap answers `conflict`, exactly as a lost double-scan.
+through the same atomic executors a direct scan uses. A resolve choice
+resolves the exact row the screen presented, re-checked under the step's
+query in the same statement. A row that moved on between render and tap
+answers `conflict`, exactly as a lost double-scan.
 
 A choice's `code` is a short printable token (letters, digits, underscore,
 dash) enabling double-scan selection: scan the object, then scan an action

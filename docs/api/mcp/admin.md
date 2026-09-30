@@ -552,8 +552,9 @@ Start a workflow registered read-safe (side-effect-free). Same contract as `invo
 
 ### get_workflow_status
 
-Check workflow status and result. Returns status (`running` | `complete`) and the
-result when complete. Resolution is namespace-aware — pass `app_id` to read a
+Check workflow status and result. Returns status (`running` | `complete` | `failed`)
+and the result when complete; a failed run carries `terminated` (true when an
+interrupt ended it) and `error`. Resolution is namespace-aware — pass `app_id` to read a
 workflow (e.g. a child) running in a non-default HotMesh namespace.
 
 | | |
