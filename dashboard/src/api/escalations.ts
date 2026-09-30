@@ -29,7 +29,7 @@ export interface FacetFilters {
   include?: 'envelope';
 }
 
-interface EscalationFilters extends FacetFilters {
+export interface EscalationFilters extends FacetFilters {
   status?: string;
   role?: string;
   type?: string;
