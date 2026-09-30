@@ -35,7 +35,10 @@ export function ensureFacetReady(): Promise<void> {
     ready = (async () => {
       await ensureEscalationCompatView(); // hmsh_escalations + lt_escalations view
       await getPool().query(ENSURE_ORIGIN_INDEX);
-    })();
+    })().catch((err) => {
+      ready = null;
+      throw err;
+    });
   }
   return ready;
 }
