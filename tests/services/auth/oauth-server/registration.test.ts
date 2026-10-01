@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  isAllowedRedirectUri, validateClientMetadata, RegistrationLimiter, REGISTRATION_ERRORS,
+  isAllowedRedirectUri, validateClientMetadata, RegistrationLimiter, REGISTRATION_ERRORS, registrationAddressKey,
 } from '../../../../services/auth/oauth-server/registration';
 
-const HOSTS = ['claude.ai'];
+const HOSTS = ['https://claude.ai/api/mcp/auth_callback'];
 
 describe('redirect URI rules', () => {
   it('allow loopback http on any port', () => {
@@ -18,6 +18,23 @@ describe('redirect URI rules', () => {
     expect(isAllowedRedirectUri('https://localhost:8443/cb', HOSTS)).toBe(true);
     expect(isAllowedRedirectUri('https://evil.example/cb', HOSTS)).toBe(false);
     expect(isAllowedRedirectUri('https://claude.ai.evil.example/cb', HOSTS)).toBe(false);
+  });
+
+  it('an allowed https redirect matches the whole URI, never just its host', () => {
+    for (const uri of [
+      'https://claude.ai/cb',
+      'https://claude.ai/api/mcp/auth_callback/extra',
+      'https://claude.ai/api/mcp/auth_callback?next=https://evil.example',
+      'https://claude.ai:8443/api/mcp/auth_callback',
+      'https://claude.ai/../../api/mcp/evil',
+    ]) {
+      expect(isAllowedRedirectUri(uri, HOSTS), uri).toBe(false);
+    }
+  });
+
+  it('the allowed URI matches in canonical form', () => {
+    expect(isAllowedRedirectUri('https://CLAUDE.ai/api/mcp/auth_callback', HOSTS)).toBe(true);
+    expect(isAllowedRedirectUri('https://claude.ai:443/api/mcp/auth_callback', HOSTS)).toBe(true);
   });
 
   it('refuse non-loopback http, custom schemes, fragments, userinfo and garbage', () => {
@@ -63,5 +80,26 @@ describe('registration limiter', () => {
     expect([limiter.allow('a', 0), limiter.allow('a', 1), limiter.allow('a', 2)]).toEqual([true, true, false]);
     expect(limiter.allow('b', 3)).toBe(true);
     expect(limiter.allow('a', 1000)).toBe(true);
+  });
+});
+
+describe('registration hardening', () => {
+  it('client names lose controls and direction overrides', () => {
+    expect(validateClientMetadata({ redirect_uris: ['http://127.0.0.1/cb'], client_name: 'Claude Code‮​ (verified)' }, HOSTS))
+      .toMatchObject({ ok: true, clientName: 'Claude Code (verified)' });
+    expect(validateClientMetadata({ redirect_uris: ['http://127.0.0.1/cb'], client_name: 'Claude\nReturns to: claude.ai' }, HOSTS))
+      .toMatchObject({ ok: true, clientName: 'ClaudeReturns to: claude.ai' });
+  });
+
+  it('a redirect URI with a control character or surrounding space is refused', () => {
+    expect(isAllowedRedirectUri('http://127.0.0.1/c\u0000b', HOSTS)).toBe(false);
+    expect(isAllowedRedirectUri(' http://127.0.0.1/cb', HOSTS)).toBe(false);
+  });
+
+  it('IPv6 addresses count by their /64', () => {
+    expect(registrationAddressKey('2001:db8:1:2:aaaa::1')).toBe(registrationAddressKey('2001:db8:1:2:bbbb::9'));
+    expect(registrationAddressKey('2001:db8:1:2::1')).not.toBe(registrationAddressKey('2001:db8:1:3::1'));
+    expect(registrationAddressKey('::ffff:10.0.0.1')).toBe('10.0.0.1');
+    expect(registrationAddressKey('10.0.0.1')).toBe('10.0.0.1');
   });
 });

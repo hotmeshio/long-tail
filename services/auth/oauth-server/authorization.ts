@@ -1,4 +1,5 @@
 import type { OAuthServerSettings } from '../../../modules/oauth-server';
+import { hasControlCharacters } from './registration';
 import type { LTGrantPreset, LTOAuthClient } from '../../../types/oauth-server';
 import { getClient } from './store';
 import { PRESET_SCOPE } from './constants';
@@ -28,7 +29,8 @@ export type AuthorizationCheck =
 const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43,128}$/;
 const PRESETS: ReadonlySet<string> = new Set(Object.keys(PRESET_SCOPE));
 
-const text = (value: unknown): string | undefined => (typeof value === 'string' && value !== '' ? value : undefined);
+const text = (value: unknown): string | undefined =>
+  (typeof value === 'string' && value !== '' && !hasControlCharacters(value) ? value : undefined);
 
 export async function checkAuthorizationRequest(
   params: Record<string, unknown>,

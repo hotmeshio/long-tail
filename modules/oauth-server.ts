@@ -7,7 +7,19 @@ export interface OAuthServerSettings {
   resource: string;
   /** RFC 9728 protected-resource metadata URL for `resource`. */
   resourceMetadataUrl: string;
-  allowedRedirectHosts: string[];
+  /** Canonical https redirect URIs allowed beyond loopback. */
+  allowedRedirectUris: string[];
+}
+
+/** An https URI in canonical form, or null when it is not one (a malformed entry never matches). */
+export function canonicalHttpsUri(uri: string): string | null {
+  try {
+    const url = new URL(uri);
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 let settings: OAuthServerSettings | null = null;
@@ -20,7 +32,9 @@ export function setOAuthServerConfig(config: LTOAuthServerConfig): void {
     issuer,
     resource,
     resourceMetadataUrl: `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`,
-    allowedRedirectHosts: config.allowedRedirectHosts ?? [],
+    allowedRedirectUris: (config.allowedRedirectUris ?? [])
+      .map(canonicalHttpsUri)
+      .filter((uri): uri is string => uri !== null),
   };
 }
 

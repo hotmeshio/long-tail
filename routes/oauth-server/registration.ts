@@ -2,7 +2,7 @@ import { Router, allowAnyOrigin } from '../../lib/http';
 import { getOAuthServerSettings } from '../../modules/oauth-server';
 import { OAUTH_REGISTRATIONS_PER_WINDOW, OAUTH_REGISTRATION_WINDOW_SECONDS } from '../../modules/defaults';
 import { registerClient } from '../../services/auth/oauth-server';
-import { validateClientMetadata, RegistrationLimiter } from '../../services/auth/oauth-server/registration';
+import { validateClientMetadata, RegistrationLimiter, registrationAddressKey } from '../../services/auth/oauth-server/registration';
 
 const router = Router();
 const limiter = new RegistrationLimiter(OAUTH_REGISTRATIONS_PER_WINDOW, OAUTH_REGISTRATION_WINDOW_SECONDS * 1000);
@@ -14,12 +14,12 @@ const limiter = new RegistrationLimiter(OAUTH_REGISTRATIONS_PER_WINDOW, OAUTH_RE
  */
 router.options('/register', allowAnyOrigin(['POST']));
 router.post('/register', allowAnyOrigin(['POST']), async (req, res) => {
-  if (!limiter.allow(req.ip ?? 'unknown')) {
+  if (!limiter.allow(registrationAddressKey(req.ip ?? 'unknown'))) {
     res.status(429).json({ error: 'rate_limited', error_description: 'too many client registrations; try again later' });
     return;
   }
   const settings = getOAuthServerSettings()!;
-  const checked = validateClientMetadata(req.body, settings.allowedRedirectHosts);
+  const checked = validateClientMetadata(req.body, settings.allowedRedirectUris);
   if (!checked.ok) {
     res.status(400).json({ error: checked.error, error_description: checked.description });
     return;

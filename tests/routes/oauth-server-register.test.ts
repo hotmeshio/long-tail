@@ -59,7 +59,7 @@ describe('POST /api/oauth/register', () => {
   });
 
   it('refuses a disallowed redirect URI with an RFC 7591 error', async () => {
-    setOAuthServerConfig({ issuer: 'http://lt.example', allowedRedirectHosts: ['claude.ai'] });
+    setOAuthServerConfig({ issuer: 'http://lt.example', allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'] });
     const reply = await register({ redirect_uris: ['https://evil.example/cb'] });
     expect(reply.status).toBe(400);
     expect(reply.body.error).toBe('invalid_redirect_uri');

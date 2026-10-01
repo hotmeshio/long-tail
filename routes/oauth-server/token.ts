@@ -5,16 +5,24 @@ import {
   exchangeAuthorizationCode, rotateRefreshToken, revokeByRefreshToken, revokeGrant,
   signAccessToken, verifyAccessToken,
 } from '../../services/auth/oauth-server';
+import { hasControlCharacters } from '../../services/auth/oauth-server/registration';
 import type { LTGrantSnapshot } from '../../types';
 
 const router = Router();
 
-/** A form field, taking the first value when the host parsed repeats into an array. */
+/**
+ * A form field, taking the first value when the host parsed repeats into an
+ * array. A value carrying a control character is treated as absent: no
+ * token, id or URI contains one.
+ */
 function field(body: unknown, name: string): string | undefined {
   const value = (body as Record<string, unknown> | undefined)?.[name];
   const first = Array.isArray(value) ? value[0] : value;
-  return typeof first === 'string' && first !== '' ? first : undefined;
+  return typeof first === 'string' && first !== '' && !hasControlCharacters(first) ? first : undefined;
 }
+
+/** RFC 7636 §4.1: 43 to 128 unreserved characters. */
+const CODE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
 
 function tokenError(res: Response, error: string, description: string): void {
   res.status(400).json({ error, error_description: description });
@@ -49,6 +57,9 @@ router.post('/token', ...tokenEndpoint, async (req, res) => {
     const codeVerifier = field(req.body, 'code_verifier');
     if (!code || !redirectUri || !codeVerifier) {
       return tokenError(res, 'invalid_request', 'code, redirect_uri and code_verifier are required');
+    }
+    if (!CODE_VERIFIER.test(codeVerifier)) {
+      return tokenError(res, 'invalid_request', 'code_verifier must be 43 to 128 unreserved characters');
     }
     const resource = field(req.body, 'resource');
     if (resource !== undefined && resource !== settings.resource) {

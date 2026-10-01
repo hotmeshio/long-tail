@@ -1,4 +1,4 @@
-import { Router, allowAnyOrigin } from '../../lib/http';
+import { Router, allowAnyOrigin, type Request, type Response, type NextFunction } from '../../lib/http';
 import { getOAuthServerSettings } from '../../modules/oauth-server';
 import { authorizationServerMetadata } from '../../services/auth/oauth-server/metadata';
 import registrationRouter from './registration';
@@ -35,5 +35,18 @@ router.use(registrationRouter);
 router.use(authorizeRouter);
 router.use(tokenRouter);
 router.use(grantsRouter);
+
+/**
+ * Anything an endpoint did not answer itself answers in the RFC 6749 error
+ * shape: a body that does not parse is the client's error, anything else the
+ * server's. No message or stack reaches the client.
+ */
+router.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (res.headersSent) return;
+  const malformed = err?.type === 'entity.parse.failed' || err?.status === 400;
+  res.status(malformed ? 400 : 500).json(malformed
+    ? { error: 'invalid_request', error_description: 'the request body is malformed' }
+    : { error: 'server_error', error_description: 'the request could not be completed' });
+});
 
 export default router;

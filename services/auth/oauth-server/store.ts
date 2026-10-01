@@ -46,7 +46,12 @@ export async function registerClient(input: { clientName?: string; redirectUris:
   return rows[0];
 }
 
+/** A client id as registerClient issues it; anything else names no client and never reaches SQL. */
+const CLIENT_ID = /^ltc_[A-Za-z0-9_-]{43}$/;
+export const isClientId = (value: string): boolean => CLIENT_ID.test(value);
+
 export async function getClient(clientId: string): Promise<LTOAuthClient | null> {
+  if (!isClientId(clientId)) return null;
   const { rows } = await getPool().query(GET_CLIENT, [clientId]);
   return rows[0] ?? null;
 }
