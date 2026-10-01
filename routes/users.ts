@@ -1,11 +1,18 @@
 import { Router } from '../lib/http';
 
 import { requireAdmin, requireBuilder, requireRoleManager } from '../modules/auth';
-import { mayGrantRole } from '../modules/capabilities';
+import { mayGrantRole, mayGrantRoles, mayManageAccount, mayRevokeRole, type GrantDecision } from '../modules/capabilities';
 import * as api from '../api/users';
 import * as personasApi from '../api/personas';
 
 const router = Router();
+
+/** Answer a refused decision with 403; true when the request may go on. */
+function allowed(decision: GrantDecision, res: { status: (code: number) => { json: (body: unknown) => void } }): boolean {
+  if (decision.allowed) return true;
+  res.status(403).json({ error: decision.error });
+  return false;
+}
 
 // ── User CRUD ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +69,7 @@ router.get('/:id', async (req, res) => {
  * Body: { external_id, email?, display_name?, roles?: [{ role, type }], metadata? }
  */
 router.post('/', requireBuilder, async (req, res) => {
+  if (!allowed(await mayGrantRoles(req.auth!.userId, (req.body || {}).roles), res)) return;
   const result = await api.createUser(req.body || {});
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -72,6 +80,7 @@ router.post('/', requireBuilder, async (req, res) => {
  * Body: { email?, display_name?, status?, metadata? }
  */
 router.put('/:id', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.updateUser({ id: req.params.id as string, ...(req.body || {}) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -83,6 +92,7 @@ router.put('/:id', requireBuilder, async (req, res) => {
  * Body: { set?: { key: value }, remove?: [key], rename?: { old: new } }
  */
 router.patch('/:id/properties', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const { set, remove, rename } = req.body || {};
   const result = await api.patchUserProperties({
     id: req.params.id as string,
@@ -98,6 +108,7 @@ router.patch('/:id/properties', requireBuilder, async (req, res) => {
  * Delete a user. Builder only.
  */
 router.delete('/:id', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.deleteUser({ id: req.params.id as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -143,6 +154,8 @@ router.post('/:id/roles', requireAdmin, async (req, res) => {
  * Remove a role from a user.
  */
 router.delete('/:id/roles/:role', requireAdmin, async (req, res) => {
+  const decision = await mayRevokeRole(req.auth!.userId, String(req.params.id), String(req.params.role));
+  if (!allowed(decision, res)) return;
   const result = await api.removeUserRole({ id: req.params.id as string, role: req.params.role as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

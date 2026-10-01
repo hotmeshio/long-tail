@@ -1,9 +1,17 @@
 import { Router } from '../lib/http';
 
 import { requireBuilder } from '../modules/auth';
+import { mayGrantRole, mayGrantRoles, mayManageAccount, mayRevokeRole, type GrantDecision } from '../modules/capabilities';
 import * as api from '../api/bot-accounts';
 
 const router = Router();
+
+/** Answer a refused decision with 403; true when the request may go on. */
+function allowed(decision: GrantDecision, res: { status: (code: number) => { json: (body: unknown) => void } }): boolean {
+  if (decision.allowed) return true;
+  res.status(403).json({ error: decision.error });
+  return false;
+}
 
 // All bot account routes require admin access
 router.use(requireBuilder);
@@ -41,6 +49,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   const { name, description, display_name, roles } = req.body || {};
+  if (!allowed(await mayGrantRoles(req.auth!.userId, roles), res)) return;
   const result = await api.createBot(
     { name, description, display_name, roles },
     req.auth ? { userId: req.auth.userId } : undefined,
@@ -54,6 +63,7 @@ router.post('/', async (req, res) => {
  * Body: { display_name?, description?, status? }
  */
 router.put('/:id', async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.updateBot({ id: req.params.id, ...(req.body || {}) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -63,6 +73,7 @@ router.put('/:id', async (req, res) => {
  * Delete a bot account.
  */
 router.delete('/:id', async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.deleteBot({ id: req.params.id });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -85,6 +96,7 @@ router.get('/:id/roles', async (req, res) => {
  */
 router.post('/:id/roles', async (req, res) => {
   const { role, type } = req.body || {};
+  if (!allowed(await mayGrantRole(req.auth!.userId, { role, type }), res)) return;
   const result = await api.addBotRole({ id: req.params.id, role, type });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -94,6 +106,7 @@ router.post('/:id/roles', async (req, res) => {
  * Remove a role from a bot.
  */
 router.delete('/:id/roles/:role', async (req, res) => {
+  if (!allowed(await mayRevokeRole(req.auth!.userId, String(req.params.id), String(req.params.role)), res)) return;
   const result = await api.removeBotRole({ id: req.params.id, role: req.params.role });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -116,6 +129,7 @@ router.get('/:id/api-keys', async (req, res) => {
  * Returns the raw key ONCE — it cannot be retrieved again.
  */
 router.post('/:id/api-keys', async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const { name, scopes, expires_at } = req.body || {};
   const result = await api.createBotKey({
     id: req.params.id,
@@ -131,7 +145,9 @@ router.post('/:id/api-keys', async (req, res) => {
  * Revoke (delete) a bot API key.
  */
 router.delete('/:id/api-keys/:keyId', async (req, res) => {
-  const result = await api.revokeBotKey({ keyId: req.params.keyId });
+  const botId = String(req.params.id);
+  if (!allowed(await mayManageAccount(req.auth!.userId, botId), res)) return;
+  const result = await api.revokeBotKey({ keyId: String(req.params.keyId), botId });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
