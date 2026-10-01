@@ -47,7 +47,7 @@ describe('File browser routes', () => {
   describe.skip('GET /file-browser/browse', () => {
     it('returns files and directories arrays with auth', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/browse`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -59,7 +59,7 @@ describe('File browser routes', () => {
 
     it('accepts prefix query parameter', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/browse?prefix=nonexistent/`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -68,7 +68,7 @@ describe('File browser routes', () => {
 
     it('accepts pageSize query parameter', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/browse?pageSize=10`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
     });
@@ -86,7 +86,7 @@ describe('File browser routes', () => {
   describe('GET /file-browser/metadata/*', () => {
     it('returns 404 for non-existent file', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/metadata/does-not-exist.txt`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       // Could be 404 or 500 depending on backend
       expect([404, 500]).toContain(res.status);
@@ -99,7 +99,7 @@ describe('File browser routes', () => {
     it('returns 400 when path is missing', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/signed-url`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ expiresIn: 3600 }),
       });
       expect(res.status).toBe(400);
@@ -110,7 +110,7 @@ describe('File browser routes', () => {
     it('returns 400 when expiresIn is missing', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/signed-url`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ path: 'test.txt' }),
       });
       expect(res.status).toBe(400);
@@ -119,7 +119,7 @@ describe('File browser routes', () => {
     it('returns 400 for invalid expiresIn value', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/signed-url`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ path: 'test.txt', expiresIn: 999 }),
       });
       expect(res.status).toBe(400);
@@ -133,7 +133,7 @@ describe('File browser routes', () => {
   describe('GET /file-browser/download/*', () => {
     it('returns 404 for non-existent file', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/download/does-not-exist.txt`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

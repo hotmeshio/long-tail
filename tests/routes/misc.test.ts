@@ -74,22 +74,20 @@ describe('Namespace routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('allows member role to create namespace', async () => {
+    it('refuses a member: registering a namespace needs builder access', async () => {
       const name = `test-ns-member-${Date.now()}`;
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
         headers: authHeaders(ctx.memberToken),
         body: JSON.stringify({ name, description: 'Member namespace' }),
       });
-      expect(res.status).toBe(200);
-      const body = await res.json() as any;
-      expect(body.name).toBe(name);
+      expect(res.status).toBe(403);
     });
 
     it('returns 400 when name is missing', async () => {
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -101,7 +99,7 @@ describe('Namespace routes', () => {
       const name = `test-ns-${Date.now()}`;
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name, description: 'Test namespace' }),
       });
       expect(res.status).toBe(200);
@@ -208,7 +206,7 @@ describe('Insight routes', () => {
     it('returns 400 when prompt is missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -219,7 +217,7 @@ describe('Insight routes', () => {
     it('accepts async mode and returns workflow_id or 503', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'screenshot a webpage and save it', wait: false }),
       });
       expect([200, 503]).toContain(res.status);
@@ -233,7 +231,7 @@ describe('Insight routes', () => {
     it('accepts tags parameter', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test', tags: ['browser-automation'], wait: false }),
       });
       expect([200, 503]).toContain(res.status);
@@ -249,7 +247,7 @@ describe('Insight routes', () => {
     it('returns 400 when required fields are missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test' }),
       });
       expect(res.status).toBe(400);
@@ -260,7 +258,7 @@ describe('Insight routes', () => {
     it('returns 400 when feedback is missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test', prior_yaml: 'app:\n  id: test' }),
       });
       expect(res.status).toBe(400);
@@ -271,7 +269,7 @@ describe('Insight routes', () => {
     it('accepts valid refine request or 503', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           prompt: 'screenshot a webpage',
           prior_yaml: 'app:\n  id: test\n  version: "1"',

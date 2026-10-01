@@ -170,7 +170,7 @@ describe('Workflow routes', () => {
     it('returns 404 for unknown workflow', async () => {
       const res = await fetch(`${ctx.BASE}/workflows/nonexistent-wf-id/terminate`, {
         method: 'POST',
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(404);

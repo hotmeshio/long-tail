@@ -137,6 +137,39 @@ export const GATED_ROUTES: GatedRoute[] = [
   { method: 'GET', path: '/controlplane/stream-messages', gate: 'builder' },
   { method: 'POST', path: '/controlplane/subscribe', gate: 'builder', body: {} },
 
+  // routes/agents.ts
+  { method: 'GET', path: '/agents', gate: 'none' },
+  { method: 'POST', path: '/agents', gate: 'builder', body: { id: 'gate-agent' } },
+  { method: 'PUT', path: '/agents/gate-agent', gate: 'builder', body: {} },
+  { method: 'DELETE', path: '/agents/gate-agent', gate: 'builder' },
+  { method: 'POST', path: '/agents/gate-agent/subscriptions', gate: 'builder', body: { topic: 't', reaction_type: 'durable', execute_as: 'x' } },
+  { method: 'DELETE', path: `/agents/gate-agent/subscriptions/${ID}`, gate: 'builder' },
+
+  // routes/topics.ts
+  { method: 'GET', path: '/topics', gate: 'none' },
+  { method: 'POST', path: '/topics', gate: 'builder', body: {} },
+  { method: 'PUT', path: '/topics/by-name/app.gate', gate: 'builder', body: {} },
+  { method: 'DELETE', path: '/topics/by-name/app.gate', gate: 'builder' },
+  { method: 'POST', path: '/topics/by-name/app.gate/publish', gate: 'builder', body: {} },
+
+  // routes/yaml-workflows/*
+  { method: 'POST', path: '/yaml-workflows', gate: 'builder', body: {} },
+  { method: 'PUT', path: `/yaml-workflows/${ID}`, gate: 'builder', body: {} },
+  { method: 'DELETE', path: `/yaml-workflows/${ID}`, gate: 'builder' },
+  { method: 'POST', path: `/yaml-workflows/${ID}/deploy`, gate: 'builder', body: {} },
+  { method: 'POST', path: `/yaml-workflows/${ID}/activate`, gate: 'builder', body: {} },
+  { method: 'POST', path: `/yaml-workflows/${ID}/archive`, gate: 'builder', body: {} },
+  { method: 'POST', path: `/yaml-workflows/${ID}/invoke`, gate: 'none', body: {} },
+  { method: 'DELETE', path: `/yaml-workflows/${ID}/cron`, gate: 'builder' },
+
+  // routes/file-browser.ts, insight.ts, workflow-sets.ts, namespaces.ts, pipelines.ts, workflows/invocation.ts
+  { method: 'POST', path: '/file-browser/signed-url', gate: 'builder', body: { path: 'a', expiresIn: 3600 } },
+  { method: 'POST', path: '/insight/build-workflow', gate: 'builder', body: {} },
+  { method: 'POST', path: '/workflow-sets', gate: 'builder', body: {} },
+  { method: 'POST', path: '/namespaces', gate: 'builder', body: {} },
+  { method: 'POST', path: `/pipelines/${ID}/interrupt`, gate: 'builder', body: {} },
+  { method: 'POST', path: `/workflows/${ID}/terminate`, gate: 'builder', body: {} },
+
   // routes/mcp.ts
   { method: 'GET', path: '/mcp/servers', gate: 'none' },
   { method: 'POST', path: '/mcp/servers', gate: 'builder', body: {} },

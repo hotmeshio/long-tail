@@ -1,4 +1,5 @@
 import { Router } from '../../lib/http';
+import { requireBuilder } from '../../modules/auth';
 
 import * as api from '../../api/workflows';
 
@@ -69,8 +70,8 @@ router.get('/:workflowId/result', async (req, res) => {
  * POST /api/workflows/:workflowId/terminate
  * Interrupt/terminate a running workflow.
  */
-router.post('/:workflowId/terminate', async (req, res) => {
-  const result = await api.terminateWorkflow({ workflowId: req.params.workflowId });
+router.post('/:workflowId/terminate', requireBuilder, async (req, res) => {
+  const result = await api.terminateWorkflow({ workflowId: String(req.params.workflowId) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -79,7 +80,7 @@ router.post('/:workflowId/terminate', async (req, res) => {
  * Export workflow state. Convenience alias for /api/workflow-states/:workflowId.
  */
 router.get('/:workflowId/export', async (req, res) => {
-  const result = await api.exportWorkflow({ workflowId: req.params.workflowId });
+  const result = await api.exportWorkflow({ workflowId: String(req.params.workflowId) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
