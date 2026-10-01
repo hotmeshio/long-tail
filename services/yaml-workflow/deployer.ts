@@ -121,6 +121,22 @@ export async function activateYamlWorkflow(
   return result;
 }
 
+/** The key compiled workflow activities read their identity context from. */
+export const SCOPE_KEY = '_scope';
+
+/**
+ * The trigger data a compiled workflow starts with. Identity context is never
+ * taken from the data a caller supplied: any `_scope` there is dropped, and
+ * only the scope the server resolved is set.
+ */
+export function withTrustedScope(
+  data: Record<string, unknown>,
+  scope?: Record<string, unknown>,
+): Record<string, unknown> {
+  const { [SCOPE_KEY]: _dropped, ...rest } = data ?? {};
+  return scope ? { ...rest, [SCOPE_KEY]: scope } : rest;
+}
+
 /**
  * Invoke a YAML workflow (fire-and-forget). Returns the job ID.
  */
@@ -130,9 +146,10 @@ export async function invokeYamlWorkflow(
   data: Record<string, unknown>,
   entity?: string,
   context?: Record<string, any>,
+  scope?: Record<string, unknown>,
 ): Promise<string> {
   const engine = await getEngine(appId);
-  return engine.pub(topic, data, context as any, entity ? { entity } : undefined);
+  return engine.pub(topic, withTrustedScope(data, scope), context as any, entity ? { entity } : undefined);
 }
 
 /**
@@ -150,6 +167,7 @@ export async function invokeYamlWorkflowSync(
   data: Record<string, unknown>,
   timeout?: number,
   entity?: string,
+  scope?: Record<string, unknown>,
 ): Promise<{ job_id: string; result: Record<string, unknown> }> {
   const hotmesh = await getEngine(appId);
   const engine = (hotmesh as any).engine;
@@ -165,7 +183,7 @@ export async function invokeYamlWorkflowSync(
 
   // Publish with entity via extended param
   const extended = entity ? { entity } : undefined;
-  const jobId: string = await engine.pub(topic, data, context, extended);
+  const jobId: string = await engine.pub(topic, withTrustedScope(data, scope), context, extended);
 
   return new Promise((resolve, reject) => {
     engine.registerJobCallback(jobId, (_topic: string, output: any) => {

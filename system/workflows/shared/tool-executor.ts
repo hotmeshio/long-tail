@@ -29,22 +29,20 @@ export async function callTool(
         return { error: `Compiled workflow "${yamlWorkflowName}" is not active` };
       }
       const toolCtx = getToolContext();
-      const scopedArgs = toolCtx?.principal.id
+      const scope = toolCtx?.principal.id
         ? {
-            ...args,
-            _scope: {
-              principal: toolCtx.principal,
-              ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
-              scopes: toolCtx.credentials.scopes,
-            },
+            principal: toolCtx.principal,
+            ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
+            scopes: toolCtx.credentials.scopes,
           }
-        : args;
+        : undefined;
       const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
-        scopedArgs,
+        args,
         undefined,
         wf.graph_topic,
+        scope,
       );
       return { job_id, workflow: yamlWorkflowName, status: 'completed', result };
     } catch (err: any) {
