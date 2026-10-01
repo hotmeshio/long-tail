@@ -92,6 +92,7 @@ export class LTExpressAdapter {
       }
       attachNatsWsProxy(server, natsAdapter.wsProxyTarget, {
         basePath: this.basePath,
+        authToken: natsAdapter.authToken,
         onWsUrlDerived: (url) => {
           if (!natsAdapter.wsUrl) {
             natsAdapter.setWsUrl(url);

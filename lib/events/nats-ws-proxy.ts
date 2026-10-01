@@ -3,6 +3,8 @@ import type { Socket } from 'net';
 import { WebSocketServer, WebSocket } from 'ws';
 
 import { loggerRegistry } from '../logger';
+import { NatsClientFilter } from './nats-ws-filter';
+import { NATS_WS_TICKET_PARAM, verifyNatsWsTicket } from './nats-ws-ticket';
 
 /** Default path for the NATS WebSocket proxy endpoint. */
 export const NATS_WS_PROXY_PATH = '/nats-ws';
@@ -41,6 +43,8 @@ export function attachNatsWsProxy(
   options: {
     basePath?: string;
     onWsUrlDerived?: (url: string) => void;
+    /** The NATS server credential, written into each browser's CONNECT by the proxy. */
+    authToken?: string | null;
   } = {},
 ): void {
   const basePath = options.basePath || '';
@@ -49,7 +53,14 @@ export function attachNatsWsProxy(
   let derived = false;
 
   server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
-    if (req.url !== proxyPath) return;
+    const url = new URL(req.url ?? '/', 'http://proxy');
+    if (url.pathname !== proxyPath) return;
+    // Only a signed-in person, holding the ticket the credentials route issued.
+    if (!verifyNatsWsTicket(url.searchParams.get(NATS_WS_TICKET_PARAM))) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
 
     // Derive the public wsUrl from the first request's headers
     if (!derived && options.onWsUrlDerived) {
@@ -60,9 +71,17 @@ export function attachNatsWsProxy(
     wss.handleUpgrade(req, socket, head, (clientWs) => {
       const upstream = new WebSocket(target);
 
+      // The browser reads; the proxy holds the credential and drops its publishes.
+      const filter = new NatsClientFilter(options.authToken ?? null);
       upstream.on('open', () => {
         clientWs.on('message', (data) => {
-          if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
+          const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+          const forward = filter.feed(chunk);
+          if (filter.malformed) {
+            clientWs.close();
+            return;
+          }
+          if (forward.length && upstream.readyState === WebSocket.OPEN) upstream.send(forward);
         });
         upstream.on('message', (data) => {
           if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
