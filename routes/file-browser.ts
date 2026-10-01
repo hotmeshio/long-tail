@@ -1,4 +1,5 @@
 import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 import path from 'path';
 
 import * as api from '../api/files';
@@ -41,7 +42,7 @@ router.get('/metadata/{*filePath}', async (req, res) => {
  * Generate a time-limited signed URL for sharing.
  * Body: { path, expiresIn } — expiresIn in seconds (3600, 21600, 86400, 604800, 2592000)
  */
-router.post('/signed-url', async (req, res) => {
+router.post('/signed-url', requireBuilder, async (req, res) => {
   const { path: filePath, expiresIn } = req.body;
   if (!filePath || !expiresIn) {
     res.status(400).json({ error: 'path and expiresIn are required' });
@@ -58,7 +59,7 @@ router.post('/signed-url', async (req, res) => {
  * DELETE /api/file-browser/delete/*
  * Permanently delete a file.
  */
-router.delete('/delete/{*filePath}', async (req, res) => {
+router.delete('/delete/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {
@@ -100,7 +101,7 @@ router.get('/download/{*filePath}', async (req, res) => {
  * Query: ?path=images/photo.png (target path including filename)
  * Body: raw file bytes (Content-Type should match the file type)
  */
-router.post('/upload', async (req, res) => {
+router.post('/upload', requireBuilder, async (req, res) => {
   const targetPath = req.query.path as string;
   if (!targetPath) {
     res.status(400).json({ error: 'path query parameter required (e.g., ?path=images/photo.png)' });

@@ -1,4 +1,5 @@
 import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 
 import * as api from '../api/namespaces';
 
@@ -18,7 +19,7 @@ router.get('/', async (_req, res) => {
  * Register a new namespace.
  * Body: { name: string, description?: string, metadata?: object }
  */
-router.post('/', async (req, res) => {
+router.post('/', requireBuilder, async (req, res) => {
   const result = await api.registerNamespace({
     name: req.body?.name,
     description: req.body?.description,

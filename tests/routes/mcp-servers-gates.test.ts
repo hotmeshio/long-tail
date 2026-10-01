@@ -88,3 +88,24 @@ describe('Capabilities listing', () => {
     expect(member.has('list_bot_accounts')).toBe(false);
   });
 });
+
+describe('topic publish', () => {
+  it('a builder who is not superadmin may not publish a system subject', async () => {
+    const { signToken } = await import('../../modules/auth');
+    const userService = await import('../../services/user');
+    const engineer = await userService.createUser({ external_id: `pub-engineer-${Date.now()}`, roles: [{ role: 'engineer', type: 'member' } as any] });
+    try {
+      const token = signToken({ userId: engineer.id, role: 'member' });
+      const sys = await post('/topics/by-name/system.oauth.grant.revoked/publish', token, { data: { grantId: 'x' } });
+      expect(sys.status).toBe(403);
+      const agentSubject = await post('/topics/by-name/app.any/publish', token, { subject: 'agent.triggers_changed' });
+      expect(agentSubject.status).toBe(403);
+    } finally {
+      await userService.deleteUser(engineer.id);
+    }
+  });
+
+  it('a member may not publish at all', async () => {
+    expect((await post('/topics/by-name/app.any/publish', ctx.memberToken, {})).status).toBe(403);
+  });
+});

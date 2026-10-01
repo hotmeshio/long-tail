@@ -17,7 +17,7 @@ describe('Topic routes', () => {
     it('POST /api/topics creates a topic', async () => {
       const res = await fetch(`${ctx.BASE}/topics`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           topic: topicName,
           category: 'app',
@@ -34,7 +34,7 @@ describe('Topic routes', () => {
     it('POST /api/topics returns 400 without topic or category', async () => {
       const res = await fetch(`${ctx.BASE}/topics`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -42,7 +42,7 @@ describe('Topic routes', () => {
 
     it('GET /api/topics lists topics', async () => {
       const res = await fetch(`${ctx.BASE}/topics`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -51,7 +51,7 @@ describe('Topic routes', () => {
 
     it('GET /api/topics?category=app filters by category', async () => {
       const res = await fetch(`${ctx.BASE}/topics?category=app`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -60,7 +60,7 @@ describe('Topic routes', () => {
 
     it('GET /api/topics?search=test searches', async () => {
       const res = await fetch(`${ctx.BASE}/topics?search=test`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -69,7 +69,7 @@ describe('Topic routes', () => {
 
     it('GET /api/topics/by-name/:topic returns the topic', async () => {
       const res = await fetch(`${ctx.BASE}/topics/by-name/${encodeURIComponent(topicName)}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -78,7 +78,7 @@ describe('Topic routes', () => {
 
     it('GET /api/topics/by-name/:topic returns 404 for missing topic', async () => {
       const res = await fetch(`${ctx.BASE}/topics/by-name/${encodeURIComponent('no.such.topic')}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -86,7 +86,7 @@ describe('Topic routes', () => {
     it('PUT /api/topics/by-name/:topic updates description/tags', async () => {
       const res = await fetch(`${ctx.BASE}/topics/by-name/${encodeURIComponent(topicName)}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ description: 'Updated description', tags: ['test', 'updated'] }),
       });
       expect(res.status).toBe(200);
@@ -97,7 +97,7 @@ describe('Topic routes', () => {
     it('DELETE /api/topics/by-name/:topic deletes the topic', async () => {
       const res = await fetch(`${ctx.BASE}/topics/by-name/${encodeURIComponent(topicName)}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -108,7 +108,7 @@ describe('Topic routes', () => {
       const systemTopic = 'system.task.*.created';
       const res = await fetch(`${ctx.BASE}/topics/by-name/${encodeURIComponent(systemTopic)}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect([400, 403]).toContain(res.status);
     });

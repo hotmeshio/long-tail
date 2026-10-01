@@ -1,6 +1,14 @@
 import { Router } from '../lib/http';
 
 import * as api from '../api/topics';
+import { requireBuilder } from '../modules/auth';
+import { isSuperAdmin } from '../services/user';
+
+/**
+ * Subjects the platform itself publishes and acts on (agent triggers, system
+ * lifecycle). Only a superadmin may publish one over REST.
+ */
+const RESERVED_SUBJECT_PREFIXES = ['system.', 'agent.'];
 
 const router = Router();
 
@@ -23,7 +31,7 @@ router.get('/', async (req, res) => {
  * POST /api/topics
  * Register a new topic in the catalog.
  */
-router.post('/', async (req, res) => {
+router.post('/', requireBuilder, async (req, res) => {
   const { topic, category } = req.body;
   if (!topic || !category) {
     res.status(400).json({ error: 'topic and category are required' });
@@ -46,8 +54,8 @@ router.get('/by-name/:topic', async (req, res) => {
  * PUT /api/topics/by-name/:topic
  * Update a topic in the catalog.
  */
-router.put('/by-name/:topic', async (req, res) => {
-  const result = await api.updateTopic({ topic: decodeURIComponent(req.params.topic), ...req.body });
+router.put('/by-name/:topic', requireBuilder, async (req, res) => {
+  const result = await api.updateTopic({ ...req.body, topic: decodeURIComponent(String(req.params.topic)) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -55,8 +63,8 @@ router.put('/by-name/:topic', async (req, res) => {
  * DELETE /api/topics/by-name/:topic
  * Delete a topic from the catalog (system topics are protected).
  */
-router.delete('/by-name/:topic', async (req, res) => {
-  const result = await api.deleteTopic({ topic: decodeURIComponent(req.params.topic) });
+router.delete('/by-name/:topic', requireBuilder, async (req, res) => {
+  const result = await api.deleteTopic({ topic: decodeURIComponent(String(req.params.topic)) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -64,10 +72,15 @@ router.delete('/by-name/:topic', async (req, res) => {
  * POST /api/topics/by-name/:topic/publish
  * Publish a test event to the event bus with the given topic and payload.
  */
-router.post('/by-name/:topic/publish', async (req, res) => {
+router.post('/by-name/:topic/publish', requireBuilder, async (req, res) => {
   // The request body IS the event envelope (Partial<LTEvent> + optional subject).
+  const subject = String((req.body as api.PublishEventInput | undefined)?.subject || decodeURIComponent(String(req.params.topic)));
+  if (RESERVED_SUBJECT_PREFIXES.some((prefix) => subject.startsWith(prefix)) && !(await isSuperAdmin(req.auth!.userId))) {
+    res.status(403).json({ error: 'Forbidden: only superadmin can publish a system subject' });
+    return;
+  }
   const result = await api.publishTopic({
-    topic: decodeURIComponent(req.params.topic),
+    topic: decodeURIComponent(String(req.params.topic)),
     event: (req.body ?? {}) as api.PublishEventInput,
   });
   res.status(result.status).json(result.data ?? { error: result.error });

@@ -9,6 +9,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as configService from '../../../services/config';
+import { assertMayActAs } from '../../../services/workflow-invocation';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import { resolveLookupContext } from '../../../services/knowledge/lookup-cache';
 import { describeMissingLookupRefs } from '../../../services/knowledge/lookup-refs';
 import { ltConfig } from '../../../modules/ltconfig';
@@ -99,7 +101,15 @@ export function registerWorkflowConfigTools(server: McpServer): void {
         'Invalidates the config cache and restarts cron if schedule changes.',
       inputSchema: upsertWorkflowConfigSchema,
     },
-    async (args: z.infer<typeof upsertWorkflowConfigSchema>) => {
+    async (args: z.infer<typeof upsertWorkflowConfigSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      if (caller && args.execute_as) {
+        try {
+          await assertMayActAs(caller.userId, args.execute_as);
+        } catch (err: any) {
+          return errorResult(err.message);
+        }
+      }
       if (args.icon && !isWorkflowIcon(args.icon)) {
         return errorResult(`Unknown workflow icon "${args.icon}"; choose one of WORKFLOW_ICONS`);
       }

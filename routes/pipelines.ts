@@ -1,4 +1,5 @@
 import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 
 import * as api from '../api/pipelines';
 
@@ -42,7 +43,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:jobId/execution', async (req, res) => {
   const result = await api.getJobExecution({
-    jobId: req.params.jobId,
+    jobId: String(req.params.jobId),
     app_id: req.query.app_id as string,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -53,9 +54,9 @@ router.get('/:jobId/execution', async (req, res) => {
  * Interrupt a running pipeline job via HotMesh.interrupt().
  * Body: { topic, app_id }
  */
-router.post('/:jobId/interrupt', async (req, res) => {
+router.post('/:jobId/interrupt', requireBuilder, async (req, res) => {
   const result = await api.interruptJob({
-    jobId: req.params.jobId,
+    jobId: String(req.params.jobId),
     topic: req.body.topic,
     app_id: req.body.app_id,
   });
