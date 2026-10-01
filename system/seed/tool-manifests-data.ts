@@ -138,9 +138,9 @@ export const HTTP_FETCH_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'fetch_json',
-    gate: 'caller',
+    gate: 'builder',
     description: 'GET a URL and parse the response as JSON. Convenience wrapper around http_request.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -152,9 +152,9 @@ export const HTTP_FETCH_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'fetch_text',
-    gate: 'caller',
+    gate: 'builder',
     description: 'GET a URL and return the response as text. Returns content, status, and content type.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -248,7 +248,7 @@ export const OAUTH_TOOLS: LTToolManifestEntry[] = [
     name: 'get_access_token',
     gate: 'caller',
     description: 'Get a fresh OAuth access token for an external service. Automatically refreshes expired tokens.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
