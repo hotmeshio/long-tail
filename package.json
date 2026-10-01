@@ -33,6 +33,8 @@
     "lint:fix": "eslint . --fix --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:fast": "vitest run --config vitest.fast.config.ts",
+    "test:llm": "vitest run --config vitest.llm.config.ts",
     "test:workflows": "vitest run tests/workflows",
     "test:export": "vitest run tests/workflows/export.test.ts",
     "test:vision": "vitest run tests/services/mcp/vision-server.test.ts",

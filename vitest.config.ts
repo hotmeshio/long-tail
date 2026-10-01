@@ -11,7 +11,8 @@ export default defineConfig({
     globalSetup: ['tests/setup/global.ts'],
     setupFiles: ['tests/setup/clear-roles.ts'],
     include: ['tests/**/*.test.ts'],
-    exclude: ['node_modules', 'build', 'tests/integration', 'tests/functional'],
+    // LLM tests spend real provider credits; run them with `npm run test:llm`.
+    exclude: ['node_modules', 'build', 'tests/integration', 'tests/functional', 'tests/**/*.llm.test.ts'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
     fileParallelism: false,
