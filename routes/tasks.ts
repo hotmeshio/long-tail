@@ -81,7 +81,7 @@ router.get('/processes', async (req, res) => {
  * Get all tasks and escalations for a process (origin_id).
  */
 router.get('/processes/:originId', async (req, res) => {
-  const result = await api.getProcess({ originId: req.params.originId });
+  const result = await api.getProcess({ originId: req.params.originId }, req.auth);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
