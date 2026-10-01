@@ -1,4 +1,5 @@
 import { isSuperAdmin } from '../services/user';
+import { isUuid } from '../lib/uuid';
 import type { AuthPayload, CapabilityAccess, CapabilitySet, LTGrantRole } from '../types';
 
 /**
@@ -65,6 +66,40 @@ export async function mayGrantRole(granterId: string, grant: RoleGrant): Promise
   const { hasRole } = await import('../services/user/roles');
   if (await hasRole(granterId, grant.role)) return { allowed: true };
   return { allowed: false, error: `You can only assign roles you hold. You do not have the '${grant.role}' role.` };
+}
+
+const ALLOWED: GrantDecision = { allowed: true };
+
+/** Whether `granterId` may assign every grant in a new account's role list. */
+export async function mayGrantRoles(granterId: string, grants: RoleGrant[] | undefined): Promise<GrantDecision> {
+  for (const grant of grants ?? []) {
+    const decision = await mayGrantRole(granterId, grant);
+    if (!decision.allowed) return decision;
+  }
+  return ALLOWED;
+}
+
+/**
+ * Whether `callerId` may change, remove, or mint keys for an account. An
+ * account holding superadmin is a superadmin's to manage; any other account
+ * is left to the route's own gate.
+ */
+export async function mayManageAccount(callerId: string, targetId: string): Promise<GrantDecision> {
+  if (await isSuperAdmin(callerId)) return ALLOWED;
+  if (!isUuid(targetId)) return ALLOWED;
+  if (await isSuperAdmin(targetId)) {
+    return { allowed: false, error: 'Only superadmin can change a superadmin account' };
+  }
+  return ALLOWED;
+}
+
+/** Removing a role follows the grant rule for the role as the account holds it. */
+export async function mayRevokeRole(callerId: string, targetId: string, role: string): Promise<GrantDecision> {
+  const account = await mayManageAccount(callerId, targetId);
+  if (!account.allowed || !isUuid(targetId)) return account;
+  const { getUserRoles } = await import('../services/user');
+  const held = (await getUserRoles(targetId)).find((r) => r.role === role);
+  return held ? mayGrantRole(callerId, { role, type: held.type }) : ALLOWED;
 }
 
 /** Capabilities from memberships carried by the caller's token: the same outcomes, no lookup. */
