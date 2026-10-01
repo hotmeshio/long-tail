@@ -13,6 +13,8 @@ export const config = {
   NATS_URL: process.env.NATS_URL || 'nats://localhost:4222',
   NATS_WS_URL: process.env.NATS_WS_URL || '',
   NATS_TOKEN: process.env.NATS_TOKEN || '',
+  /** A subscribe-only NATS credential for browsers that connect without the proxy. */
+  NATS_DASHBOARD_TOKEN: process.env.NATS_DASHBOARD_TOKEN || '',
 
   PORT: parseInt(process.env.PORT || '3000', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',
