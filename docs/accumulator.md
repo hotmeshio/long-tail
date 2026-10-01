@@ -69,7 +69,43 @@ A batch wait may add `partialOnTimeout: true`; it stores `envelope.batch_partial
 
 A facet selector (`accumulateByMetadata`, `removeItemByMetadata`, a reciprocal named by `key` + `value`, the scan verb's item mode) considers only pending rows that carry the accumulator declaration, ordered by priority then age. A release or remediation row sharing the container's facet is never picked; with no open container the answer is `not-found`, and the scan answers `no_open_container`.
 
-An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated against the container role's versioned form when present), an optional `metadata` patch (reserved keys rejected), `assertClaim` (by id), and an optional `reciprocal`.
+`accumulateByMetadata` also takes `container: { types?, subtypes?, facets? }`, which narrows the pick to accumulators of that escalation type or subtype that also carry the extra facets. A narrowed add picks its container first, never choosing the add's own reciprocal row, then adds by id; the by-id statement re-checks `pending` under lock. Use it when items are themselves accumulators in the container's queue and share its facet:
+
+```ts
+await lt.escalations.accumulateByMetadata({
+  key: 'boxKey', value: 'BX-1', itemKey: orderId,
+  restrictRoles: ['match-filling'],
+  container: { types: ['matchBox'] },
+  reciprocal: { id: slotEscalationId },
+});
+```
+
+An add takes `itemKey` (1 to 128 characters), an optional `payload` (validated against the container role's versioned form when present), an optional `metadata` patch (reserved keys rejected), `assertClaim` (by id), an optional `reciprocal`, and an optional `initiatedBy`.
+
+### Attribution
+
+Each entry records its `actor`: the caller, or the user named by `initiatedBy`. A trusted service that adds or removes an item because a person acted elsewhere (submitted their row, scanned at another station) passes that person's `lt_users.id`, so the Items panel and the `escalation.updated` event credit the person. Only callers with global escalation access may name someone else, and the id must be a known user. `initiatedBy` is attribution only: the caller's rights gate the write, and the caller stays `metadata.resolved_by`. All six add and remove forms accept it, as do the admin MCP tools `accumulate_item` and `remove_item`.
+
+### Item labels
+
+The Items panel lists each held item by its key. A container role's `form_schema` may declare `x-lt-item-label`, a template whose `{{item.*}}` tokens read the held item (`itemKey`, `payload`, `actor`, `at`) beside the usual `escalation`, `metadata`, `envelope`, and `payload` domains:
+
+```json
+{ "type": "object", "x-lt-item-label": "{{item.payload.stickerCode}}", "properties": { } }
+```
+
+The panel shows the label with the key as its tooltip and still removes by key. When the template's tokens all resolve to nothing, the item shows its key.
+
+A scan's item-mode `accumulate` step fills the same payload field from the row it located, through a `{item.<facet>}` token in `params.resolverPayload`:
+
+```jsonc
+"params": {
+  "accumulate": { "containerFacet": "boxKey" },
+  "resolverPayload": { "stickerCode": "{item.orderSlug}" }
+}
+```
+
+A located row that lacks the facet makes the step fall through, so every row the step can locate carries it. When the container role enforces its form, declare the payload field there.
 
 ### Outcomes
 

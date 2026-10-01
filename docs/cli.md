@@ -96,7 +96,7 @@ ltc esc timeline serialNumber PRN-001 --entity serialNumber
 ```bash
 ltc wf list                               # Discovered workflows
 ltc wf invoke reviewContent --data '{"content": "test"}'
-ltc wf status wf-abc123                   # Check status (running/completed)
+ltc wf status wf-abc123                   # Check status (running, completed, failed, failed (terminated))
 ltc wf result wf-abc123                   # Get result payload
 ltc wf terminate wf-abc123                # Terminate a running workflow
 ```

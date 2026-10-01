@@ -52,6 +52,16 @@ export function buildFacetWhere(
     clauses.push(`role = ANY($${params.length}::text[])`);
   }
 
+  if (q.types && q.types.length) {
+    params.push(q.types);
+    clauses.push(`type = ANY($${params.length}::text[])`);
+  }
+
+  if (q.subtypes && q.subtypes.length) {
+    params.push(q.subtypes);
+    clauses.push(`subtype = ANY($${params.length}::text[])`);
+  }
+
   if (q.status) {
     params.push(q.status);
     clauses.push(`status = $${params.length}`);

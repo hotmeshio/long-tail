@@ -31,7 +31,7 @@ import { EscalationSortControl } from './EscalationSortControl';
 import { EscalationListView } from '../../components/escalation/EscalationListView';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { useEscalationListQuery } from '../../hooks/useEscalationListQuery';
-import { LIST_VIEWS, isListView, isListLayout, resolveListView, type EscalationListParams } from '../../lib/escalation-list-url';
+import { LIST_STATUS, LIST_VIEWS, readEscalationListParams, resolveListView, type EscalationListParams } from '../../lib/escalation-list-url';
 import { tableLayoutProps } from '../../components/escalation/EscalationTableView';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { DataTable, type Column } from '../../components/common/data/DataTable';
@@ -58,7 +58,7 @@ export function AvailableEscalationsPage() {
   useResolveLinkVarUrl();
   const navigate = useNavigate();
   const { filters, setFilter, pagination } = useFilterParams({
-    filters: { role: '', type: '', priority: '', status: 'available', search: '' },
+    filters: { role: '', type: '', subtype: '', priority: '', status: 'available', search: '' },
   });
   // The queue moves on arrivals and departures-into-work — created and
   // claimed. A role filter narrows the subscription to that queue's subject
@@ -188,7 +188,6 @@ export function AvailableEscalationsPage() {
   // role's rich list view shows when one exists, else the table: the dense,
   // scannable, countable presentation.
   const viewParam = searchParams.get('view');
-  const layoutParam = searchParams.get('layout');
   const setViewParam = useCallback((v: 'table' | 'timeline' | 'rich' | null) => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -233,20 +232,14 @@ export function AvailableEscalationsPage() {
   // Clear selections on filter/page changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filters.role, filters.type, filters.priority, filters.status, debouncedSearch, pagination.page, pagination.pageSize]);
+  }, [filters.role, filters.type, filters.subtype, filters.priority, filters.status, debouncedSearch, pagination.page, pagination.pageSize]);
 
-  // The list params in the shape the shared query takes; the same reader a
-  // pinned view or a portal panel runs over a saved URL.
+  // The list params come from the same reader a pinned view or a portal panel
+  // runs over a saved URL; only the search is debounced here.
   const listParams = useMemo<EscalationListParams>(() => ({
-    statusFilter: filters.status || '',
-    role: filters.role || undefined,
-    type: filters.type || undefined,
-    priority: filters.priority ? parseInt(filters.priority) : undefined,
+    ...readEscalationListParams(searchParams, LIST_STATUS.AVAILABLE),
     search: debouncedSearch || undefined,
-    facets: facetFilters,
-    view: isListView(viewParam) ? viewParam : null,
-    layout: isListLayout(layoutParam) ? layoutParam : null,
-  }), [filters.status, filters.role, filters.type, filters.priority, debouncedSearch, facetFilters, viewParam, layoutParam]);
+  }), [searchParams, debouncedSearch]);
 
   // Timeline mode fetches 100 per page so the spine has enough story to tell.
   const timelinePageSize = 100;

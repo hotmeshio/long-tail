@@ -99,7 +99,7 @@ const result = await lt.exports.getStatus({ workflowId: 'wf_abc123' });
 |-------|------|----------|-------------|
 | `workflowId` | `string` | Yes | The workflow's unique identifier |
 
-**Returns:** `LTApiResult<WorkflowStatus>` -- returns 404 if the workflow is not found or data has expired.
+**Returns:** `LTApiResult<{ workflow_id, status, state, terminated }>`: the numeric HotMesh `status`, `state` (`running`, `completed`, or `failed`) and `terminated`. Returns 404 if the workflow is not found or data has expired.
 
 **Auth:** Not required
 

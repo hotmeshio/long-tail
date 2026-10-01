@@ -12,7 +12,7 @@ export function registerAccumulateRoutes(router: Router): void {
   /**
    * POST /api/escalations/accumulate-by-signal-key
    * Add one item to an accumulator escalation by its signal_key.
-   * Body: { signalKey, itemKey, payload?, metadata?, reciprocal? }
+   * Body: { signalKey, itemKey, payload?, metadata?, reciprocal?, initiatedBy? }
    */
   router.post('/accumulate-by-signal-key', async (req, res) => {
     const result = await api.accumulateItemBySignalKey({
@@ -21,6 +21,7 @@ export function registerAccumulateRoutes(router: Router): void {
       payload: req.body?.payload,
       metadata: req.body?.metadata,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
@@ -29,7 +30,7 @@ export function registerAccumulateRoutes(router: Router): void {
    * POST /api/escalations/accumulate-by-metadata
    * Add one item to the highest priority pending accumulator whose metadata
    * contains the key/value.
-   * Body: { key, value, itemKey, payload?, metadata?, restrictRoles?, reciprocal? }
+   * Body: { key, value, itemKey, payload?, metadata?, restrictRoles?, container?, reciprocal?, initiatedBy? }
    */
   router.post('/accumulate-by-metadata', async (req, res) => {
     const result = await api.accumulateItemByMetadata({
@@ -39,27 +40,30 @@ export function registerAccumulateRoutes(router: Router): void {
       payload: req.body?.payload,
       metadata: req.body?.metadata,
       restrictRoles: req.body?.restrictRoles,
+      container: req.body?.container,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 
   /**
    * POST /api/escalations/remove-item-by-signal-key
-   * Body: { signalKey, itemKey, reciprocal? }
+   * Body: { signalKey, itemKey, reciprocal?, initiatedBy? }
    */
   router.post('/remove-item-by-signal-key', async (req, res) => {
     const result = await api.removeItemBySignalKey({
       signalKey: req.body?.signalKey,
       itemKey: req.body?.itemKey,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 
   /**
    * POST /api/escalations/remove-item-by-metadata
-   * Body: { key, value, itemKey, restrictRoles?, reciprocal? }
+   * Body: { key, value, itemKey, restrictRoles?, reciprocal?, initiatedBy? }
    */
   router.post('/remove-item-by-metadata', async (req, res) => {
     const result = await api.removeItemByMetadata({
@@ -68,6 +72,7 @@ export function registerAccumulateRoutes(router: Router): void {
       itemKey: req.body?.itemKey,
       restrictRoles: req.body?.restrictRoles,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, req.auth!);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
@@ -87,7 +92,7 @@ export function registerAccumulateRoutes(router: Router): void {
    * the add that reaches max answers { outcome: 'completed', signaled } and the
    * waiting workflow resumes with the collection. Claim-agnostic unless
    * assertClaim: true.
-   * Body: { itemKey, payload?, metadata?, assertClaim?, reciprocal? }
+   * Body: { itemKey, payload?, metadata?, assertClaim?, reciprocal?, initiatedBy? }
    */
   router.post('/:id/accumulate', async (req, res) => {
     const auth = await effectiveWorkAuth(req, res);
@@ -99,6 +104,7 @@ export function registerAccumulateRoutes(router: Router): void {
       metadata: req.body?.metadata,
       assertClaim: req.body?.assertClaim,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, auth);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
@@ -106,7 +112,7 @@ export function registerAccumulateRoutes(router: Router): void {
   /**
    * POST /api/escalations/:id/remove-item
    * Remove one held item; the row stays pending and the waiter never wakes.
-   * Body: { itemKey, reciprocal? }
+   * Body: { itemKey, reciprocal?, initiatedBy? }
    */
   router.post('/:id/remove-item', async (req, res) => {
     const auth = await effectiveWorkAuth(req, res);
@@ -115,6 +121,7 @@ export function registerAccumulateRoutes(router: Router): void {
       id: req.params.id,
       itemKey: req.body?.itemKey,
       reciprocal: req.body?.reciprocal,
+      initiatedBy: req.body?.initiatedBy,
     }, auth);
     res.status(result.status).json(result.data ?? { error: result.error });
   });

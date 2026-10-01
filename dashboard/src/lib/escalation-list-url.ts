@@ -43,11 +43,16 @@ export const LIST_STATUS = {
   ALL: 'all',
 } as const;
 
+/** The scalar list filters a list URL carries; every reader and query forwards each one. */
+export const LIST_FILTER_KEYS = ['role', 'type', 'subtype', 'priority', 'search'] as const;
+export type ListFilterKey = (typeof LIST_FILTER_KEYS)[number];
+
 export interface EscalationListParams {
   /** The status filter as the URL names it; empty means unset. */
   statusFilter: string;
   role?: string;
   type?: string;
+  subtype?: string;
   priority?: number;
   search?: string;
   facets: FacetFilters;
@@ -101,6 +106,7 @@ export function readEscalationListParams(sp: URLSearchParams, defaultStatus = ''
     statusFilter: sp.get('status') || defaultStatus,
     role: sp.get('role') || undefined,
     type: sp.get('type') || undefined,
+    subtype: sp.get('subtype') || undefined,
     priority: priority ? parseInt(priority, 10) : undefined,
     search: sp.get('search') || undefined,
     facets: parseFacetParams(sp),

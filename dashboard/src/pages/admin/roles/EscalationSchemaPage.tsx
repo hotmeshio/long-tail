@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Braces, Check, History, BookOpen } from 'lucide-react';
 import {
@@ -9,6 +9,7 @@ import {
   type RoleSchemaVersionSummary,
 } from '../../../api/roles';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
+import { findUnknownWidgets } from '../../../components/escalation/widgets/field-widgets';
 
 /**
  * The escalation form schema, on its own page (/admin/roles/:role/schema).
@@ -71,6 +72,11 @@ export function EscalationSchemaPage() {
     setSavedOk(false);
     setJsonError(!safeParseObject(value).ok);
   };
+
+  const unknownWidgets = useMemo(() => {
+    const parsed = safeParseObject(text);
+    return parsed.ok ? findUnknownWidgets(parsed.value) : [];
+  }, [text]);
 
   const handleSave = () => {
     const parsed = safeParseObject(text);
@@ -177,6 +183,12 @@ export function EscalationSchemaPage() {
             placeholder={PLACEHOLDER}
           />
           {jsonError && <p className="text-2xs text-status-error -mt-4">Invalid JSON</p>}
+          {unknownWidgets.length > 0 && (
+            <p className="text-2xs text-status-warning -mt-4" role="status">
+              Unknown widget{unknownWidgets.length > 1 ? 's' : ''}, rendered as the default control:{' '}
+              {unknownWidgets.map((u) => `${u.path} (${u.widget})`).join(', ')}
+            </p>
+          )}
 
           <div>
             <label className="block text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">

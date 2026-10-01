@@ -15,6 +15,9 @@ import { sanitizeAppId, quoteSchema } from '../hotmesh-utils';
 
 import { getHandle } from './client';
 import { postProcessExecution } from './post-process';
+import {
+  readWorkflowState, workflowStateFromStatus, isTerminated, WORKFLOW_STATES, type WorkflowState,
+} from '../workflow-state';
 import type { JobListParams, JobListResult, JobRow } from './types';
 
 /** Error thrown when a workflow job is not found (expired or never existed). */
@@ -57,18 +60,18 @@ export async function exportWorkflow(
 }
 
 /**
- * Return only the status semaphore for a workflow.
- * 0 = complete, negative = interrupted.
+ * Return the status semaphore for a workflow (above 0 running, 0 closed,
+ * below 0 terminated) and the state it implies.
  */
 export async function getWorkflowStatus(
   workflowId: string,
   taskQueue: string,
   workflowName: string,
-): Promise<{ workflow_id: string; status: number }> {
+): Promise<{ workflow_id: string; status: number; state: WorkflowState; terminated: boolean }> {
   try {
     const handle = await getHandle(taskQueue, workflowName, workflowId);
     const status = await handle.status();
-    return { workflow_id: workflowId, status };
+    return { workflow_id: workflowId, status, state: workflowStateFromStatus(status), terminated: isTerminated(status) };
   } catch {
     throw new WorkflowNotFoundError(workflowId);
   }
@@ -106,7 +109,9 @@ export async function exportWorkflowExecution(
 /** The input/output envelope pair plus the derived run status. */
 export interface WorkflowEnvelopes {
   workflow_id: string;
-  status: 'running' | 'completed' | 'failed';
+  status: WorkflowState;
+  /** Present and true when an interrupt ended the run. */
+  terminated?: boolean;
   /** The workflow's input — the single LTEnvelope for one-arg workflows, else the args array. */
   input: unknown;
   /** The workflow's return envelope, or null while it is still running or when it failed. */
@@ -134,8 +139,8 @@ export async function getWorkflowEnvelopes(
     throw new WorkflowNotFoundError(workflowId);
   }
 
-  const [statusCode, args] = await Promise.all([
-    handle.status(),
+  const [reading, args] = await Promise.all([
+    readWorkflowState(handle),
     handle.input<unknown[]>().catch(() => undefined),
   ]).catch(() => {
     throw new WorkflowNotFoundError(workflowId);
@@ -145,28 +150,21 @@ export async function getWorkflowEnvelopes(
   // multi-arg workflows keep the args array verbatim.
   const input = Array.isArray(args) && args.length === 1 ? args[0] : args ?? null;
 
-  if (statusCode > 0) {
-    return { workflow_id: workflowId, status: 'running', input, output: null };
+  if (reading.state === WORKFLOW_STATES.RUNNING) {
+    return { workflow_id: workflowId, status: reading.state, input, output: null };
   }
-
-  try {
-    const output = await handle.output<unknown>();
+  if (reading.state === WORKFLOW_STATES.FAILED) {
     return {
       workflow_id: workflowId,
-      status: statusCode === 0 ? 'completed' : 'failed',
-      input,
-      output: output ?? null,
-    };
-  } catch (err: any) {
-    // output() throws the workflow's own error for failed runs — that IS the outcome.
-    return {
-      workflow_id: workflowId,
-      status: 'failed',
+      status: reading.state,
+      ...(reading.terminated ? { terminated: true } : {}),
       input,
       output: null,
-      error: err?.message ?? String(err),
+      ...(reading.error ? { error: reading.error } : {}),
     };
   }
+  const output = await handle.output<unknown>().catch(() => null);
+  return { workflow_id: workflowId, status: reading.state, input, output: output ?? null };
 }
 
 /**
@@ -286,7 +284,7 @@ export async function listJobs(app_id: string, params: JobListParams): Promise<J
   const jobs = dataResult.rows.map((row: any) => ({
     workflow_id: row.key.replace(keyPrefix, ''),
     entity: row.entity,
-    status: (row.status > 0 ? 'running' : row.status === 0 ? 'completed' : 'failed') as JobRow['status'],
+    status: workflowStateFromStatus(row.status),
     is_live: row.is_live,
     created_at: row.created_at,
     updated_at: row.updated_at,

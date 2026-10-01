@@ -46,7 +46,21 @@ const result = await lt.workflows.getStatus({ workflowId: 'wf_abc' });
 |-------|------|----------|-------------|
 | `workflowId` | `string` | Yes | HotMesh workflow ID |
 
-**Returns:** `LTApiResult<{ workflowId, status }>` -- status 0 = completed, 1 = running. Returns 404 if not found.
+**Returns:** `LTApiResult<{ workflowId, status, state, terminated, error? }>`. Returns 404 if not found.
+
+| Field | Meaning |
+|-------|---------|
+| `status` | HotMesh job status: above 0 running, 0 closed, below 0 terminated |
+| `state` | `running`, `completed`, or `failed`. A run that closed with an error is `failed` at status 0; a terminated run is `failed` |
+| `terminated` | `true` when an interrupt ended the run |
+| `error` | the failure message, when HotMesh still holds it |
+
+```typescript
+// after lt.workflows.terminate({ workflowId: 'wf_abc' })
+// result.data → { workflowId: 'wf_abc', status: -999999999, state: 'failed', terminated: true }
+```
+
+Terminate acts on the named run; a child run is terminated by its own id.
 
 **Auth:** Not required
 
@@ -67,7 +81,7 @@ const result = await lt.workflows.getEnvelopes({ workflowId: 'reviewContent-a1b2
 |-------|------|----------|-------------|
 | `workflowId` | `string` | Yes | The workflow's unique identifier |
 
-**Returns:** `LTApiResult<{ workflow_id, status: 'running' | 'completed' | 'failed', input, output, error? }>` — 404 when the workflow is unknown or expired.
+**Returns:** `LTApiResult<{ workflow_id, status: 'running' | 'completed' | 'failed', terminated?, input, output, error? }>` — `terminated: true` when an interrupt ended the run; 404 when the workflow is unknown or expired.
 
 **Auth:** Not required
 
@@ -77,7 +91,7 @@ const result = await lt.workflows.getEnvelopes({ workflowId: 'reviewContent-a1b2
 
 Get the result of a completed workflow.
 
-Returns 202 if the workflow is still running. Never blocks.
+Returns 202 if the workflow is still running, and a failed or terminated run answers at once with its error. Never blocks.
 
 ```typescript
 const result = await lt.workflows.getResult({ workflowId: 'wf_abc' });
@@ -89,7 +103,12 @@ const result = await lt.workflows.getResult({ workflowId: 'wf_abc' });
 |-------|------|----------|-------------|
 | `workflowId` | `string` | Yes | HotMesh workflow ID |
 
-**Returns:** `LTApiResult<{ workflowId, result }>` (status 200 when complete) or `LTApiResult<{ workflowId, status: 'running' }>` (status 202 when still running). Returns 404 if not found.
+**Returns:** one of
+- `LTApiResult<{ workflowId, state: 'completed', result }>` (200)
+- `LTApiResult<{ workflowId, state: 'failed', terminated, error?, result: null }>` (200)
+- `LTApiResult<{ workflowId, status: 'running' }>` (202)
+
+Returns 404 if not found.
 
 **Auth:** Not required
 

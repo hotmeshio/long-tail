@@ -1,6 +1,7 @@
 import { createClient } from '../../workers';
 import * as exportService from '../../services/export';
 import { resolveWorkflowHandle } from '../../services/task';
+import { readWorkflowState, WORKFLOW_STATES } from '../../services/workflow-state';
 import {
   invokeWorkflow as invokeWorkflowService,
   checkInvocationRoles,
@@ -70,14 +71,16 @@ export async function invokeWorkflow(
 /**
  * Get the execution status of a workflow.
  *
- * Returns the HotMesh status code (0 = completed, 1 = running).
+ * Returns the HotMesh status code (above 0 running, 0 closed, below 0
+ * terminated) with the state it implies: `running`, `completed` or `failed`,
+ * `terminated` when an interrupt ended it, and `error` for a failed run.
  * Resolves the workflow handle via task record or worker registry.
  * `appId` selects the namespace for the job-entity fallback so a child
  * running in another app resolves instead of 404ing against `durable`.
  *
  * @param input.workflowId — HotMesh workflow ID
  * @param input.appId — HotMesh namespace for resolution (default: durable)
- * @returns `{ status: 200, data: { workflowId, status } }` or 404
+ * @returns `{ status: 200, data: { workflowId, status, state, terminated, error? } }` or 404
  */
 export async function getWorkflowStatus(input: {
   workflowId: string;
@@ -92,11 +95,11 @@ export async function getWorkflowStatus(input: {
       resolved.workflowName,
       input.workflowId,
     );
-    const status = await handle.status();
+    const reading = await readWorkflowState(handle);
 
     return {
       status: 200,
-      data: { workflowId: input.workflowId, status },
+      data: { workflowId: input.workflowId, ...reading },
     };
   } catch (err: any) {
     if (isResolveError(err)) return { status: 404, error: err.message };
@@ -108,11 +111,13 @@ export async function getWorkflowStatus(input: {
  * Get the result of a completed workflow.
  *
  * Returns 202 if the workflow is still running, 200 with the result
- * payload when complete. Never blocks — always returns immediately.
+ * payload when complete, and 200 with `state: 'failed'` (plus `terminated`
+ * and `error` when known) when it failed or was terminated. Never blocks —
+ * always returns immediately.
  *
  * @param input.workflowId — HotMesh workflow ID
  * @param input.appId — HotMesh namespace for resolution (default: durable)
- * @returns `{ status: 200, data: { workflowId, result } }` or 202 if running
+ * @returns `{ status: 200, data: { workflowId, state, result } }` or 202 if running
  */
 export async function getWorkflowResult(input: {
   workflowId: string;
@@ -127,19 +132,31 @@ export async function getWorkflowResult(input: {
       resolved.workflowName,
       input.workflowId,
     );
-    const status = await handle.status();
+    const reading = await readWorkflowState(handle);
 
-    if (status !== 0) {
+    if (reading.state === WORKFLOW_STATES.RUNNING) {
       return {
         status: 202,
         data: { workflowId: input.workflowId, status: 'running' },
+      };
+    }
+    if (reading.state === WORKFLOW_STATES.FAILED) {
+      return {
+        status: 200,
+        data: {
+          workflowId: input.workflowId,
+          state: reading.state,
+          terminated: reading.terminated,
+          ...(reading.error ? { error: reading.error } : {}),
+          result: null,
+        },
       };
     }
 
     const result = await handle.result();
     return {
       status: 200,
-      data: { workflowId: input.workflowId, result },
+      data: { workflowId: input.workflowId, state: reading.state, result },
     };
   } catch (err: any) {
     if (isResolveError(err)) return { status: 404, error: err.message };

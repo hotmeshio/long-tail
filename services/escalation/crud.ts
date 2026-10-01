@@ -1,7 +1,8 @@
 import { getPool } from '../../lib/db';
 import { publishEscalationEvent } from '../../lib/events/publish';
 import { escalationEventData } from '../../lib/events/escalation-wire';
-import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
+import type { LTEscalationRecord, LTEscalationStatus, ScanAvailability } from '../../types';
+import { SCAN_AVAILABILITY } from '../../types/scan-code';
 import { ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
 
 import { isUuid, onlyUuids } from '../../lib/uuid';
@@ -726,6 +727,7 @@ export async function resolveByMetadataAtomic(
   enforcingRoles?: string[] | null,
   assertId?: string | null,
   extraFacets?: Record<string, any> | null,
+  availability?: ScanAvailability | null,
 ): Promise<ResolveByMetadataResult> {
   await ensureEscalationCompatView();
   const pool = getPool();
@@ -741,7 +743,8 @@ export async function resolveByMetadataAtomic(
   const { rows } = await pool.query(
     RESOLVE_BY_METADATA_ATOMIC,
     [filter, userId, payloadJson, metaPatch, allRoles, selfRoles,
-      enforcingRoles?.length ? enforcingRoles : null, assertId ?? null],
+      enforcingRoles?.length ? enforcingRoles : null, assertId ?? null,
+      availability && availability !== SCAN_AVAILABILITY.ANY ? availability : null],
   );
 
   if (rows.length === 0) return { outcome: 'not_found' };

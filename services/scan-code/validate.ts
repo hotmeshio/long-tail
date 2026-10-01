@@ -151,6 +151,25 @@ export function assertValidSteps(steps: ScanStep[]): void {
       if (options?.containerRoles !== undefined && !Array.isArray(options.containerRoles)) {
         throw new Error(`${at}: params.accumulate.containerRoles must be an array`);
       }
+      const container = options?.container;
+      if (container !== undefined) {
+        if (!container || typeof container !== 'object' || Array.isArray(container)) {
+          throw new Error(`${at}: params.accumulate.container must be an object`);
+        }
+        for (const list of ['roles', 'types', 'subtypes'] as const) {
+          const value = container[list];
+          if (value !== undefined && (!Array.isArray(value) || !value.every((v) => typeof v === 'string' && v))) {
+            throw new Error(`${at}: params.accumulate.container.${list} must be an array of strings`);
+          }
+        }
+        if (container.facets !== undefined
+          && (!container.facets || typeof container.facets !== 'object' || Array.isArray(container.facets))) {
+          throw new Error(`${at}: params.accumulate.container.facets must be an object`);
+        }
+        if (!options?.containerFacet) {
+          throw new Error(`${at}: params.accumulate.container requires params.accumulate.containerFacet`);
+        }
+      }
       if (!options?.containerFacet && !step.params?.itemKey) {
         throw new Error(`${at}: accumulate requires params.itemKey or params.accumulate.containerFacet`);
       }

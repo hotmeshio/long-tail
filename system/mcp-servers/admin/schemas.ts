@@ -107,12 +107,14 @@ export const accumulateItemSchema = z.object({
   payload: z.record(z.any()).optional().describe('Optional item payload, delivered inside $accumulated'),
   metadata: z.record(z.any()).optional().describe('Merge patch for the container metadata, same statement'),
   reciprocal: adminReciprocalSchema.optional(),
+  initiatedBy: z.string().optional().describe('lt_users.id of the person the add is for; recorded as the entry actor (attribution only)'),
 });
 
 export const removeItemSchema = z.object({
   id: z.string().describe('Accumulator escalation UUID'),
   itemKey: z.string().describe('The held item key to remove'),
   reciprocal: adminReciprocalSchema.omit({ payload: true }).optional(),
+  initiatedBy: z.string().optional().describe('lt_users.id of the person the removal is for; recorded as the entry actor (attribution only)'),
 });
 
 export const getEscalationItemsSchema = z.object({
@@ -797,6 +799,8 @@ export const findOrphanedSignalsSchema = z.object({
 /** A faceted query over a pond — filter/sort by columns and metadata facets. */
 export const facetQuerySchema = z.object({
   role: z.string().describe('Pond role to target (the escalation role)'),
+  types: z.array(z.string()).optional().describe('Only rows whose escalation type is one of these'),
+  subtypes: z.array(z.string()).optional().describe('Only rows whose escalation subtype is one of these'),
   status: z.string().optional().describe("Status filter (e.g. 'pending')"),
   available: z.boolean().optional().describe('Only rows not currently claimed'),
   facets: z.record(z.any()).optional().describe('Metadata facet equality filters'),

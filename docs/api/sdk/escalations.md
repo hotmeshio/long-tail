@@ -888,6 +888,8 @@ await lt.escalations.accumulateByMetadata({ key: 'binKey', value: binKey, itemKe
 | `assertClaim` | `boolean` | No | By id only: require the caller's own live claim |
 | `reciprocal` | `object` | No | `{ id \| signalKey \| key + value, payload? }`: a second accumulator row written in the same statement, both or neither |
 | `restrictRoles` | `string[]` | No | By metadata only: expected queues, intersected with the caller's write scope. The facet selects among pending accumulator rows only; other rows sharing it are never candidates, and none open answers 404 |
+| `container` | `{ types?, subtypes?, facets? }` | No | By metadata only: narrows the container to accumulators of these escalation types or subtypes that also carry these facets. The add's own reciprocal row is never its container |
+| `initiatedBy` | `string` | No | The `lt_users.id` of the person who caused the add, recorded as the entry's `actor`. Global-access callers only; attribution, never privilege |
 
 **Returns:** `LTApiResult<{ outcome: 'accepted' \| 'completed', count, remaining, escalationId, signaled?, workflowId?, reciprocal? }>`. `remaining` is `null` on an unbounded accumulator. 409 on `Item already held`, `Accumulator is full`, claim blocks, terminal rows, and reciprocal blocks; 400 on a non-accumulator; 404 non-disclosure.
 
@@ -901,6 +903,8 @@ Remove ONE held item from a pending accumulator in one guarded statement. The ro
 await lt.escalations.removeItem({ id: binId, itemKey: orderId, reciprocal: { id: bagEscalationId } });
 // → { outcome: 'removed', count: 11, escalationId, reciprocal?: { count, escalationId } }
 ```
+
+Removals take `initiatedBy` too, with the same rules.
 
 **Returns:** `LTApiResult<{ outcome: 'removed', count, escalationId, reciprocal? }>`. 404 `Item not held by this escalation`.
 
@@ -1086,6 +1090,8 @@ const result = await lt.escalations.searchByFacets({
   limit: 50,
 });
 ```
+
+`types` and `subtypes` narrow by the escalation's declared type and subtype (`type = ANY(types)`, `subtype = ANY(subtypes)`); every other `FacetQuery` element applies as documented in [Faceted Routing](../../faceted-routing.md#the-query--facetquery).
 
 **Returns:** `LTApiResult<{ escalations; total }>`.
 

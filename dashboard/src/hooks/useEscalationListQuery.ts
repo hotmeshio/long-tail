@@ -44,6 +44,7 @@ export function useEscalationListQuery(
   const sharedFilters = {
     role: params.role,
     type: params.type,
+    subtype: params.subtype,
     priority: params.priority,
     limit,
     offset,

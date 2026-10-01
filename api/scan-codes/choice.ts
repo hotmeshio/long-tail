@@ -92,13 +92,14 @@ export async function executeScanChoice(
     // showed. A row that moved on (resolved, claimed away, re-routed) is the
     // same double-actor race a second scan loses.
     const located = await locateForStep(step, ctx, 2);
-    if (!located || !located.escalations.some((e) => e.id === input.escalationId)) {
+    const presented = located?.escalations.find((e) => e.id === input.escalationId);
+    if (!presented) {
       return decorate(conflict('the item is no longer in the presented state'), ctx, input);
     }
 
     // 6. Dispatch through the same atomic executors a direct scan uses.
     const synthesized: ScanStep = { query: step.query, verb: choice.verb, params: choice.params };
-    const result = await dispatchChoiceVerb(synthesized, ctx, located.escalations[0]);
+    const result = await dispatchChoiceVerb(synthesized, ctx, presented);
     return decorate(result, ctx, input);
   } catch (err: any) {
     return { status: 500, error: err.message };

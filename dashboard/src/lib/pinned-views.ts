@@ -54,6 +54,7 @@ export function pinBadgeQuery(url: string): { available: boolean; params: Record
       ...list.facets,
       role: list.role,
       type: list.type,
+      subtype: list.subtype,
       priority: list.priority,
       status: apiStatus,
       ...(claimed ? { claimed: true } : {}),

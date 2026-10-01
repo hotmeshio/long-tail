@@ -90,6 +90,12 @@ describe('executeScanChoice — the pointer is never authority', () => {
     expect(claim).not.toHaveBeenCalled();
   });
 
+  it('dispatches the presented row, not the first row the locate returns', async () => {
+    locate.mockResolvedValue({ escalations: [{ id: 'other' }, row] as any, total: 2 });
+    await executeScanChoice(pointer, auth);
+    expect(claim.mock.calls[0][2].id).toBe('esc-1');
+  });
+
   it('the identity gate re-applies: unsatisfied requirement is NOT_PRIMED', async () => {
     satisfied.mockResolvedValue(false);
     const result = await executeScanChoice(pointer, auth);

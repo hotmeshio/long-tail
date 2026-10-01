@@ -2,6 +2,7 @@ import { getPool } from '../../lib/db';
 import { sanitizeAppId, quoteSchema } from '../hotmesh-utils';
 
 import { DISTINCT_ENTITIES, ACTIVE_GRAPH_TOPICS, COUNT_JOBS, LIST_JOBS } from './sql';
+import { workflowStateFromStatus } from '../workflow-state';
 
 export interface ListJobsParams {
   rawAppId: string;
@@ -101,7 +102,7 @@ export async function listJobs(params: ListJobsParams): Promise<{ jobs: JobRow[]
   const jobs = dataResult.rows.map((row: any) => ({
     workflow_id: row.key.startsWith(keyPrefix) ? row.key.slice(keyPrefix.length) : row.key,
     entity: row.entity,
-    status: row.status > 0 ? 'running' : row.status === 0 ? 'completed' : 'failed',
+    status: workflowStateFromStatus(row.status),
     is_live: row.is_live,
     created_at: row.created_at,
     updated_at: row.updated_at,

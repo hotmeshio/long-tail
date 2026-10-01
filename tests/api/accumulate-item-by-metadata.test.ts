@@ -59,6 +59,10 @@ function makeBin(overrides: Record<string, any> = {}): any {
   };
 }
 
+function mockGetEscalation(id: string) {
+  vi.mocked(escalationService.getEscalation).mockResolvedValue(makeBin({ id, role: 'bin' }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   enforcing.roles = new Set();
@@ -83,6 +87,23 @@ describe('accumulateItemByMetadata (api)', () => {
     expect(input.roles).toEqual(['bin']);
     expect(input.actor).toBe(AUTH.userId);
     expect(mockSearch).not.toHaveBeenCalled();
+  });
+
+  it('a narrowed container selector picks in Long Tail, skipping the reciprocal row, then adds by id', async () => {
+    const SLOT_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    mockGetEscalation(SLOT_ID);
+    mockSearch.mockResolvedValue({ escalations: [makeBin({ id: SLOT_ID }), makeBin()], total: 2 });
+    mockById.mockResolvedValue({ outcome: 'accepted', count: 1, remaining: 1, escalation: makeBin() });
+    const result = await accumulateItemByMetadata({
+      key: 'binKey', value: 'b-1', itemKey: 'bag-1',
+      container: { types: ['rollup'], subtypes: ['bin'], facets: { lane: 'a' } }, reciprocal: { id: SLOT_ID },
+    }, AUTH);
+    expect(result.status).toBe(200);
+    expect(mockByMeta).not.toHaveBeenCalled();
+    expect(mockSearch.mock.calls[0][0]).toMatchObject({
+      types: ['rollup'], subtypes: ['bin'], facets: { lane: 'a', binKey: 'b-1' }, status: 'pending', limit: 2,
+    });
+    expect(mockById.mock.calls[0][0]).toBe(BIN_ID);
   });
 
   it('maps a not-found selection to 404 naming the facet, never a 400 for a non-accumulator neighbor', async () => {
