@@ -51,6 +51,9 @@ export interface LTGrantSummary {
 export interface LTOAuthServerConfig {
   /** Public base URL Long Tail is served under, e.g. `https://api.example.com/longtail`. */
   issuer: string;
-  /** Hosts allowed in non-loopback redirect URIs at client registration. */
-  allowedRedirectHosts?: string[];
+  /**
+   * Exact https redirect URIs a client may register, beyond loopback, e.g.
+   * `https://claude.ai/api/mcp/auth_callback`. Compared in canonical form.
+   */
+  allowedRedirectUris?: string[];
 }

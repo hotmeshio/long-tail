@@ -203,7 +203,7 @@ Then run `/mcp` in Claude Code and pick Authenticate. The browser opens the cons
 
 Allow as me appears only when it grants more than read-only: when you can write in some role, or hold an admin tier. Either way the client acts as you, so every result is limited to your roles, and every action is recorded as you.
 
-Access tokens last 5 minutes and carry your roles as of issue; the client refreshes them silently with a refresh token that rotates on each use and lasts 30 days. A refresh re-reads your roles and account status, so a role change reaches the client within one token lifetime. Disconnect a client under **Connected apps** in the user menu to end its access at once; the same happens when the client revokes its token.
+Access tokens last 5 minutes; the client refreshes them silently with a refresh token that rotates on each use and lasts 30 days. Every request reads the grant: a client acts with your roles as they are now, and a disconnected app, a revoked token or a deactivated account stops working on the next request. Disconnect a client under **Connected apps** in the user menu; the same happens when the client revokes its token.
 
 **Enable it** with `auth.oauthServer` in `start()`, or `LT_OAUTH_ISSUER` in the environment:
 
@@ -212,13 +212,13 @@ start({
   auth: {
     oauthServer: {
       issuer: 'https://api.example.com/longtail', // the public base URL Long Tail is served under
-      allowedRedirectHosts: ['claude.ai'],        // https redirect hosts, beyond loopback
+      allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'], // exact https redirects, beyond loopback
     },
   },
 });
 ```
 
-Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, `localhost`, `[::1]`, any port) are always allowed, which covers Claude Code and Claude Desktop; an `https` redirect is allowed only on a host in `allowedRedirectHosts`.
+Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, `localhost`, `[::1]`, any port) are always allowed, which covers Claude Code and Claude Desktop; an `https` redirect is allowed only when it equals a URI in `allowedRedirectUris`.
 
 **Embedded deployments** mount two routers, and let four paths reach Long Tail without the host's login:
 

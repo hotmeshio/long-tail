@@ -56,10 +56,11 @@ beforeEach(() => {
 });
 
 describe('OAuth server settings', () => {
-  it('derive the resource and its metadata URL from the issuer, ignoring a trailing slash', () => {
-    setOAuthServerConfig({ issuer: `${ISSUER}/`, allowedRedirectHosts: ['claude.ai'] });
+  it('derive the resource and its metadata URL from the issuer, ignoring a trailing slash; allowed redirects are canonical https URIs', () => {
+    setOAuthServerConfig({ issuer: `${ISSUER}/`, allowedRedirectUris: ['https://Claude.ai/api/mcp/auth_callback', 'http://not-https/cb'] });
     expect(getOAuthServerSettings()).toEqual({
-      issuer: ISSUER, resource: `${ISSUER}/mcp`, resourceMetadataUrl: METADATA, allowedRedirectHosts: ['claude.ai'],
+      issuer: ISSUER, resource: `${ISSUER}/mcp`, resourceMetadataUrl: METADATA,
+      allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'],
     });
   });
 });

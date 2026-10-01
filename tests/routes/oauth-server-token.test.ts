@@ -105,7 +105,7 @@ describe('POST /api/oauth/token', () => {
   it('answers RFC 6749 errors', async () => {
     const { code } = await approve();
     const cases: Array<[Record<string, string>, string]> = [
-      [{ grant_type: 'authorization_code', code, code_verifier: 'wrong-verifier-wrong-verifier-wrong-verif', client_id: fixture.clientId, redirect_uri: REDIRECT_URI }, 'invalid_grant'],
+      [{ grant_type: 'authorization_code', code, code_verifier: 'w'.repeat(43), client_id: fixture.clientId, redirect_uri: REDIRECT_URI }, 'invalid_grant'],
       [{ grant_type: 'authorization_code', code, client_id: fixture.clientId }, 'invalid_request'],
       [{ grant_type: 'password', client_id: fixture.clientId }, 'unsupported_grant_type'],
       [{ grant_type: 'refresh_token', refresh_token: 'x' }, 'invalid_request'],

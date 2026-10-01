@@ -4,8 +4,9 @@ import { getOAuthServerSettings } from '../../modules/oauth-server';
 import { OAUTH_CODE_TTL_SECONDS } from '../../modules/defaults';
 import { getClient, issueAuthorizationCode, PRESET_SCOPE } from '../../services/auth/oauth-server';
 import {
-  checkAuthorizationRequest, isGrantPreset, withQuery, type AuthorizationCheck,
+  checkAuthorizationRequest, grantablePresets, isGrantPreset, withQuery, type AuthorizationCheck,
 } from '../../services/auth/oauth-server/authorization';
+import { getUserRoles } from '../../services/user';
 
 const router = Router();
 const CONSENT_PAGE_PATH = '/oauth/consent';
@@ -61,6 +62,10 @@ router.post('/authorize', requireAuth, async (req, res) => {
   const preset = req.body?.preset;
   if (!isGrantPreset(preset)) {
     res.status(400).json({ error: 'invalid_request', error_description: 'preset must be read_only or just_me' });
+    return;
+  }
+  if (!grantablePresets(await getUserRoles(req.auth!.userId)).includes(preset)) {
+    res.status(403).json({ error: 'access_denied', error_description: `you may not grant ${preset}` });
     return;
   }
   const { client, redirectUri, codeChallenge, state, resource } = check.request;

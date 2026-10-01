@@ -3,6 +3,8 @@ import path from 'path';
 import { Router, jsonBody, serveStatic } from '../lib/http';
 import type { Server as HttpServer } from 'http';
 
+const CONSENT_PAGE_PATH = '/oauth/consent';
+
 import routes from '../routes';
 import mcpEndpoint from '../routes/mcp-endpoint';
 import { createWellKnownRouter } from '../routes/oauth-well-known';
@@ -139,7 +141,13 @@ export class LTExpressAdapter {
         res.type('application/javascript').send(`window.__LT_BASE__="${basePath}";`);
       });
 
-      router.get('/{*splat}', (_req, res) => {
+      router.get('/{*splat}', (req, res) => {
+        // The consent page grants access to a person's account: never inside
+        // another site's frame. A host's own security policy is kept.
+        if (req.path.startsWith(CONSENT_PAGE_PATH)) {
+          res.setHeader('X-Frame-Options', 'DENY');
+          if (!res.getHeader('Content-Security-Policy')) res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+        }
         const html = (cachedIndex ?? readFileSync(indexPath, 'utf-8')).replace(
           '<head>',
           '<head>' +
