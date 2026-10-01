@@ -160,8 +160,8 @@ export function registerEscalationTools(server: McpServer): void {
         'full records including metadata.',
       inputSchema: getEscalationsByWorkflowSchema,
     },
-    async (args: z.infer<typeof getEscalationsByWorkflowSchema>) => {
-      const result = await escalationApi.getEscalationsByWorkflowId({ workflowId: args.workflow_id });
+    async (args: z.infer<typeof getEscalationsByWorkflowSchema>, extra?: ToolCallExtra) => {
+      const result = await escalationApi.getEscalationsByWorkflowId({ workflowId: args.workflow_id }, externalCaller(extra));
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
       }

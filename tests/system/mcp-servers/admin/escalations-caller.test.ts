@@ -45,8 +45,8 @@ const ARGS = { id: 'e1', ids: ['e1'], signalKey: 's', key: 'k', value: 'v', reso
   role: 'r', itemKey: 'i', query: {}, groupBy: {}, measure: {}, facet: { key: 'k', value: 'v' }, priority: 2,
   targetUserId: CALLER.userId, workflow_id: 'w' };
 const DIRECT_SERVICE_TOOLS = ['get_escalation_stats', 'release_expired_claims', 'bulk_triage'];
-// api/ takes no principal for these, over REST as well.
-const UNSCOPED_API_TOOLS = ['get_escalations_by_workflow'];
+// Scoped to an external caller; an internal call passes no principal and reads every row.
+const CALLER_SCOPED_TOOLS = ['get_escalations_by_workflow'];
 
 function captureTools(): Map<string, (args: any, extra?: any) => Promise<any>> {
   const handlers = new Map<string, (args: any, extra?: any) => Promise<any>>();
@@ -67,15 +67,16 @@ beforeEach(() => {
 
 describe('escalation tools act as the /mcp caller', () => {
   const tools = captureTools();
-  const apiTools = [...tools.keys()].filter((name) => ![...DIRECT_SERVICE_TOOLS, ...UNSCOPED_API_TOOLS].includes(name));
+  const apiTools = [...tools.keys()].filter((name) => ![...DIRECT_SERVICE_TOOLS, ...CALLER_SCOPED_TOOLS].includes(name));
 
   it('covers every api-backed escalation tool', () => {
     expect(apiTools.length).toBe(26);
   });
 
-  it('get_escalations_by_workflow calls api the same way for every caller', async () => {
+  it('get_escalations_by_workflow is scoped to an external caller, and unscoped internally', async () => {
     const handler = tools.get('get_escalations_by_workflow')!;
-    expect(await authsFor(handler, { authInfo: CALLER })).toEqual(await authsFor(handler));
+    expect(await authsFor(handler, { authInfo: CALLER })).toEqual([CALLER]);
+    expect(await authsFor(handler)).toEqual([undefined]);
   });
 
   for (const name of apiTools) {

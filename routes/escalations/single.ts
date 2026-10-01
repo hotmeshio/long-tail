@@ -24,7 +24,7 @@ export function registerSingleRoutes(router: Router): void {
   router.get('/by-workflow/:workflowId', async (req, res) => {
     const result = await api.getEscalationsByWorkflowId({
       workflowId: req.params.workflowId,
-    });
+    }, req.auth);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 

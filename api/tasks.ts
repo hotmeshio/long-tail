@@ -1,5 +1,6 @@
 import * as taskService from '../services/task';
 import * as escalationService from '../services/escalation';
+import { getEscalationReadScope, scopeAdmits } from './escalations/helpers';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
 
 /**
@@ -152,12 +153,15 @@ export async function listProcesses(input: {
  */
 export async function getProcess(input: {
   originId: string;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
-    const [tasks, escalations] = await Promise.all([
+    const [tasks, all] = await Promise.all([
       taskService.getProcessTasks(input.originId),
       escalationService.getEscalationsByOriginId(input.originId),
     ]);
+    // With a caller, only the escalations that caller may read.
+    const scope = auth?.userId ? await getEscalationReadScope(auth.userId) : null;
+    const escalations = scope ? all.filter((e) => scopeAdmits(scope, auth!.userId, e)) : all;
     return {
       status: 200,
       data: { origin_id: input.originId, tasks, escalations },
