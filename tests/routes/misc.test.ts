@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupRouteTest, authHeaders } from './setup';
 
 const ctx = setupRouteTest(4622);
@@ -132,6 +132,22 @@ describe('DBA routes', () => {
 });
 
 describe('Insight routes', () => {
+  const LLM_KEYS = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'] as const;
+  const saved: Partial<Record<(typeof LLM_KEYS)[number], string>> = {};
+
+  beforeAll(() => {
+    for (const key of LLM_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterAll(() => {
+    for (const key of LLM_KEYS) {
+      if (saved[key] !== undefined) process.env[key] = saved[key];
+    }
+  });
+
   describe('POST /api/insight/mcp-query', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/insight/mcp-query`, { method: 'POST' });
@@ -149,19 +165,13 @@ describe('Insight routes', () => {
       expect(body.error).toContain('prompt');
     });
 
-    it('accepts async mode and returns workflow_id or 503', async () => {
+    it('returns 503 without an LLM key', async () => {
       const res = await fetch(`${ctx.BASE}/insight/mcp-query`, {
         method: 'POST',
         headers: authHeaders(ctx.adminToken),
         body: JSON.stringify({ prompt: 'test query', wait: false }),
       });
-      // 503 if no LLM key, 200 if key present (async mode returns immediately)
-      expect([200, 503]).toContain(res.status);
-      const body = await res.json() as any;
-      if (res.status === 200) {
-        expect(body.workflow_id).toBeDefined();
-        expect(body.status).toBe('started');
-      }
+      expect(res.status).toBe(503);
     });
   });
 
@@ -188,7 +198,6 @@ describe('Insight routes', () => {
         headers: authHeaders(ctx.adminToken),
         body: JSON.stringify({ prompt: 'Count active users by role' }),
       });
-      // Without LLM key, the endpoint falls back gracefully
       expect(res.status).toBe(200);
       const body = await res.json() as any;
       expect(body).toHaveProperty('description');
@@ -214,27 +223,13 @@ describe('Insight routes', () => {
       expect(body.error).toContain('prompt');
     });
 
-    it('accepts async mode and returns workflow_id or 503', async () => {
-      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
-        method: 'POST',
-        headers: authHeaders(ctx.builderToken),
-        body: JSON.stringify({ prompt: 'screenshot a webpage and save it', wait: false }),
-      });
-      expect([200, 503]).toContain(res.status);
-      const body = await res.json() as any;
-      if (res.status === 200) {
-        expect(body.workflow_id).toBeDefined();
-        expect(body.status).toBe('started');
-      }
-    });
-
-    it('accepts tags parameter', async () => {
+    it('returns 503 without an LLM key', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
         headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test', tags: ['browser-automation'], wait: false }),
       });
-      expect([200, 503]).toContain(res.status);
+      expect(res.status).toBe(503);
     });
   });
 
@@ -264,20 +259,6 @@ describe('Insight routes', () => {
       expect(res.status).toBe(400);
       const body = await res.json() as any;
       expect(body.error).toContain('feedback');
-    });
-
-    it('accepts valid refine request or 503', async () => {
-      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
-        method: 'POST',
-        headers: authHeaders(ctx.builderToken),
-        body: JSON.stringify({
-          prompt: 'screenshot a webpage',
-          prior_yaml: 'app:\n  id: test\n  version: "1"',
-          feedback: 'screenshot_path missing .png extension',
-          wait: false,
-        }),
-      });
-      expect([200, 503]).toContain(res.status);
     });
   });
 });
