@@ -2,6 +2,7 @@ import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../services/yaml-workflow/workers';
 import { invokeYamlWorkflow as invokeYamlWorkflowService } from '../../services/yaml-workflow/invoke';
+import { assertMayActAs, InvocationError } from '../../services/workflow-invocation';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import { isNotFoundError } from './helpers';
 
@@ -131,6 +132,10 @@ export async function invokeYamlWorkflow(input: {
     if (wf.status !== 'active') {
       return { status: 400, error: 'Workflow must be active to invoke' };
     }
+    if (input.execute_as) {
+      if (!auth?.userId) return { status: 403, error: 'execute_as requires an authenticated caller' };
+      await assertMayActAs(auth.userId, input.execute_as);
+    }
 
     const result = await invokeYamlWorkflowService(wf, {
       data: input.data,
@@ -141,6 +146,7 @@ export async function invokeYamlWorkflow(input: {
     });
     return { status: 200, data: result };
   } catch (err: any) {
+    if (err instanceof InvocationError) return { status: err.statusCode, error: err.message };
     if (isNotFoundError(err)) {
       return { status: 404, error: 'YAML workflow not found' };
     }

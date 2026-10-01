@@ -16,6 +16,32 @@ interface InvokeOptions {
 }
 
 /**
+ * The identity context compiled workflow activities run under, from the
+ * server-side identity: execute_as with the invoker as initiator, else the
+ * invoker. Never read from the caller's data.
+ */
+async function resolveScope(
+  executeAs: string | undefined,
+  userId: string | undefined,
+): Promise<Record<string, unknown> | undefined> {
+  if (executeAs) {
+    const [botPrincipal, invokerPrincipal] = await Promise.all([
+      resolvePrincipal(executeAs),
+      userId ? resolvePrincipal(userId) : Promise.resolve(null),
+    ]);
+    if (!botPrincipal) return undefined;
+    return {
+      principal: botPrincipal,
+      scopes: ['mcp:tool:call'],
+      ...(invokerPrincipal ? { initiatedBy: userId, initiatingPrincipal: invokerPrincipal } : {}),
+    };
+  }
+  if (!userId) return undefined;
+  const principal = await resolvePrincipal(userId);
+  return principal ? { principal, scopes: ['mcp:tool:call'] } : undefined;
+}
+
+/**
  * Invoke a YAML workflow with scope injection.
  * Shared by HTTP route and cron callback.
  */
@@ -24,31 +50,7 @@ export async function invokeYamlWorkflow(
   options: InvokeOptions = {},
 ): Promise<{ job_id: string; result?: unknown }> {
   const data: Record<string, unknown> = { ...(options.data || {}) };
-
-  // Inject _scope so compiled workflow activities have identity context
-  if (!data._scope) {
-    const executeAs = options.execute_as;
-    const userId = options.userId;
-
-    if (executeAs) {
-      const [botPrincipal, invokerPrincipal] = await Promise.all([
-        resolvePrincipal(executeAs),
-        userId ? resolvePrincipal(userId) : Promise.resolve(null),
-      ]);
-      if (botPrincipal) {
-        data._scope = {
-          principal: botPrincipal,
-          scopes: ['mcp:tool:call'],
-          ...(invokerPrincipal ? { initiatedBy: userId, initiatingPrincipal: invokerPrincipal } : {}),
-        };
-      }
-    } else if (userId) {
-      const principal = await resolvePrincipal(userId);
-      if (principal) {
-        data._scope = { principal, scopes: ['mcp:tool:call'] };
-      }
-    }
-  }
+  const scope = await resolveScope(options.execute_as, options.userId);
 
   if (options.source) {
     if (!data._metadata) data._metadata = {};
@@ -76,6 +78,7 @@ export async function invokeYamlWorkflow(
         data,
         options.timeout,
         wf.graph_topic,
+        scope,
       );
       publishWorkflowEvent({
         type: 'workflow.completed',
@@ -120,6 +123,7 @@ export async function invokeYamlWorkflow(
     data,
     wf.graph_topic,
     context,
+    scope,
   );
 
   publishWorkflowEvent({

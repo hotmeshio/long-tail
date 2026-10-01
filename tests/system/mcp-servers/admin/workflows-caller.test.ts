@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Who a workflow is invoked as over MCP: the /mcp caller, checked against the
-// workflow's invocation roles, or lt-system for internal calls.
+// workflow's invocation rules and any execute_as override, or lt-system for
+// internal calls.
 
 const mocks = vi.hoisted(() => ({
   invokeWorkflow: vi.fn(async () => ({ workflowId: 'wf-1' })),
-  checkInvocationRoles: vi.fn(async () => undefined),
+  authorizeInvocation: vi.fn(async () => undefined),
   getWorkflowConfig: vi.fn(async () => ({ workflow_type: 'probe', invocable: true, read_safe: true })),
 }));
 
 vi.mock('../../../../services/workflow-invocation', () => ({
   invokeWorkflow: mocks.invokeWorkflow,
-  checkInvocationRoles: mocks.checkInvocationRoles,
+  authorizeInvocation: mocks.authorizeInvocation,
 }));
 vi.mock('../../../../services/config', () => ({
   listWorkflowConfigs: vi.fn(async () => []),
@@ -43,20 +44,25 @@ describe('MCP workflow invocation identity', () => {
   for (const name of INVOKE_TOOLS) {
     it(`${name} checks invocation roles and invokes as the external caller`, async () => {
       await tools.get(name)!({ workflow_type: 'probe', data: {} }, { authInfo: CALLER });
-      expect(mocks.checkInvocationRoles).toHaveBeenCalledWith('probe', CALLER.userId, CALLER.role);
+      expect(mocks.authorizeInvocation).toHaveBeenCalledWith({ workflowType: 'probe', userId: CALLER.userId, executeAs: undefined });
       expect(invokedAuth()).toEqual({ userId: CALLER.userId, role: CALLER.role });
     });
 
     it(`${name} does not invoke when the caller lacks the invocation roles`, async () => {
-      mocks.checkInvocationRoles.mockRejectedValueOnce(new Error('Insufficient role for invocation'));
+      mocks.authorizeInvocation.mockRejectedValueOnce(new Error('Insufficient role for invocation'));
       await expect(tools.get(name)!({ workflow_type: 'probe', data: {} }, { authInfo: CALLER }))
         .rejects.toThrow('Insufficient role for invocation');
       expect(mocks.invokeWorkflow).not.toHaveBeenCalled();
     });
 
+    it(`${name} passes an execute_as override to the authorization`, async () => {
+      await tools.get(name)!({ workflow_type: 'probe', data: {}, execute_as: 'svc-bot' }, { authInfo: CALLER });
+      expect(mocks.authorizeInvocation).toHaveBeenCalledWith({ workflowType: 'probe', userId: CALLER.userId, executeAs: 'svc-bot' });
+    });
+
     it(`${name} invokes as lt-system internally without a role check`, async () => {
       await tools.get(name)!({ workflow_type: 'probe', data: {} });
-      expect(mocks.checkInvocationRoles).not.toHaveBeenCalled();
+      expect(mocks.authorizeInvocation).not.toHaveBeenCalled();
       expect(invokedAuth()).toEqual(SYSTEM);
     });
   }

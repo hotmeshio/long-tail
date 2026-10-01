@@ -9,7 +9,7 @@ import * as configService from '../../../services/config';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../../services/workers/registry';
 import {
   invokeWorkflow,
-  checkInvocationRoles,
+  authorizeInvocation,
   type InvocationAuthContext,
 } from '../../../services/workflow-invocation';
 import { externalCaller, type ToolCallExtra } from '../caller-auth';
@@ -31,10 +31,14 @@ const SYSTEM_INVOKER: InvocationAuthContext = { userId: 'lt-system', role: 'supe
  * off: at `/mcp` they decide which invoke tool is listed, not whether the
  * invocation is allowed. Internal calls invoke as lt-system.
  */
-async function resolveInvoker(workflowType: string, extra?: ToolCallExtra): Promise<InvocationAuthContext> {
+async function resolveInvoker(
+  workflowType: string,
+  extra?: ToolCallExtra,
+  executeAs?: string,
+): Promise<InvocationAuthContext> {
   const caller = externalCaller(extra);
   if (!caller) return SYSTEM_INVOKER;
-  await checkInvocationRoles(workflowType, caller.userId, caller.role);
+  await authorizeInvocation({ workflowType, userId: caller.userId, executeAs });
   return { userId: caller.userId, role: caller.role };
 }
 
@@ -117,7 +121,7 @@ export function registerWorkflowTools(server: McpServer): void {
     },
     async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const config = await configService.getWorkflowConfig(args.workflow_type);
-      const invoker = await resolveInvoker(args.workflow_type, extra);
+      const invoker = await resolveInvoker(args.workflow_type, extra, args.execute_as);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
@@ -174,7 +178,7 @@ export function registerWorkflowTools(server: McpServer): void {
           isError: true,
         };
       }
-      const invoker = await resolveInvoker(args.workflow_type, extra);
+      const invoker = await resolveInvoker(args.workflow_type, extra, args.execute_as);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({

@@ -10,7 +10,7 @@ const mockResolveLookupContext = vi.fn();
 
 vi.mock('../../services/workflow-invocation', () => ({
   invokeWorkflow: (...a: unknown[]) => mockInvoke(...a),
-  checkInvocationRoles: (...a: unknown[]) => mockCheckRoles(...a),
+  authorizeInvocation: (...a: unknown[]) => mockCheckRoles(...a),
   InvocationError: class InvocationError extends Error { statusCode = 403; },
 }));
 vi.mock('../../services/config', () => ({
