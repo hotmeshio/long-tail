@@ -152,6 +152,33 @@ export async function disconnectFromServer(serverId: string): Promise<void> {
  * Alias lookups (e.g. 'translation' matching 'long-tail-translation') reuse
  * the same client instance to avoid double-connecting the singleton server.
  */
+/**
+ * The built-in server a server id or name resolves to, by the same rules
+ * resolveClient follows: an exact or fuzzy factory name, else a registered
+ * server whose name matches a factory. Null for an external server.
+ */
+export async function resolveBuiltinServerName(serverId: string): Promise<string | null> {
+  if (builtinFactories.has(serverId)) return serverId;
+  const norm = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const normId = norm(serverId);
+  for (const [name] of builtinFactories) {
+    const normName = norm(name);
+    if (normName.includes(normId) || normId.includes(normName)) return name;
+  }
+  try {
+    const dbServer =
+      (await mcpDbService.getMcpServer(serverId)) ||
+      (await mcpDbService.getMcpServerByName(serverId));
+    if (!dbServer) return null;
+    for (const [name] of builtinFactories) {
+      if (dbServer.name === name || name.includes(dbServer.name) || dbServer.name.includes(name)) return name;
+    }
+  } catch {
+    // DB lookup failed: treated as external
+  }
+  return null;
+}
+
 export async function resolveClient(serverId: string): Promise<Client | null> {
   // 1. Direct lookup (by UUID or name)
   if (clients.has(serverId)) return clients.get(serverId)!;
