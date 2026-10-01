@@ -8,6 +8,7 @@ export {
   issueAuthorizationCode,
   exchangeAuthorizationCode,
   rotateRefreshToken,
+  getLiveGrant,
   revokeByRefreshToken,
   revokeGrant,
   listGrants,

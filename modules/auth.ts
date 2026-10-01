@@ -171,6 +171,16 @@ export const requireAuth: RequestHandler = async (req: Request, res: Response, n
 };
 
 /**
+ * `requireAuth` without the SSO fallback: only a credential the request
+ * carries itself (the configured adapter, else a Bearer JWT or bot key).
+ * For endpoints a cross-site page must not reach through the host's cookie.
+ */
+export const requireCredentialAuth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  const mw = _authMiddleware || createAuthMiddleware(new JwtAuthAdapter());
+  return mw(req, res, next);
+};
+
+/**
  * Replace the auth adapter used by `requireAuth`.
  * Call before starting the server.
  */

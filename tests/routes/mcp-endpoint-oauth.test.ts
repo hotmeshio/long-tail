@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   listEscalations: vi.fn(async () => ({ status: 200, data: { escalations: [], total: 0 } })),
   isSuperAdmin: vi.fn(async () => false),
   hasRole: vi.fn(async () => false),
+  getLiveGrant: vi.fn(),
+}));
+vi.mock('../../services/auth/oauth-server/store', async (io) => ({
+  ...(await io<typeof import('../../services/auth/oauth-server/store')>()),
+  getLiveGrant: mocks.getLiveGrant,
 }));
 
 vi.mock('../../services/domain', () => ({ getDomainIndex: vi.fn(async () => null), getDomainDictionary: vi.fn(async () => null) }));
@@ -28,8 +33,9 @@ let url: string;
 let issuer: string;
 let savedSecret: string;
 
+const GRANT_IDS = { read_only: '00000000-0000-4000-8000-0000000000f9', just_me: '00000000-0000-4000-8000-0000000000fa' };
 const grant = (preset: 'read_only' | 'just_me'): LTGrantSnapshot => ({
-  grant_id: '00000000-0000-4000-8000-0000000000f9', user_id: USER, client_id: 'ltc_c',
+  grant_id: GRANT_IDS[preset], user_id: USER, client_id: 'ltc_c',
   policy: { preset }, scope: preset === 'read_only' ? 'mcp:read' : 'mcp:full',
   roles: [{ role: 'reviewer', type: 'member', read_scope: 'all', write_scope: 'all' }],
 });
@@ -54,6 +60,8 @@ const toolNames = async (token: string) =>
   (await rpc(token, 'tools/list', {})).body.result.tools.map((t: { name: string }) => t.name) as string[];
 
 beforeAll(async () => {
+  mocks.getLiveGrant.mockImplementation(async (gid: string) =>
+    gid === GRANT_IDS.read_only ? grant('read_only') : gid === GRANT_IDS.just_me ? grant('just_me') : null);
   savedSecret = config.JWT_SECRET;
   (config as any).JWT_SECRET = 'mcp-oauth-route-secret';
   const app = createApp();

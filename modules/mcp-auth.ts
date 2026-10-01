@@ -1,14 +1,14 @@
 import jwt from 'jsonwebtoken';
 
 import type { Request, Response, NextFunction, RequestHandler } from '../lib/http';
-import { requireAuth } from './auth';
+import { requireCredentialAuth } from './auth';
 import { getOAuthServerSettings, type OAuthServerSettings } from './oauth-server';
 import {
   ACCESS_TOKEN_TYPE,
   verifyAccessToken,
   accessTokenPrincipal,
+  getLiveGrant,
 } from '../services/auth/oauth-server';
-import { isRevoked } from '../services/auth/oauth-server/revocations';
 
 const CHALLENGE_HEADER = 'WWW-Authenticate';
 
@@ -28,31 +28,34 @@ function challenge(settings: OAuthServerSettings, error?: string): string {
 }
 
 /**
- * Authentication for `/mcp`. With the OAuth server configured, an access
- * token for this resource authenticates the request and every 401 carries the
- * RFC 9728 challenge, so MCP clients can discover how to sign in. Any other
- * credential goes through `requireAuth` unchanged. Without the OAuth server,
- * this is `requireAuth`.
+ * Authentication for `/mcp`. Only a credential the request carries itself
+ * authenticates: the host's SSO cookie fallback never applies here, since a
+ * cookie rides along on a request any page the person visits can send. With
+ * the OAuth server configured, an access token for this resource
+ * authenticates the request while its grant is live, and every 401 carries
+ * the RFC 9728 challenge so MCP clients can discover how to sign in. Any other
+ * credential goes through the configured auth adapter unchanged.
  */
 export const requireMcpAuth: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const settings = getOAuthServerSettings();
-  if (!settings) return requireAuth(req, res, next);
+  if (!settings) return requireCredentialAuth(req, res, next);
 
   const token = bearerToken(req);
   if (token && isAccessToken(token)) {
     const claims = verifyAccessToken(token, { issuer: settings.issuer, audience: settings.resource });
-    if (!claims || isRevoked(claims)) {
+    const live = claims ? await getLiveGrant(claims.gid, claims.sub) : null;
+    if (!claims || !live || live.client_id !== claims.client_id) {
       res.setHeader(CHALLENGE_HEADER, challenge(settings, 'invalid_token'));
       res.status(401).json({ error: 'invalid_token' });
       return;
     }
-    req.auth = accessTokenPrincipal(claims);
+    req.auth = accessTokenPrincipal(claims, live);
     next();
     return;
   }
 
   res.setHeader(CHALLENGE_HEADER, challenge(settings));
-  return requireAuth(req, res, (err?: unknown) => {
+  return requireCredentialAuth(req, res, (err?: unknown) => {
     res.removeHeader(CHALLENGE_HEADER);
     next(err);
   });

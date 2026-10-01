@@ -3,7 +3,6 @@ import { requireAuth } from '../../modules/auth';
 import { getUserRoles } from '../../services/user/roles';
 import { listGrants, revokeGrant } from '../../services/auth/oauth-server';
 import { grantablePresets } from '../../services/auth/oauth-server/authorization';
-import { revokeEverywhere } from '../../services/auth/oauth-server/revocation-events';
 
 const router = Router();
 
@@ -33,7 +32,6 @@ router.delete('/grants/:id', requireAuth, async (req, res) => {
     res.status(404).json({ error: 'not_found' });
     return;
   }
-  revokeEverywhere(revoked.grant_id);
   res.json({ disconnected: true });
 });
 
