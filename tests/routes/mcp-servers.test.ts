@@ -12,7 +12,7 @@ describe('MCP Servers routes', () => {
 
     it('returns server list', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -24,7 +24,7 @@ describe('MCP Servers routes', () => {
 
     it('supports status filter', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers?status=connected`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -35,7 +35,7 @@ describe('MCP Servers routes', () => {
 
     it('supports search filter', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers?search=zzz_no_match_zzz`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -45,7 +45,7 @@ describe('MCP Servers routes', () => {
 
     it('supports pagination', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers?limit=1&offset=0`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -56,7 +56,7 @@ describe('MCP Servers routes', () => {
   describe('GET /api/mcp/servers/:id', () => {
     it('returns 404 for non-existent server', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -71,7 +71,7 @@ describe('MCP Servers routes', () => {
     it('returns 400 when required fields missing', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name: 'test' }),
       });
       expect(res.status).toBe(400);
@@ -82,7 +82,7 @@ describe('MCP Servers routes', () => {
     it('returns 404 for non-existent server', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ description: 'updated' }),
       });
       expect(res.status).toBe(404);
@@ -93,7 +93,7 @@ describe('MCP Servers routes', () => {
     it('returns 404 for non-existent server', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers/00000000-0000-0000-0000-000000000099`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -104,7 +104,7 @@ describe('MCP Servers routes', () => {
       const name = `test-extended-${Date.now()}`;
       const res = await fetch(`${ctx.BASE}/mcp/servers`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           name,
           transport_type: 'stdio',
@@ -124,7 +124,7 @@ describe('MCP Servers routes', () => {
       // cleanup
       await fetch(`${ctx.BASE}/mcp/servers/${server.id}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
     });
   });
@@ -134,7 +134,7 @@ describe('MCP Servers routes', () => {
       const name = `test-update-ext-${Date.now()}`;
       const createRes = await fetch(`${ctx.BASE}/mcp/servers`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           name,
           transport_type: 'stdio',
@@ -149,7 +149,7 @@ describe('MCP Servers routes', () => {
 
       const updateRes = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           tags: ['new-tag-a', 'new-tag-b'],
           compile_hints: 'updated hint',
@@ -165,7 +165,7 @@ describe('MCP Servers routes', () => {
       // cleanup
       await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
     });
   });
@@ -181,7 +181,7 @@ describe('MCP Servers routes', () => {
     it('returns 400 without required fields', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers/test-connection`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ transport_type: 'stdio' }),
       });
       expect(res.status).toBe(400);
@@ -192,7 +192,7 @@ describe('MCP Servers routes', () => {
     it('returns response with success field for invalid connection', async () => {
       const res = await fetch(`${ctx.BASE}/mcp/servers/test-connection`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           transport_type: 'stdio',
           transport_config: { command: 'nonexistent-binary-xyz', args: [] },
@@ -214,7 +214,7 @@ describe('MCP Servers routes', () => {
       // 1. Create with all fields
       const createRes = await fetch(`${ctx.BASE}/mcp/servers`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           name,
           description: 'lifecycle test server',
@@ -235,7 +235,7 @@ describe('MCP Servers routes', () => {
 
       // 2. Read back
       const getRes = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(getRes.status).toBe(200);
       const fetched = await getRes.json();
@@ -248,7 +248,7 @@ describe('MCP Servers routes', () => {
       // 3. Update extended fields
       const updateRes = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           description: 'updated description',
           tags: ['updated'],
@@ -265,7 +265,7 @@ describe('MCP Servers routes', () => {
 
       // 4. Verify update persisted
       const verifyRes = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(verifyRes.status).toBe(200);
       const verified = await verifyRes.json();
@@ -276,7 +276,7 @@ describe('MCP Servers routes', () => {
       // 5. Delete
       const deleteRes = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(deleteRes.status).toBe(200);
       const deleteBody = await deleteRes.json();
@@ -284,7 +284,7 @@ describe('MCP Servers routes', () => {
 
       // 6. Verify 404 after delete
       const gone = await fetch(`${ctx.BASE}/mcp/servers/${created.id}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(gone.status).toBe(404);
     });

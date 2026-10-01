@@ -3,6 +3,7 @@ export {
   connectToServer,
   disconnectFromServer,
   resolveClient,
+  resolveBuiltinServerName,
   connectAutoServers,
   disconnectAll,
   isConnected,

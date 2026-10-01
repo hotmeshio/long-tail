@@ -4,6 +4,7 @@ export {
   disconnectFromServer,
   listServerTools,
   resolveClient,
+  resolveBuiltinServerName,
   connectAutoServers,
   disconnectAll,
   isConnected,
@@ -12,5 +13,6 @@ export {
 
 export {
   callServerTool,
+  callBuiltinToolAs,
   toolActivities,
 } from './tools';

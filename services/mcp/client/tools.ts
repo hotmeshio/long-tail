@@ -20,6 +20,24 @@ function deriveAuthFromToolContext(): { userId?: string; delegationToken?: strin
 }
 
 /**
+ * Call a built-in server's tool as a named caller: the handler sees the
+ * caller as an external principal, so caller-aware tools act with the
+ * caller's own rights rather than lt-system's. `serverName` is the canonical
+ * built-in name (resolveBuiltinServerName).
+ */
+export async function callBuiltinToolAs(
+  serverName: string,
+  toolName: string,
+  args: Record<string, any>,
+  caller: { userId: string; role?: string },
+): Promise<any> {
+  const toolArgs = { ...args, _auth: { userId: caller.userId } };
+  const builtin = await dispatchBuiltinTool(serverName, toolName, toolArgs, { authInfo: caller });
+  if (!builtin) throw Object.assign(new Error(`Tool ${toolName} not found on ${serverName}`), { name: 'ToolNotFoundError' });
+  return builtin.result;
+}
+
+/**
  * Call a tool on a connected server.
  * Resolves the server by ID or name, auto-connecting built-in servers.
  */

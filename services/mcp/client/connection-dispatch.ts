@@ -15,6 +15,7 @@ export async function dispatchBuiltinTool(
   serverId: string,
   toolName: string,
   args: Record<string, any>,
+  extra?: { authInfo?: { userId: string; role?: string } },
 ): Promise<{ dispatched: true; result: any } | null> {
   const builtinFactories = getBuiltinFactories();
   const builtinServers = getBuiltinServers();
@@ -47,7 +48,8 @@ export async function dispatchBuiltinTool(
   // Call the handler directly — no transport, no JSON-RPC.
   // Tool handlers return MCP-shaped responses: { content: [{ type: 'text', text: '...' }] }
   // Parse the text content the same way callServerTool does.
-  const mcpResponse = await tool.handler(args);
+  // With `extra`, the handler sees an external caller and acts as them.
+  const mcpResponse = extra ? await tool.handler(args, extra) : await tool.handler(args);
   let parsed: any = mcpResponse;
 
   if (mcpResponse && Array.isArray(mcpResponse.content)) {

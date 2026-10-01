@@ -136,4 +136,14 @@ export const GATED_ROUTES: GatedRoute[] = [
   { method: 'GET', path: '/controlplane/streams', gate: 'builder' },
   { method: 'GET', path: '/controlplane/stream-messages', gate: 'builder' },
   { method: 'POST', path: '/controlplane/subscribe', gate: 'builder', body: {} },
+
+  // routes/mcp.ts
+  { method: 'GET', path: '/mcp/servers', gate: 'none' },
+  { method: 'POST', path: '/mcp/servers', gate: 'builder', body: {} },
+  { method: 'POST', path: '/mcp/servers/test-connection', gate: 'builder', body: {} },
+  { method: 'GET', path: `/mcp/servers/${ID}`, gate: 'none' },
+  { method: 'PUT', path: `/mcp/servers/${ID}`, gate: 'builder', body: {} },
+  { method: 'DELETE', path: `/mcp/servers/${ID}`, gate: 'builder' },
+  { method: 'POST', path: `/mcp/servers/${ID}/connect`, gate: 'builder', body: {} },
+  { method: 'POST', path: `/mcp/servers/${ID}/disconnect`, gate: 'builder', body: {} },
 ];
