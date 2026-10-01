@@ -14,7 +14,6 @@ import { signToken } from '../../modules/auth';
 import * as userService from '../../services/user';
 import { setOAuthServerConfig, clearOAuthServerConfig } from '../../modules/oauth-server';
 import { exchangeAuthorizationCode, signAccessToken } from '../../services/auth/oauth-server';
-import { clearRevocations } from '../../services/auth/oauth-server/revocations';
 import { REDIRECT_URI, createGrantFixture, issueCode, removeGrantFixture } from '../helpers/oauth-server-fixtures';
 
 const STAMP = `${Date.now()}-grants`;
@@ -58,7 +57,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   clearOAuthServerConfig();
-  clearRevocations();
   (config as any).JWT_SECRET = savedSecret;
   await getPool().query('DELETE FROM lt_users WHERE id = $1', [readOnlyUserId]);
   await removeGrantFixture(fixture);

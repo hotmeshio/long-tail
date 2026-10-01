@@ -6,10 +6,11 @@ import type { AuthPayload, LTGrantPolicy, LTGrantRole, LTGrantSnapshot, LTRoleTy
 import { ACCESS_TOKEN_TYPE, OAUTH_PRINCIPAL_TYPE } from './constants';
 
 /**
- * Access tokens are self-contained HS256 JWTs for one resource (`aud`, the
- * `/mcp` URL). They carry the grant and the person's roles as of issue or
- * refresh, so verifying one needs no database call. They name the person in
- * `sub` and carry no `userId` claim, so `requireAuth` refuses them on `/api`.
+ * Access tokens are HS256 JWTs for one resource (`aud`, the `/mcp` URL). They
+ * name the grant (`gid`) and the person (`sub`) and carry no `userId` claim,
+ * so `requireAuth` refuses them on `/api`. A verified token is honored only
+ * while its grant is live: `/mcp` reads the grant on each request and acts on
+ * its current roles, policy and scope.
  */
 
 export interface AccessTokenTarget {
@@ -69,6 +70,7 @@ export function verifyAccessToken(token: string, target: AccessTokenTarget): LTA
     });
     if (decoded.header.typ !== ACCESS_TOKEN_TYPE) return null;
     const claims = decoded.payload as LTAccessTokenClaims;
+    if (typeof claims.exp !== 'number') return null;
     if (!claims.sub || !claims.gid || !claims.client_id || !Array.isArray(claims.roles)) return null;
     return claims;
   } catch {
@@ -82,17 +84,21 @@ function highestRoleType(roles: LTGrantRole[]): LTRoleType {
   return 'member';
 }
 
-/** The request identity for a verified access token, in the shape other credentials produce. */
-export function accessTokenPrincipal(claims: LTAccessTokenClaims): AuthPayload {
+/**
+ * The request identity for a verified access token and its live grant, in the
+ * shape other credentials produce. Roles, policy and scope come from the grant
+ * as it stands now, not as the token recorded them.
+ */
+export function accessTokenPrincipal(claims: LTAccessTokenClaims, live: LTGrantSnapshot): AuthPayload {
   return {
     userId: claims.sub,
-    role: highestRoleType(claims.roles),
-    roles: claims.roles.map((r) => ({ role: r.role, type: r.type })),
-    scopes: [claims.scope],
+    role: highestRoleType(live.roles),
+    roles: live.roles.map((r) => ({ role: r.role, type: r.type })),
+    scopes: [live.scope],
     principalType: OAUTH_PRINCIPAL_TYPE,
-    clientId: claims.client_id,
-    grantId: claims.gid,
-    policy: claims.policy,
-    grantRoles: claims.roles,
+    clientId: live.client_id,
+    grantId: live.grant_id,
+    policy: live.policy,
+    grantRoles: live.roles,
   };
 }

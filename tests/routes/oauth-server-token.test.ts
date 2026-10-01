@@ -12,7 +12,6 @@ import mcpRouter from '../../routes/mcp-endpoint';
 import { config } from '../../modules/config';
 import { signToken } from '../../modules/auth';
 import { setOAuthServerConfig, clearOAuthServerConfig } from '../../modules/oauth-server';
-import { clearRevocations } from '../../services/auth/oauth-server/revocations';
 import { REDIRECT_URI, pkcePair, createGrantFixture, removeGrantFixture } from '../helpers/oauth-server-fixtures';
 
 // The whole flow over HTTP: consent, code exchange, /mcp, refresh, revoke.
@@ -77,7 +76,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   clearOAuthServerConfig();
-  clearRevocations();
   (config as any).JWT_SECRET = savedSecret;
   await removeGrantFixture(fixture);
   await new Promise<void>((resolve) => server.close(() => resolve()));

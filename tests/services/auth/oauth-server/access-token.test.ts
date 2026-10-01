@@ -95,11 +95,28 @@ describe('access tokens', () => {
 
   it('the principal names the person with their highest role type and the grant', () => {
     const claims = verifyAccessToken(signAccessToken(SNAPSHOT, TARGET).token, TARGET)!;
-    expect(accessTokenPrincipal(claims)).toEqual({
+    expect(accessTokenPrincipal(claims, SNAPSHOT)).toEqual({
       userId: USER, role: 'admin',
       roles: [{ role: 'reviewer', type: 'member' }, { role: 'ops', type: 'admin' }],
       scopes: ['mcp:read'], principalType: 'oauth', clientId: 'ltc_client', grantId: SNAPSHOT.grant_id,
       policy: { preset: 'read_only' }, grantRoles: SNAPSHOT.roles,
     });
+  });
+
+  it('the principal takes roles, policy and scope from the live grant', () => {
+    const claims = verifyAccessToken(signAccessToken(SNAPSHOT, TARGET).token, TARGET)!;
+    const live = { ...SNAPSHOT, scope: 'mcp:full', policy: { preset: 'just_me' as const }, roles: [{ role: 'reviewer', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const }] };
+    expect(accessTokenPrincipal(claims, live)).toMatchObject({
+      role: 'member', roles: [{ role: 'reviewer', type: 'member' }], scopes: ['mcp:full'], policy: { preset: 'just_me' },
+    });
+  });
+
+  it('a token without exp is refused', () => {
+    const forever = jwt.sign(
+      { client_id: 'ltc_client', gid: SNAPSHOT.grant_id, scope: 'mcp:read', policy: { preset: 'read_only' }, roles: [] },
+      SECRET,
+      { algorithm: 'HS256', header: { alg: 'HS256', typ: ACCESS_TOKEN_TYPE }, issuer: TARGET.issuer, audience: TARGET.audience, subject: USER },
+    );
+    expect(verifyAccessToken(forever, TARGET)).toBeNull();
   });
 });

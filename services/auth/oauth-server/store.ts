@@ -9,6 +9,7 @@ import {
   ISSUE_CODE,
   EXCHANGE_CODE,
   ROTATE_REFRESH_TOKEN,
+  GET_LIVE_GRANT,
   REVOKE_ON_REFRESH_REUSE,
   REVOKE_BY_REFRESH_TOKEN,
   REVOKE_GRANT,
@@ -110,6 +111,13 @@ export async function rotateRefreshToken(input: {
   if (rows[0]) return { snapshot: rows[0], refreshToken: next };
   const reuse = await pool.query(REVOKE_ON_REFRESH_REUSE, [oldHash, REFRESH_REUSE_GRACE_SECONDS]);
   return { snapshot: null, revoked: reuse.rows[0] ?? null };
+}
+
+/** The live grant an access token names; null when it is revoked, its owner inactive, or it is another user's. */
+export async function getLiveGrant(grantId: string, userId: string): Promise<LTGrantSnapshot | null> {
+  if (!isUuid(grantId) || !isUuid(userId)) return null;
+  const { rows } = await getPool().query(GET_LIVE_GRANT, [grantId, userId]);
+  return rows[0] ?? null;
 }
 
 /** Revoke the grant behind a refresh token presented by its own client (RFC 7009). */

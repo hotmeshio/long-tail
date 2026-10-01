@@ -1,16 +1,21 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ validateBotApiKey: vi.fn(), resolvePrincipal: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  validateBotApiKey: vi.fn(), resolvePrincipal: vi.fn(), getLiveGrant: vi.fn(), sso: null as any,
+}));
 vi.mock('../../services/auth/bot-api-key', () => ({ validateBotApiKey: mocks.validateBotApiKey }));
 vi.mock('../../services/iam/principal', () => ({ resolvePrincipal: mocks.resolvePrincipal }));
-vi.mock('../../modules/sso', () => ({ getSSOConfig: () => null }));
+vi.mock('../../modules/sso', () => ({ getSSOConfig: () => mocks.sso }));
+vi.mock('../../services/auth/oauth-server/store', async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  getLiveGrant: mocks.getLiveGrant,
+}));
 
 import { config } from '../../modules/config';
 import { signToken } from '../../modules/auth';
 import { requireMcpAuth } from '../../modules/mcp-auth';
 import { setOAuthServerConfig, clearOAuthServerConfig, getOAuthServerSettings } from '../../modules/oauth-server';
 import { signAccessToken } from '../../services/auth/oauth-server';
-import { markRevoked, clearRevocations } from '../../services/auth/oauth-server/revocations';
 import type { LTGrantSnapshot } from '../../types';
 
 const SECRET = 'mcp-auth-secret';
@@ -43,7 +48,12 @@ const bearer = (token: string) => `Bearer ${token}`;
 
 beforeAll(() => { savedSecret = config.JWT_SECRET; (config as any).JWT_SECRET = SECRET; });
 afterAll(() => { (config as any).JWT_SECRET = savedSecret; clearOAuthServerConfig(); });
-beforeEach(() => { clearRevocations(); clearOAuthServerConfig(); vi.clearAllMocks(); });
+beforeEach(() => {
+  clearOAuthServerConfig();
+  vi.clearAllMocks();
+  mocks.sso = null;
+  mocks.getLiveGrant.mockResolvedValue(SNAPSHOT);
+});
 
 describe('OAuth server settings', () => {
   it('derive the resource and its metadata URL from the issuer, ignoring a trailing slash', () => {
@@ -68,12 +78,20 @@ describe('requireMcpAuth without the OAuth server', () => {
 describe('requireMcpAuth with the OAuth server', () => {
   beforeEach(() => setOAuthServerConfig({ issuer: ISSUER }));
 
-  it('authenticates an access token as the person, with no lookup and no challenge', async () => {
+  it('authenticates an access token as the person while its grant is live, with no challenge', async () => {
     const { outcome, auth, challenge } = await authenticate(bearer(signAccessToken(SNAPSHOT, TARGET).token));
     expect(outcome).toBe('next');
     expect(auth).toMatchObject({ userId: USER, role: 'member', principalType: 'oauth', grantId: SNAPSHOT.grant_id, scopes: ['mcp:read'] });
     expect(challenge).toBeUndefined();
+    expect(mocks.getLiveGrant).toHaveBeenCalledWith(SNAPSHOT.grant_id, USER);
     expect(mocks.validateBotApiKey).not.toHaveBeenCalled();
+  });
+
+  it('acts on the grant as it stands now, not as the token recorded it', async () => {
+    const token = signAccessToken(SNAPSHOT, TARGET).token;
+    mocks.getLiveGrant.mockResolvedValue({ ...SNAPSHOT, roles: [{ role: 'ops', type: 'admin', read_scope: 'all', write_scope: 'all' }] });
+    const { auth } = await authenticate(bearer(token));
+    expect(auth).toMatchObject({ role: 'admin', roles: [{ role: 'ops', type: 'admin' }] });
   });
 
   it('refuses an expired token or one for another resource with invalid_token', async () => {
@@ -84,16 +102,18 @@ describe('requireMcpAuth with the OAuth server', () => {
     }
   });
 
-  it('refuses a token whose grant or person was revoked', async () => {
+  it('refuses a token whose grant is revoked or whose person is inactive, in every process', async () => {
     const token = signAccessToken(SNAPSHOT, TARGET).token;
-    markRevoked({ grantId: SNAPSHOT.grant_id });
-    expect((await authenticate(bearer(token))).outcome).toBe('401 invalid_token');
-    clearRevocations();
-    markRevoked({ userId: USER });
+    mocks.getLiveGrant.mockResolvedValue(null);
     expect((await authenticate(bearer(token))).outcome).toBe('401 invalid_token');
   });
 
-  it('passes other credentials to requireAuth, and challenges only when it refuses', async () => {
+  it('refuses a token whose grant now belongs to another client', async () => {
+    mocks.getLiveGrant.mockResolvedValue({ ...SNAPSHOT, client_id: 'ltc_other' });
+    expect((await authenticate(bearer(signAccessToken(SNAPSHOT, TARGET).token))).outcome).toBe('401 invalid_token');
+  });
+
+  it('passes other credentials to the auth adapter, and challenges only when it refuses', async () => {
     const session = await authenticate(bearer(signToken({ userId: USER, role: 'member' })));
     expect(session).toMatchObject({ outcome: 'next', challenge: undefined });
     mocks.validateBotApiKey.mockResolvedValue({ user_id: USER, scopes: ['mcp:read'] });
@@ -102,12 +122,19 @@ describe('requireMcpAuth with the OAuth server', () => {
   });
 });
 
-describe('revocation entries', () => {
-  it('expire after one access-token lifetime', async () => {
-    const { isRevoked } = await import('../../services/auth/oauth-server/revocations');
-    const now = 1_000_000;
-    markRevoked({ grantId: 'g1' }, now);
-    expect(isRevoked({ gid: 'g1', sub: 'u' }, now + 1000)).toBe(true);
-    expect(isRevoked({ gid: 'g1', sub: 'u' }, now + 301_000)).toBe(false);
+describe('requireMcpAuth never uses the SSO cookie fallback', () => {
+  beforeEach(() => {
+    mocks.sso = { resolve: vi.fn(async () => ({ externalId: 'hike-user' })) };
+  });
+
+  it('without the OAuth server, a cookie-only request is refused', async () => {
+    expect(await authenticate()).toMatchObject({ outcome: '401 Unauthorized' });
+    expect(mocks.sso.resolve).not.toHaveBeenCalled();
+  });
+
+  it('with the OAuth server, a cookie-only request is refused with the challenge', async () => {
+    setOAuthServerConfig({ issuer: ISSUER });
+    expect(await authenticate()).toMatchObject({ outcome: '401 Unauthorized', challenge: `Bearer resource_metadata="${METADATA}"` });
+    expect(mocks.sso.resolve).not.toHaveBeenCalled();
   });
 });

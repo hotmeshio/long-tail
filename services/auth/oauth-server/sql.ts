@@ -57,6 +57,18 @@ export const EXCHANGE_CODE = `
   FROM g JOIN rt ON rt.grant_id = g.id JOIN c ON c.grant_id = g.id`;
 
 /**
+ * The grant an access token names, as it stands now: only while the grant is
+ * unrevoked and its owner active, with the owner's current memberships. One
+ * primary-key lookup per /mcp request, so a revocation, a deactivation or a
+ * role change takes effect on the next request in every process.
+ */
+export const GET_LIVE_GRANT = `
+  SELECT g.id AS grant_id, g.user_id, g.client_id, g.policy, g.scope, ${GRANT_ROLES} AS roles
+  FROM lt_oauth_grants g
+  JOIN lt_users u ON u.id = g.user_id AND u.status = 'active'
+  WHERE g.id = $1 AND g.user_id = $2 AND g.revoked_at IS NULL`;
+
+/**
  * Rotate a refresh token: mark the old one used and issue its successor, only
  * for the client that holds it and while the grant is live and its owner
  * active. Returns current roles.
