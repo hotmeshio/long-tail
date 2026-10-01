@@ -30,8 +30,13 @@ export async function callBuiltinToolAs(
   toolName: string,
   args: Record<string, any>,
   caller: { userId: string; role?: string },
+  credentials?: { userId?: string; delegationToken?: string },
 ): Promise<any> {
-  const toolArgs = { ...args, _auth: { userId: caller.userId } };
+  // `_auth` carries the identity tools resolve credentials with, as callServerTool sets it.
+  const toolArgs = {
+    ...args,
+    _auth: credentials ? { userId: credentials.userId, token: credentials.delegationToken } : { userId: caller.userId },
+  };
   const builtin = await dispatchBuiltinTool(serverName, toolName, toolArgs, { authInfo: caller });
   if (!builtin) throw Object.assign(new Error(`Tool ${toolName} not found on ${serverName}`), { name: 'ToolNotFoundError' });
   return builtin.result;
