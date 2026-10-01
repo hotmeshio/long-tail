@@ -16,6 +16,11 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 | `"escalation"` | ReadOnly embedded escalation card. ID sourced from `x-lt-source`; optional `x-lt-fields` surfaces any metadata or resolver detail. See [x-lt-embed.md](x-lt-embed.md). |
 | `"escalation-list"` | ReadOnly embedded escalation list. Driven by an `x-lt-query` facet object; columns from `x-lt-columns`. See [x-lt-embed.md](x-lt-embed.md). |
 | `"invoke"` | ReadOnly control that starts a workflow, directly or in a prefilled dialog. Target and payload mapping in `x-lt-invoke`. See [x-lt-invoke.md](x-lt-invoke.md). |
+| `"textarea"` | Alias of `format: "textarea"`: a multi-line text box. |
+
+A string field renders as a textarea when it declares `format: "textarea"` or `x-lt-widget: "textarea"`, when its value holds a line break, or when its value runs past 80 characters. Read-only fields and dictionary displays keep the line breaks the value carries.
+
+The escalation schema editor flags any `x-lt-widget` name outside this table. The schema still saves, and the field renders as its type's default control.
 
 ---
 

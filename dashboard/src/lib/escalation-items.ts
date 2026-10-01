@@ -1,4 +1,6 @@
 import type { LTEscalationRecord } from '../api/types';
+import { interpolateHelp, type HelpTokenContext } from './x-lt-help';
+import { getDeep } from './x-lt-bind';
 
 /** One held item of an accumulator or batch row, in the shape the workflow receives. */
 export interface EscalationItem {
@@ -90,4 +92,62 @@ export function summarizePayload(payload: Record<string, unknown> | undefined): 
   });
   const more = Object.keys(payload).length - parts.length;
   return more > 0 ? `${parts.join(' · ')} · +${more}` : parts.join(' · ');
+}
+
+/** The container role's form-schema key naming how each held item displays. */
+export const ITEM_LABEL_KEY = 'x-lt-item-label';
+
+const TOKEN = /\{\{\s*([^{}]+?)\s*\}\}/g;
+const ITEM_DOMAIN = 'item';
+const MISSING = '—';
+
+function formatValue(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+/** One token's value: `item.*` from the held item, every other domain as help tokens resolve it. */
+function tokenValue(path: string, item: EscalationItem, ctx: HelpTokenContext): string | null {
+  const dot = path.indexOf('.');
+  const domain = dot === -1 ? path : path.slice(0, dot);
+  if (domain === ITEM_DOMAIN) {
+    try {
+      return formatValue(dot === -1 ? item : getDeep(item, path.slice(dot + 1)));
+    } catch {
+      return null;
+    }
+  }
+  const value = interpolateHelp(`{{${path}}}`, ctx);
+  return value === MISSING ? null : value;
+}
+
+/**
+ * An item's display label from the role's `x-lt-item-label` template, whose
+ * `{{item.*}}` tokens read the held item (itemKey, payload, actor, at) beside
+ * the usual escalation domains. Null when there is no template or every token
+ * it names is missing, so the caller falls back to the item key.
+ */
+export function itemLabel(
+  template: unknown,
+  item: EscalationItem,
+  ctx: HelpTokenContext = {},
+): string | null {
+  if (typeof template !== 'string' || !template.trim()) return null;
+  let resolved = 0;
+  let tokens = 0;
+  const label = template.replace(TOKEN, (_match, rawPath: string) => {
+    tokens += 1;
+    const value = tokenValue(rawPath, item, ctx);
+    if (value === null) return MISSING;
+    resolved += 1;
+    return value;
+  }).trim();
+  if (tokens > 0 && resolved === 0) return null;
+  return label || null;
 }

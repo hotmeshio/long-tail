@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -103,5 +103,24 @@ describe('EscalationSchemaPage', () => {
     expect(screen.getByText('Invalid JSON')).toBeInTheDocument();
     expect(screen.getByText('Save Version')).toBeDisabled();
     expect(mutateFn).not.toHaveBeenCalled();
+  });
+
+  it('warns on an unknown widget and still saves', () => {
+    renderPage();
+    const [editor] = screen.getAllByRole('textbox') as HTMLTextAreaElement[];
+    fireEvent.change(editor, {
+      target: { value: JSON.stringify({ type: 'object', properties: { notes: { type: 'string', 'x-lt-widget': 'multiline' } } }) },
+    });
+    expect(screen.getByRole('status').textContent).toContain('notes (multiline)');
+    expect(screen.getByText('Save Version')).toBeEnabled();
+  });
+
+  it('the textarea alias raises no warning', () => {
+    renderPage();
+    const [editor] = screen.getAllByRole('textbox') as HTMLTextAreaElement[];
+    fireEvent.change(editor, {
+      target: { value: JSON.stringify({ type: 'object', properties: { notes: { type: 'string', 'x-lt-widget': 'textarea' } } }) },
+    });
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

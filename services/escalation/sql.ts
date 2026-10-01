@@ -170,7 +170,9 @@ export function searchEscalationsQuery(orderBy: string): string {
  * $1 = metadata filter (jsonb), $2 = userId, $3 = resolver_payload (jsonb),
  * $4 = metadata patch (jsonb, nullable), $5 = write_all roles (text[], null = global /
  * no filter), $6 = write_self roles (text[], nullable), $7 = enforcing roles
- * (text[], null = none), $8 = assert id (uuid, nullable).
+ * (text[], null = none), $8 = assert id (uuid, nullable), $9 = claim state
+ * ('mine' | 'available' | 'claimed', null = any). 'mine' is a live claim held by
+ * $2 and picks the most recently claimed row first.
  *
  * Write-scope is folded into the same FOR UPDATE statement (no TOCTOU): the row
  * is resolvable if the caller has global access ($5 NULL), or the row's role is in
@@ -198,7 +200,13 @@ WITH target AS MATERIALIZED (
       OR (role = ANY($6::text[]) AND assigned_to = $2)
     )
     AND ($8::uuid IS NULL OR id = $8::uuid)
-  ORDER BY priority ASC, created_at ASC
+    AND (
+         $9::text IS NULL
+      OR ($9 = 'mine' AND assigned_to = $2 AND assigned_until > NOW())
+      OR ($9 = 'available' AND (assigned_to IS NULL OR assigned_until IS NULL OR assigned_until <= NOW()))
+      OR ($9 = 'claimed' AND assigned_to IS NOT NULL AND assigned_until > NOW())
+    )
+  ORDER BY CASE WHEN $9 = 'mine' THEN claimed_at END DESC NULLS LAST, priority ASC, created_at ASC
   LIMIT 1
   FOR UPDATE
 ),

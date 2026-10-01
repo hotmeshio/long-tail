@@ -4,7 +4,8 @@ import { Plus, X, User } from 'lucide-react';
 import { useAccumulateItem, useRemoveAccumulatedItem } from '../../api/escalations';
 import { DateValue } from '../common/display/DateValue';
 import { UserName } from '../common/display/UserName';
-import { summarizePayload, type EscalationItems } from '../../lib/escalation-items';
+import { itemLabel, summarizePayload, type EscalationItems } from '../../lib/escalation-items';
+import type { HelpTokenContext } from '../../lib/x-lt-help';
 
 /**
  * The held items of an accumulator or batch row, in arrival order, with the
@@ -13,10 +14,14 @@ import { summarizePayload, type EscalationItems } from '../../lib/escalation-ite
  * guarded statements the API exposes, so a stale panel gets the server's
  * answer rather than a local guess.
  */
-export function EscalationItemsPanel({ escalationId, items, canWrite }: {
+export function EscalationItemsPanel({ escalationId, items, canWrite, labelTemplate, labelContext }: {
   escalationId: string;
   items: EscalationItems;
   canWrite: boolean;
+  /** The container role's `x-lt-item-label` template; absent, items show their key. */
+  labelTemplate?: unknown;
+  /** The escalation domains the template may read beside `item`. */
+  labelContext?: HelpTokenContext;
 }) {
   const add = useAccumulateItem();
   const remove = useRemoveAccumulatedItem();
@@ -65,12 +70,20 @@ export function EscalationItemsPanel({ escalationId, items, canWrite }: {
         <p className="text-xs text-text-tertiary italic">Nothing held yet.</p>
       ) : (
         <ol className="divide-y divide-surface-border/60" data-testid="items-list">
-          {items.items.map((item, index) => (
+          {items.items.map((item, index) => {
+            const label = itemLabel(labelTemplate, item, labelContext);
+            return (
             <li key={item.itemKey} className="py-2 flex items-start gap-2 group">
               <span className="text-2xs text-text-quaternary font-mono w-5 shrink-0 text-right pt-0.5">{index + 1}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-mono text-text-primary truncate" title={item.itemKey}>{item.itemKey}</span>
+                  <span
+                    className={`text-xs text-text-primary truncate ${label ? '' : 'font-mono'}`}
+                    title={item.itemKey}
+                    data-testid="item-label"
+                  >
+                    {label ?? item.itemKey}
+                  </span>
                   {item.reciprocalId && (
                     <Link
                       to={`/escalations/detail/${item.reciprocalId}`}
@@ -102,14 +115,15 @@ export function EscalationItemsPanel({ escalationId, items, canWrite }: {
                   onClick={() => remove.mutate({ id: escalationId, itemKey: item.itemKey })}
                   disabled={remove.isPending}
                   className="icon-link opacity-50 group-hover:opacity-100 shrink-0 p-0.5"
-                  title={`Remove ${item.itemKey}`}
-                  aria-label={`Remove ${item.itemKey}`}
+                  title={`Remove ${label ?? item.itemKey}`}
+                  aria-label={`Remove ${label ?? item.itemKey}`}
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
 

@@ -290,12 +290,16 @@ export function registerEscalationTools(server: McpServer): void {
       description:
         'Add ONE item to an open accumulator escalation. Interim adds answer outcome "accepted" with the ' +
         'count held and remaining slots; the add that reaches max completes the row and wakes the waiting ' +
-        'workflow with the ordered collection. A reciprocal row is written in the same statement, both or neither.',
+        'workflow with the ordered collection. A reciprocal row is written in the same statement, both or neither. ' +
+        'initiatedBy credits the person the add is for.',
       inputSchema: accumulateItemSchema,
     },
     async (args: z.infer<typeof accumulateItemSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.accumulateItem(
-        { id: args.id, itemKey: args.itemKey, payload: args.payload, metadata: args.metadata, reciprocal: args.reciprocal },
+        {
+          id: args.id, itemKey: args.itemKey, payload: args.payload, metadata: args.metadata,
+          reciprocal: args.reciprocal, initiatedBy: args.initiatedBy,
+        },
         await callerAuth(extra),
       );
       if (result.error) {
@@ -312,12 +316,12 @@ export function registerEscalationTools(server: McpServer): void {
       title: 'Remove Item',
       description:
         'Remove ONE held item from a pending open accumulator escalation. The row stays pending and the ' +
-        'waiting workflow is never woken.',
+        'waiting workflow is never woken. initiatedBy credits the person the removal is for.',
       inputSchema: removeItemSchema,
     },
     async (args: z.infer<typeof removeItemSchema>, extra?: ToolCallExtra) => {
       const result = await escalationApi.removeItem(
-        { id: args.id, itemKey: args.itemKey, reciprocal: args.reciprocal },
+        { id: args.id, itemKey: args.itemKey, reciprocal: args.reciprocal, initiatedBy: args.initiatedBy },
         await callerAuth(extra),
       );
       if (result.error) {

@@ -1,12 +1,35 @@
-import { Client, Pool } from 'pg';
+import { Client, Pool, type ClientConfig } from 'pg';
 
 import { postgres_options } from '../../modules/config';
+import { loggerRegistry } from '../logger';
+
+/** A new connection that cannot be established within this window fails instead of hanging. */
+const CONNECT_TIMEOUT_MS = 10_000;
 
 let pool: Pool | null = null;
+
+/** A lost socket fails the pending query; its 'error' event must never end the process. */
+function onConnectionError(error: Error): void {
+  loggerRegistry.debug(`[lt-db] connection error: ${error.message}`);
+}
+
+function onIdleConnectionLost(error: Error): void {
+  loggerRegistry.warn(`[lt-db] pooled connection lost: ${error.message}`);
+}
+
+/** `pg.Client` that carries an 'error' listener from construction. */
+class GuardedClient extends Client {
+  constructor(config?: string | ClientConfig) {
+    super(config);
+    this.on('error', onConnectionError);
+  }
+}
 
 export function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+      keepAlive: true,
       ...postgres_options,
       // Long-tail's shared tables live in public. Postgres's default
       // search_path is `"$user", public`: if any schema shares the connecting
@@ -18,6 +41,9 @@ export function getPool(): Pool {
       // the engine fully qualifies its app schemas.
       options: '-c search_path=public',
     });
+    pool.on('error', onIdleConnectionLost);
+    // pg-pool drops its own listener while a client is checked out
+    pool.on('connect', (client) => client.on('error', onConnectionError));
   }
   return pool;
 }
@@ -30,10 +56,10 @@ export async function closePool(): Promise<void> {
 }
 
 /**
- * HotMesh connection descriptor: `{ class: Client, options: postgres_options }`.
+ * HotMesh connection descriptor: `{ class: GuardedClient, options: postgres_options }`.
  * Use this everywhere HotMesh / Durable APIs need a connection config
  * instead of importing `pg` and `postgres_options` directly.
  */
 export function getConnection() {
-  return { class: Client, options: postgres_options };
+  return { class: GuardedClient, options: postgres_options };
 }

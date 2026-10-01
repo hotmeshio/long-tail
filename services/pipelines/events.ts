@@ -1,5 +1,6 @@
 import { hmshTimestampToISO, computeDuration } from '../hotmesh-utils';
 import type { ExecutionEvent, JobContext } from './types';
+import { workflowStateFromStatus } from '../workflow-state';
 
 /**
  * Transform raw activities + job context into a chronological event list
@@ -104,7 +105,7 @@ function completionEvent(
 function appendWorkflowTerminalEvent(
   events: ExecutionEvent[], nextId: number, ctx: JobContext,
 ): void {
-  const status = ctx.job.status > 0 ? 'running' : ctx.job.status === 0 ? 'completed' : 'failed';
+  const status = workflowStateFromStatus(ctx.job.status);
   if (status === 'completed') {
     events.push({
       event_id: nextId,

@@ -14,6 +14,7 @@ import {
 } from '../../../services/workflow-invocation';
 import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import * as workflowApi from '../../../api/workflows';
+import { WORKFLOW_STATES } from '../../../shared/workflow-state';
 import type { LTWorkflowConfig } from '../../../types/config';
 import {
   listDiscoveredWorkflowsSchema,
@@ -200,47 +201,33 @@ export function registerWorkflowTools(server: McpServer): void {
       title: 'Get Workflow Status',
       description:
         'Check the status and result of a workflow execution. Returns ' +
-        'status (running | complete) and the result if complete. ' +
+        'status (running | complete | failed) and the result if complete; a ' +
+        'failed run carries terminated (true when an interrupt ended it) and error. ' +
         'Resolution is namespace-aware: pass app_id to read a workflow (e.g. a ' +
         'child) running in a non-default HotMesh namespace.',
       inputSchema: getWorkflowStatusSchema,
     },
     async (args: z.infer<typeof getWorkflowStatusSchema>) => {
-      const statusResult = await workflowApi.getWorkflowStatus({
+      const reply = (body: Record<string, unknown>, isError = false) => ({
+        content: [{ type: 'text' as const, text: JSON.stringify(body) }],
+        ...(isError ? { isError: true } : {}),
+      });
+      const found = await workflowApi.getWorkflowResult({
         workflowId: args.workflow_id,
         appId: args.app_id,
       });
-      if (statusResult.error) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: statusResult.error }) }],
-          isError: true,
-        };
+      if (found.error) return reply({ error: found.error }, true);
+      const data = found.data as { state?: string; terminated?: boolean; error?: string; result?: unknown };
+      if (found.status === 202) return reply({ workflow_id: args.workflow_id, status: 'running' });
+      if (data.state === WORKFLOW_STATES.FAILED) {
+        return reply({
+          workflow_id: args.workflow_id,
+          status: WORKFLOW_STATES.FAILED,
+          terminated: data.terminated === true,
+          ...(data.error ? { error: data.error } : {}),
+        });
       }
-      // HotMesh status: 0 = complete, positive = running.
-      if (statusResult.data?.status !== 0) {
-        return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({ workflow_id: args.workflow_id, status: 'running' }),
-          }],
-        };
-      }
-      const resultResult = await workflowApi.getWorkflowResult({
-        workflowId: args.workflow_id,
-        appId: args.app_id,
-      });
-      if (resultResult.error) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: resultResult.error }) }],
-          isError: true,
-        };
-      }
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({ workflow_id: args.workflow_id, status: 'complete', result: resultResult.data?.result }),
-        }],
-      };
+      return reply({ workflow_id: args.workflow_id, status: 'complete', result: data.result });
     },
   );
 

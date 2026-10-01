@@ -1,6 +1,7 @@
 import pc from 'picocolors';
 import { apiFetch } from '../client';
 import { output, formatStatus } from '../format';
+import { WORKFLOW_STATES } from '../../../shared/workflow-state';
 
 const COLUMNS = [
   { key: 'workflow_type', label: 'Type', width: 24 },
@@ -28,10 +29,14 @@ export async function invokeWorkflow(type: string, opts: { data?: string; json?:
 }
 
 export async function getWorkflowStatus(id: string, opts: { json?: boolean }): Promise<void> {
-  const data = await apiFetch<any>(`/workflows/status/${id}`);
+  const data = await apiFetch<any>(`/workflows/${encodeURIComponent(id)}/status`);
   if (opts.json) { console.log(JSON.stringify(data, null, 2)); return; }
-  const status = data.status === 0 ? pc.green('completed') : pc.blue('running');
-  console.log(`\n  ${data.workflowId}  ${status}\n`);
+  const state = data.state === WORKFLOW_STATES.COMPLETED
+    ? pc.green('completed')
+    : data.state === WORKFLOW_STATES.FAILED
+      ? pc.red(data.terminated ? 'failed (terminated)' : 'failed')
+      : pc.blue('running');
+  console.log(`\n  ${data.workflowId}  ${state}${data.error ? pc.dim(`  ${data.error}`) : ''}\n`);
 }
 
 export async function getWorkflowResult(id: string, opts: { json?: boolean }): Promise<void> {
@@ -69,6 +74,6 @@ export async function getWorkflowEnvelopes(id: string, opts: { json?: boolean })
 }
 
 export async function terminateWorkflow(id: string): Promise<void> {
-  await apiFetch(`/workflows/terminate/${id}`, { method: 'POST' });
+  await apiFetch(`/workflows/${encodeURIComponent(id)}/terminate`, { method: 'POST' });
   console.log(`\n  ${pc.green('✓')} Terminated ${pc.dim(id)}\n`);
 }

@@ -5,9 +5,11 @@ import type {
   RemoveItemServiceOutcome,
 } from '../../services/escalation/accumulate';
 import { checkResolverPayload } from '../../services/escalation/resolver-validation';
+import * as userService from '../../services/user';
+import { isUuid } from '../../lib/uuid';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import { ESCALATION_ACCUMULATE_KEYS, ESCALATION_BATCH_KEYS } from '../../types/escalation';
-import type { AccumulatedItem, LTEscalationRecord } from '../../types';
+import type { AccumulatedItem, ContainerSelector, LTEscalationRecord } from '../../types';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
@@ -31,6 +33,11 @@ export interface AccumulateItemInput {
   metadata?: Record<string, any>;
   assertClaim?: boolean;
   reciprocal?: ReciprocalInput;
+  /**
+   * The person who caused the add, when a trusted service performs it for
+   * them. Recorded as the entry's actor; the caller's rights still gate the write.
+   */
+  initiatedBy?: string;
 }
 
 function parseEnvelope(escalation: LTEscalationRecord): Record<string, any> {
@@ -56,23 +63,68 @@ const NO_ACCUMULATOR_FOR_FACET = 'No pending accumulator found for this metadata
 /**
  * The container a facet names: the highest priority pending row that carries
  * the facet AND the accumulator declaration, within the given roles (null =
- * unscoped). A release or remediation row sharing the facet is never a
- * candidate, so a by-facet add lands on the open container or nowhere.
+ * unscoped) and the selector's guards. A release or remediation row sharing
+ * the facet is never a candidate, and neither is the add's own reciprocal row,
+ * so a by-facet add lands on the open container or nowhere.
  */
 async function pickAccumulatorByFacet(
   key: string,
   value: string,
   roles: string[] | null,
+  selector?: ContainerSelector,
+  excludeId?: string,
 ): Promise<LTEscalationRecord | null> {
   if (roles !== null && roles.length === 0) return null;
   const found = await escalationService.searchByFacets({
     roles: roles ?? undefined,
-    facets: { [key]: value },
+    types: selector?.types,
+    subtypes: selector?.subtypes,
+    facets: { ...selector?.facets, [key]: value },
     status: 'pending',
     exists: [ESCALATION_ACCUMULATE_KEYS.COUNT],
-    limit: 1,
+    limit: excludeId ? 2 : 1,
   });
-  return found.escalations[0] ?? null;
+  return found.escalations.find((row) => row.id !== excludeId) ?? null;
+}
+
+const isStringList = (v: unknown) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
+
+/** The selector's shape error, or null when it is absent or well formed. */
+function containerSelectorError(selector: ContainerSelector | undefined): string | null {
+  if (selector === undefined) return null;
+  if (!selector || typeof selector !== 'object' || Array.isArray(selector)) return 'container must be an object';
+  if (selector.types !== undefined && !isStringList(selector.types)) return 'container.types must be an array of strings';
+  if (selector.subtypes !== undefined && !isStringList(selector.subtypes)) return 'container.subtypes must be an array of strings';
+  if (selector.facets !== undefined && (!selector.facets || typeof selector.facets !== 'object' || Array.isArray(selector.facets))) {
+    return 'container.facets must be an object';
+  }
+  return null;
+}
+
+function isNarrowed(selector: ContainerSelector | undefined): boolean {
+  return !!(selector?.types?.length || selector?.subtypes?.length
+    || (selector?.facets && Object.keys(selector.facets).length));
+}
+
+/**
+ * The entry's actor: the caller, or the user a global-access caller names as
+ * the initiator. Attribution only; it never widens what the caller may write.
+ */
+async function resolveActor(
+  initiatedBy: string | undefined,
+  auth: LTApiAuth,
+): Promise<{ actor: string } | { error: LTApiResult }> {
+  if (initiatedBy === undefined || initiatedBy === auth.userId) return { actor: auth.userId };
+  if (typeof initiatedBy !== 'string' || !isUuid(initiatedBy)) {
+    return { error: { status: 400, error: 'initiatedBy must be a user id' } };
+  }
+  if (!(await userService.hasGlobalEscalationAccess(auth.userId))) {
+    return { error: { status: 403, error: 'initiatedBy requires global escalation access' } };
+  }
+  if (!(await userService.getUser(initiatedBy))) {
+    return { error: { status: 400, error: 'initiatedBy names no user' } };
+  }
+  return { actor: initiatedBy };
 }
 
 function reciprocalSelectorCount(r: ReciprocalInput): number {
@@ -153,6 +205,8 @@ export async function accumulateItem(
   try {
     const { id, itemKey, metadata } = input;
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
@@ -175,7 +229,7 @@ export async function accumulateItem(
       itemKey,
       payload: payload.payload,
       metadata: { ...metadata, resolved_by: auth.userId },
-      actor: auth.userId,
+      actor: initiator.actor,
       assertClaim: input.assertClaim ? auth.userId : undefined,
       resolvedBy: await resolverIdentity(auth),
       reciprocal: reciprocal.reciprocal,
@@ -199,6 +253,8 @@ export async function accumulateItemBySignalKey(
     const { signalKey, itemKey, metadata } = input;
     if (!signalKey) return { status: 400, error: 'signalKey is required' };
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
 
     const escalation = await escalationService.getEscalationBySignalKey(signalKey);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
@@ -217,7 +273,7 @@ export async function accumulateItemBySignalKey(
       itemKey,
       payload: payload.payload,
       metadata: { ...metadata, resolved_by: auth.userId },
-      actor: auth.userId,
+      actor: initiator.actor,
       resolvedBy: await resolverIdentity(auth),
       reciprocal: reciprocal.reciprocal,
     });
@@ -239,13 +295,21 @@ export async function accumulateItemBySignalKey(
  * between phases surfaces as a 409.
  */
 export async function accumulateItemByMetadata(
-  input: { key: string; value: string; restrictRoles?: string[] } & Omit<AccumulateItemInput, 'assertClaim'>,
+  input: {
+    key: string; value: string; restrictRoles?: string[];
+    /** Narrows the container beyond the facet: type, subtype, extra facet guards. */
+    container?: ContainerSelector;
+  } & Omit<AccumulateItemInput, 'assertClaim'>,
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     const { key, value, itemKey, metadata } = input;
     if (!key || !value) return { status: 400, error: 'key and value are required' };
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
+    const selectorError = containerSelectorError(input.container);
+    if (selectorError) return { status: 400, error: selectorError };
 
     const writeScope = await getEscalationWriteScope(auth.userId);
     const allowedRoles = restrictScopeRoles(writeScope.allRoles, writeScope.global, input.restrictRoles);
@@ -254,13 +318,17 @@ export async function accumulateItemByMetadata(
     const resolvedBy = await resolverIdentity(auth);
     const outcome = { ...metadata, resolved_by: auth.userId };
 
+    // A narrowed selector picks in Long Tail, then adds by id; the by-id
+    // statement re-checks pending under its lock, and type, subtype and the
+    // accumulator declaration are fixed at creation.
     const enforcing = await getEnforcingRoles();
-    if (enforcing.size === 0 || input.payload === undefined) {
+    const narrowed = isNarrowed(input.container);
+    if (!narrowed && (enforcing.size === 0 || input.payload === undefined)) {
       const result = await escalationService.accumulateItemByMetadata(key, value, {
         itemKey,
         payload: input.payload,
         metadata: outcome,
-        actor: auth.userId,
+        actor: initiator.actor,
         resolvedBy,
         roles: allowedRoles ?? undefined,
         reciprocal: reciprocal.reciprocal,
@@ -269,7 +337,7 @@ export async function accumulateItemByMetadata(
       return accumulateOutcomeResult(result, itemKey, result.escalation?.workflow_id ?? null);
     }
 
-    const row = await pickAccumulatorByFacet(key, value, allowedRoles);
+    const row = await pickAccumulatorByFacet(key, value, allowedRoles, input.container, reciprocal.reciprocal?.id);
     if (!row) return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
     if (!isAccumulator(row)) return { status: 400, error: 'Escalation is not an accumulator' };
     const payload = await gatePayload(row, input.payload, auth.userId);
@@ -279,7 +347,7 @@ export async function accumulateItemByMetadata(
       itemKey,
       payload: payload.payload,
       metadata: outcome,
-      actor: auth.userId,
+      actor: initiator.actor,
       resolvedBy,
       reciprocal: reciprocal.reciprocal,
     });
@@ -295,6 +363,8 @@ export async function accumulateItemByMetadata(
 export interface RemoveItemInput {
   itemKey: string;
   reciprocal?: Omit<ReciprocalInput, 'payload'>;
+  /** The person who caused the removal; see {@link AccumulateItemInput.initiatedBy}. */
+  initiatedBy?: string;
 }
 
 /**
@@ -309,6 +379,8 @@ export async function removeItem(
   try {
     const { id, itemKey } = input;
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for accumulation' };
@@ -322,7 +394,7 @@ export async function removeItem(
     if ('error' in reciprocal) return reciprocal.error;
 
     const result = await escalationService.removeAccumulatedItem(escalation.id, {
-      itemKey, actor: auth.userId, reciprocal: reciprocal.reciprocal,
+      itemKey, actor: initiator.actor, reciprocal: reciprocal.reciprocal,
     });
     return removeOutcomeResult(result, itemKey);
   } catch (err: any) {
@@ -338,6 +410,8 @@ export async function removeItemBySignalKey(
     const { signalKey, itemKey } = input;
     if (!signalKey) return { status: 400, error: 'signalKey is required' };
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
     const escalation = await escalationService.getEscalationBySignalKey(signalKey);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
     if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for accumulation' };
@@ -348,7 +422,7 @@ export async function removeItemBySignalKey(
     const reciprocal = await gateReciprocal(input.reciprocal, auth);
     if ('error' in reciprocal) return reciprocal.error;
     const result = await escalationService.removeAccumulatedItemBySignalKey(signalKey, {
-      itemKey, actor: auth.userId, reciprocal: reciprocal.reciprocal,
+      itemKey, actor: initiator.actor, reciprocal: reciprocal.reciprocal,
     });
     return removeOutcomeResult(result, itemKey);
   } catch (err: any) {
@@ -364,12 +438,14 @@ export async function removeItemByMetadata(
     const { key, value, itemKey } = input;
     if (!key || !value) return { status: 400, error: 'key and value are required' };
     if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const initiator = await resolveActor(input.initiatedBy, auth);
+    if ('error' in initiator) return initiator.error;
     const writeScope = await getEscalationWriteScope(auth.userId);
     const allowedRoles = restrictScopeRoles(writeScope.allRoles, writeScope.global, input.restrictRoles);
     const reciprocal = await gateReciprocal(input.reciprocal, auth);
     if ('error' in reciprocal) return reciprocal.error;
     const result = await escalationService.removeAccumulatedItemByMetadata(key, value, {
-      itemKey, actor: auth.userId, roles: allowedRoles ?? undefined, reciprocal: reciprocal.reciprocal,
+      itemKey, actor: initiator.actor, roles: allowedRoles ?? undefined, reciprocal: reciprocal.reciprocal,
     });
     if (result.outcome === 'not-found') return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
     return removeOutcomeResult(result, itemKey);

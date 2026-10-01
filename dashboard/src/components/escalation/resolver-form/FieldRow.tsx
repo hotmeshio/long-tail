@@ -1,4 +1,5 @@
 import { WIDGET_MAP } from '../widgets';
+import { JSON_WIDGET, TEXTAREA_WIDGET } from '../widgets/field-widgets';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { resolveFieldOptions } from '../../../lib/x-lt-options';
 import { resolveCtxPath } from '../../../lib/ctx-path';
@@ -74,7 +75,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
     );
   }
 
-  if (widgetName === 'json' && (kind === 'array' || kind === 'object')) {
+  if (widgetName === JSON_WIDGET && (kind === 'array' || kind === 'object')) {
     return <JsonField {...control} value={value} />;
   }
 
@@ -262,8 +263,8 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
       );
     }
 
-    // Explicit textarea format or long content.
-    if (format === 'textarea' || text.length > 80) {
+    // A declared textarea, multi-line text, or long content.
+    if (format === 'textarea' || widgetName === TEXTAREA_WIDGET || text.includes('\n') || text.length > 80) {
       const staticMax = fieldSchema?.maxLength as number | undefined;
       const dynamicMax = fieldSchema?.['x-lt-max-length'] as string | undefined;
       const dynamicValue = dynamicMax ? Number(resolveCtxPath(dynamicMax, escalationContext as Record<string, unknown> | undefined)) : NaN;

@@ -1,12 +1,13 @@
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { SectionHeading } from './SectionHeading';
 import type { LTJob } from '../../../api/types';
+import { workflowStateFromStatus } from '../../../lib/workflow-state';
 
 function jobLabel(job: LTJob): string {
   const date = new Date(job.created_at);
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const day = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  const status = job.status === 'completed' || Number(job.status) === 0 ? 'completed' : job.is_live ? 'running' : 'failed';
+  const status = typeof job.status === 'string' ? job.status : workflowStateFromStatus(Number(job.status));
   return `${day} ${time} — ${status}`;
 }
 

@@ -68,9 +68,15 @@ export async function claimStep(
   return executed(result.data.escalation, step);
 }
 
+/**
+ * Resolves the row the step's query names: the scanned target, the extra
+ * facets, and the claim state, all inside the atomic statement. A presented
+ * choice passes the row it showed, so the resolve lands on that row or misses.
+ */
 export async function resolveStep(
   step: ScanStep,
   ctx: StepContext,
+  presentedId?: string,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   const rendered = await templated(step, ctx, (tpl) => ({
     resolverPayload: scanCodeService.interpolateScanTemplate(step.params?.resolverPayload ?? {}, tpl),
@@ -84,6 +90,8 @@ export async function resolveStep(
     metadata: { ...rendered.metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
     extraFacets: step.query?.facets,
+    availability: step.query?.availability,
+    assertId: presentedId,
   }, ctx.auth);
   if (result.status === 404) return null;
   if (result.status === 403) return forbidden(result.error);
@@ -169,7 +177,7 @@ export async function dispatchChoiceVerb(
     case SCAN_VERBS.CLAIM_SHOW_DETAIL:
       return (await claimStep(step, ctx)) ?? (await missReason(step, ctx, 'the item is no longer claimable'));
     case SCAN_VERBS.RESOLVE:
-      return (await resolveStep(step, ctx)) ?? (await missReason(step, ctx, 'the item is no longer resolvable'));
+      return (await resolveStep(step, ctx, row.id)) ?? (await missReason(step, ctx, 'the item is no longer resolvable'));
     case SCAN_VERBS.ESCALATE:
       return (await escalateStep(step, ctx)) ?? (await missReason(step, ctx, 'the item already moved on'));
     case SCAN_VERBS.RELEASE:
@@ -271,7 +279,10 @@ export async function accumulateStep(
       itemKey: rendered.itemKey,
       payload: rendered.payload,
       metadata: rendered.metadata,
-      restrictRoles: options.containerRoles,
+      restrictRoles: options.container?.roles ?? options.containerRoles,
+      container: options.container
+        ? { types: options.container.types, subtypes: options.container.subtypes, facets: options.container.facets }
+        : undefined,
       ...(options.reciprocal === false ? {} : { reciprocal: { id: item.id } }),
     };
   } else {
