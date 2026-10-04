@@ -247,14 +247,19 @@ External MCP servers authenticate to Long Tail using service tokens — long-liv
 
 ### Generating a Service Token
 
-```
-POST /api/mcp/servers/:id/service-token
-Authorization: Bearer <admin-jwt>
+Service tokens are issued in server code with `generateServiceToken` from `services/auth/service-token.ts`. Run it from a script or startup hook that has database access:
 
-{ "name": "ext-calendar-server", "scopes": ["delegation:validate"] }
+```typescript
+import { generateServiceToken } from './services/auth';
+
+const { id, rawToken } = await generateServiceToken(
+  'ext-calendar-server',    // name
+  serverId,                 // lt_mcp_servers id, or null
+  ['delegation:validate'],  // scopes
+);
 ```
 
-Returns the raw token **once**. The system stores only a bcrypt hash.
+Returns the raw token **once**. The system stores only a bcrypt hash. `listServiceTokens(serverId)` lists a server's tokens without hashes, and `revokeServiceToken(id)` deletes one.
 
 ### Using a Service Token
 
@@ -272,7 +277,7 @@ curl -H "Authorization: Bearer lt_svc_a1b2c3..." \
 An external MCP server running in a separate container (or separate docker-compose) follows this pattern:
 
 1. **Register** with Long Tail as an SSE-based MCP server.
-2. **Receive a service token** from an admin.
+2. **Receive a service token** issued with `generateServiceToken` (the example reads it from `LT_SERVICE_TOKEN`).
 3. **Accept tool calls** with `_auth.token` in the args.
 4. **Validate** the delegation token against Long Tail's delegation API.
 5. **Fetch** user-scoped credentials (OAuth tokens, files, etc.) via the delegation API.
@@ -353,14 +358,11 @@ echo "Workflow $WORKFLOW_ID started with userId in envelope"
 ### 4. Test External MCP Server Delegation
 
 ```bash
-# Start with external server overlay
-docker compose -f docker-compose.yml -f docker-compose.external.yml up -d --build
-
-# Generate a service token for the external server (requires admin JWT)
-SERVICE_TOKEN=$(curl -s -X POST http://localhost:3000/api/mcp/servers/<server-id>/service-token \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"ext-test","scopes":["delegation:validate"]}' | jq -r .rawToken)
+# Issue a service token with generateServiceToken (see Generating a Service Token),
+# then start the external server overlay with it. The overlay passes it to the
+# external container as LT_SERVICE_TOKEN.
+LT_EXTERNAL_SERVICE_TOKEN=lt_svc_... \
+  docker compose -f docker-compose.yml -f docker-compose.external.yml up -d --build
 
 # Create a delegation token manually (for testing)
 DELEGATION=$(node -e "
@@ -412,7 +414,7 @@ cd dashboard && npx vitest run
 | User JWT | 24 hours | Full API access | Login endpoint | Dashboard, API routes |
 | Bot API key | Long-lived | Full API access (RBAC-scoped) | Admin | Programmatic clients, CI/CD |
 | Delegation token | 5 minutes | Specific scopes (e.g., `oauth:google:read`) | Workflow activities | MCP tools, delegation API |
-| Service token | Long-lived | Server-specific (e.g., `delegation:validate`) | Admin | External MCP servers |
+| Service token | Long-lived | Server-specific (e.g., `delegation:validate`) | Server code (`generateServiceToken`) | External MCP servers |
 | OAuth access token | Provider-set (~1hr) | Provider scopes (e.g., `email`, `profile`) | OAuth flow | External APIs |
 
 ### Trust Boundaries

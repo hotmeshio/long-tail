@@ -39,14 +39,14 @@ The worker container registers the LT interceptor, starts workflow workers, and 
 // worker.ts — Worker container entry point
 import { start } from '@hotmeshio/long-tail';
 import * as reviewContent from './workflows/review-content';
-import * as verifyDocument from './workflows/verify-document';
+import * as kitchenSink from './workflows/kitchen-sink';
 
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
   workers: [
     { taskQueue: 'long-tail', workflow: reviewContent.reviewContent },
-    { taskQueue: 'long-tail-verify', workflow: verifyDocument.verifyDocument },
+    { taskQueue: 'long-tail-examples', workflow: kitchenSink.kitchenSink },
   ],
   telemetry: process.env.HONEYCOMB_API_KEY
     ? { honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY } }

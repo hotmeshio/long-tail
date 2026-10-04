@@ -10,8 +10,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
     - [The Cycle](#the-cycle)
 - [Connecting an Agent to Long Tail](#connecting-an-agent-to-long-tail) — the `/mcp` endpoint, service accounts, multi-environment `.mcp.json`, example prompts
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
-- [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
-- [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
+- [Document Vision Server](#document-vision-server): AI tools as MCP tools
 - [Server Registration Lifecycle](#server-registration-lifecycle) — two paths, startup sequence, when things connect
 - [External MCP Servers](#external-mcp-servers) — Path B: dashboard/API registration
 - [Built-in Servers](#built-in-servers) — servers that ship by default
@@ -443,21 +442,20 @@ const work = await client.callTool({
 
 **Over stdio or SSE:** Connect your MCP client to Long Tail's Streamable HTTP endpoint or spawn the server as a subprocess. The tools and responses are identical regardless of transport.
 
-The Human Queue handles the people side. The Document Vision server handles the AI side — wrapping model capabilities as MCP tools.
+The Human Queue handles the people side. The Vision server handles the AI side, wrapping model capabilities as MCP tools.
 
 ## Document Vision Server
 
-The Document Vision server (`services/mcp/vision-server.ts`) wraps AI processing activities as MCP tools. It follows the same singleton pattern as the Human Queue server — Zod schemas at module level, `createVisionServer()` / `stopVisionServer()` lifecycle.
-
-The included implementation wraps OpenAI Vision extraction and member database validation. The pattern applies to any AI capability you want to expose as MCP tools.
+The Vision server (`system/mcp-servers/vision.ts`, server ID `long-tail-vision`) wraps LLM vision calls as MCP tools. Zod schemas sit at module level, and `createVisionServer()` returns a fresh `McpServer` instance per call because the MCP SDK allows one transport per server. Full parameter reference: [Vision tools](api/mcp/vision.md).
 
 ### Tools
 
 | Tool | Arguments | Returns |
 |------|-----------|---------|
-| `list_document_pages` | *(none)* | `{ pages: string[] }` |
-| `extract_member_info` | `{ image_ref, page_number }` | `{ member_info: MemberInfo \| null }` |
-| `validate_member` | `{ member_info: MemberInfo }` | `{ result, databaseRecord? }` |
+| `analyze_image` | `{ image, prompt? }` | `{ description, text_content, objects }` |
+| `describe_image` | `{ image, context? }` | `{ description }` |
+
+`image` accepts a storage path, a data URI, or an `https://` URL. Images larger than 7680px on either side are downscaled before the model call. Without an LLM API key, both tools return `{ error: 'LLM API key not configured' }`.
 
 ### Connecting
 
@@ -466,7 +464,7 @@ Same `InMemoryTransport` pattern as the Human Queue:
 ```typescript
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createVisionServer } from '@hotmeshio/long-tail/services/mcp/vision-server';
+import { createVisionServer } from '../system/mcp-servers/vision';
 
 const server = await createVisionServer();
 const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -475,13 +473,11 @@ await server.connect(serverTransport);
 const client = new McpClient({ name: 'my-vision-client', version: '1.0.0' });
 await client.connect(clientTransport);
 
-// Discover tools
 const { tools } = await client.listTools();
 
-// Call a tool
 const result = await client.callTool({
-  name: 'list_document_pages',
-  arguments: {},
+  name: 'describe_image',
+  arguments: { image: 'screenshots/page-1.png' },
 });
 ```
 
@@ -490,90 +486,16 @@ const result = await client.callTool({
 To wrap your own AI capabilities as MCP tools, follow the same pattern:
 
 1. Define Zod schemas at module level (avoids TS2589 deep inference errors)
-2. Use the singleton pattern with `create` / `stop` lifecycle
+2. Expose a `create` / `stop` lifecycle
 3. Register tools with `(server as any).registerTool()` (type cast required by SDK)
 
-See `services/mcp/vision-server.ts` and `services/mcp/server.ts` for working examples.
-
-## MCP-Native Workflow
-
-The `verify-document-mcp` workflow demonstrates both MCP servers working together. Every activity call — listing pages, extracting data, validating members — routes through the Vision MCP server. When the workflow escalates, the Human Queue MCP server manages the review cycle. Both sides speak the same protocol.
-
-### How It Works
-
-```
-verify-document-mcp workflow
-  |
-  +-- proxyActivities --> MCP client -- InMemoryTransport --> Vision MCP Server
-  |                                                            +- list_document_pages
-  |                                                            +- extract_member_info (-> OpenAI Vision)
-  |                                                            +- validate_member (-> member DB)
-  |
-  +-- return { type: 'escalation' }
-       |
-       +-- interceptor --> Human Queue MCP Server
-                            +- check_resolution
-                            +- get_available_work
-                            +- claim_and_resolve
-```
-
-### The Activity Wrapper Pattern
-
-The key insight: MCP tool calls are wrapped as activities with the **same function signatures** as direct implementations. The workflow doesn't know (or care) that MCP is underneath — it just calls `extractMemberInfo()`. But each call routes through the MCP protocol, making every AI tool invocation protocol-native.
-
-```typescript
-import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createVisionServer } from '../../services/mcp/vision-server';
-
-let client: McpClient | null = null;
-
-async function getClient(): Promise<McpClient> {
-  if (client) return client;
-  const server = await createVisionServer();
-  const [ct, st] = InMemoryTransport.createLinkedPair();
-  await server.connect(st);
-  client = new McpClient({ name: 'verify-mcp-client', version: '1.0.0' });
-  await client.connect(ct);
-  return client;
-}
-
-export async function extractMemberInfo(
-  imageRef: string,
-  pageNumber: number,
-): Promise<MemberInfo | null> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: 'extract_member_info',
-    arguments: { image_ref: imageRef, page_number: pageNumber },
-  });
-  return parseResult(result).member_info;
-}
-```
-
-Because the signatures match the original activities, the workflow uses `proxyActivities()` at module scope — the standard pattern. Each proxied call is a durable checkpoint. If the process crashes after a Vision MCP tool call completes, replay uses the cached result.
-
-### The Pipeline
-
-1. **List pages** via MCP tool `list_document_pages`
-2. **Extract** member info from each page via MCP tool `extract_member_info` (routes to OpenAI Vision)
-3. **Merge** multi-page extractions into a single record
-4. **Validate** against member database via MCP tool `validate_member`
-5. **Return or escalate** — match returns; mismatch escalates to the Human Queue
-
-When the workflow escalates, agents can query and resolve the escalation through the Human Queue MCP server — the same protocol used for the AI tools.
+See `system/mcp-servers/vision.ts` and `services/mcp/server-lifecycle.ts` for working examples.
 
 ### Running the Tests
 
 ```bash
-# Vision server tool tests (no OpenAI key needed for most)
-npm run test:mcp:vision
-
-# Full integration (needs OpenAI key for extraction + workflow tests)
-OPENAI_API_KEY=sk-... npm run test:mcp:vision
-
-# With verbose output
-npx vitest run tests/workflows/verify-document-mcp.test.ts --reporter=verbose
+# Vision server tool tests
+npm run test:vision
 ```
 
 The examples above use built-in servers. Long Tail can also connect to any external MCP server.
@@ -1087,14 +1009,11 @@ The shared test utility at `tests/setup/mcp.ts` wraps this pattern as `createMcp
 ### Running MCP Tests
 
 ```bash
-# Human Queue protocol tests (8 tests — real client, real server, real DB)
-npm run test:mcp
+# Human Queue protocol tests plus MCP registry, CRUD, and REST tests (real client, real server, real DB)
+npx vitest run tests/services/mcp/servers.test.ts
 
 # Vision MCP server tool tests
-npm run test:mcp:vision
-
-# Full integration with OpenAI Vision
-OPENAI_API_KEY=sk-... npm run test:mcp:vision
+npm run test:vision
 
 # All backend tests except those that call a live model
 npm test
@@ -1108,26 +1027,21 @@ npm run test:llm
 
 ### What the Protocol Tests Prove
 
-The `tests/mcp.test.ts` suite includes 8 tests:
+The `MCP protocol (InMemoryTransport)` block in `tests/services/mcp/servers.test.ts` includes 9 tests:
 
-1. **Tool discovery** — `listTools()` returns the expected tools
-2. **Create** — `escalate_to_human` writes a real PostgreSQL record
-3. **Check** — `check_resolution` reads status from DB
-4. **List** — `get_available_work` filters by role
-5. **Resolve** — `claim_and_resolve` atomically claims and resolves
-6. **Full lifecycle** — escalate -> check -> list -> resolve -> check -> list (empty)
-7. **Error: not found** — checking a nonexistent ID returns `isError: true`
-8. **Error: already resolved** — claiming a resolved escalation returns `isError: true`
+1. **Tool discovery**: `listTools()` returns the 7 tools registered by `services/mcp/server`
+2. **Create**: `escalate_to_human` writes a real PostgreSQL record
+3. **Check**: `check_resolution` reads status from DB
+4. **List**: `get_available_work` filters by role
+5. **Resolve**: `claim_and_resolve` atomically claims and resolves
+6. **Outcome metadata**: `claim_and_resolve` records outcome metadata on the row
+7. **Full lifecycle**: escalate -> check -> list -> resolve -> check -> list (empty)
+8. **Error: not found**: checking a nonexistent ID returns `isError: true`
+9. **Error: already resolved**: claiming a resolved escalation returns `isError: true`
 
-The `tests/workflows/verify-document-mcp.test.ts` suite adds:
+`tests/services/mcp/vision-server.test.ts` covers the Vision server: tool discovery (`analyze_image`, `describe_image`), the missing-LLM-key error for each tool, and independent server instances.
 
-1. **Vision tool discovery** — `listTools()` returns 3 Vision tools
-2. **list_document_pages** — returns page refs from storage
-3. **validate_member** — match, mismatch, and not_found cases
-4. **extract_member_info** — extracts via OpenAI Vision (needs API key)
-5. **Full MCP-native workflow** — extraction -> validation -> escalation -> Human Queue MCP resolution
-
-Every test verifies both the MCP response and the actual database state.
+Every protocol test verifies both the MCP response and the actual database state.
 
 ## Custom Adapters
 

@@ -59,7 +59,7 @@ See the [Compilation Pipeline](https://github.com/hotmeshio/long-tail/blob/main/
 - [The Interceptor](#the-interceptor)
 - [Escalation Lifecycle](#escalation-lifecycle)
 - [Composing Workflows](#composing-workflows)
-- [Verify Document Example](#verify-document-example) — full walkthrough
+- [Worked Example](#worked-example): AI review with human escalation
 - [Milestones](#milestones)
 - [Roles](#roles)
 - [Testing](#testing)
@@ -410,110 +410,9 @@ PUT /api/workflows/processDocumentOrchestrator/config
 
 The orchestrator gets its own task record and tracks the lifecycle of its children.
 
-## Verify Document Example
+## Worked Example
 
-The concepts above — activities, interceptor, escalation, composition — come together in a concrete example. The `verify-document` workflow demonstrates the full pattern: AI does initial work (OpenAI Vision extraction), validates against a database, and escalates to a human when it isn't confident.
-
-### The Pipeline
-
-```
-Document images --> Vision extraction --> Database validation --> Match or escalate
-```
-
-**Step 1 — List pages.** The workflow loads document page images from storage.
-
-**Step 2 — Extract.** Each page is sent to OpenAI's Vision API (`gpt-4o-mini`) as a durable activity. The prompt asks for structured JSON: member ID, name, address, phone, email, emergency contact.
-
-**Step 3 — Merge.** Multi-page extractions are merged. The primary page (with member ID) provides the base record; partial pages (emergency contact, additional fields) are folded in.
-
-**Step 4 — Validate.** The merged record is compared against the member database. Address fields are checked for exact match. Member status must be `active`.
-
-**Step 5 — Return or escalate.** If everything matches, the workflow returns:
-
-```typescript
-return {
-  type: 'return',
-  milestones: [
-    { name: 'pages_processed', value: pages.length },
-    { name: 'extraction', value: 'success' },
-    { name: 'validation', value: 'match' },
-  ],
-  data: {
-    documentId,
-    memberId: merged.memberId,
-    extractedInfo: merged,
-    validationResult: 'match',
-    confidence: 1.0,
-  },
-};
-```
-
-If there's a mismatch or missing data, it escalates with full context:
-
-```typescript
-return {
-  type: 'escalation',
-  data: {
-    documentId,
-    extractedInfo: merged,        // what Vision saw
-    validationResult: 'mismatch', // why it's escalating
-    databaseRecord: record,       // what the database has
-    reason: 'Address mismatch for MBR-2024-001...',
-  },
-  message: reason,
-  role: 'reviewer',
-};
-```
-
-### Durable Activities
-
-Each activity (list pages, extract, validate) is wrapped with `proxyActivities()`:
-
-```typescript
-const { listDocumentPages, extractMemberInfo, validateMember } =
-  Durable.workflow.proxyActivities<ActivitiesType>({
-    activities,
-    retryPolicy: {
-      maximumAttempts: 2,
-      backoffCoefficient: 2,
-      maximumInterval: '10 seconds',
-    },
-  });
-```
-
-If the process crashes after `extractMemberInfo` completes but before `validateMember` starts, the workflow replays from the last checkpoint. The Vision API is not called again.
-
-### The Orchestrator
-
-The workflow is invoked through a thin orchestrator:
-
-```typescript
-import { executeLT } from '@hotmeshio/long-tail';
-
-export async function verifyDocumentOrchestrator(envelope: LTEnvelope) {
-  return await executeLT({
-    workflowName: 'verifyDocument',
-    args: [envelope],
-    taskQueue: 'long-tail-verify',
-  });
-}
-```
-
-The orchestrator creates the task record, starts the child, and waits. If the child escalates, the orchestrator waits for the human to resolve it. When resolved, the child re-runs, completes, and the orchestrator gets the result.
-
-### Running the Tests
-
-```bash
-# Vision workflow tests (requires OpenAI API key)
-OPENAI_API_KEY=sk-... npm run test:vision
-
-# With verbose output
-npx vitest run tests/workflows/verify-document.test.ts --reporter=verbose
-```
-
-### MCP-Native Variant
-
-The same pipeline also exists as an MCP-native workflow (`verify-document-mcp`) where every activity routes through MCP tools instead of calling functions directly. See the [MCP Guide](mcp.md#mcp-native-workflow) for that perspective.
+`examples/workflows/review-content` brings the concepts above together: an activity asks an AI model to review content, the workflow approves it when the model is confident, and escalates to a `reviewer` otherwise. The interceptor tracks the task and the escalation, and resolving the escalation completes the run. Its test is `tests/workflows/review-content.test.ts`.
 
 ## Escalation Strategies
 
@@ -654,9 +553,9 @@ it('should escalate and resolve', async () => {
   const workflowId = `test-${Durable.guid()}`;
 
   await client.workflow.start({
-    args: [{ data: { documentId: 'DOC-001' }, metadata: {} }],
+    args: [{ data: { contentId: 'CONTENT-001', content: 'Borderline post', contentType: 'text' }, metadata: {} }],
     taskQueue: 'test-queue',
-    workflowName: 'verifyDocument',
+    workflowName: 'reviewContent',
     workflowId,
     expire: 120,
   });
@@ -668,9 +567,9 @@ it('should escalate and resolve', async () => {
 
   // Resolve — triggers a re-run
   await resolveEscalation(escalations[0].id, {
-    documentId: 'DOC-001',
-    memberId: 'MBR-2024-001',
-    verified: true,
+    contentId: 'CONTENT-001',
+    approved: true,
+    humanNote: 'Reviewed and approved',
   });
 
   // Wait for the re-run to complete, then verify
@@ -688,9 +587,6 @@ The test utilities are in `tests/setup/`: `waitForEscalation()` and `waitForEsca
 ```bash
 # All workflow tests (~4-5 min)
 npm run test:workflows
-
-# Verify-document workflow (requires OpenAI key)
-OPENAI_API_KEY=sk-... npm run test:vision
 
 # Full backend suite
 npm test

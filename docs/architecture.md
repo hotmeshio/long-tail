@@ -24,7 +24,7 @@ system/          Always ships. The built-in tool inventory.
 └── mcp-servers/   Built-in MCP servers wrapping the activities
 
 examples/        Opt-in demos. Seed with `examples: true`.
-├── workflows/     review-content, verify-document, process-claim, ...
+├── workflows/     review-content, kitchen-sink, ortho-pipeline, ...
 └── types/
 
 your-app/        Your workflows. Same conventions, your directory.
