@@ -694,6 +694,12 @@ OPENAI_API_KEY=sk-... npm run test:vision
 
 # Full backend suite
 npm test
+
+# Fast backend tests: skips tests/workflows and *.llm.test.ts, blanks LLM keys
+npm run test:fast
+
+# Tests that call a live model
+npm run test:llm
 ```
 
 ---

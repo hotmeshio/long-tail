@@ -1,6 +1,8 @@
 # Exports API
 
-Export endpoints expose workflow state and execution history. The execution history endpoint produces structured, typed events — useful for debugging, auditing, and migrating data. All endpoints require authentication.
+Export endpoints expose workflow state and execution history. The execution history endpoint produces structured, typed events — useful for debugging, auditing, and migrating data.
+
+**Auth:** Every endpoint requires builder access (superadmin or the `engineer` role), except `GET /api/workflow-states/:workflowId/execution`. That endpoint is open to builders and to the person who started the run or the account it runs as (`lt_tasks.initiated_by` / `executing_as`); others receive `403`.
 
 Every endpoint resolves the workflow automatically from the `workflowId` — no additional parameters needed.
 

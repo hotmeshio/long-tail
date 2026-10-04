@@ -169,7 +169,7 @@ List distinct `origin_id` values with summary stats. Each origin ID represents a
 GET /api/tasks/processes/:originId
 ```
 
-Returns all tasks and escalations for a process (identified by `origin_id`).
+Returns all tasks for a process (identified by `origin_id`), and the escalations in that process the caller may read (the same read-scope rule as `GET /api/escalations/by-workflow/:workflowId`).
 
 **Path parameters:**
 

@@ -381,16 +381,25 @@ curl -X POST http://localhost:9090/tools/fetch_external_data \
 ### 5. Run Unit Tests
 
 ```bash
-# Delegation token tests (9 tests)
-npx vitest run tests/delegation-tokens.test.ts
+# Delegation token tests
+npx vitest run tests/services/delegation
 
-# OAuth tests (28 tests)
-npx vitest run tests/oauth
+# OAuth provider tests
+npx vitest run tests/services/oauth
 
-# All backend tests (487 tests)
+# OAuth authorization server tests (MCP clients)
+npx vitest run tests/services/auth/oauth-server tests/routes/oauth-server-*.test.ts
+
+# Fast backend tests: skips tests/workflows and *.llm.test.ts, blanks LLM keys
+npm run test:fast
+
+# All backend tests except those that call a live model
 npx vitest run
 
-# Frontend tests (520 tests)
+# Tests that call a live model (spend provider credits)
+npm run test:llm
+
+# Frontend tests
 cd dashboard && npx vitest run
 ```
 

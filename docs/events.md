@@ -47,6 +47,8 @@ services:
 
 **Browser access.** The dashboard only subscribes. With the WebSocket proxy (`wsProxy`, so browsers reach NATS through Long Tail at `<basePath>/nats-ws`), `GET /api/nats-credentials` returns a WebSocket URL carrying a short-lived ticket for the signed-in person (`NATS_WS_TICKET_TTL_SECONDS`, default 300) and no NATS credential. The proxy admits only a ticket holder, writes the server's `NATS_TOKEN` into the connection itself, and drops anything the browser tries to publish. When browsers connect to NATS directly, set `NATS_DASHBOARD_TOKEN` to a subscribe-only NATS credential and the route hands that out instead of `NATS_TOKEN`.
 
+**Reconnecting.** The dashboard fetches a fresh ticket from `GET /api/nats-credentials` for every connection attempt. After a drop it retries with jittered exponential backoff, from `NATS_RECONNECT_INITIAL_MS` (default 1000) up to `NATS_RECONNECT_MAX_MS` (default 60000), one attempt at a time. It waits while the tab is hidden, and stops when the credentials route answers `401` (the session ended). On reconnect it reopens every active subscription and refetches the open pages. When live updates stay down longer than `NATS_LIVE_NOTICE_AFTER_MS` (default 30000), a "Live updates unavailable" notice appears in the announcement banner row. `GET /api/settings` carries these values as `events.reconnect` (`initialDelayMs`, `maxDelayMs`, `noticeAfterMs`).
+
 Both adapters still publish events regardless of `EVENT_TRANSPORT` — the setting only controls what the dashboard listens on. This means server-side event consumers (callbacks, NATS subscribers) work independently of the dashboard transport.
 
 ## The event envelope

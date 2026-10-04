@@ -150,6 +150,8 @@ const servers = await findServersByTags(['database', 'analytics'], 'any');
 
 Tags are GIN-indexed in PostgreSQL for fast lookup. Register a new MCP server tagged `analytics` and mcpQuery automatically picks up its tools. Register one tagged `vision` and mcpTriage can use it for remediation. The tool inventory grows without code changes.
 
+The model sees and calls only the tools the workflow's principal may call. A tool the LLM chooses in mcpQuery or mcpTriage acts as that principal and passes the same manifest gate it carries at `/mcp`. A workflow with no principal, such as an internal job, runs its tools as `lt-system`.
+
 ### System Workflows
 
 | Pipeline | Workflows | Purpose |

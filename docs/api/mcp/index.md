@@ -49,4 +49,6 @@ See `examples/mcp-servers/` for the registration pattern.
 
 ## Read-Safe Classification
 
-Every tool is classified as either **read-safe** (query-only, no side effects) or **write** (modifies state). When `mcp.exposure.readOnly` is enabled, only read-safe tools are available to external MCP consumers.
+Every tool is classified as either **read-safe** (query-only, no side effects) or **write** (modifies state). When `mcp.exposure.readOnly` is enabled, only read-safe tools are available to external MCP consumers. A caller whose key or OAuth grant is read-only sees the same read-safe subset.
+
+Each tool also declares a role gate (`caller`, `admin`, `builder`, `roleManager`, or `superadmin`), and a tool appears only to accounts that hold it. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section.

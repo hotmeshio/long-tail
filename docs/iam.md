@@ -123,14 +123,14 @@ Use `execute_as` when a workflow needs permissions or credentials that differ fr
 Two ways to set `execute_as`:
 
 1. **Workflow config** — set `execute_as` in `lt_config_workflows`. Every invocation of that workflow runs as the specified service account.
-2. **Per-request override** — pass `executeAs` in the invocation payload. Requires admin or superadmin role.
+2. **Per-request override** — pass `execute_as` in the invocation body. A superadmin may act as any account. A caller holding an admin-type grant may act as an account that holds no superadmin grant and whose every role the caller also holds, at the same or a higher type. No other caller may set it.
 
 In both cases, the original invoker is preserved in `initiated_by`. The audit trail always shows both who asked and who executed.
 
 ### Lifecycle
 
 ```bash
-# Create a service account (admin-only)
+# Create a service account (builder: superadmin or the engineer role)
 POST /api/bot-accounts
 { "name": "data-bot", "description": "Nightly analytics" }
 
@@ -287,13 +287,15 @@ The MCP client also emits debug-level audit logs for every tool invocation:
 | Credential | Scope | Lifetime | Revocation |
 |---|---|---|---|
 | User JWT | Full API (RBAC-scoped) | 24 hours | Logout / expiry |
-| Bot API key | Full API (RBAC-scoped) | Until revoked | Admin deletes key |
+| Bot API key | Full API (RBAC-scoped) | Until revoked | A builder revokes the key |
 | Delegation token | Specific scopes | 5 min (max 1 hr) | Expires naturally |
 | OAuth token | Provider scopes | Provider-set | User revokes in Connections |
 
-Service accounts inherit the same RBAC constraints as human users. A service account with the `member` role cannot access admin endpoints. A service account without `engineer` cannot invoke workflows gated by `invocation_roles`.
+Service accounts inherit the same RBAC constraints as human users. A service account with the `member` role cannot access admin endpoints. A service account that holds none of a workflow's `invocation_roles` cannot invoke it.
 
-The `execute_as` override requires admin role. There is no way for a non-admin to impersonate a service account through the API.
+Invocation roles are checked against the caller's current grants in the database, never the role claims a token carries. A workflow with an empty `invocation_roles` list is open to every authenticated caller. A superadmin, or a holder of the `admin` role at admin type, invokes any invocable workflow. `capabilityInvoke`, which calls tools with system authority, is invocable by superadmins only. Identity context for a compiled workflow comes from the server: a caller-supplied `_scope` in the input data is ignored.
+
+The `execute_as` override never exceeds the caller's own authority. A superadmin may act as any account; a caller holding an admin-type grant may act as a non-superadmin account all of whose roles the caller holds at the same or a higher type. Anyone else is refused with `403`.
 
 ## Key Files
 

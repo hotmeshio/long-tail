@@ -829,7 +829,7 @@ Reassign a single escalation to a different role. The caller must be authorized 
 GET /api/escalations/by-workflow/:workflowId
 ```
 
-Returns all escalations linked to a specific workflow ID.
+Returns the escalations linked to a specific workflow ID that the caller may read: every escalation for callers with global escalation access, escalations in roles the caller reads at `all` scope, and, for roles held at `self` read scope, only those assigned to the caller.
 
 **Path parameters:**
 

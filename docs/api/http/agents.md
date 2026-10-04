@@ -2,7 +2,9 @@
 
 CRUD operations for agent automations — autonomous personas that react to events and run workflows on schedules. Each automation has an identity, motivation (goals/rules), event subscriptions, cron schedules, and a knowledge domain.
 
-All endpoints require authentication.
+All endpoints require authentication. Creating, updating, and deleting agents and subscriptions require builder access (superadmin or the `engineer` role).
+
+Configuring an agent or subscription also requires that the caller may act as the identity it runs as (its `execute_as`, else the agent's `user_id`). The act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type. A schedule or subscription with no identity runs as lt-system, and a `capability` subscription calls a tool with lt-system authority; only a superadmin may configure either.
 
 ## List agent automations
 
@@ -64,6 +66,8 @@ Returns an agent with aggregated stats (knowledge entry count, escalation count)
 POST /api/agents
 ```
 
+**Auth:** Requires builder access and the act-as rule for `user_id` and each schedule's identity.
+
 **Body:**
 
 ```json
@@ -101,6 +105,8 @@ POST /api/agents
 PUT /api/agents/:id
 ```
 
+**Auth:** Same as create.
+
 Partial update — only include fields to change. Changing `status` or `behaviors` automatically restarts event subscriptions and cron schedules.
 
 **Response 200:** The updated agent.
@@ -110,6 +116,8 @@ Partial update — only include fields to change. Changing `status` or `behavior
 ```
 DELETE /api/agents/:id
 ```
+
+**Auth:** Requires builder access.
 
 Permanently removes the agent. Event subscriptions are cascade-deleted. Cron schedules are stopped. Knowledge entries and workflow history are preserved.
 
@@ -153,6 +161,8 @@ GET /api/agents/:agentId/subscriptions
 POST /api/agents/:agentId/subscriptions
 ```
 
+**Auth:** Requires builder access and the act-as rule for the subscription's identity. A `capability` subscription requires superadmin.
+
 **Body:**
 
 ```json
@@ -188,6 +198,8 @@ POST /api/agents/:agentId/subscriptions
 PUT /api/agents/:agentId/subscriptions/:subId
 ```
 
+**Auth:** Same as create. Returns `404` when the subscription does not belong to the agent.
+
 Partial update.
 
 **Response 200:** The updated subscription.
@@ -197,5 +209,7 @@ Partial update.
 ```
 DELETE /api/agents/:agentId/subscriptions/:subId
 ```
+
+**Auth:** Requires builder access.
 
 **Response 200:** `{ "deleted": true }`

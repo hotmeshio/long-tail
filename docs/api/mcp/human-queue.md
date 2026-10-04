@@ -9,6 +9,10 @@ Built-in escalation and human queue management. Exposes the escalation API as MC
 | AI required | No |
 | Credential providers | — |
 
+## Access
+
+These tools act with full authority. At `/mcp` they are listed for superadmin accounts only. Other accounts work the queue through the role-checked escalation tools on [long-tail-admin](admin.md).
+
 ## Compile Hints
 
 escalate_and_wait creates a durable pause point. The step AFTER escalate_and_wait is always a signal step (kind: "signal") that receives the human response. Fields from the signal step output (e.g., password) must be wired via data_flow edges to ALL downstream steps that need them.

@@ -75,7 +75,7 @@ Long Tail's embedded server automatically applies auth middleware to all API rou
 
 ### requireAdmin
 
-`requireAdmin` is a separate middleware that runs after authentication. It checks whether the authenticated user holds superadmin status, either through a database lookup (`isSuperAdmin()`) or by verifying that the JWT `role` claim equals `'admin'`. Requests that fail this check receive a `403 Forbidden` response.
+`requireAdmin` is a separate middleware that runs after authentication. It passes a request whose JWT `role` claim is `'admin'` or `'superadmin'`, or whose user is a superadmin in the database (`isSuperAdmin()`). Requests that fail this check receive a `403 Forbidden` response.
 
 ## Custom Adapter Example
 
@@ -258,7 +258,7 @@ A resolve that slides the session makes this endpoint a session-refresh surface 
 
 ### requireAuth Fallback
 
-When SSO is configured and a request arrives without a Bearer token, `requireAuth` calls `sso.resolve(req)` as a fallback. This allows direct API calls from the host backend (which forward cookies but not Bearer tokens) to authenticate without an explicit exchange. The dashboard always uses Bearer after the initial exchange. The fallback never passes `res` — session sliding belongs exclusively to the exchange.
+When SSO is configured and a request arrives without a Bearer token, `requireAuth` calls `sso.resolve(req)` as a fallback. This allows direct API calls from the host backend (which forward cookies but not Bearer tokens) to authenticate without an explicit exchange. The dashboard always uses Bearer after the initial exchange. The fallback never passes `res` — session sliding belongs exclusively to the exchange. The fallback does not apply at `/mcp`: an MCP request authenticates only with the Bearer credential it carries (an OAuth access token, a service-account key, or a signed JWT). See [Connect with OAuth](mcp.md#connect-with-oauth).
 
 ### Role Mapping
 
@@ -311,5 +311,6 @@ When a service account starts a workflow, its `userId` flows through the same en
 | Variable     | Required | Description                                      |
 |--------------|----------|--------------------------------------------------|
 | `JWT_SECRET` | Yes      | Signing and verification key for the JWT adapter. |
+| `LT_OAUTH_ISSUER` | No | Public base URL for the OAuth authorization server that MCP clients sign in through. Equivalent to `auth.oauthServer.issuer` in `start()`. See [Connect with OAuth](mcp.md#connect-with-oauth). |
 
 `JWT_SECRET` must be set when using `JwtAuthAdapter` or `signToken`. Omitting it will cause token verification to fail at runtime. Use a cryptographically random string of at least 32 characters in production.

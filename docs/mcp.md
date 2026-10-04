@@ -153,7 +153,7 @@ Long Tail is itself an MCP server. Any MCP-aware client — Claude Code, Claude 
 |---|---|
 | URL | `POST https://<host>/mcp` |
 | Transport | Streamable HTTP, stateless — one request and one response per call |
-| Auth | `Authorization: Bearer <token>`: an OAuth access token (people, see below), a service-account key (machines), or a signed user token (JWT) |
+| Auth | `Authorization: Bearer <token>`: an OAuth access token (people, see below), a service-account key (machines), or a signed user token (JWT). The host's session cookie does not authenticate `/mcp`. |
 
 ### Access: which tools, and which records
 
@@ -164,15 +164,15 @@ Two things decide what a connected agent can do, and both must pass.
 - `mcp:read` — the read-only tools: listing, searching, diagnosing, stream and escalation stats, exports. Anything that only reports.
 - `mcp:full` — those, plus the tools that change state: create an escalation, claim and resolve one, invoke a workflow, update a configuration, prune the database.
 
-A deployment can also be set read-only as a whole, which holds every key to read access whatever its scope, and can hide entire groups of tools. Production is the place to do this by default.
+A deployment can also be set read-only as a whole with `mcp.exposure.readOnly` in `start()`, which exposes only read-safe tools to every key and OAuth grant whatever its scope, and can hide entire groups of tools (`allowServers`, `denyServers`). Production is the place to do this by default.
 
 **Role decides which tools and which records.** Each tool declares the capability its caller needs, the same gates the dashboard's REST routes use, and a tool appears only to accounts that hold it:
 
 | Capability | Who holds it | Tools |
 |---|---|---|
-| Caller | Any account | Escalations, tasks, workflow invocation and status, exports, scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
+| Caller | Any account | Escalations, tasks, workflow invocation, scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
 | Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, assigning and removing a user's roles |
-| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, terminating workflows, HTTP requests, file writes, Claude Code tasks |
+| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, workflow status, envelopes and exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
 | Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
 | Superadmin | Superadmin | Other users' OAuth connections, the human-queue tools workflows use to create and resolve escalations |
 
@@ -972,7 +972,7 @@ When `mcp.server.enabled` is `true` (the default), the Human Queue server starts
 
 ## REST API
 
-All routes are mounted at `/api/mcp`.
+All routes are mounted at `/api/mcp`. Each route carries the same gate as its `/mcp` twin: registering, editing, deleting, testing, connecting and disconnecting a server require builder access (superadmin or the `engineer` role). Server reads are open to any account; `transport_config` is returned to builders only.
 
 ### Server Registration
 
@@ -1012,6 +1012,8 @@ curl -X POST http://localhost:3000/api/mcp/servers/$ID/tools/search/call \
   -H 'Content-Type: application/json' \
   -d '{ "arguments": { "query": "hello" } }'
 ```
+
+A tool call runs as the caller, or as the `execute_as` account when the caller may act as it, and a built-in tool passes the same manifest gate it carries at `/mcp`.
 
 Server registrations are persisted in PostgreSQL so they survive restarts.
 
@@ -1094,8 +1096,14 @@ npm run test:mcp:vision
 # Full integration with OpenAI Vision
 OPENAI_API_KEY=sk-... npm run test:mcp:vision
 
-# All tests
+# All backend tests except those that call a live model
 npm test
+
+# Fast backend tests: skips tests/workflows and *.llm.test.ts, blanks LLM keys
+npm run test:fast
+
+# Tests that call a live model
+npm run test:llm
 ```
 
 ### What the Protocol Tests Prove

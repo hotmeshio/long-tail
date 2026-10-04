@@ -20,7 +20,7 @@ const result = await lt.settings.get();
 | `escalation.claimDurations` | `number[]` | Available claim duration options (minutes) |
 | `events.transport` | `'socketio' \| 'nats' \| 'none'` | Dashboard event transport (default: `socketio`; `nats` when `EVENT_TRANSPORT=nats`) |
 | `events.natsWsUrl` | `string \| null` | NATS WebSocket URL (present when NATS adapter registered) |
-| `events.natsToken` | `string \| null` | NATS auth token (present when NATS adapter registered) |
+| `events.reconnect` | `{ initialDelayMs, maxDelayMs, noticeAfterMs }` | Dashboard reconnect timing in ms (`NATS_RECONNECT_INITIAL_MS` default `1000`, `NATS_RECONNECT_MAX_MS` default `60000`, `NATS_LIVE_NOTICE_AFTER_MS` default `30000`) |
 | `auth.sso` | `boolean` | Whether SSO is configured for embedded deployments |
 | `auth.ssoLogoutUrl` | `string \| null` | Host logout URL (redirected to on dashboard sign out) |
 | `ai.enabled` | `boolean` | Whether an LLM API key is configured |

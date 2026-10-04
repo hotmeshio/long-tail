@@ -137,7 +137,7 @@ Accessible at `/workflows/durable/invoke` to anyone the server lists an invokabl
 Every invokable workflow is presented as a tool. The list of tools takes the left quarter of the row, grouped by task queue, with the prompt **Choose a tool to begin** until one is selected. Names read as titles (`fleetTools` shows as **Fleet Tools**, queues the same way) and each row leads with the workflow's icon, or its tier glyph when none is declared. The first row is preselected, `?type=<WorkflowType>` tracks the choice, and every choice is a history entry, so the page opens on a form and the back button retraces picks. The form fills the rest of the row, its heading and Submit staying put while the body scrolls:
 
 - **Heading and description** — the icon and title, with the identifier, tier, and queue as metadata, then the config's one-line description. Keep reference material in `x-lt-help`; it appears in the side panel on demand.
-- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override").
+- **Identity summary** — who will execute: the current user, the workflow's configured `execute_as` bot ("configured default"), or, for admins and superadmins, an override chosen from the bot picker ("admin override"). The server accepts an override only within the caller's own authority (see [IAM](iam.md#when-to-use-a-service-account)).
 - **Certification checkbox** — for a certified workflow, stamps `metadata.certified` on this one run.
 - **The form** — a workflow that declares `inputSchema` renders the x-lt-* form: sections, two columns, conditional fields and instruction blocks, selects with inline or lookup-backed labeled options, Yes/No decisions over booleans, multi-select lists, validated JSON maps, and a side panel with **Instructions** (the interpolated `x-lt-help`) and **Issues** (violations, click to focus). The `fleetTools` example exercises every shape. Every other workflow renders the envelope template form from `envelopeSchema`, with its Form and JSON views. See [Invoke forms](hitl/invoke-form.md).
 - **Submit** — posts `{ data, metadata }` to the invoke endpoint. The page stays put, reports the started id, and subscribes to that run's `system.workflow.{id}.completed` and `.failed` events, so the outcome and the workflow's returned `data` appear beside Submit without leaving the page. One click disarms the button until the person chooses **Submit again**. While live events are off, a warning beside the button offers a reconnect, since the result could not arrive otherwise. Builders also get a **View workflow** link to its execution. A `422` from the input schema gate lands in the Issues view.
@@ -176,7 +176,7 @@ Browse all registered MCP servers and their exposed tools.
 - **Register Server** button — opens a guided wizard: choose transport, configure connection, discover tools, review and save.
 - **Server detail** — click any row to view and edit. Shows all exposed tools with their input schemas, tags, compile hints, and credential providers. Tools are the building blocks that the MCP Tool Designer compiles into deterministic pipelines.
 
-**API:** `GET /api/mcp-servers` lists servers. `POST /api/mcp-servers` registers a new one. `GET /api/mcp-servers/:id/tools` lists tools for a server.
+**API:** `GET /api/mcp/servers` lists servers. `POST /api/mcp/servers` registers a new one. `GET /api/mcp/servers/:id/tools` lists tools for a server. Registering, editing, connecting and deleting servers require builder access; reads are open to any account, and `transport_config` is returned to builders only.
 
 ### Graph Workflows
 
@@ -196,7 +196,7 @@ The Graph → Configure page. Deterministic workflows compiled from dynamic MCP 
 
 **Empty state:** When no tools have been compiled yet, a Wand2 icon prompts users to visit the MCP Tool Designer to create their first deterministic tool.
 
-**API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates. `POST /api/yaml-workflows/:id/invoke` invokes.
+**API:** `GET /api/yaml-workflows` lists pipeline tools. `POST /api/yaml-workflows/:id/deploy` deploys. `POST /api/yaml-workflows/:id/activate` activates. `POST /api/yaml-workflows/:id/invoke` invokes. Creating, editing, deploying, activating, archiving and scheduling require builder access; listing, reading and invoking are open to any account.
 
 ### Graph Executions
 
@@ -221,7 +221,7 @@ Accessible at `/workflows/executions`. Lists procedural workflow runs from one H
   - **Escalations** (panel) — every escalation the workflow raised as a row (status dot, type, role, age), each linking to its detail page; related child tasks list below. Empty reads "This workflow has not escalated."
   - **Actions** menu — Restart (prefills a fresh invoke from the start event), Terminate (running runs only), Compile into Pipeline (runs with tool calls), and jumps to worker / engine stream messages.
 
-**API:** `GET /api/workflow-states/jobs?namespace=durable` lists runs (params `entity` for type, `status`, `search`, `registered` for tier, `sort_by`, `order`, `limit`, `offset`). `GET /api/workflow-states/:workflowId/execution` returns the detail. `POST /api/workflows/:workflowId/terminate` stops a running one.
+**API:** `GET /api/workflow-states/jobs?namespace=durable` lists runs (params `entity` for type, `status`, `search`, `registered` for tier, `sort_by`, `order`, `limit`, `offset`). `GET /api/workflow-states/:workflowId/execution` returns the detail. `POST /api/workflows/:workflowId/terminate` stops a running one. The list and terminate require builder access (superadmin or the `engineer` role); the detail is open to builders and to the person who started the run or the account it runs as.
 
 ### Accounts
 
@@ -326,7 +326,7 @@ A code encodes **`version:category:target`** (e.g. `10:1:SN-12345`):
 
 **Rules are ECA over escalations.** A rule is an ordered list of event-condition-action steps, first match wins: the event is the scanned code, the condition is a query against the escalation (role, status, availability, metadata facets), and the action is a canonical verb (`show-detail`, `show-list`, `claim`, `claim-show-detail`, `release`, `resolve`, `escalate`, `cancel`, `present`). Mutations ride single-statement by-metadata operations under the caller's own role scope, and stamp provenance facets (`scanScheme`, `scanCategory`, `scanActionName`, `scannedAt`) on every transition. Ordering is the design: put the expected state first and a broad fallback last, since a scan is also a state query.
 
-**Admin config** lives at `/admin/scan-codes` (scheme list) and `/admin/scan-codes/:version` (a scheme with its rules) — builder-gated (admin, engineer, superadmin). A scheme carries a name, its target facet, encoding, and — for identity schemes — a grant policy.
+**Admin config** lives at `/admin/scan-codes` (scheme list) and `/admin/scan-codes/:version` (a scheme with its rules) — role-manager gated (admin, engineer, superadmin). A scheme carries a name, its target facet, encoding, and — for identity schemes — a grant policy.
 
 **Station surface.** `/scan/station` is a full-screen scan surface with an idle prompt, an info/choice screen (the current reality plus labeled choices when a rule presents options), and a badge prompt when identity is required. In **kiosk mode** — a login holding exactly one role whose `properties.kiosk` is set — the chrome falls away and only the role's list, escalation detail, and this scan screen are reachable. The header **scan** panel offers the same manual entry and capture settings on any page.
 
@@ -485,7 +485,7 @@ This is the primary view for understanding how a multi-step workflow progresses 
 
 ### Files
 
-Accessible at `/files`. Browse and manage files in the connected storage backend (MinIO locally, S3/GCS in production).
+Accessible at `/files` (builder-only: superadmin or the `engineer` role). Browse and manage files in the connected storage backend (MinIO locally, S3/GCS in production).
 
 - **File browser** — navigate directories with breadcrumbs; the list shows name, size, and last-modified. Paginated via a continuation token.
 - **Preview panel** — click a file to preview it in the side panel: images inline, text and code inline, JSON, and a PDF open-in-tab. Everything else downloads.
@@ -557,6 +557,7 @@ The dashboard is push-driven: broker events (Socket.IO or NATS) invalidate React
 - **One scheduler per client**: identical query keys requested by several hooks in a window invalidate once, and a key wanted by two tiers flushes on the snappier lane.
 - **Hidden tabs cost nothing**: a background tab's flushes mark queries stale without any network (`refetchType: 'none'`); one catch-up refetch runs when the tab becomes visible.
 - **Mutations stay immediate**: a user's own action (claim, resolve, bulk ops) invalidates directly in its `onSuccess` — the tiers govern only event-driven refresh.
+- **Reconnect catches up**: after a NATS drop the dashboard reconnects with a fresh ticket and jittered backoff, reopens its subscriptions and refetches the open pages. A drop that outlasts `NATS_LIVE_NOTICE_AFTER_MS` shows a "Live updates unavailable" notice in the announcement banner row. See [Events](events.md#dashboard-transport-selection).
 
 Every timing constant — the three tiers and the shared `SEARCH_DEBOUNCE_MS` input debounce — lives in `dashboard/src/lib/realtime-refresh.ts`. Tune there; nothing else in the event path carries a number.
 

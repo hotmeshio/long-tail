@@ -11,7 +11,7 @@ Unified system management — tasks, escalations, workflows, diagnostics, agents
 
 ## Access
 
-Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read` can call the Read-safe tools; the rest (Read-safe: No) change state and require an `mcp:full` key, and the account's role must permit the action on the target. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section for the full model.
+Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read` can call the Read-safe tools; the rest (Read-safe: No) change state and require an `mcp:full` key, and the account's role must permit the action on the target. Each tool also declares a role gate (`caller`, `admin`, `builder`, or `roleManager`); a tool appears only to accounts that hold it. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section for the full model.
 
 ## Compile Hints
 
