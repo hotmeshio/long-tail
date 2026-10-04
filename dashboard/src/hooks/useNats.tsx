@@ -10,6 +10,8 @@ import {
 import { connect, type NatsConnection, type Subscription, StringCodec } from 'nats.ws';
 
 import { NATS_WS_URL, NATS_TOKEN } from '../lib/nats/config';
+import type { NatsCredentials } from '../lib/nats/credentials';
+import { DEFAULT_RECONNECT_POLICY, reconnectDelay, type ReconnectPolicy } from '../lib/nats/reconnect';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
 import { subjectMatchesPattern } from '../lib/events/matching';
 import { EventContext } from './useEventContext';
@@ -19,6 +21,8 @@ import { EventContext } from './useEventContext';
 interface NatsContextValue {
   /** Whether the WebSocket is connected to NATS. */
   connected: boolean;
+  /** Realtime has been down past the notice threshold while reconnecting. */
+  unavailable: boolean;
   /**
    * Register a callback for events matching a subject pattern.
    * Returns an unsubscribe function. Subscriptions are ref-stable.
@@ -31,6 +35,7 @@ interface NatsContextValue {
 
 const NatsContext = createContext<NatsContextValue>({
   connected: false,
+  unavailable: false,
   subscribe: () => () => {},
 });
 
@@ -39,9 +44,9 @@ const NatsContext = createContext<NatsContextValue>({
 /**
  * Read the NATS connection status from the nearest `NatsProvider`.
  */
-export function useNatsStatus(): { connected: boolean } {
-  const { connected } = useContext(NatsContext);
-  return { connected };
+export function useNatsStatus(): { connected: boolean; unavailable: boolean } {
+  const { connected, unavailable } = useContext(NatsContext);
+  return { connected, unavailable };
 }
 
 /**
@@ -83,27 +88,48 @@ const sc = StringCodec();
  * Maintains a single NATS WebSocket connection shared across the app.
  *
  * Responsibilities:
- * 1. Connect to NATS via WebSocket with auto-reconnect
+ * 1. Connect, and after any drop reconnect with fresh credentials: each
+ *    attempt asks `resolveCredentials` for a new URL (behind the proxy, a new
+ *    ticket), backs off with jitter, runs one at a time, pauses while the tab
+ *    is hidden, and stops when the server says the session ended.
  * 2. Hold ONE broker subscription per distinct active pattern, refcounted
- *    across subscribers — the broker filters, so this client receives only
- *    the subjects pages actually asked for. A page's pattern opens on first
- *    use, is shared by every hook asking for the same pattern, and closes
- *    when the last subscriber leaves.
+ *    across subscribers. The broker filters, so this client receives only
+ *    the subjects pages asked for. Patterns reopen on every new connection.
+ * 3. Report `unavailable` once realtime has been down past the notice threshold.
  *
  * Cache invalidation is handled by per-page hooks in `useEventHooks.ts`.
  */
 interface NatsProviderProps {
   children: ReactNode;
-  /** Runtime NATS WebSocket URL from server settings. Falls back to build-time config. */
+  /** Static WebSocket URL, used when no `resolveCredentials` is given. Falls back to build-time config. */
   url?: string | null;
-  /** Runtime NATS auth token from server settings. Falls back to build-time config. */
+  /** Static NATS auth token, used with `url`. Falls back to build-time config. */
   token?: string | null;
+  /** Fresh connection details for each attempt. */
+  resolveCredentials?: () => Promise<NatsCredentials>;
+  policy?: ReconnectPolicy;
+  /** Called after a connection that replaced a lost one; events sent meanwhile are not replayed. */
+  onReconnect?: () => void;
+  /** A change restarts the connection loop (for one, a new sign-in). */
+  sessionKey?: unknown;
 }
 
-export function NatsProvider({ children, url, token }: NatsProviderProps) {
+export function NatsProvider({
+  children,
+  url,
+  token,
+  resolveCredentials,
+  policy = DEFAULT_RECONNECT_POLICY,
+  onReconnect,
+  sessionKey,
+}: NatsProviderProps) {
   const ncRef = useRef<NatsConnection | null>(null);
   const [connected, setConnected] = useState(false);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+
+  const latest = useRef({ url, token, resolveCredentials, policy, onReconnect });
+  latest.current = { url, token, resolveCredentials, policy, onReconnect };
 
   // Listener registry (pattern → handlers) and its live broker subscription
   // (pattern → NATS subscription). One broker subscription serves every
@@ -171,57 +197,103 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
     };
   }, [openBrokerSub]);
 
-  const connectNats = useCallback(async () => {
-    try {
-      if (ncRef.current) return;
-
-      const resolvedUrl = url || NATS_WS_URL;
-      if (!resolvedUrl) {
-        console.error('[lt-nats] no NATS WebSocket URL configured — set NATS_WS_URL on the server');
-        return;
-      }
-
-      const nc = await connect({
-        servers: resolvedUrl,
-        token: token || NATS_TOKEN || undefined,
-        reconnect: true,
-        maxReconnectAttempts: -1,
-        reconnectTimeWait: 2000,
-      });
-
-      ncRef.current = nc;
-      setConnected(true);
-
-      // Open broker subscriptions for every pattern registered before the
-      // connection came up. (The nats.ws client re-establishes live
-      // subscriptions itself across reconnects.)
-      for (const pattern of listenersRef.current.keys()) {
-        openBrokerSub(pattern);
-      }
-
-      // Only the link state drives the indicator. A server error reply (a
-      // rejected subject, for one) arrives on a live connection and is not a
-      // disconnect.
-      (async () => {
-        for await (const s of nc.status()) {
-          if (s.type === 'disconnect') {
-            setConnected(false);
-          } else if (s.type === 'reconnect') {
-            setConnected(true);
-          }
-        }
-      })();
-    } catch {
-      setConnected(false);
-      reconnectTimer.current = setTimeout(connectNats, 3000);
-    }
-  }, [openBrokerSub]);
-
   useEffect(() => {
-    connectNats();
+    let disposed = false;
+    let stopped = false;
+    let inFlight = false;
+    let hadConnection = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setSessionEnded(false);
+
+    const isHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+    const credentials = async (): Promise<NatsCredentials> => {
+      const { url: staticUrl, token: staticToken, resolveCredentials: resolve } = latest.current;
+      if (resolve) return resolve();
+      const resolvedUrl = staticUrl || NATS_WS_URL;
+      return resolvedUrl
+        ? { kind: 'ok', url: resolvedUrl, token: staticToken || NATS_TOKEN || null }
+        : { kind: 'unavailable' };
+    };
+
+    const schedule = () => {
+      if (disposed || stopped) return;
+      timer = setTimeout(attemptConnection, reconnectDelay(attempt++, latest.current.policy));
+    };
+
+    const watch = (nc: NatsConnection) => {
+      nc.closed().then(() => {
+        if (ncRef.current !== nc) return;
+        ncRef.current = null;
+        brokerSubsRef.current.clear();
+        setConnected(false);
+        schedule();
+      });
+    };
+
+    async function attemptConnection() {
+      timer = undefined;
+      if (disposed || stopped || inFlight || ncRef.current) return;
+      // A hidden tab waits; visibilitychange resumes it.
+      if (isHidden()) return;
+      inFlight = true;
+      try {
+        const creds = await credentials();
+        if (disposed) return;
+        if (creds.kind === 'session-ended') {
+          stopped = true;
+          setSessionEnded(true);
+          return;
+        }
+        if (creds.kind === 'unavailable') {
+          schedule();
+          return;
+        }
+        // nats.ws would reconnect to the same URL, whose ticket expires, so
+        // every reconnect goes through this loop instead.
+        const nc = await connect({
+          servers: creds.url,
+          token: creds.token ?? undefined,
+          reconnect: false,
+        });
+        if (disposed) {
+          nc.close().catch(() => {});
+          return;
+        }
+        ncRef.current = nc;
+        attempt = 0;
+        setConnected(true);
+        brokerSubsRef.current.clear();
+        for (const pattern of listenersRef.current.keys()) {
+          openBrokerSub(pattern);
+        }
+        if (hadConnection) latest.current.onReconnect?.();
+        hadConnection = true;
+        watch(nc);
+      } catch {
+        if (!disposed) schedule();
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    const resume = () => {
+      if (disposed || stopped || inFlight || ncRef.current || isHidden()) return;
+      if (timer) clearTimeout(timer);
+      attempt = 0;
+      attemptConnection();
+    };
+
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('online', resume);
+    attemptConnection();
 
     return () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('online', resume);
       for (const sub of brokerSubsRef.current.values()) {
         try { sub.unsubscribe(); } catch { /* already closed */ }
       }
@@ -232,10 +304,21 @@ export function NatsProvider({ children, url, token }: NatsProviderProps) {
       }
       setConnected(false);
     };
-  }, [connectNats]);
+  }, [openBrokerSub, sessionKey]);
+
+  // The notice follows the connection state, never event silence: a quiet
+  // station can go hours without events on a healthy connection.
+  useEffect(() => {
+    if (connected || sessionEnded) {
+      setUnavailable(false);
+      return;
+    }
+    const timer = setTimeout(() => setUnavailable(true), policy.noticeAfterMs);
+    return () => clearTimeout(timer);
+  }, [connected, sessionEnded, policy.noticeAfterMs]);
 
   return (
-    <NatsContext.Provider value={{ connected, subscribe }}>
+    <NatsContext.Provider value={{ connected, unavailable, subscribe }}>
       <EventContext.Provider value={{ connected, subscribe }}>
         {children}
       </EventContext.Provider>

@@ -15,6 +15,12 @@ export const config = {
   NATS_TOKEN: process.env.NATS_TOKEN || '',
   /** A subscribe-only NATS credential for browsers that connect without the proxy. */
   NATS_DASHBOARD_TOKEN: process.env.NATS_DASHBOARD_TOKEN || '',
+  /** How long a browser's WebSocket proxy ticket admits an upgrade. The dashboard fetches one per attempt. */
+  NATS_WS_TICKET_TTL_SECONDS: parseInt(process.env.NATS_WS_TICKET_TTL_SECONDS || '300', 10),
+  /** Dashboard reconnect backoff: first delay, delay cap, and how long a drop lasts before the banner shows. */
+  NATS_RECONNECT_INITIAL_MS: parseInt(process.env.NATS_RECONNECT_INITIAL_MS || '1000', 10),
+  NATS_RECONNECT_MAX_MS: parseInt(process.env.NATS_RECONNECT_MAX_MS || '60000', 10),
+  NATS_LIVE_NOTICE_AFTER_MS: parseInt(process.env.NATS_LIVE_NOTICE_AFTER_MS || '30000', 10),
 
   PORT: parseInt(process.env.PORT || '3000', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',

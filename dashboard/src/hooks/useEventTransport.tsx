@@ -1,31 +1,38 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { getToken } from '../api/client';
 import { useAuth } from './useAuth';
 import { loadSettings } from '../api/settings';
-import { LT_BASE } from '../lib/base-path';
+import { fetchNatsCredentials } from '../lib/nats/credentials';
+import { resolveReconnectPolicy, type ReconnectPolicy } from '../lib/nats/reconnect';
 import { NatsProvider } from './useNats';
 import { SocketIOProvider } from './useSocketIO';
 
 type Transport = 'nats' | 'socketio' | null;
 
 interface NatsSettings {
+  /** The server-reported WebSocket URL, used until a session can fetch a ticket. */
   url: string | null;
-  token: string | null;
+  policy: ReconnectPolicy;
 }
 
 /**
  * Auto-detecting event transport provider.
  *
  * On mount, fetches `/api/settings` to check `events.transport`.
- * - `'nats'` — wraps children in `<NatsProvider>`
- * - `'socketio'` or default — wraps children in `<SocketIOProvider>`
- * - While loading — renders children without a provider (events disabled until detected)
+ * - `'nats'`: wraps children in `<NatsProvider>`, which fetches fresh
+ *   credentials from `/api/nats-credentials` for every connection attempt
+ * - `'socketio'` or default: wraps children in `<SocketIOProvider>`
+ * - While loading: renders children without a provider (events disabled until detected)
  */
 export function EventTransportProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [transport, setTransport] = useState<Transport>(null);
-  const [natsSettings, setNatsSettings] = useState<NatsSettings>({ url: null, token: null });
+  const [natsSettings, setNatsSettings] = useState<NatsSettings>({
+    url: null,
+    policy: resolveReconnectPolicy(null),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -38,27 +45,10 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
         console.log('[lt-transport] server reports:', value);
         if (!cancelled) {
           if (value === 'nats') {
-            let natsUrl = data.events.natsWsUrl ?? null;
-            let natsToken: string | null = null;
-
-            // Fetch NATS token from authenticated endpoint
-            const jwt = getToken();
-            if (jwt) {
-              try {
-                const credRes = await fetch(`${LT_BASE}/api/nats-credentials`, {
-                  headers: { Authorization: `Bearer ${jwt}` },
-                });
-                if (credRes.ok) {
-                  const creds = await credRes.json();
-                  natsUrl = creds.natsWsUrl ?? natsUrl;
-                  natsToken = creds.natsToken ?? null;
-                }
-              } catch {
-                console.warn('[lt-transport] failed to fetch NATS credentials');
-              }
-            }
-
-            setNatsSettings({ url: natsUrl, token: natsToken });
+            setNatsSettings({
+              url: data.events.natsWsUrl ?? null,
+              policy: resolveReconnectPolicy(data.events.reconnect),
+            });
           }
           setTransport(value === 'nats' ? 'nats' : 'socketio');
         }
@@ -72,14 +62,32 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
+  const resolveCredentials = useCallback(
+    () => fetchNatsCredentials(natsSettings.url),
+    [natsSettings.url],
+  );
+  // One refetch brings open pages up to date after events missed while down.
+  const refetchActive = useCallback(() => {
+    queryClient.invalidateQueries({ refetchType: 'active' });
+  }, [queryClient]);
+
   if (transport === 'nats') {
-    return <NatsProvider url={natsSettings.url} token={natsSettings.token}>{children}</NatsProvider>;
+    return (
+      <NatsProvider
+        resolveCredentials={resolveCredentials}
+        policy={natsSettings.policy}
+        onReconnect={refetchActive}
+        sessionKey={isAuthenticated}
+      >
+        {children}
+      </NatsProvider>
+    );
   }
 
   if (transport === 'socketio') {
     return <SocketIOProvider>{children}</SocketIOProvider>;
   }
 
-  // Still detecting — render children without event provider
+  // Still detecting: render children without event provider
   return <>{children}</>;
 }

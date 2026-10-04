@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import jwt from 'jsonwebtoken';
 
 vi.mock('../../../modules/sso', () => ({ getSSOConfig: () => null }));
 
@@ -16,6 +17,19 @@ afterAll(() => { (config as any).JWT_SECRET = savedSecret; });
 describe('NATS WebSocket ticket', () => {
   it('names the person it was issued to', () => {
     expect(verifyNatsWsTicket(signNatsWsTicket(USER))).toBe(USER);
+  });
+
+  it('lives as long as NATS_WS_TICKET_TTL_SECONDS, five minutes by default', () => {
+    const { iat, exp } = jwt.decode(signNatsWsTicket(USER)!) as { iat: number; exp: number };
+    expect(exp - iat).toBe(config.NATS_WS_TICKET_TTL_SECONDS);
+    expect(config.NATS_WS_TICKET_TTL_SECONDS).toBe(300);
+  });
+
+  it('an expired ticket is refused', () => {
+    const expired = jwt.sign({}, 'ticket-secret', {
+      algorithm: 'HS256', header: { alg: 'HS256', typ: 'nats-ws+jwt' }, subject: USER, expiresIn: -1,
+    });
+    expect(verifyNatsWsTicket(expired)).toBeNull();
   });
 
   it('a session token is not a ticket', () => {

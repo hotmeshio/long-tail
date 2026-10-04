@@ -9,7 +9,6 @@ import { config } from '../../modules/config';
  */
 export const NATS_WS_TICKET_TYPE = 'nats-ws+jwt';
 export const NATS_WS_TICKET_PARAM = 'ticket';
-const TICKET_TTL_SECONDS = 24 * 60 * 60;
 
 export function signNatsWsTicket(userId: string): string | null {
   if (!config.JWT_SECRET) return null;
@@ -17,7 +16,7 @@ export function signNatsWsTicket(userId: string): string | null {
     algorithm: 'HS256',
     header: { alg: 'HS256', typ: NATS_WS_TICKET_TYPE },
     subject: userId,
-    expiresIn: TICKET_TTL_SECONDS,
+    expiresIn: config.NATS_WS_TICKET_TTL_SECONDS,
   });
 }
 

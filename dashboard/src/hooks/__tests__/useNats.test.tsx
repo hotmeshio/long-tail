@@ -128,6 +128,7 @@ describe('useNatsStatus', () => {
       subscribe: vi.fn().mockReturnValue(mockSub),
       status: vi.fn().mockReturnValue(mockStatus),
       close: vi.fn().mockResolvedValue(undefined),
+      closed: vi.fn().mockReturnValue(new Promise(() => {})),
     };
 
     (mockConnect as ReturnType<typeof vi.fn>).mockResolvedValue(mockNc);
@@ -144,7 +145,7 @@ describe('useNatsStatus', () => {
     expect(result.current.connected).toBe(true);
   });
 
-  // The status stream drives the indicator by link state alone.
+  // A status reply on a live connection is not a drop; only closing is.
   async function renderWithStatuses(statuses: Array<{ type: string; data?: string }>) {
     const { connect: mockConnect } = await import('nats.ws');
     const queue = [...statuses];
@@ -157,6 +158,7 @@ describe('useNatsStatus', () => {
       subscribe: vi.fn().mockReturnValue({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }), unsubscribe: vi.fn() }),
       status: vi.fn().mockReturnValue(mockStatus),
       close: vi.fn().mockResolvedValue(undefined),
+      closed: vi.fn().mockReturnValue(new Promise(() => {})),
     };
     (mockConnect as ReturnType<typeof vi.fn>).mockResolvedValue(mockNc);
     const rendered = renderHook(() => useNatsStatus(), { wrapper: createWrapper(queryClient) });
@@ -169,13 +171,6 @@ describe('useNatsStatus', () => {
   it('stays connected through a server error reply on a live connection', async () => {
     const { result } = await renderWithStatuses([{ type: 'error', data: 'NATS_PROTOCOL_ERR' }]);
     expect(result.current.connected).toBe(true);
-  });
-
-  it('reports a disconnect and the reconnect that follows it', async () => {
-    const { result } = await renderWithStatuses([{ type: 'disconnect' }]);
-    expect(result.current.connected).toBe(false);
-    const again = await renderWithStatuses([{ type: 'disconnect' }, { type: 'reconnect' }]);
-    expect(again.result.current.connected).toBe(true);
   });
 });
 
@@ -218,6 +213,7 @@ describe('useNatsSubscription', () => {
         }),
       }),
       close: vi.fn().mockResolvedValue(undefined),
+      closed: vi.fn().mockReturnValue(new Promise(() => {})),
     };
 
     (mockConnect as ReturnType<typeof vi.fn>).mockResolvedValue(mockNc);
@@ -279,6 +275,7 @@ describe('useNatsSubscription', () => {
         }),
       }),
       close: vi.fn().mockResolvedValue(undefined),
+      closed: vi.fn().mockReturnValue(new Promise(() => {})),
     };
 
     (mockConnect as ReturnType<typeof vi.fn>).mockResolvedValue(mockNc);

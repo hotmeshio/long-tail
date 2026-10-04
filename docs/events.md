@@ -45,7 +45,7 @@ services:
       - NATS_TOKEN=your-token
 ```
 
-**Browser access.** The dashboard only subscribes. With the WebSocket proxy (`wsProxy`, so browsers reach NATS through Long Tail at `<basePath>/nats-ws`), `GET /api/nats-credentials` returns a WebSocket URL carrying a 24-hour ticket for the signed-in person and no NATS credential. The proxy admits only a ticket holder, writes the server's `NATS_TOKEN` into the connection itself, and drops anything the browser tries to publish. When browsers connect to NATS directly, set `NATS_DASHBOARD_TOKEN` to a subscribe-only NATS credential and the route hands that out instead of `NATS_TOKEN`.
+**Browser access.** The dashboard only subscribes. With the WebSocket proxy (`wsProxy`, so browsers reach NATS through Long Tail at `<basePath>/nats-ws`), `GET /api/nats-credentials` returns a WebSocket URL carrying a short-lived ticket for the signed-in person (`NATS_WS_TICKET_TTL_SECONDS`, default 300) and no NATS credential. The proxy admits only a ticket holder, writes the server's `NATS_TOKEN` into the connection itself, and drops anything the browser tries to publish. When browsers connect to NATS directly, set `NATS_DASHBOARD_TOKEN` to a subscribe-only NATS credential and the route hands that out instead of `NATS_TOKEN`.
 
 Both adapters still publish events regardless of `EVENT_TRANSPORT` — the setting only controls what the dashboard listens on. This means server-side event consumers (callbacks, NATS subscribers) work independently of the dashboard transport.
 

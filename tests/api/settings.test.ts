@@ -223,6 +223,15 @@ describe('getSettings — environment', () => {
     expect(env.nodeVersion).toBe(process.version);
   });
 
+  it('reports the dashboard reconnect policy', async () => {
+    const result = await getSettings();
+    expect(result.data.events.reconnect).toEqual({
+      initialDelayMs: config.NATS_RECONNECT_INITIAL_MS,
+      maxDelayMs: config.NATS_RECONNECT_MAX_MS,
+      noticeAfterMs: config.NATS_LIVE_NOTICE_AFTER_MS,
+    });
+  });
+
   it('reports the resolved event transport in the environment block', async () => {
     eventRegistry.register(new SocketIOEventAdapter());
     const result = await getSettings();

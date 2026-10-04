@@ -72,6 +72,11 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         events: {
           transport,
           natsWsUrl: natsAdapter ? resolveNatsWsUrl(natsAdapter, req) : null,
+          reconnect: {
+            initialDelayMs: config.NATS_RECONNECT_INITIAL_MS,
+            maxDelayMs: config.NATS_RECONNECT_MAX_MS,
+            noticeAfterMs: config.NATS_LIVE_NOTICE_AFTER_MS,
+          },
         },
         auth: {
           sso: isSSOEnabled(),
