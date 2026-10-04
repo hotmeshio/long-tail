@@ -115,6 +115,55 @@ Resolve an already-claimed escalation with a payload. Use when the claim happene
 | payload | object | Yes | Resolution payload data — resumes the waiting workflow |
 | metadata | object | No | Outcome facets merged into the escalation's metadata (see `claim_and_resolve`) |
 
+### resolve_batch_item
+
+Submit one declared item of a batch escalation. Interim items return outcome `accepted` with the count remaining; the last item completes the escalation and wakes the waiting workflow with the full collection.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The batch escalation ID |
+| item_key | string | Yes | The declared batch item key this submission fills |
+| payload | object | Yes | The item payload |
+
+### accumulate_item
+
+Add one item to an open accumulator escalation. Interim adds return outcome `accepted` with the count held; the add that reaches `max` completes the escalation and wakes the waiting workflow with the ordered collection.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The accumulator escalation ID (the container) |
+| item_key | string | Yes | The key this item is held under |
+| payload | object | No | Item payload, delivered inside `$accumulated` |
+| reciprocal | object | No | A second accumulator row written in the same statement, both or neither. Exactly one of `id`, `signalKey`, or `key`/`value`, plus an optional `payload` |
+
+### remove_item
+
+Remove one held item from a pending open accumulator escalation. The row stays pending and the waiting workflow is not woken.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The accumulator escalation ID |
+| item_key | string | Yes | The held item key to remove |
+| reciprocal | object | No | A second accumulator row written in the same statement, both or neither. Exactly one of `id`, `signalKey`, or `key`/`value` |
+
 ### escalate_and_wait
 
 Create an escalation and pause the workflow until a human responds. Returns a signal ID that the workflow uses to wait durably. Preferred over escalate_to_human + check_resolution polling.

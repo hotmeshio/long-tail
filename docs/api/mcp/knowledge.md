@@ -139,3 +139,37 @@ Append a value to an array field within a knowledge entry. Creates the entry and
 | key | string | Yes | Document key |
 | path | string | Yes | JSONB path to array field |
 | value | any | Yes | Value to append to the array |
+
+### set_knowledge_field
+
+Set a value at a dot-notation path within a knowledge entry, keeping sibling fields. Creates the entry when it does not exist.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| domain | string | Yes | Knowledge domain |
+| key | string | Yes | Document key |
+| path | string | Yes | Dot-notation path to the field |
+| value | any | Yes | Value to set, any JSON type |
+| tags | string[] | No | Tags to union with existing tags |
+
+### remove_knowledge_field
+
+Remove a field from a knowledge entry by dot-path. The entry remains; only the targeted path is deleted.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| domain | string | Yes | Knowledge domain |
+| key | string | Yes | Document key |
+| path | string | Yes | Dot-notation path to remove |

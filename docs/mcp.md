@@ -305,109 +305,20 @@ These tools act with full authority, so at `/mcp` they are listed for superadmin
 
 ### Tools
 
-#### `escalate_to_human`
+| Tool | Purpose |
+|------|---------|
+| `escalate_to_human` | Create an escalation for human review |
+| `check_resolution` | Check whether an escalation is resolved and read its payload |
+| `get_escalation_lookups` | Read the knowledge lookups pinned on an escalation |
+| `get_available_work` | List pending, unclaimed escalations for a role |
+| `claim_and_resolve` | Claim and resolve an escalation in one atomic call |
+| `resolve_escalation` | Resolve an escalation that is already claimed |
+| `resolve_batch_item` | Fill one declared item of a batch escalation |
+| `accumulate_item` | Add one item to an open accumulator escalation |
+| `remove_item` | Remove one held item from an open accumulator |
+| `escalate_and_wait` | Create an escalation and pause the workflow until it is resolved |
 
-Create a new escalation for human review.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `role` | string | yes | Target role (e.g., `"reviewer"`) |
-| `message` | string | yes | What needs human review |
-| `data` | object | no | Contextual data for the reviewer |
-| `type` | string | no | Classification (default: `"mcp"`) |
-| `subtype` | string | no | Subtype (default: `"tool_call"`) |
-| `priority` | number | no | 1 (highest) to 4 (lowest), default: 2 |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "pending",
-  "role": "reviewer",
-  "created_at": "2025-01-15T10:30:00Z"
-}
-```
-
-#### `check_resolution`
-
-Check the status of an escalation.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `escalation_id` | string | yes | The escalation ID to check |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "pending"
-}
-```
-
-When resolved:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "resolved",
-  "resolver_payload": { "approved": true, "note": "..." },
-  "resolved_at": "2025-01-15T11:00:00Z"
-}
-```
-
-Returns `isError: true` if the escalation doesn't exist.
-
-#### `get_available_work`
-
-List pending, unassigned escalations for a role.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `role` | string | yes | Role to filter by |
-| `limit` | number | no | Max results (default: 10) |
-
-Returns:
-
-```json
-{
-  "count": 2,
-  "escalations": [
-    {
-      "escalation_id": "uuid",
-      "type": "mcp",
-      "subtype": "tool_call",
-      "description": "Address mismatch for MBR-2024-001",
-      "priority": 2,
-      "role": "reviewer",
-      "created_at": "2025-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-#### `claim_and_resolve`
-
-Claim an escalation and resolve it in one atomic operation.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `escalation_id` | string | yes | The escalation to resolve |
-| `resolver_id` | string | yes | Who/what is resolving (e.g., `"my-agent"`) |
-| `payload` | object | yes | Resolution data |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "resolved",
-  "resolved_at": "2025-01-15T11:00:00Z"
-}
-```
-
-Returns `isError: true` if the escalation isn't available (already claimed, already resolved, or doesn't exist).
+Parameters and examples for each are in the [Human Queue reference](api/mcp/human-queue.md).
 
 ### Scope and one-time users
 
