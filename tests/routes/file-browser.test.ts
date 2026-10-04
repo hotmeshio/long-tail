@@ -37,6 +37,13 @@ describe('File browser routes', () => {
       const res = await fetch(`${ctx.BASE}/file-browser/download/test.txt`);
       expect(res.status).toBe(401);
     });
+
+    it('reads need builder: a member is refused before storage is touched', async () => {
+      for (const path of ['browse', 'metadata/test.txt', 'download/test.txt']) {
+        const res = await fetch(`${ctx.BASE}/file-browser/${path}`, { headers: authHeaders(ctx.memberToken) });
+        expect({ path, status: res.status }).toEqual({ path, status: 403 });
+      }
+    });
   });
 
   // ── Browse ────────────────────────────────────────────────────────────────
@@ -73,11 +80,11 @@ describe('File browser routes', () => {
       expect(res.status).toBe(200);
     });
 
-    it('works with member token (non-admin)', async () => {
+    it('refuses a member token (non-builder)', async () => {
       const res = await fetch(`${ctx.BASE}/file-browser/browse`, {
         headers: authHeaders(ctx.memberToken),
       });
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
   });
 

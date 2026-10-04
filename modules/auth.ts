@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { config } from './config';
 import { getSSOConfig } from './sso';
 import { loggerRegistry } from '../lib/logger';
-import { mayAdminister, mayBuild, mayManageRoles, type CapabilityPrincipal } from './capabilities';
+import { mayAdminister, mayBuild, mayManageRoles, mayReadWorkflowRun, type CapabilityPrincipal } from './capabilities';
 import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
 import { resolvePrincipal } from '../services/iam/principal';
@@ -217,6 +217,19 @@ export const requireBuilder = requireCapability(mayBuild, 'Forbidden: builder ac
 
 /** Role-management access: admin access or the 'engineer' role. Backend twin of `isBuilder || isOps`. */
 export const requireRoleManager = requireCapability(mayManageRoles, 'Forbidden: role-management access required');
+
+/** Reads of one workflow run (`:workflowId`): builder access, or the person who started it or it runs as. */
+export const requireWorkflowReader: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.auth?.userId && await mayReadWorkflowRun(req.auth, String(req.params.workflowId))) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: 'Forbidden: workflow read access required' });
+  } catch {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+};
 
 /**
  * Generate a JWT token. Utility for tests and token provisioning.

@@ -63,7 +63,7 @@ export const DB_QUERY_TOOLS = [
 export const FILE_STORAGE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'read_file',
-    gate: 'caller',
+    gate: 'builder',
     description: 'Read file content from managed storage. Returns content, size, and detected MIME type. Supports utf8 (text) or base64 encoding.',
     read_safe: true,
     inputSchema: {
@@ -92,7 +92,7 @@ export const FILE_STORAGE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'list_files',
-    gate: 'caller',
+    gate: 'builder',
     description: 'List files in a storage directory. Returns file paths, sizes, and modification timestamps.',
     read_safe: true,
     inputSchema: {

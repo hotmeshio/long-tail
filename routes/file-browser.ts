@@ -13,7 +13,7 @@ const router = Router();
  * List files and directories at a given prefix.
  * Query: ?prefix=screenshots/&pageSize=100&continuationToken=...
  */
-router.get('/browse', async (req, res) => {
+router.get('/browse', requireBuilder, async (req, res) => {
   const result = await api.browseFiles({
     prefix: req.query.prefix as string,
     pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined,
@@ -26,7 +26,7 @@ router.get('/browse', async (req, res) => {
  * GET /api/file-browser/metadata/*
  * Get metadata for a single file.
  */
-router.get('/metadata/{*filePath}', async (req, res) => {
+router.get('/metadata/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {
@@ -74,7 +74,7 @@ router.delete('/delete/{*filePath}', requireBuilder, async (req, res) => {
  * GET /api/file-browser/download/*
  * Download a file with Content-Disposition: attachment.
  */
-router.get('/download/{*filePath}', async (req, res) => {
+router.get('/download/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {

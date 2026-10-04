@@ -1,4 +1,5 @@
 import { Router } from '../lib/http';
+import { requireBuilder, requireWorkflowReader } from '../modules/auth';
 
 import * as api from '../api/exports';
 import type { LTExportField } from '../types';
@@ -10,7 +11,7 @@ const router = Router();
  * GET /api/workflow-states/jobs
  * List workflow jobs with optional filtering and pagination.
  */
-router.get('/jobs', async (req, res) => {
+router.get('/jobs', requireBuilder, async (req, res) => {
   const app_id = (req.query.app_id || req.query.namespace) as string | undefined;
   if (!app_id) {
     res.status(400).json({ error: 'app_id (or namespace) query parameter is required' });
@@ -34,7 +35,7 @@ router.get('/jobs', async (req, res) => {
  * GET /api/workflow-states/:workflowId
  * Export the full workflow state using HotMesh's durable export.
  */
-router.get('/:workflowId', async (req, res) => {
+router.get('/:workflowId', requireBuilder, async (req, res) => {
   const allow = req.query.allow
     ? (req.query.allow as string).split(',') as LTExportField[]
     : undefined;
@@ -44,7 +45,7 @@ router.get('/:workflowId', async (req, res) => {
   const values = req.query.values === 'false' ? false : undefined;
 
   const result = await api.exportWorkflowState({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
     allow,
     block,
     values,
@@ -56,9 +57,9 @@ router.get('/:workflowId', async (req, res) => {
  * GET /api/workflow-states/:workflowId/execution
  * Export workflow state as a structured execution event history.
  */
-router.get('/:workflowId/execution', async (req, res) => {
+router.get('/:workflowId/execution', requireWorkflowReader, async (req, res) => {
   const result = await api.exportWorkflowExecution({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
     excludeSystem: req.query.excludeSystem === 'true',
     omitResults: req.query.omitResults === 'true',
     mode: (req.query.mode as ExportMode) || undefined,
@@ -74,9 +75,9 @@ router.get('/:workflowId/execution', async (req, res) => {
  * The workflow's input and output envelopes — two narrow lookups, no event
  * stream. Output is null with status 'running' until the workflow completes.
  */
-router.get('/:workflowId/envelopes', async (req, res) => {
+router.get('/:workflowId/envelopes', requireBuilder, async (req, res) => {
   const result = await api.getWorkflowEnvelopes({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -85,9 +86,9 @@ router.get('/:workflowId/envelopes', async (req, res) => {
  * GET /api/workflow-states/:workflowId/status
  * Return only the numeric status semaphore.
  */
-router.get('/:workflowId/status', async (req, res) => {
+router.get('/:workflowId/status', requireBuilder, async (req, res) => {
   const result = await api.getWorkflowStatus({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -96,9 +97,9 @@ router.get('/:workflowId/status', async (req, res) => {
  * GET /api/workflow-states/:workflowId/state
  * Return the current job state of the workflow.
  */
-router.get('/:workflowId/state', async (req, res) => {
+router.get('/:workflowId/state', requireBuilder, async (req, res) => {
   const result = await api.getWorkflowState({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
   });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

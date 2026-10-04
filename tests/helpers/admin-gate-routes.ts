@@ -19,6 +19,7 @@ export const GATE_DENIALS = [
   'Forbidden: admin access required',
   'Forbidden: builder access required',
   'Forbidden: role-management access required',
+  'Forbidden: workflow read access required',
 ];
 
 const ID = '00000000-0000-4000-8000-0000000000c1';
@@ -164,11 +165,25 @@ export const GATED_ROUTES: GatedRoute[] = [
 
   // routes/file-browser.ts, insight.ts, workflow-sets.ts, namespaces.ts, pipelines.ts, workflows/invocation.ts
   { method: 'POST', path: '/file-browser/signed-url', gate: 'builder', body: { path: 'a', expiresIn: 3600 } },
+  { method: 'GET', path: '/file-browser/browse', gate: 'builder' },
+  { method: 'GET', path: '/file-browser/metadata/a.txt', gate: 'builder' },
   { method: 'POST', path: '/insight/build-workflow', gate: 'builder', body: {} },
   { method: 'POST', path: '/workflow-sets', gate: 'builder', body: {} },
   { method: 'POST', path: '/namespaces', gate: 'builder', body: {} },
   { method: 'POST', path: `/pipelines/${ID}/interrupt`, gate: 'builder', body: {} },
   { method: 'POST', path: `/workflows/${ID}/terminate`, gate: 'builder', body: {} },
+  { method: 'GET', path: `/workflows/${ID}/status`, gate: 'builder' },
+  { method: 'GET', path: `/workflows/${ID}/export`, gate: 'builder' },
+  // Also open to the person who started the run or it runs as (tests/routes/workflow-read-access.test.ts).
+  { method: 'GET', path: `/workflows/${ID}/result`, gate: 'builder' },
+
+  // routes/exports.ts
+  { method: 'GET', path: '/workflow-states/jobs?app_id=durable', gate: 'builder' },
+  { method: 'GET', path: `/workflow-states/${ID}`, gate: 'builder' },
+  { method: 'GET', path: `/workflow-states/${ID}/execution`, gate: 'builder' },
+  { method: 'GET', path: `/workflow-states/${ID}/envelopes`, gate: 'builder' },
+  { method: 'GET', path: `/workflow-states/${ID}/status`, gate: 'builder' },
+  { method: 'GET', path: `/workflow-states/${ID}/state`, gate: 'builder' },
 
   // routes/mcp.ts
   { method: 'GET', path: '/mcp/servers', gate: 'none' },

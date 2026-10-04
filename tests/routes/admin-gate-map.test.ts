@@ -33,6 +33,7 @@ vi.mock('../../api/dba', (io) => stubApi(io as any));
 vi.mock('../../api/diagnostics', (io) => stubApi(io as any));
 vi.mock('../../api/controlplane', (io) => stubApi(io as any));
 vi.mock('../../api/files', (io) => stubApi(io as any));
+vi.mock('../../api/exports', (io) => stubApi(io as any));
 vi.mock('../../api/insight', (io) => stubApi(io as any));
 vi.mock('../../api/workflow-sets', (io) => stubApi(io as any));
 vi.mock('../../api/namespaces', (io) => stubApi(io as any));
