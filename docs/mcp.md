@@ -177,7 +177,9 @@ A deployment can also be set read-only as a whole with `mcp.exposure.readOnly` i
 
 Within a tool, the account's role decides whether the action is allowed on a given target. Workflow invocation runs as the account and follows the workflow's invocation roles. Assigning a role follows the same rule as the dashboard: only a superadmin assigns the superadmin type, and an admin without the `engineer` role assigns only roles they hold. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations; it cannot route work to finance or manage users.
 
-A built-in tool declares its capability with `gate` on its manifest entry. A tool whose entry has no `gate` is not exposed at `/mcp`.
+A built-in tool declares its capability with `gate` on its manifest entry. A tool whose entry has no `gate` is not exposed at `/mcp`. A host's in-process servers (`mcp.serverFactories` with a `config.toolManifest`) declare `gate` the same way; it applies when the tool is called over REST or chosen by an LLM inside a workflow, and a host tool with no `gate` requires builder.
+
+Builder is the most powerful capability after superadmin. It includes registering an MCP server with the `stdio` transport, which runs a command on the Long Tail host with that host's environment and network. Grant the `engineer` role with the same care as host access.
 
 Put plainly: **scope is read or write; role is which tools and which records.** A read key answers questions; a full key with the right role also acts.
 

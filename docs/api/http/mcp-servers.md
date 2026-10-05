@@ -2,6 +2,8 @@
 
 Manage MCP server registrations, connections, and tool invocations. All endpoints require authentication. Registering, testing, updating, deleting, connecting, and disconnecting servers require builder access (superadmin or the `engineer` role).
 
+A `stdio` server is a command Long Tail starts on its own host, with that host's environment and network. Builder access therefore includes running commands on the host: grant the `engineer` role with the same care as host access.
+
 ## List servers
 
 ```
