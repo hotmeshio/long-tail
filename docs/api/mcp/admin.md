@@ -692,7 +692,8 @@ Start a workflow registered read-safe (side-effect-free). Same contract as `invo
 Check workflow status and result. Returns status (`running` | `complete` | `failed`)
 and the result when complete; a failed run carries `terminated` (true when an
 interrupt ended it) and `error`. Resolution is namespace-aware — pass `app_id` to read a
-workflow (e.g. a child) running in a non-default HotMesh namespace.
+workflow (e.g. a child) running in a non-default HotMesh namespace. Readable by a builder,
+or by the person who started the run or the account it runs as.
 
 | | |
 |---|---|
@@ -1869,7 +1870,7 @@ Export the full workflow state using HotMesh durable export.
 
 ### export_workflow_execution
 
-Export workflow state as a structured execution event history.
+Export workflow state as a structured execution event history. Readable by a builder, or by the person who started the run or the account it runs as.
 
 | | |
 |---|---|

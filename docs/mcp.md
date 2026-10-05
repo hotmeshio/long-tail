@@ -169,9 +169,9 @@ A deployment can also be set read-only as a whole with `mcp.exposure.readOnly` i
 
 | Capability | Who holds it | Tools |
 |---|---|---|
-| Caller | Any account | Escalations, tasks, workflow invocation, scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
+| Caller | Any account | Escalations, tasks, workflow invocation, a run's status and execution history (for a builder, or the person who started the run or it runs as), scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
 | Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, assigning and removing a user's roles |
-| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, workflow status, envelopes and exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
+| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, workflow envelopes and state exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
 | Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
 | Superadmin | Superadmin | Other users' OAuth connections, the human-queue tools workflows use to create and resolve escalations |
 

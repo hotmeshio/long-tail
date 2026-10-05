@@ -6,6 +6,9 @@ import { z } from 'zod';
 
 import * as api from '../../../api/exports';
 import { pickPaths } from '../../../lib/json-path/pick';
+import { mayReadWorkflowRun } from '../../../modules/capabilities';
+import { callerAuth, type ToolCallExtra } from '../caller-auth';
+import { RUN_READ_DENIED } from './run-read';
 import {
   listExportJobsSchema,
   exportWorkflowStateSchema,
@@ -70,7 +73,10 @@ export function registerExportTools(server: McpServer): void {
         'pass select (dot paths) to return only what you need.',
       inputSchema: exportWorkflowExecutionSchema,
     },
-    async (args: z.infer<typeof exportWorkflowExecutionSchema>) => {
+    async (args: z.infer<typeof exportWorkflowExecutionSchema>, extra?: ToolCallExtra) => {
+      if (!(await mayReadWorkflowRun(await callerAuth(extra), args.workflow_id))) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: RUN_READ_DENIED }) }], isError: true };
+      }
       const result = await api.exportWorkflowExecution({
         workflowId: args.workflow_id,
         excludeSystem: args.excludeSystem,

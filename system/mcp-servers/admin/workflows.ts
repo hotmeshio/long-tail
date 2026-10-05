@@ -12,7 +12,9 @@ import {
   authorizeInvocation,
   type InvocationAuthContext,
 } from '../../../services/workflow-invocation';
-import { externalCaller, type ToolCallExtra } from '../caller-auth';
+import { callerAuth, externalCaller, type ToolCallExtra } from '../caller-auth';
+import { mayReadWorkflowRun } from '../../../modules/capabilities';
+import { RUN_READ_DENIED } from './run-read';
 import * as workflowApi from '../../../api/workflows';
 import { WORKFLOW_STATES } from '../../../shared/workflow-state';
 import type { LTWorkflowConfig } from '../../../types/config';
@@ -211,11 +213,14 @@ export function registerWorkflowTools(server: McpServer): void {
         'child) running in a non-default HotMesh namespace.',
       inputSchema: getWorkflowStatusSchema,
     },
-    async (args: z.infer<typeof getWorkflowStatusSchema>) => {
+    async (args: z.infer<typeof getWorkflowStatusSchema>, extra?: ToolCallExtra) => {
       const reply = (body: Record<string, unknown>, isError = false) => ({
         content: [{ type: 'text' as const, text: JSON.stringify(body) }],
         ...(isError ? { isError: true } : {}),
       });
+      if (!(await mayReadWorkflowRun(await callerAuth(extra), args.workflow_id))) {
+        return reply({ error: RUN_READ_DENIED }, true);
+      }
       const found = await workflowApi.getWorkflowResult({
         workflowId: args.workflow_id,
         appId: args.app_id,

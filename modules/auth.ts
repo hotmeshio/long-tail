@@ -226,8 +226,10 @@ export const requireWorkflowReader: RequestHandler = async (req: Request, res: R
       return;
     }
     res.status(403).json({ error: 'Forbidden: workflow read access required' });
-  } catch {
-    res.status(403).json({ error: 'Forbidden' });
+  } catch (err: any) {
+    // A failed lookup is not an access decision: report it, and serve nothing.
+    loggerRegistry.error(`[long-tail] workflow read check failed: ${err?.message}`);
+    res.status(500).json({ error: 'Workflow read check failed' });
   }
 };
 

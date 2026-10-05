@@ -48,6 +48,7 @@ vi.mock('../../lib/db', async (io) => ({
 }));
 vi.mock('../../services/user', async (io) => ({ ...(await io<typeof import('../../services/user')>()), isSuperAdmin: lookups.isSuperAdmin }));
 vi.mock('../../services/user/rbac', async (io) => ({ ...(await io<typeof import('../../services/user/rbac')>()), isSuperAdmin: lookups.isSuperAdmin }));
+vi.mock('../../services/task/crud', async (io) => ({ ...(await io<typeof import('../../services/task/crud')>()), getTaskByWorkflowId: async () => null }));
 vi.mock('../../services/user/roles', async (io) => ({ ...(await io<typeof import('../../services/user/roles')>()), hasRole: lookups.hasRole }));
 
 import routes from '../../routes';
