@@ -49,6 +49,8 @@ POST /api/tasks
 
 ---
 
+**Run data.** A task row carries its run's input (`envelope`), output (`data`) and `metadata`. A builder, and the person who started the run or the account it runs as, receive them; for any other caller those three fields are omitted from list, process and single-task responses.
+
 ## List tasks
 
 ```

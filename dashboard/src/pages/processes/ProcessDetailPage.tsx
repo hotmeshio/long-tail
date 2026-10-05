@@ -99,7 +99,10 @@ export function ProcessDetailPage() {
     );
   }
 
-  const hasMessages = rootEnvelope || rootResult || isRunning;
+  // Run input and output reach builders and the run's own people only; the
+  // panels show when the server sent them.
+  const runDataShown = tasks.some((t) => t.envelope !== undefined);
+  const hasMessages = runDataShown && (rootEnvelope || rootResult || isRunning);
 
   return (
     <div>

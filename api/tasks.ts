@@ -1,7 +1,24 @@
 import * as taskService from '../services/task';
 import * as escalationService from '../services/escalation';
 import { getEscalationReadScope, scopeAdmits } from './escalations/helpers';
+import { mayBuild } from '../modules/capabilities';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
+import type { LTTaskRecord } from '../types';
+
+/**
+ * How a caller sees task rows. A builder, and the person a run was started by
+ * or runs as, see the whole row; anyone else sees it without the run's input
+ * (`envelope`), output (`data`) and `metadata`. An in-process call (no auth)
+ * sees whole rows.
+ */
+async function taskViewFor(auth?: LTApiAuth): Promise<(task: LTTaskRecord) => LTTaskRecord> {
+  if (!auth?.userId || (await mayBuild(auth))) return (task) => task;
+  return (task) => {
+    if (task.initiated_by === auth.userId || task.executing_as === auth.userId) return task;
+    const { envelope: _envelope, data: _data, metadata: _metadata, ...rest } = task;
+    return rest as LTTaskRecord;
+  };
+}
 
 /**
  * Create a task record.
@@ -94,10 +111,10 @@ export async function listTasks(input: {
   origin_id?: string;
   limit?: number;
   offset?: number;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
-    const result = await taskService.listTasks(input as any);
-    return { status: 200, data: result };
+    const [result, view] = await Promise.all([taskService.listTasks(input as any), taskViewFor(auth)]);
+    return { status: 200, data: { ...result, tasks: result.tasks.map(view) } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -155,10 +172,12 @@ export async function getProcess(input: {
   originId: string;
 }, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
-    const [tasks, all] = await Promise.all([
+    const [rows, all, view] = await Promise.all([
       taskService.getProcessTasks(input.originId),
       escalationService.getEscalationsByOriginId(input.originId),
+      taskViewFor(auth),
     ]);
+    const tasks = rows.map(view);
     // With a caller, only the escalations that caller may read.
     const scope = auth?.userId ? await getEscalationReadScope(auth.userId) : null;
     const escalations = scope ? all.filter((e) => scopeAdmits(scope, auth!.userId, e)) : all;
@@ -179,13 +198,13 @@ export async function getProcess(input: {
  */
 export async function getTask(input: {
   id: string;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
     const task = await taskService.getTask(input.id);
     if (!task) {
       return { status: 404, error: 'Task not found' };
     }
-    return { status: 200, data: task };
+    return { status: 200, data: (await taskViewFor(auth))(task) };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

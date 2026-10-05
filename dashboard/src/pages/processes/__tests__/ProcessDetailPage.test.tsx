@@ -147,6 +147,26 @@ describe('ProcessDetailPage', () => {
     expect(screen.getByText('1/2')).toBeInTheDocument();
   });
 
+  it('shows the run input when the server sends it, and no panels when it is withheld', () => {
+    const withData = makeTask({ envelope: '{"data":{"orderId":"A-1"}}' });
+    vi.mocked(useProcessDetail).mockReturnValue({
+      data: { origin_id: 'origin-1', tasks: [withData], escalations: [] },
+      isLoading: false,
+    } as any);
+    const { unmount } = renderPage();
+    expect(screen.getByText('Input')).toBeInTheDocument();
+    unmount();
+
+    const { envelope: _e, data: _d, metadata: _m, ...withheld } = makeTask({ status: 'in_progress' as any });
+    vi.mocked(useProcessDetail).mockReturnValue({
+      data: { origin_id: 'origin-1', tasks: [withheld], escalations: [] },
+      isLoading: false,
+    } as any);
+    renderPage();
+    expect(screen.queryByText('Input')).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting for task...')).not.toBeInTheDocument();
+  });
+
   it('shows loading skeleton when data is loading', () => {
     vi.mocked(useProcessDetail).mockReturnValue({
       data: undefined,
