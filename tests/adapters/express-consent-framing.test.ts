@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { existsSync } from 'fs';
+import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import path from 'path';
@@ -9,8 +10,20 @@ import { createApp } from '../../lib/http';
 
 // The consent page is never framed, and a host's own security policy is kept
 // alongside the consent page's.
-const DASHBOARD_BUILT = existsSync(path.resolve(__dirname, '..', '..', 'dashboard', 'dist', 'index.html'));
 let server: Server | null = null;
+let dist: string;
+
+// A minimal dashboard build, so the test runs without building the SPA.
+beforeAll(() => {
+  dist = mkdtempSync(path.join(tmpdir(), 'lt-dashboard-'));
+  writeFileSync(path.join(dist, 'index.html'), '<html><head></head><body></body></html>');
+  vi.spyOn(LTExpressAdapter.prototype as any, 'resolveDashboardDist').mockReturnValue(dist);
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
+  rmSync(dist, { recursive: true, force: true });
+});
 
 afterEach(async () => {
   if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
@@ -26,7 +39,7 @@ async function listen(hostPolicy?: string): Promise<string> {
   return `http://127.0.0.1:${(server!.address() as AddressInfo).port}`;
 }
 
-describe.skipIf(!DASHBOARD_BUILT)('consent page framing', () => {
+describe('consent page framing', () => {
   it('forbids framing when the host sets no policy', async () => {
     const res = await fetch(`${await listen()}/oauth/consent?client_id=x`);
     expect(res.headers.get('x-frame-options')).toBe('DENY');
