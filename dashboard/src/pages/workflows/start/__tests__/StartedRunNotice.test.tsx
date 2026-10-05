@@ -11,6 +11,9 @@ vi.mock('../../../../hooks/useEventContext', () => ({
   useEventStatus: () => ({ connected: true }),
 }));
 
+const apiFetch = vi.fn();
+vi.mock('../../../../api/client', () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }));
+
 import { InvokeFooter } from '../InvokeFooter';
 import { workflowEventPattern } from '../StartedRunNotice';
 
@@ -26,7 +29,11 @@ function renderStarted(executionPath: string | null = null) {
   );
 }
 
-beforeEach(() => { patterns = []; handler = null; });
+beforeEach(() => {
+  patterns = []; handler = null;
+  apiFetch.mockReset();
+  apiFetch.mockRejectedValue(new Error('Forbidden'));
+});
 
 describe('InvokeFooter — following a started run', () => {
   it('subscribes to nothing until a run has started', () => {
@@ -66,6 +73,14 @@ describe('InvokeFooter — following a started run', () => {
     act(() => handler!(event('system.workflow.wf-1.completed')));
     expect(screen.getByTestId('started-run')).toHaveTextContent('Completed');
     expect(screen.queryByTestId('started-run-result')).not.toBeInTheDocument();
+  });
+
+  it('a completed event without data reads the run\'s result through the API', async () => {
+    apiFetch.mockResolvedValue({ result: { type: 'return', data: { serialNumber: 'printer-09' } } });
+    renderStarted();
+    await act(async () => { handler!(event('system.workflow.wf-1.completed')); });
+    expect(apiFetch).toHaveBeenCalledWith('/workflows/wf-1/result');
+    expect(await screen.findByTestId('started-run-result')).toHaveTextContent('printer-09');
   });
 
   it('a failed event reads as failure', () => {

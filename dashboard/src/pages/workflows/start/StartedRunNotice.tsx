@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEventSubscriptions } from '../../../hooks/useEventContext';
+import { apiFetch } from '../../../api/client';
 import { JsonViewer } from '../../../components/common/data/JsonViewer';
 import { TreeNode } from '../../../components/common/data/json-viewer-nodes';
 import type { NatsLTEvent } from '../../../lib/nats/types';
@@ -36,8 +37,16 @@ export function useRunOutcome(workflowId: string): { outcome: RunOutcome; payloa
     workflowId ? [workflowEventPattern(workflowId, 'completed'), workflowEventPattern(workflowId, 'failed')] : [],
     (event: NatsLTEvent) => {
       if (event.workflowId !== workflowId) return;
-      setOutcome(event.type.endsWith('.failed') ? RUN_OUTCOMES.FAILED : RUN_OUTCOMES.COMPLETED);
+      const failed = event.type.endsWith('.failed');
+      setOutcome(failed ? RUN_OUTCOMES.FAILED : RUN_OUTCOMES.COMPLETED);
       setPayload(event.data);
+      // Events reach non-builders without data; the run's own person reads
+      // its result through the API instead.
+      if (!failed && event.data === undefined) {
+        apiFetch<{ result?: { data?: Record<string, unknown> } }>(`/workflows/${encodeURIComponent(workflowId)}/result`)
+          .then((res) => setPayload(res.result?.data))
+          .catch(() => { /* the outcome stands without its payload */ });
+      }
     },
   );
 
