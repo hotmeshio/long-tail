@@ -6,7 +6,10 @@ import sharp from 'sharp';
 import { callLLM } from '../../services/llm';
 import { LLM_MODEL_SECONDARY, LLM_MAX_TOKENS_VISION } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import { getStorageBackend } from '../../lib/storage';
+import { mayBuild } from '../../modules/capabilities';
+import { externalCaller, type ToolCallExtra } from './caller-auth';
 import { ANALYZE_IMAGE_PROMPT, DESCRIBE_IMAGE_PROMPT } from './vision-prompts';
 
 const MIME_MAP: Record<string, string> = {
@@ -32,6 +35,8 @@ const describeImageSchema = z.object({
   context: z.string().optional().describe('Optional context about the image'),
 });
 
+export const STORAGE_READ_DENIED = 'Reading an image from managed storage requires builder access; pass an https URL or a data URI';
+
 /**
  * Resolve an image reference to an LLM-ready content block.
  *
@@ -42,6 +47,7 @@ const describeImageSchema = z.object({
  */
 async function resolveImageContent(
   image: string,
+  extra?: ToolCallExtra,
 ): Promise<{ type: 'image_url'; image_url: { url: string } }> {
   // Already a data URI — pass through
   if (image.startsWith('data:')) {
@@ -53,7 +59,12 @@ async function resolveImageContent(
     return { type: 'image_url', image_url: { url: image } };
   }
 
-  // Storage path — strip file:// prefix if present, read via backend
+  // Storage path: reading managed files is a builder capability, as at
+  // /api/file-browser. Internal callers (compiled pipelines) pass no extra.
+  const caller = externalCaller(extra);
+  if (caller && !(await mayBuild(caller))) {
+    throw new Error(STORAGE_READ_DENIED);
+  }
   const storagePath = image.replace(/^file:\/\//, '');
   const backend = getStorageBackend();
   const { data } = await backend.read(storagePath);
@@ -88,7 +99,7 @@ function registerTools(srv: McpServer): void {
       description: 'Analyze an image and extract structured data: description, text content, and notable objects.',
       inputSchema: analyzeImageSchema,
     },
-    async (args: z.infer<typeof analyzeImageSchema>) => {
+    async (args: z.infer<typeof analyzeImageSchema>, extra?: ToolCallExtra) => {
       const { hasLLMApiKey } = await import('../../services/llm');
       if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
         return {
@@ -110,7 +121,7 @@ function registerTools(srv: McpServer): void {
 
       let response;
       try {
-        const imageContent = await resolveImageContent(args.image || (args as any).image_path);
+        const imageContent = await resolveImageContent(args.image || (args as any).image_path, extra);
         response = await callLLM({
           model: LLM_MODEL_SECONDARY,
           messages: [
@@ -173,7 +184,7 @@ function registerTools(srv: McpServer): void {
       description: 'Generate a detailed description of an image.',
       inputSchema: describeImageSchema,
     },
-    async (args: z.infer<typeof describeImageSchema>) => {
+    async (args: z.infer<typeof describeImageSchema>, extra?: ToolCallExtra) => {
       const { hasLLMApiKey } = await import('../../services/llm');
       if (!hasLLMApiKey(LLM_MODEL_SECONDARY)) {
         return {
@@ -197,7 +208,7 @@ function registerTools(srv: McpServer): void {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: [await resolveImageContent(args.image || (args as any).image_path) as any],
+            content: [await resolveImageContent(args.image || (args as any).image_path, extra) as any],
           },
         ],
         max_tokens: LLM_MAX_TOKENS_VISION,
@@ -238,7 +249,7 @@ export async function createVisionServer(options?: {
   const name = options?.name || 'long-tail-vision';
   const instance = new McpServer({ name, version: '1.0.0' });
   registerTools(instance);
-  loggerRegistry.info(`[lt-mcp:vision] ${name} ready (2 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:vision] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }
 
