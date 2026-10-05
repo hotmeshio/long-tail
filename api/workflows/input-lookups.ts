@@ -27,7 +27,7 @@ export async function getWorkflowInputLookups(
     }
 
     const user = auth.userId ? await userService.getUser(auth.userId) : null;
-    if (!canInvokeWorkflow(config, user?.roles ?? [], auth.role)) {
+    if (!canInvokeWorkflow(config, user?.roles ?? [])) {
       return { status: 403, error: 'Not authorized to invoke this workflow' };
     }
 

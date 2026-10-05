@@ -62,12 +62,17 @@ describe('listInvocableWorkflows', () => {
     expect(certified.tier).toBe('certified');
   });
 
-  it('a superadmin JWT with no user row still gets the full list', async () => {
+  it('a superadmin claim with no user row sees only open workflows, as invoke admits', async () => {
     mockGetUser.mockResolvedValue(null);
     const result = await listInvocableWorkflows({ userId: 'ghost', role: 'superadmin' });
+    expect(names(result)).toEqual(['openToAll']);
+  });
+
+  it('a superadmin grant in the database gets the full list', async () => {
+    mockGetUser.mockResolvedValue({ roles: [{ role: 'superadmin', type: 'superadmin' }] });
+    const result = await listInvocableWorkflows({ userId: 'u-super', role: 'member' });
     expect(names(result)).toContain('basicEcho');
     expect(names(result)).toContain('unregisteredFlow');
-    expect(names(result)).not.toContain('ltSystemFlow');
   });
 
   it('a caller with no grants sees only open workflows', async () => {

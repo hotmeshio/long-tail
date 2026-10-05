@@ -47,11 +47,18 @@ describe('getWorkflowInputLookups', () => {
     expect(mockResolve).toHaveBeenCalledWith(REFS);
   });
 
-  it('a superadmin reads every workflow\'s lookups', async () => {
+  it('a superadmin grant reads every workflow\'s lookups', async () => {
+    mockGetConfig.mockResolvedValue(config());
+    mockGetUser.mockResolvedValue({ roles: [{ role: 'superadmin', type: 'superadmin' }] } as any);
+    const result = await getWorkflowInputLookups({ type: 'fleetTools' }, { userId: 'u1', role: 'member' });
+    expect(result.status).toBe(200);
+  });
+
+  it('a superadmin claim without the grant is refused, as invoke refuses it', async () => {
     mockGetConfig.mockResolvedValue(config());
     mockGetUser.mockResolvedValue({ roles: [] } as any);
     const result = await getWorkflowInputLookups({ type: 'fleetTools' }, { userId: 'u1', role: 'superadmin' });
-    expect(result.status).toBe(200);
+    expect(result.status).toBe(403);
   });
 
   it('403s a caller the invoke gate refuses, with no knowledge read', async () => {
