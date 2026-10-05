@@ -29,9 +29,13 @@ export async function builtinServerFor(serverIdOrName: string): Promise<string |
   }) ?? null;
 }
 
-/** The capability a built-in tool's manifest gates it at. A tool without a gate needs builder. */
+/**
+ * The capability a built-in tool's manifest gates it at, from the manifest the
+ * server was registered with (Long Tail's or the host's). A tool without a gate needs builder.
+ */
 export function builtinToolGate(serverName: string, toolName: string): CapabilityGate {
-  const manifest = builtinMcpServerFactories[serverName]?.config?.toolManifest;
+  const manifest = mcpClient.getBuiltinToolManifest(serverName)
+    ?? builtinMcpServerFactories[serverName]?.config?.toolManifest;
   return manifest?.find((t) => t.name === toolName)?.gate ?? 'builder';
 }
 

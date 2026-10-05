@@ -1,5 +1,6 @@
 export {
   registerBuiltinServer,
+  getBuiltinToolManifest,
   connectToServer,
   disconnectFromServer,
   listServerTools,

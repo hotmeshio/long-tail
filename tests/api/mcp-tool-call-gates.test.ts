@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   callTool: vi.fn(),
   resolveBuiltinServerName: vi.fn(),
   callBuiltinToolAs: vi.fn(),
+  getBuiltinToolManifest: vi.fn(),
   access: vi.fn(),
   assertMayActAs: vi.fn(),
   getUser: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('../../services/mcp', () => ({ mcpRegistry: { current: { callTool: mocks
 vi.mock('../../services/mcp/client', () => ({
   resolveBuiltinServerName: mocks.resolveBuiltinServerName,
   callBuiltinToolAs: mocks.callBuiltinToolAs,
+  getBuiltinToolManifest: mocks.getBuiltinToolManifest,
 }));
 vi.mock('../../modules/capabilities', () => ({ capabilityAccess: () => mocks.access }));
 vi.mock('../../services/user', () => ({ getUser: mocks.getUser, getUserByExternalId: mocks.getUserByExternalId }));
@@ -38,6 +40,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.resolveBuiltinServerName.mockResolvedValue('long-tail-admin');
   mocks.callBuiltinToolAs.mockResolvedValue({ ok: true });
+  mocks.getBuiltinToolManifest.mockReturnValue(undefined);
+});
+
+describe('callMcpTool on a host-registered server', () => {
+  beforeEach(() => {
+    mocks.resolveBuiltinServerName.mockResolvedValue('host-slack');
+    mocks.getBuiltinToolManifest.mockReturnValue([{ name: 'send_message', gate: 'caller' }, { name: 'purge_channel' }]);
+  });
+
+  it('applies the gate the host declared on the tool', async () => {
+    mocks.access.mockResolvedValue(true);
+    const result = await callMcpTool({ id: 'host-slack', toolName: 'send_message' }, ME);
+    expect(mocks.access).toHaveBeenCalledWith('caller');
+    expect(result.status).toBe(200);
+  });
+
+  it('a host tool without a gate needs builder', async () => {
+    mocks.access.mockResolvedValue(false);
+    const result = await callMcpTool({ id: 'host-slack', toolName: 'purge_channel' }, ME);
+    expect(mocks.access).toHaveBeenCalledWith('builder');
+    expect(result.status).toBe(403);
+  });
 });
 
 describe('callMcpTool on a built-in server', () => {

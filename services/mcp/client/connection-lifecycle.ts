@@ -6,7 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../../../lib/logger';
 import * as mcpDbService from '../db';
-import type { LTMcpServerRecord, LTMcpToolManifest } from '../../../types';
+import type { LTMcpServerRecord, LTMcpToolManifest, LTToolManifestEntry } from '../../../types';
 
 /** In-memory map of server ID/name to active MCP client */
 const clients = new Map<string, Client>();
@@ -17,6 +17,9 @@ const clients = new Map<string, Client>();
  * rather than external stdio/SSE connections.
  */
 const builtinFactories = new Map<string, () => Promise<any>>();
+
+/** Tool manifests declared with a built-in factory (Long Tail's or the host's), keyed by server name. */
+const builtinManifests = new Map<string, LTToolManifestEntry[]>();
 
 /**
  * Cached built-in McpServer instances -- keyed by canonical server name.
@@ -47,8 +50,16 @@ export function getBuiltinServers(): Map<string, any> {
 export function registerBuiltinServer(
   name: string,
   factory: () => Promise<any>,
+  toolManifest?: LTToolManifestEntry[],
 ): void {
   builtinFactories.set(name, factory);
+  if (toolManifest) builtinManifests.set(name, toolManifest);
+  else builtinManifests.delete(name);
+}
+
+/** The tool manifest a built-in server was registered with, if any. */
+export function getBuiltinToolManifest(name: string): LTToolManifestEntry[] | undefined {
+  return builtinManifests.get(name);
 }
 
 /**
