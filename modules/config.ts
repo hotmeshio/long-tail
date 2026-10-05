@@ -1,3 +1,9 @@
+/** A positive integer from the environment, or the default when unset or malformed. */
+function positiveInt(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 export const config = {
   POSTGRES_HOST: process.env.POSTGRES_HOST || 'localhost',
   POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5415', 10),
@@ -16,11 +22,16 @@ export const config = {
   /** A subscribe-only NATS credential for browsers that connect without the proxy. */
   NATS_DASHBOARD_TOKEN: process.env.NATS_DASHBOARD_TOKEN || '',
   /** How long a browser's WebSocket proxy ticket admits an upgrade. The dashboard fetches one per attempt. */
-  NATS_WS_TICKET_TTL_SECONDS: parseInt(process.env.NATS_WS_TICKET_TTL_SECONDS || '300', 10),
-  /** Dashboard reconnect backoff: first delay, delay cap, and how long a drop lasts before the banner shows. */
-  NATS_RECONNECT_INITIAL_MS: parseInt(process.env.NATS_RECONNECT_INITIAL_MS || '1000', 10),
-  NATS_RECONNECT_MAX_MS: parseInt(process.env.NATS_RECONNECT_MAX_MS || '60000', 10),
-  NATS_LIVE_NOTICE_AFTER_MS: parseInt(process.env.NATS_LIVE_NOTICE_AFTER_MS || '30000', 10),
+  NATS_WS_TICKET_TTL_SECONDS: positiveInt('NATS_WS_TICKET_TTL_SECONDS', 300),
+  /**
+   * Dashboard reconnect: first backoff delay, delay cap, how long a drop lasts
+   * before the banner shows, and the window the first retry and catch-up
+   * refetch spread across.
+   */
+  NATS_RECONNECT_INITIAL_MS: positiveInt('NATS_RECONNECT_INITIAL_MS', 1000),
+  NATS_RECONNECT_MAX_MS: positiveInt('NATS_RECONNECT_MAX_MS', 60000),
+  NATS_LIVE_NOTICE_AFTER_MS: positiveInt('NATS_LIVE_NOTICE_AFTER_MS', 30000),
+  NATS_RECONNECT_SPREAD_MS: positiveInt('NATS_RECONNECT_SPREAD_MS', 5000),
 
   PORT: parseInt(process.env.PORT || '3000', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',

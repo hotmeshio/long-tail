@@ -229,6 +229,7 @@ describe('getSettings — environment', () => {
       initialDelayMs: config.NATS_RECONNECT_INITIAL_MS,
       maxDelayMs: config.NATS_RECONNECT_MAX_MS,
       noticeAfterMs: config.NATS_LIVE_NOTICE_AFTER_MS,
+      spreadMs: config.NATS_RECONNECT_SPREAD_MS,
     });
   });
 

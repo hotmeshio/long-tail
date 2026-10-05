@@ -12,7 +12,7 @@ import { NatsProvider, useNatsStatus, useNatsSubscription } from '../useNats';
 import type { NatsCredentials } from '../../lib/nats/credentials';
 
 const connectMock = vi.mocked(connect) as unknown as ReturnType<typeof vi.fn>;
-const POLICY = { initialDelayMs: 1, maxDelayMs: 4, noticeAfterMs: 30 };
+const POLICY = { initialDelayMs: 1, maxDelayMs: 4, noticeAfterMs: 30, spreadMs: 2 };
 const hang = () => new Promise<never>(() => {});
 
 /** A fake connection whose `closed()` settles when `drop()` is called. */
@@ -30,7 +30,7 @@ function fakeConnection() {
 
 const ok = (url: string): NatsCredentials => ({ kind: 'ok', url, token: null });
 
-function wrapperFor(props: { resolveCredentials: () => Promise<NatsCredentials>; onReconnect?: () => void }) {
+function wrapperFor(props: { resolveCredentials: () => Promise<NatsCredentials>; onReconnect?: () => void; sessionKey?: unknown }) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <NatsProvider policy={POLICY} {...props}>{children}</NatsProvider>;
   };
@@ -154,5 +154,39 @@ describe('NatsProvider reconnect loop', () => {
     succeed = true;
     await waitFor(() => expect(result.current.connected).toBe(true));
     expect(result.current.unavailable).toBe(false);
+  });
+
+  it('retries at once when the browser comes back online', async () => {
+    connectMock.mockResolvedValue(fakeConnection().nc);
+    const resolveCredentials = vi.fn()
+      .mockResolvedValueOnce({ kind: 'unavailable' })
+      .mockResolvedValue(ok('wss://h'));
+    const slow = { ...POLICY, initialDelayMs: 60_000, maxDelayMs: 60_000 };
+    const { result } = renderHook(() => useNatsStatus(), {
+      wrapper: ({ children }: { children: ReactNode }) => <NatsProvider policy={slow} resolveCredentials={resolveCredentials}>{children}</NatsProvider>,
+    });
+    await waitFor(() => expect(resolveCredentials).toHaveBeenCalledTimes(1));
+    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    expect(resolveCredentials).toHaveBeenCalledTimes(2);
+  });
+
+  it('a new session restarts a loop the ended session stopped', async () => {
+    connectMock.mockResolvedValue(fakeConnection().nc);
+    const resolveCredentials = vi.fn()
+      .mockResolvedValueOnce({ kind: 'session-ended' })
+      .mockResolvedValue(ok('wss://h'));
+    let session = 'signed-out';
+    const { result, rerender } = renderHook(() => useNatsStatus(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <NatsProvider policy={POLICY} resolveCredentials={resolveCredentials} sessionKey={session}>{children}</NatsProvider>
+      ),
+    });
+    await waitFor(() => expect(resolveCredentials).toHaveBeenCalledTimes(1));
+    expect(connectMock).not.toHaveBeenCalled();
+
+    session = 'signed-in';
+    rerender();
+    await waitFor(() => expect(result.current.connected).toBe(true));
   });
 });

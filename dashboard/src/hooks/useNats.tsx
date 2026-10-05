@@ -11,7 +11,7 @@ import { connect, type NatsConnection, type Subscription, StringCodec } from 'na
 
 import { NATS_WS_URL, NATS_TOKEN } from '../lib/nats/config';
 import type { NatsCredentials } from '../lib/nats/credentials';
-import { DEFAULT_RECONNECT_POLICY, reconnectDelay, type ReconnectPolicy } from '../lib/nats/reconnect';
+import { DEFAULT_RECONNECT_POLICY, reconnectDelay, spreadDelay, type ReconnectPolicy } from '../lib/nats/reconnect';
 import type { NatsLTEvent, NatsEventHandler } from '../lib/nats/types';
 import { subjectMatchesPattern } from '../lib/events/matching';
 import { EventContext } from './useEventContext';
@@ -204,6 +204,7 @@ export function NatsProvider({
     let hadConnection = false;
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let refetchTimer: ReturnType<typeof setTimeout> | undefined;
     setSessionEnded(false);
 
     const isHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
@@ -217,9 +218,9 @@ export function NatsProvider({
         : { kind: 'unavailable' };
     };
 
-    const schedule = () => {
+    const schedule = (delay = reconnectDelay(attempt++, latest.current.policy)) => {
       if (disposed || stopped) return;
-      timer = setTimeout(attemptConnection, reconnectDelay(attempt++, latest.current.policy));
+      timer = setTimeout(attemptConnection, delay);
     };
 
     const watch = (nc: NatsConnection) => {
@@ -228,7 +229,9 @@ export function NatsProvider({
         ncRef.current = null;
         brokerSubsRef.current.clear();
         setConnected(false);
-        schedule();
+        // Every tab loses its connection at once on a deploy; spread the
+        // first retry so they do not all return in the same second.
+        schedule(spreadDelay(latest.current.policy));
       });
     };
 
@@ -268,7 +271,9 @@ export function NatsProvider({
         for (const pattern of listenersRef.current.keys()) {
           openBrokerSub(pattern);
         }
-        if (hadConnection) latest.current.onReconnect?.();
+        if (hadConnection) {
+          refetchTimer = setTimeout(() => latest.current.onReconnect?.(), spreadDelay(latest.current.policy));
+        }
         hadConnection = true;
         watch(nc);
       } catch {
@@ -292,6 +297,7 @@ export function NatsProvider({
     return () => {
       disposed = true;
       if (timer) clearTimeout(timer);
+      if (refetchTimer) clearTimeout(refetchTimer);
       document.removeEventListener('visibilitychange', resume);
       window.removeEventListener('online', resume);
       for (const sub of brokerSubsRef.current.values()) {

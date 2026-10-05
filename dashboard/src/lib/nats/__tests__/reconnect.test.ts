@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
-import { DEFAULT_RECONNECT_POLICY, reconnectDelay, resolveReconnectPolicy } from '../reconnect';
+import { DEFAULT_RECONNECT_POLICY, reconnectDelay, resolveReconnectPolicy, spreadDelay } from '../reconnect';
 
-const policy = { initialDelayMs: 1_000, maxDelayMs: 60_000, noticeAfterMs: 30_000 };
+const policy = { initialDelayMs: 1_000, maxDelayMs: 60_000, noticeAfterMs: 30_000, spreadMs: 5_000 };
 
 describe('reconnectDelay', () => {
   it('doubles from the initial delay', () => {
@@ -26,10 +26,18 @@ describe('reconnectDelay', () => {
   });
 });
 
+describe('spreadDelay', () => {
+  it('lands anywhere across the spread window', () => {
+    expect(spreadDelay(policy, () => 0)).toBe(0);
+    expect(spreadDelay(policy, () => 0.5)).toBe(2_500);
+    expect(spreadDelay(policy, () => 1)).toBe(5_000);
+  });
+});
+
 describe('resolveReconnectPolicy', () => {
   it('uses the server values', () => {
-    expect(resolveReconnectPolicy({ initialDelayMs: 500, maxDelayMs: 10_000, noticeAfterMs: 5_000 }))
-      .toEqual({ initialDelayMs: 500, maxDelayMs: 10_000, noticeAfterMs: 5_000 });
+    expect(resolveReconnectPolicy({ initialDelayMs: 500, maxDelayMs: 10_000, noticeAfterMs: 5_000, spreadMs: 2_000 }))
+      .toEqual({ initialDelayMs: 500, maxDelayMs: 10_000, noticeAfterMs: 5_000, spreadMs: 2_000 });
   });
 
   it('defaults missing or invalid values', () => {

@@ -21,7 +21,7 @@ GET /api/settings
   "events": {
     "transport": "socketio",
     "natsWsUrl": null,
-    "reconnect": { "initialDelayMs": 1000, "maxDelayMs": 60000, "noticeAfterMs": 30000 }
+    "reconnect": { "initialDelayMs": 1000, "maxDelayMs": 60000, "noticeAfterMs": 30000, "spreadMs": 5000 }
   },
   "auth": {
     "sso": false,
@@ -45,6 +45,7 @@ GET /api/settings
 | `events.reconnect.initialDelayMs` | `number` | First delay before the dashboard retries a dropped event connection. Read from `NATS_RECONNECT_INITIAL_MS` (default `1000`). |
 | `events.reconnect.maxDelayMs` | `number` | Upper bound on the retry delay as it backs off. Read from `NATS_RECONNECT_MAX_MS` (default `60000`). |
 | `events.reconnect.noticeAfterMs` | `number` | How long the connection may stay down before the dashboard shows a notice. Read from `NATS_LIVE_NOTICE_AFTER_MS` (default `30000`). |
+| `events.reconnect.spreadMs` | `number` | Window the first retry after a drop, and the catch-up refetch after reconnecting, are spread across, so tabs return gradually after a deploy. Read from `NATS_RECONNECT_SPREAD_MS` (default `5000`). |
 | `auth.sso` | `boolean` | Whether SSO is configured for embedded deployments. When `true`, the dashboard auto-exchanges host auth for an LT JWT instead of showing the login form. |
 | `auth.ssoLogoutUrl` | `string \| null` | URL to redirect the browser on logout. Set by the host via `sso.logoutUrl` in the startup config. When `null`, the dashboard shows its own login page on logout. |
 | `ai.enabled` | `boolean` | Whether an LLM API key is configured. When `false`, the dashboard hides AI-specific features (pipelines designer, AI assistant, triage). |
