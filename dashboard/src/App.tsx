@@ -296,15 +296,19 @@ const router = createBrowserRouter([
       // Capabilities (all authenticated users)
       { path: 'capabilities', element: <Lazy><CapabilitiesPage /></Lazy> },
 
-      // Agents section (all authenticated users)
-      { path: 'agents', element: <Lazy><AgentsPage /></Lazy> },
-      { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
-      { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
-      { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
-
-      // Topics section (all authenticated users)
-      { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
-      { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
+      // Agents and topics (builder: superadmin or engineer), matching the
+      // sidebar and the server's write gates
+      {
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
+        children: [
+          { path: 'agents', element: <Lazy><AgentsPage /></Lazy> },
+          { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
+          { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
+          { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
+          { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
+          { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
+        ],
+      },
 
       // Invoke: open to anyone the server lists an invokable workflow for
       {
