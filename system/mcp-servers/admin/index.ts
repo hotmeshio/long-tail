@@ -35,6 +35,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { registeredToolCount } from '../../../services/mcp/registered-tools';
 
 import { registerTaskTools } from './tasks';
 import { registerEscalationTools } from './escalations';
@@ -58,7 +59,6 @@ import { registerDiagnosticsTools } from './diagnostics';
 import { registerScanCodeTools } from './scan-codes';
 import { registerDomainContextTools } from './domain-context';
 import { registerAnnouncementTools } from './announcements';
-import { ADMIN_TOOLS } from '../../seed/tool-manifests-admin';
 
 let server: McpServer | null = null;
 
@@ -98,7 +98,7 @@ export async function createAdminServer(options?: {
   registerDomainContextTools(instance);
   registerAnnouncementTools(instance);
 
-  loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${ADMIN_TOOLS.length} tools registered)`);
+  loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }
 

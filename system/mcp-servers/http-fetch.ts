@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as http from '../activities/http';
 
 const httpRequestSchema = z.object({
@@ -79,6 +80,6 @@ export async function createHttpFetchServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:http-fetch] ${name} ready (3 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:http-fetch] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }

@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as oauth from '../activities/oauth';
 import { resolveCapabilities } from '../../modules/capabilities';
 import { externalCaller, type ToolCallExtra } from './caller-auth';
@@ -103,6 +104,6 @@ export async function createOAuthServer(): Promise<McpServer> {
     },
   );
 
-  loggerRegistry.info('[lt-mcp:oauth] long-tail-oauth ready (3 tools registered)');
+  loggerRegistry.info(`[lt-mcp:oauth] long-tail-oauth ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }

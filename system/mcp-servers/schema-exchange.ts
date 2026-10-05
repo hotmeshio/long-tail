@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as schemaExchange from '../activities/schema-exchange';
 
 const exchangeSchema = z.object({
@@ -70,6 +71,6 @@ export async function createSchemaExchangeServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:schema-exchange] ${name} ready (2 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:schema-exchange] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }

@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import { publishFileEvent } from '../../lib/events/publish';
 import * as fileStorage from '../activities/file-storage';
 
@@ -109,6 +110,6 @@ export async function createFileStorageServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:file-storage] ${name} ready (4 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:file-storage] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }
