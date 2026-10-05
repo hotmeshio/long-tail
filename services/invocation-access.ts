@@ -43,9 +43,11 @@ export function mayActAs(caller: readonly InvocationRoleGrant[], target: readonl
   ));
 }
 
-/** Superadmin anywhere, or the named admin role held as admin type, invokes every workflow. */
-export function hasGlobalInvocationAccess(roles: readonly InvocationRoleGrant[], authRole?: string): boolean {
-  if (authRole === INVOCATION_ROLE_TYPES.SUPERADMIN) return true;
+/**
+ * Superadmin anywhere, or the named admin role held as admin type, invokes
+ * every workflow. Decided from grants only, never a token's role claim.
+ */
+export function hasGlobalInvocationAccess(roles: readonly InvocationRoleGrant[]): boolean {
   return roles.some((r) => r.type === INVOCATION_ROLE_TYPES.SUPERADMIN)
     || roles.some((r) => r.role === ADMIN_ROLE && r.type === INVOCATION_ROLE_TYPES.ADMIN);
 }
@@ -59,12 +61,11 @@ export function hasGlobalInvocationAccess(roles: readonly InvocationRoleGrant[],
 export function canInvokeWorkflow(
   config: Pick<LTWorkflowConfig, 'invocable' | 'invocation_roles'> & { workflow_type?: string },
   roles: readonly InvocationRoleGrant[],
-  authRole?: string,
 ): boolean {
   if (!config.invocable) return false;
   if (config.workflow_type && SYSTEM_AUTHORITY_WORKFLOWS.has(config.workflow_type)) return holdsSuperadmin(roles);
   if (config.invocation_roles.length === 0) return true;
-  if (hasGlobalInvocationAccess(roles, authRole)) return true;
+  if (hasGlobalInvocationAccess(roles)) return true;
   const held = new Set(roles.map((r) => r.role));
   return config.invocation_roles.some((r) => held.has(r));
 }
