@@ -82,14 +82,16 @@ POST /api/mcp/servers
 **Transport config for `sse`:**
 
 ```json
-{ "url": "http://localhost:3001/sse" }
+{ "url": "http://localhost:3001/sse", "headers": { "Authorization": "Bearer <token>" } }
 ```
 
 **Transport config for `streamable-http`:**
 
 ```json
-{ "url": "http://localhost:3001/mcp" }
+{ "url": "http://localhost:3001/mcp", "headers": { "Authorization": "Bearer <token>" } }
 ```
+
+`headers` is optional and is sent with every request to the server, the SSE stream included. Like the rest of `transport_config`, it is returned only to builders.
 
 **Response 201:** Created server record.
 

@@ -611,7 +611,9 @@ Point Long Tail at a URL. The server runs elsewhere.
 }
 ```
 
-For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`.
+For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`. A server that authenticates its callers takes `headers`, sent with every request: `"transport_config": { "url": "...", "headers": { "Authorization": "Bearer <token>" } }`.
+
+**Another Long Tail instance.** Its `/mcp` is a remote server like any other. On the remote instance, create a service account with the roles the connection should act under and an API key (`mcp:read` or `mcp:full`). On this instance, register `https://<remote-host>/mcp` as `streamable-http` with `"headers": { "Authorization": "Bearer <the key>" }`. The remote lists and runs only the tools that account's roles allow, and records every call as that account.
 
 **Dashboard:** Select **Network Service**, enter the URL, choose SSE or Streamable HTTP, walk through Discovery/Test/Review.
 

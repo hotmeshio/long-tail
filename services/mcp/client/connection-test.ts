@@ -1,7 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { createNetworkTransport } from './network-transport';
 
 import type { LTMcpToolManifest } from '../../../types';
 
@@ -24,10 +23,8 @@ export async function testConnection(
         args: transportConfig.args || [],
         env: transportConfig.env,
       });
-    } else if (transportType === 'streamable-http') {
-      transport = new StreamableHTTPClientTransport(new URL(transportConfig.url!));
     } else {
-      transport = new SSEClientTransport(new URL(transportConfig.url!));
+      transport = createNetworkTransport(transportType, transportConfig);
     }
 
     await client.connect(transport);

@@ -1,10 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { createNetworkTransport } from './network-transport';
 import * as mcpDbService from '../db';
 import type { LTMcpServerRecord, LTMcpToolManifest, LTToolManifestEntry } from '../../../types';
 
@@ -119,10 +118,8 @@ export async function connectToServer(server: LTMcpServerRecord): Promise<Client
       args: server.transport_config.args || [],
       env: server.transport_config.env,
     });
-  } else if (ttype === 'streamable-http') {
-    transport = new StreamableHTTPClientTransport(new URL(server.transport_config.url!));
   } else {
-    transport = new SSEClientTransport(new URL(server.transport_config.url!));
+    transport = createNetworkTransport(ttype === 'streamable-http' ? 'streamable-http' : 'sse', server.transport_config);
   }
 
   await client.connect(transport);
