@@ -25,13 +25,18 @@ export async function currentToolPrincipal(): Promise<ToolPrincipal | null> {
   return { userId: user.id, access: capabilityAccess({ userId: user.id }) };
 }
 
-/** The built-in server a tool belongs to when the principal may call it; undefined when refused; null for an external server. */
+/**
+ * The built-in server a tool belongs to when the principal may call it; null
+ * for an external server the principal may call; undefined when refused. An
+ * external server's tools run on its stored credential (a remote Long Tail's
+ * service-account key, say), so they are a builder's to call.
+ */
 export async function permittedBuiltin(
   principal: ToolPrincipal,
   serverName: string,
   toolName: string,
 ): Promise<string | null | undefined> {
   const builtin = await builtinServerFor(serverName);
-  if (!builtin) return null;
+  if (!builtin) return (await principal.access('builder')) ? null : undefined;
   return (await principal.access(builtinToolGate(builtin, toolName))) ? builtin : undefined;
 }

@@ -9,6 +9,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
     - [Compiled Workflows as Tools](#compiled-workflows-as-tools)
     - [The Cycle](#the-cycle)
 - [Connecting an Agent to Long Tail](#connecting-an-agent-to-long-tail) — the `/mcp` endpoint, service accounts, multi-environment `.mcp.json`, example prompts
+- [Connecting Long Tail Instances](#connecting-long-tail-instances): one instance calling another's tools over MCP
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
 - [Document Vision Server](#document-vision-server): AI tools as MCP tools
 - [Server Registration Lifecycle](#server-registration-lifecycle) — two paths, startup sequence, when things connect
@@ -171,7 +172,7 @@ A deployment can also be set read-only as a whole with `mcp.exposure.readOnly` i
 |---|---|---|
 | Caller | Any account | Escalations, tasks, workflow invocation, a run's status and execution history (for a builder, or the person who started the run or it runs as), scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
 | Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, assigning and removing a user's roles |
-| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections, control plane, workflow envelopes and state exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
+| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections and calling an external server's tools, control plane, workflow envelopes and state exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
 | Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
 | Superadmin | Superadmin | Other users' OAuth connections, the human-queue tools workflows use to create and resolve escalations |
 
@@ -229,7 +230,7 @@ Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, 
 
 ### 1. Create a service account
 
-In the dashboard: **Admin → Bot Accounts → Create**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
+In the dashboard: create one under **Accounts → Service Accounts**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
 
 Give each environment its own account and key, scoped to the least it needs.
 
@@ -298,6 +299,63 @@ The full tool reference is in [the admin server doc](api/mcp/admin.md). A read k
 
 **Settings** — *read*
 - "What versions and features is this deployment running?"
+
+## Connecting Long Tail Instances
+
+One Long Tail instance can call another's tools over MCP. Each instance keeps its own database, roles, queues and workflows; the connection is a registered MCP server on the calling instance that points at the other instance's `/mcp`, authenticated with a service account the other instance issues. Separate teams (engineering, operations, sales) can each run an instance, and a shared instance can reach into all of them, without either side sharing a database or a login.
+
+### Set up the connection
+
+**On the instance being called (the remote):**
+
+1. Create a service account under **Accounts → Service Accounts**, or `POST /api/bot-accounts`. Give it the roles the connection should act under, and nothing more.
+2. Generate an API key for it with the scope the connection needs: `mcp:read` for a connection that only reads and runs read-safe workflows, `mcp:full` for one that also claims, resolves and invokes. The raw key is shown once.
+
+**On the calling instance:**
+
+3. Register the remote's `/mcp` as a network server. In the dashboard: **Servers & Tools → Register Server**, choose **Network Service**, enter `https://<remote-host>/mcp`, choose **Streamable HTTP**, and put the key in **Headers (JSON)** as `{ "Authorization": "Bearer <key>" }`. Or over the API:
+
+```bash
+curl -X POST https://<this-host>/api/mcp/servers \
+  -H "Authorization: Bearer $LT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "operations-longtail",
+    "transport_type": "streamable-http",
+    "transport_config": {
+      "url": "https://ops.example.com/mcp",
+      "headers": { "Authorization": "Bearer <remote service-account key>" }
+    },
+    "tags": ["longtail", "operations"],
+    "auto_connect": true
+  }'
+```
+
+4. Test and connect: the **Test** step (or `POST /api/mcp/servers/test-connection`) lists the tools the remote offers this account; `POST /api/mcp/servers/:id/connect` connects and caches the tool list. With `auto_connect: true` the connection opens at every start.
+
+Registration, testing and connecting require builder access on the calling instance.
+
+### What each side enforces
+
+**The remote decides what the connection can do.** It treats the connection as its service account: it lists only the tools that account's roles allow, applies the key's scope (`mcp:read` sees read-only tools), honors its own `mcp.exposure` settings, filters every result to the account's read scope, and records every action as that account. Changing the account's roles on the remote changes what the connection can do on the next call.
+
+**The calling instance decides who may use the connection.** The stored key carries the remote account's authority, so calling an external server's tools directly is a builder capability: over REST (`POST /api/mcp/servers/:id/tools/:tool/call`) and in AI tool loops, a person without builder access is refused. Workflows and compiled pipelines that a builder deploys call the remote as part of their own run, which is how everyone else reaches it: through a deployed workflow, with its own invocation roles, rather than through the raw connection.
+
+The key is part of `transport_config`, which is returned only to builders.
+
+### Keys
+
+- **Rotate:** generate a new key on the remote, update the server's headers on the calling instance (`PUT /api/mcp/servers/:id`, or edit the server), then revoke the old key on the remote.
+- **Revoke:** revoking the key on the remote ends the connection on its next call.
+- **One account per connection:** give each calling instance its own service account on the remote, so each connection's access and audit trail stay separate.
+
+### Troubleshooting
+
+| Symptom | Meaning |
+|---|---|
+| Test fails with `Unauthorized` | The remote rejected the key: missing, mistyped, revoked, or not sent (check **Headers**) |
+| A tool is missing from the list | The remote account's roles do not allow it, or the key is `mcp:read` and the tool changes state |
+| A call answers `Tool ... not found` | The same: the remote does not offer that tool to this account |
+| A call answers `need builder access` | The calling instance refused it: calling external tools directly needs builder access there |
 
 ## Human Queue Server
 
@@ -613,7 +671,7 @@ Point Long Tail at a URL. The server runs elsewhere.
 
 For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`. A server that authenticates its callers takes `headers`, sent with every request: `"transport_config": { "url": "...", "headers": { "Authorization": "Bearer <token>" } }`.
 
-**Another Long Tail instance.** Its `/mcp` is a remote server like any other. On the remote instance, create a service account with the roles the connection should act under and an API key (`mcp:read` or `mcp:full`). On this instance, register `https://<remote-host>/mcp` as `streamable-http` with `"headers": { "Authorization": "Bearer <the key>" }`. The remote lists and runs only the tools that account's roles allow, and records every call as that account.
+**Another Long Tail instance** is a remote server like any other. See [Connecting Long Tail Instances](#connecting-long-tail-instances).
 
 **Dashboard:** Select **Network Service**, enter the URL, choose SSE or Streamable HTTP, walk through Discovery/Test/Review.
 

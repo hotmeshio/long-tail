@@ -111,12 +111,21 @@ describe('callMcpTool on a built-in server', () => {
 });
 
 describe('callMcpTool on an external server', () => {
-  it('passes through to the adapter with the caller identity', async () => {
+  it('a builder passes through to the adapter with the caller identity', async () => {
     mocks.resolveBuiltinServerName.mockResolvedValue(null);
+    mocks.access.mockResolvedValue(true);
     mocks.callTool.mockResolvedValue({ remote: true });
     const result = await callMcpTool({ id: 'remote-1', toolName: 'search' }, ME);
     expect(result.status).toBe(200);
+    expect(mocks.access).toHaveBeenCalledWith('builder');
     expect(mocks.callTool).toHaveBeenCalledWith('remote-1', 'search', { user_id: ME.userId }, { userId: ME.userId });
-    expect(mocks.access).not.toHaveBeenCalled();
+  });
+
+  it('anyone else is refused: the server\'s stored credential carries its authority', async () => {
+    mocks.resolveBuiltinServerName.mockResolvedValue(null);
+    mocks.access.mockResolvedValue(false);
+    const result = await callMcpTool({ id: 'remote-1', toolName: 'search' }, ME);
+    expect(result.status).toBe(403);
+    expect(mocks.callTool).not.toHaveBeenCalled();
   });
 });

@@ -242,7 +242,7 @@ POST /api/mcp/servers/:id/tools/:toolName/call
 
 Invoke a tool on a connected MCP server.
 
-**Auth:** The tool runs as the caller, or as the `execute_as` account when given. A built-in tool requires the capability its manifest `gate` declares, checked for the acting account; a built-in tool with no gate requires builder access. `execute_as` follows the act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type.
+**Auth:** The tool runs as the caller, or as the `execute_as` account when given. A built-in tool requires the capability its manifest `gate` declares, checked for the acting account; a built-in tool with no gate requires builder access. A tool on an external server (any registered network or local-process server) requires builder access, since it runs on the credential stored with that server. `execute_as` follows the act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type.
 
 **Request body:**
 

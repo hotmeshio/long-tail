@@ -72,4 +72,16 @@ describe('loadToolsFromServers for a workflow principal', () => {
     const { toolIds } = await loadToolsFromServers(undefined, { toolServerMap: new Map(), toolDefCache: new Map() });
     expect(toolIds).toHaveLength(2);
   });
+
+  it('an external server\'s tools are a builder\'s: refused for anyone else, listed and run for a builder', async () => {
+    mocks.builtinServerFor.mockResolvedValue(null);
+    const external = () => ({ toolServerMap: new Map([['remote_longtail__find_escalations', 'remote-longtail']]), yamlWorkflowMap: new Map() });
+    const refused = await callTool('remote_longtail__find_escalations', {}, external());
+    expect(refused).toMatchObject({ error: expect.stringContaining('not available') });
+    expect(mocks.callServerTool).not.toHaveBeenCalled();
+
+    mocks.access.mockImplementation(async () => true);
+    await callTool('remote_longtail__find_escalations', {}, external());
+    expect(mocks.callServerTool).toHaveBeenCalled();
+  });
 });

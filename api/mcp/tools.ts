@@ -120,6 +120,11 @@ export async function callMcpTool(
       return { status: 200, data: { result } };
     }
 
+    // An external server's tools run on its stored credential (headers, env),
+    // which carries that server's authority: a builder's to use.
+    if (!(await capabilityAccess({ userId: actor.userId })('builder'))) {
+      return { status: 403, error: `Forbidden: tools on an external MCP server need builder access` };
+    }
     const adapter = mcpRegistry.current;
     if (!adapter) {
       return { status: 400, error: 'MCP adapter not registered' };
