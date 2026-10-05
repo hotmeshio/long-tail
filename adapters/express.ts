@@ -144,10 +144,11 @@ export class LTExpressAdapter {
 
       router.get('/{*splat}', (req, res) => {
         // The consent page grants access to a person's account: never inside
-        // another site's frame. A host's own security policy is kept.
+        // a frame. Browsers enforce every CSP header, so appending a second
+        // policy keeps the host's and still refuses framing.
         if (req.path.startsWith(CONSENT_PAGE_PATH)) {
           res.setHeader('X-Frame-Options', 'DENY');
-          if (!res.getHeader('Content-Security-Policy')) res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+          res.append('Content-Security-Policy', "frame-ancestors 'none'");
         }
         const html = (cachedIndex ?? readFileSync(indexPath, 'utf-8')).replace(
           '<head>',
