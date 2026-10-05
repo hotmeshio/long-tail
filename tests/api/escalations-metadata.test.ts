@@ -116,6 +116,16 @@ describe('findByMetadata', () => {
     expect(result.data.total).toBe(1);
     expect(result.data.escalations).toHaveLength(1);
   });
+
+  it('a caller with no roles sees nothing and makes no query', async () => {
+    mockHasGlobalAccess.mockResolvedValue(false);
+    mockGetUserRoles.mockResolvedValue([]);
+
+    const result = await findByMetadata({ key: 'orderId', value: 'order-123' }, SYSTEM_AUTH);
+
+    expect(result).toEqual({ status: 200, data: { escalations: [], total: 0 } });
+    expect(mockFindByMetadata).not.toHaveBeenCalled();
+  });
 });
 
 // ── claimByMetadata ─────────────────────────────────────────────────────

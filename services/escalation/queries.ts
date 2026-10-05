@@ -375,7 +375,10 @@ function narrowRoleWithinScope(
   role: string | undefined,
   visibleRoles: string[] | undefined,
 ): { role?: string; roles?: string[]; empty: boolean } {
-  if (!role || !visibleRoles) return { role, roles: visibleRoles, empty: false };
+  if (!visibleRoles) return { role, roles: undefined, empty: false };
+  // An empty scope sees nothing; the SDK would read an empty list as no filter.
+  if (visibleRoles.length === 0) return { empty: true };
+  if (!role) return { roles: visibleRoles, empty: false };
   if (!visibleRoles.includes(role)) return { empty: true };
   return { role, roles: undefined, empty: false };
 }
