@@ -6,7 +6,9 @@
  * streamable-http transport protocol.
  *
  * Stateless mode — each POST creates a fresh server+transport pair.
- * Auth via Bearer token (JWT or bot API key) in the Authorization header.
+ * Auth via Bearer token (JWT, bot API key, or OAuth access token) in the
+ * Authorization header.
+ * The caller sees only the tools whose manifest gate they hold.
  *
  * Mount at /mcp:
  *   POST /mcp  → JSON-RPC messages (initialize, tools/list, tools/call)
@@ -14,22 +16,30 @@
  *   DELETE /mcp → 405 (no sessions in stateless mode)
  */
 
-import { Router } from 'express';
+import { Router } from '../lib/http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
-import { requireAuth } from '../modules/auth';
+import { requireMcpAuth } from '../modules/mcp-auth';
+import { capabilityAccess } from '../modules/capabilities';
 import { loggerRegistry } from '../lib/logger';
 import { createUnifiedMcpServer } from '../services/mcp/external-server';
 import { getExposureConfig } from '../services/mcp/exposure';
 
 const router = Router();
 
+/** The tool a single `tools/call` message names; undefined for anything else. */
+function requestedToolName(body: unknown): string | undefined {
+  const message = body as { method?: unknown; params?: { name?: unknown } } | undefined;
+  if (message?.method !== 'tools/call') return undefined;
+  return typeof message.params?.name === 'string' ? message.params.name : undefined;
+}
+
 // POST /mcp — JSON-RPC messages
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireMcpAuth, async (req, res) => {
   try {
     const exposure = getExposureConfig();
     const callerScopes = (req.auth as any)?.scopes as string[] | undefined;
-    const server = await createUnifiedMcpServer(exposure, callerScopes);
+    const server = await createUnifiedMcpServer(capabilityAccess(req.auth), exposure, callerScopes, requestedToolName(req.body));
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
@@ -58,7 +68,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // GET /mcp — SSE stream (not supported in stateless mode)
-router.get('/', requireAuth, (_req, res) => {
+router.get('/', requireMcpAuth, (_req, res) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed. Use POST for stateless requests.' },
@@ -67,7 +77,7 @@ router.get('/', requireAuth, (_req, res) => {
 });
 
 // DELETE /mcp — session close (not supported in stateless mode)
-router.delete('/', requireAuth, (_req, res) => {
+router.delete('/', requireMcpAuth, (_req, res) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed. Stateless mode has no sessions.' },

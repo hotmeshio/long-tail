@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as escalationService from '../../services/escalation';
 import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
@@ -470,7 +471,7 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:server] ${name} ready (7 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:server] ${name} ready (${registeredToolCount(server)} tools registered)`);
   return server;
 }
 

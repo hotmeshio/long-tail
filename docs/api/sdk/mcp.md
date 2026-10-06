@@ -243,8 +243,8 @@ const result = await lt.mcp.callTool({
 | `id` | `string` | Yes | The MCP server identifier |
 | `toolName` | `string` | Yes | Name of the tool to invoke |
 | `arguments` | `Record<string, any>` | No | Key-value arguments to pass to the tool |
-| `execute_as` | `string` | No | User ID to impersonate for the tool call |
+| `execute_as` | `string` | No | Account id or `external_id` to run the tool as |
 
 **Returns:** `LTApiResult<{ result: any }>`
 
-**Auth:** Optional (userId forwarded to the MCP adapter when provided)
+**Auth:** Required (`401` without it). The tool runs as the caller, or as `execute_as` when given; for `execute_as`, a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type. A built-in tool requires the capability its manifest `gate` declares, checked for the acting account; a built-in tool with no gate requires builder access (superadmin or the `engineer` role). Refusals return `403`.

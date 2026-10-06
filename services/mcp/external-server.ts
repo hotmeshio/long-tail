@@ -11,6 +11,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loggerRegistry } from '../../lib/logger';
 import { builtinMcpServerFactories } from '../../system';
 import { getDomainIndex } from '../domain';
+import type { CapabilityAccess } from '../../types';
 import type { ExposureConfig } from './exposure';
 
 /**
@@ -46,7 +47,7 @@ async function buildInstructions(): Promise<string | undefined> {
 // Only these servers are exposed via the /mcp endpoint.
 // Example servers (playwright, gmail, image-tools) are excluded.
 
-const SHIPPED_SERVERS = new Set([
+export const SHIPPED_SERVERS = new Set([
   'long-tail-admin',
   'long-tail-human-queue',
   'long-tail-file-storage',
@@ -99,6 +100,16 @@ function isServerAllowed(name: string, exposure?: ExposureConfig): boolean {
   return true;
 }
 
+/**
+ * Whether the caller holds the capability the tool's manifest entry declares.
+ * Fails closed: a tool without a manifest entry or a gate is never exposed.
+ */
+async function isToolPermitted(toolName: string, serverName: string, access: CapabilityAccess): Promise<boolean> {
+  const manifest = builtinMcpServerFactories[serverName]?.config?.toolManifest;
+  const gate = manifest?.find((t) => t.name === toolName)?.gate;
+  return gate !== undefined && (await access(gate));
+}
+
 function isToolAllowed(
   toolName: string,
   serverName: string,
@@ -127,18 +138,24 @@ function isToolAllowed(
 // ── Unified server creation ──────────────────────────────────────────────────
 
 /**
- * Create a unified McpServer with tools from all qualifying shipped servers.
- * Called per-request in stateless mode. Server instances are cached; only
- * the McpServer wrapper and tool registrations are fresh (pure in-memory).
+ * Create a unified McpServer with the tools this caller may use from all
+ * qualifying shipped servers. Called per-request in stateless mode, so a tool
+ * the caller lacks the capability for is neither listed nor callable. When
+ * the request calls one tool, only that tool is registered and only its gate
+ * is checked. Server instances are cached; only the McpServer wrapper and
+ * tool registrations are fresh (pure in-memory).
  */
 export async function createUnifiedMcpServer(
+  access: CapabilityAccess,
   exposure?: ExposureConfig,
   callerScopes?: string[],
+  requestedTool?: string,
 ): Promise<McpServer> {
   const unified = new McpServer(
     { name: 'long-tail', version: '1.0.0' },
     { instructions: await buildInstructions() },
   );
+  const named = new Set<string>();
   const registered = new Set<string>();
 
   for (const [name] of Object.entries(builtinMcpServerFactories)) {
@@ -156,15 +173,20 @@ export async function createUnifiedMcpServer(
 
       for (const [toolName, tool] of Object.entries(tools)) {
         if (!tool?.handler || !tool.enabled) continue;
-        if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
 
-        // Deduplicate: prefix with server short name on collision
+        // Deduplicate: prefix with server short name on collision. Names are
+        // claimed before filtering so a tool keeps its name for every caller.
         let finalName = toolName;
-        if (registered.has(toolName)) {
+        if (named.has(toolName)) {
           const prefix = name.replace('long-tail-', '').replace(/-/g, '_');
           finalName = `${prefix}_${toolName}`;
-          if (registered.has(finalName)) continue; // still a collision — skip
+          if (named.has(finalName)) continue; // still a collision — skip
         }
+        named.add(finalName);
+
+        if (requestedTool !== undefined && finalName !== requestedTool) continue;
+        if (!(await isToolPermitted(toolName, name, access))) continue;
+        if (!isToolAllowed(toolName, name, exposure, callerScopes)) continue;
         registered.add(finalName);
 
         // Re-register the tool handler on the unified server.
@@ -186,6 +208,10 @@ export async function createUnifiedMcpServer(
       );
     }
   }
+
+  // A call to one denied or unknown tool registers none; the tool handlers
+  // still answer it the way the SDK answers any unknown tool.
+  (unified as any).setToolRequestHandlers();
 
   loggerRegistry.info(`[lt-mcp:endpoint] unified server ready (${registered.size} tools)`);
   return unified;

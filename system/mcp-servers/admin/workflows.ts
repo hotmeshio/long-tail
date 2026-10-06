@@ -9,8 +9,12 @@ import * as configService from '../../../services/config';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../../services/workers/registry';
 import {
   invokeWorkflow,
-  checkInvocationRoles,
+  authorizeInvocation,
+  type InvocationAuthContext,
 } from '../../../services/workflow-invocation';
+import { callerAuth, externalCaller, type ToolCallExtra } from '../caller-auth';
+import { mayReadWorkflowRun } from '../../../modules/capabilities';
+import { RUN_READ_DENIED } from './run-read';
 import * as workflowApi from '../../../api/workflows';
 import { WORKFLOW_STATES } from '../../../shared/workflow-state';
 import type { LTWorkflowConfig } from '../../../types/config';
@@ -20,6 +24,25 @@ import {
   getWorkflowStatusSchema,
   terminateWorkflowSchema,
 } from './schemas';
+
+const SYSTEM_INVOKER: InvocationAuthContext = { userId: 'lt-system', role: 'superadmin' };
+
+/**
+ * Who a workflow is invoked as. A `/mcp` caller must satisfy the workflow's
+ * invocation roles and becomes the envelope identity. Key scopes are left
+ * off: at `/mcp` they decide which invoke tool is listed, not whether the
+ * invocation is allowed. Internal calls invoke as lt-system.
+ */
+async function resolveInvoker(
+  workflowType: string,
+  extra?: ToolCallExtra,
+  executeAs?: string,
+): Promise<InvocationAuthContext> {
+  const caller = externalCaller(extra);
+  if (!caller) return SYSTEM_INVOKER;
+  await authorizeInvocation({ workflowType, userId: caller.userId, executeAs });
+  return { userId: caller.userId, role: caller.role };
+}
 
 export function registerWorkflowTools(server: McpServer): void {
 
@@ -98,8 +121,9 @@ export function registerWorkflowTools(server: McpServer): void {
         'workflow runs durably in the background.',
       inputSchema: invokeWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+    async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const config = await configService.getWorkflowConfig(args.workflow_type);
+      const invoker = await resolveInvoker(args.workflow_type, extra, args.execute_as);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
@@ -110,7 +134,7 @@ export function registerWorkflowTools(server: McpServer): void {
         // WorkflowOptions passthrough — parity with the HTTP invoke route, which
         // spreads extra body keys into options. signalIn stays service-forced.
         options: args.options,
-        auth: { userId: 'lt-system', role: 'superadmin' },
+        auth: invoker,
       });
       return {
         content: [{
@@ -136,7 +160,7 @@ export function registerWorkflowTools(server: McpServer): void {
         'input_schema the payload must satisfy.',
       inputSchema: invokeWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+    async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const config = await configService.getWorkflowConfig(args.workflow_type);
       if (!config?.invocable) {
         return {
@@ -156,6 +180,7 @@ export function registerWorkflowTools(server: McpServer): void {
           isError: true,
         };
       }
+      const invoker = await resolveInvoker(args.workflow_type, extra, args.execute_as);
       const rejected = await inputSchemaRejection(config, args);
       if (rejected) return rejected;
       const result = await invokeWorkflow({
@@ -164,7 +189,7 @@ export function registerWorkflowTools(server: McpServer): void {
         metadata: args.metadata,
         executeAs: args.execute_as,
         options: args.options,
-        auth: { userId: 'lt-system', role: 'superadmin' },
+        auth: invoker,
       });
       return {
         content: [{
@@ -188,11 +213,14 @@ export function registerWorkflowTools(server: McpServer): void {
         'child) running in a non-default HotMesh namespace.',
       inputSchema: getWorkflowStatusSchema,
     },
-    async (args: z.infer<typeof getWorkflowStatusSchema>) => {
+    async (args: z.infer<typeof getWorkflowStatusSchema>, extra?: ToolCallExtra) => {
       const reply = (body: Record<string, unknown>, isError = false) => ({
         content: [{ type: 'text' as const, text: JSON.stringify(body) }],
         ...(isError ? { isError: true } : {}),
       });
+      if (!(await mayReadWorkflowRun(await callerAuth(extra), args.workflow_id))) {
+        return reply({ error: RUN_READ_DENIED }, true);
+      }
       const found = await workflowApi.getWorkflowResult({
         workflowId: args.workflow_id,
         appId: args.app_id,

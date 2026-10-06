@@ -117,6 +117,18 @@ export function TransportStep({ form, set, isBuiltin }: Props) {
               ))}
             </div>
           </div>
+          <div>
+            <label className={labelCls}>Headers (JSON)</label>
+            <textarea
+              value={form.headers}
+              onChange={(e) => set('headers', e.target.value)}
+              placeholder={'{ "Authorization": "Bearer <service-account key>" }'}
+              className="input-json w-full"
+              rows={3}
+              spellCheck={false}
+            />
+            <p className={hintCls}>Sent with every request. Another Long Tail instance's /mcp takes a service-account key here.</p>
+          </div>
         </>
       )}
 

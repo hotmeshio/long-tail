@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response } from '../../lib/http';
 
 import { resolveActingAuth } from '../../services/iam/acting-identity';
 import type { LTApiAuth } from '../../types/sdk';

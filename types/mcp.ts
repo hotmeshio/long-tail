@@ -21,8 +21,10 @@ export interface LTMcpServerRecord {
     args?: string[];
     /** For stdio: environment variables to set */
     env?: Record<string, string>;
-    /** For sse: the URL to connect to */
+    /** For sse and streamable-http: the URL to connect to */
     url?: string;
+    /** For sse and streamable-http: headers sent with every request, e.g. Authorization */
+    headers?: Record<string, string>;
   };
   /** Whether to auto-connect on startup */
   auto_connect: boolean;

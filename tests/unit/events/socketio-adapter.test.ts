@@ -70,4 +70,36 @@ describe('SocketIOEventAdapter publish scoping', () => {
     await adapterWithSockets([socket]).publish(makeEvent('system.task.t-1.created'));
     expect(socket.emit).not.toHaveBeenCalled();
   });
+
+  it('a non-builder socket receives the browser view; a builder socket the whole event', async () => {
+    const member = makeSocket();
+    const builder = makeSocket();
+    (member.data as any).ltViewer = { builder: false };
+    (builder.data as any).ltViewer = { builder: true };
+    const full: LTEvent = {
+      ...event,
+      data: { id: 'esc-1', role: 'order-review', status: 'pending', description: 'private', metadata: { orderId: 'A-1' } },
+    };
+    await adapterWithSockets([member, builder]).publish(full);
+    expect(member.emit.mock.calls[0][1].data).toEqual({ id: 'esc-1', role: 'order-review', status: 'pending' });
+    expect(builder.emit.mock.calls[0][1]).toBe(full);
+  });
+
+  it('a socket whose viewer is not yet known receives the browser view', async () => {
+    const socket = makeSocket();
+    const full: LTEvent = { ...event, data: { id: 'esc-1', description: 'private' } };
+    await adapterWithSockets([socket]).publish(full);
+    expect(socket.emit.mock.calls[0][1].data).toEqual({ id: 'esc-1' });
+  });
+});
+
+describe('createSocketIOAuthenticator', () => {
+  it('returns the person a valid token names, and false otherwise', async () => {
+    const jwt = (await import('jsonwebtoken')).default;
+    const { createSocketIOAuthenticator } = await import('../../../start/socket-auth');
+    const verify = createSocketIOAuthenticator({ auth: { secret: 'socket-secret' } } as any)!;
+    expect(verify(jwt.sign({ userId: 'u-1' }, 'socket-secret'))).toEqual({ userId: 'u-1' });
+    expect(verify(jwt.sign({ other: 1 }, 'socket-secret'))).toBe(false);
+    expect(verify('garbage')).toBe(false);
+  });
 });

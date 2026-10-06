@@ -1,6 +1,8 @@
 # File Browser API
 
-Browse, preview, download, share, and delete files in the storage backend (S3, MinIO, or local filesystem). All endpoints require authentication except file serving.
+Browse, preview, download, share, and delete files in the storage backend (S3, MinIO, or local filesystem).
+
+**Auth:** Every `/api/file-browser` endpoint (browse, metadata, signed-url, delete, download, upload) requires builder access (superadmin or the `engineer` role). Serving a file at `/api/files/{filePath}` requires the signed token from a signed URL (`?token=`).
 
 ## Browse files
 

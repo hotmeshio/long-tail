@@ -234,30 +234,19 @@ import { escalationStrategyRegistry, McpEscalationStrategy } from '@hotmeshio/lo
 escalationStrategyRegistry.register(new McpEscalationStrategy());
 ```
 
-When the MCP strategy is configured, ensure the triage worker is registered:
-
-```typescript
-import * as mcpTriageWorkflow from '@hotmeshio/long-tail/workflows/mcp-triage';
-
-await start({
-  database: { ... },
-  workers: [
-    // ... your workflows
-    { taskQueue: 'lt-mcp-triage', workflow: mcpTriageWorkflow.mcpTriage },
-  ],
-  escalation: { strategy: 'mcp' },
-});
-```
+The triage workflows (`mcpTriageRouter`, `mcpTriageDeterministic`, `mcpTriage`) register as system workers on the `long-tail-system` task queue when `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is set.
 
 ## Testing
 
-The MCP triage test demonstrates the full flow without requiring an OpenAI API key. It uses mock activities with deterministic extraction:
+The triage integration test runs the full lifecycle against the docker compose stack: it finds the seeded "wrong language" escalation, walks the reviewer, admin, and engineer chain, resolves with `needsTriage`, waits for the triage workflow, and verifies the remediated process and the engineering recommendation. It requires `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and skips without one.
 
 ```bash
-# Run the triage test
-npx vitest run tests/workflows/mcp-triage.test.ts --reporter=verbose
+docker compose up -d --build
+npx vitest run --config tests/integration/vitest.config.ts tests/integration/mcpTriage.test.ts
 ```
 
-The test covers:
-1. **Full triage flow** — extraction fails, human flags `needsTriage`, triage workflow rotates pages, re-invoked workflow succeeds, signals back to parent
-2. **Standard fallback** — resolver doesn't set `needsTriage`, standard re-run proceeds as normal
+The same chain runs through the dashboard UI in `tests/functional/mcpTriage.test.ts`:
+
+```bash
+npx playwright test --config tests/functional/playwright.config.ts mcpTriage
+```

@@ -3,6 +3,10 @@ import type { Socket } from 'net';
 import { WebSocketServer, WebSocket } from 'ws';
 
 import { loggerRegistry } from '../logger';
+import { NatsClientFilter } from './nats-ws-filter';
+import { NatsServerFilter } from './nats-ws-server-filter';
+import { payloadForViewer, viewerFor } from './browser-view';
+import { NATS_WS_TICKET_PARAM, verifyNatsWsTicket } from './nats-ws-ticket';
 
 /** Default path for the NATS WebSocket proxy endpoint. */
 export const NATS_WS_PROXY_PATH = '/nats-ws';
@@ -41,6 +45,8 @@ export function attachNatsWsProxy(
   options: {
     basePath?: string;
     onWsUrlDerived?: (url: string) => void;
+    /** The NATS server credential, written into each browser's CONNECT by the proxy. */
+    authToken?: string | null;
   } = {},
 ): void {
   const basePath = options.basePath || '';
@@ -48,8 +54,20 @@ export function attachNatsWsProxy(
   const wss = new WebSocketServer({ noServer: true });
   let derived = false;
 
-  server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
-    if (req.url !== proxyPath) return;
+  server.on('upgrade', async (req: IncomingMessage, socket: Socket, head: Buffer) => {
+    const url = new URL(req.url ?? '/', 'http://proxy');
+    if (url.pathname !== proxyPath) return;
+    // Only a signed-in person, holding the ticket the credentials route issued.
+    const userId = verifyNatsWsTicket(url.searchParams.get(NATS_WS_TICKET_PARAM));
+    if (!userId) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    // Decided once per connection: a builder receives events whole, anyone
+    // else receives the browser view (lib/events/browser-view.ts).
+    const viewer = await viewerFor(userId);
+    if (socket.destroyed) return;
 
     // Derive the public wsUrl from the first request's headers
     if (!derived && options.onWsUrlDerived) {
@@ -60,12 +78,28 @@ export function attachNatsWsProxy(
     wss.handleUpgrade(req, socket, head, (clientWs) => {
       const upstream = new WebSocket(target);
 
+      // The browser reads; the proxy holds the credential and drops its publishes.
+      const filter = new NatsClientFilter(options.authToken ?? null);
+      const inbound = viewer.builder ? null : new NatsServerFilter((payload) => payloadForViewer(payload, viewer));
       upstream.on('open', () => {
         clientWs.on('message', (data) => {
-          if (upstream.readyState === WebSocket.OPEN) upstream.send(data);
+          const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+          const forward = filter.feed(chunk);
+          if (filter.malformed) {
+            clientWs.close();
+            return;
+          }
+          if (forward.length && upstream.readyState === WebSocket.OPEN) upstream.send(forward);
         });
         upstream.on('message', (data) => {
-          if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
+          if (clientWs.readyState !== WebSocket.OPEN) return;
+          if (!inbound) {
+            clientWs.send(data);
+            return;
+          }
+          const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+          const forward = inbound.feed(chunk);
+          if (forward.length) clientWs.send(forward);
         });
       });
 

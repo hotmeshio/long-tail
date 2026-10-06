@@ -3,6 +3,7 @@ import type { ToolDefinition } from '../../../services/llm';
 import * as mcpDbService from '../../../services/mcp/db';
 import { generateStrategySection } from './strategy-advisors';
 import type { ServerInfo } from './types';
+import { currentToolPrincipal, permittedBuiltin } from './principal-tools';
 
 /**
  * Discover MCP servers, cache tool definitions, and return a lightweight
@@ -33,9 +34,14 @@ export async function loadToolsFromServers(
   const toolIds: string[] = [];
   const inventoryLines: string[] = [];
   const serverInfos: ServerInfo[] = [];
+  // The model sees only the tools the workflow's principal may call.
+  const principal = await currentToolPrincipal();
 
   for (const server of servers) {
-    const manifest = server.tool_manifest || [];
+    const manifest: any[] = [];
+    for (const t of server.tool_manifest || []) {
+      if (!principal || (await permittedBuiltin(principal, server.name, t.name)) !== undefined) manifest.push(t);
+    }
     const slug = server.name.replace(/[^a-zA-Z0-9]/g, '_');
     const serverTags = server.tags?.length ? server.tags.join(', ') : 'general';
     const toolNames: string[] = [];

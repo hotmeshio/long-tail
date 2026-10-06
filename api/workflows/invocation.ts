@@ -4,7 +4,7 @@ import { resolveWorkflowHandle } from '../../services/task';
 import { readWorkflowState, WORKFLOW_STATES } from '../../services/workflow-state';
 import {
   invokeWorkflow as invokeWorkflowService,
-  checkInvocationRoles,
+  authorizeInvocation,
   InvocationError,
 } from '../../services/workflow-invocation';
 import { cancelEscalationsByWorkflowId } from '../../services/escalation/crud';
@@ -39,7 +39,7 @@ export async function invokeWorkflow(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    await checkInvocationRoles(input.type, auth.userId, auth.role);
+    await authorizeInvocation({ workflowType: input.type, userId: auth.userId, executeAs: input.execute_as });
 
     const config = await configService.getWorkflowConfig(input.type);
     const violation = await checkInvokeInput(config, input.data, input.metadata);

@@ -9,6 +9,7 @@ import { config } from '../modules/config';
 import { getFeatureFlags } from '../modules/features';
 import { getSearchConfig } from '../modules/search';
 import { getBranding } from '../modules/branding';
+import { getOAuthServerSettings } from '../modules/oauth-server';
 import { LONG_TAIL_VERSION, HOTMESH_VERSION } from '../modules/version';
 import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
@@ -71,6 +72,12 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         events: {
           transport,
           natsWsUrl: natsAdapter ? resolveNatsWsUrl(natsAdapter, req) : null,
+          reconnect: {
+            initialDelayMs: config.NATS_RECONNECT_INITIAL_MS,
+            maxDelayMs: config.NATS_RECONNECT_MAX_MS,
+            noticeAfterMs: config.NATS_LIVE_NOTICE_AFTER_MS,
+            spreadMs: config.NATS_RECONNECT_SPREAD_MS,
+          },
         },
         auth: {
           sso: isSSOEnabled(),
@@ -78,6 +85,8 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
           // Session keepalive dials for the SPA (null = no keepalive / no idle gate).
           ssoKeepaliveSeconds: getSSOConfig()?.keepaliveSeconds ?? null,
           ssoKeepaliveIdleTimeoutSeconds: getSSOConfig()?.keepaliveIdleTimeoutSeconds ?? null,
+          // The OAuth authorization server for MCP clients (Connected apps).
+          oauthServer: getOAuthServerSettings() !== null,
         },
         ai: {
           enabled: hasLLMApiKey(),

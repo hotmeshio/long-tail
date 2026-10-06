@@ -220,7 +220,7 @@ const result = await lt.escalations.getLookups({ id: 'esc_123' });
 
 ## getByWorkflowId
 
-List all escalations for a given workflow ID.
+List the escalations for a given workflow ID. With `auth` as the second argument, only the escalations that caller may read; without it, every escalation.
 
 ```typescript
 const result = await lt.escalations.getByWorkflowId({ workflowId: 'wf_abc' });
@@ -234,7 +234,7 @@ const result = await lt.escalations.getByWorkflowId({ workflowId: 'wf_abc' });
 
 **Returns:** `LTApiResult<{ escalations }>`
 
-**Auth:** Not required
+**Auth:** Optional (filters to the caller's readable escalations when provided)
 
 ---
 

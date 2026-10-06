@@ -258,7 +258,7 @@ const result = await lt.yamlWorkflows.invoke({
 
 **Returns:** `LTApiResult<any>`
 
-**Auth:** Optional (userId forwarded to invoke service when provided)
+**Auth:** Optional (userId forwarded to invoke service when provided). `execute_as` requires an authenticated caller and the act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type. The server sets the workflow's `_scope` identity context; a `_scope` key in `data` is ignored.
 
 ---
 

@@ -130,6 +130,8 @@ Two MCP tools give agents programmatic access to the catalog:
 
 This enables autonomous wiring: an agent can discover available topics, read their schemas, and create subscriptions — all through tool calls.
 
+`list_topics` is open to any account. Registering, editing, deleting and publishing topics, over MCP or REST, requires builder access (superadmin or the `engineer` role). Publishing to a `system.` or `agent.` subject over REST requires superadmin.
+
 ## LTTopicConfig
 
 The TypeScript interface for static topic declarations:

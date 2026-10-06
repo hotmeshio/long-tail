@@ -21,7 +21,7 @@ Get a fresh OAuth access token for an external service. Automatically refreshes 
 
 | | |
 |---|---|
-| Read-safe | Yes |
+| Read-safe | No |
 
 **Parameters:**
 

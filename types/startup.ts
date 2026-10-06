@@ -3,8 +3,10 @@ import type { WorkflowIconName } from './workflow-icons';
 import type { EscalationLookupRef } from './escalation';
 
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
+import type { CapabilityGate } from './capability';
 import type { ScanEncoding, ScanGrantScope, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
 import type { LTOAuthStartConfig } from './oauth';
+import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
@@ -90,6 +92,17 @@ export interface LTWorkerConfig {
  * When present, the config is upserted into `lt_mcp_servers` at startup
  * so the dashboard shows tools, tags, and compile hints on first boot.
  */
+
+/** Static definition of one tool in a built-in MCP server's manifest. */
+export interface LTToolManifestEntry {
+  name: string;
+  description: string;
+  inputSchema: Record<string, any>;
+  /** Tool only reads data — safe to expose to external MCP consumers without write permission. */
+  read_safe?: boolean;
+  /** Capability an external `/mcp` caller needs. Unlabelled tools are hidden at `/mcp`. */
+  gate?: CapabilityGate;
+}
 export interface LTMcpServerConfig {
   description?: string;
   tags?: string[];
@@ -102,13 +115,7 @@ export interface LTMcpServerConfig {
   /** When true, all tools on this server require an AI API key. Server is hidden when no key is configured. */
   aiRequired?: boolean;
   /** Tool manifest — static JSON schema definitions for each tool. */
-  toolManifest?: Array<{
-    name: string;
-    description: string;
-    inputSchema: Record<string, any>;
-    /** Tool only reads data — safe to expose to external MCP consumers without write permission. */
-    read_safe?: boolean;
-  }>;
+  toolManifest?: LTToolManifestEntry[];
   /**
    * Per-entry ownership override. `true` → description, tags, category,
    * compile hints, and credential providers are compared and applied on every
@@ -478,6 +485,8 @@ export interface LTStartConfig {
     /** SSO for embedded deployments. Host auth is trusted; users are
      *  JIT-provisioned in lt_users from the resolved identity. */
     sso?: LTSSOConfig;
+    /** OAuth authorization server for MCP clients connecting to `/mcp`. */
+    oauthServer?: LTOAuthServerConfig;
   };
 
   /** OpenTelemetry. Register before workers start. */

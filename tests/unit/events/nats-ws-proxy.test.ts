@@ -3,6 +3,13 @@ import { createServer, type Server } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { attachNatsWsProxy } from '../../../lib/events/nats-ws-proxy';
+import { signNatsWsTicket } from '../../../lib/events/nats-ws-ticket';
+import { config } from '../../../modules/config';
+
+// The proxy admits only a ticket holder (tests/lib/events/nats-ws-proxy.test.ts
+// covers refusal and filtering); these connect with one.
+(config as any).JWT_SECRET = config.JWT_SECRET || 'nats-proxy-derivation-secret';
+const ticketed = (url: string) => `${url}?ticket=${signNatsWsTicket('11111111-1111-4111-8111-111111111111')}`;
 
 function listenOnRandomPort(server: Server): Promise<number> {
   return new Promise((resolve) => {
@@ -65,7 +72,7 @@ describe('attachNatsWsProxy — URL derivation', () => {
     const onDerived = vi.fn();
     const { proxyPort } = await setupProxy({ onWsUrlDerived: onDerived });
 
-    await connectAndClose(`ws://localhost:${proxyPort}/nats-ws`, {
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/nats-ws`), {
       'x-forwarded-proto': 'https',
       'x-forwarded-host': 'api.example.com',
     });
@@ -77,7 +84,7 @@ describe('attachNatsWsProxy — URL derivation', () => {
     const onDerived = vi.fn();
     const { proxyPort } = await setupProxy({ onWsUrlDerived: onDerived });
 
-    await connectAndClose(`ws://localhost:${proxyPort}/nats-ws`);
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/nats-ws`));
 
     expect(onDerived).toHaveBeenCalledWith(`ws://localhost:${proxyPort}/nats-ws`);
   });
@@ -86,7 +93,7 @@ describe('attachNatsWsProxy — URL derivation', () => {
     const onDerived = vi.fn();
     const { proxyPort } = await setupProxy({ onWsUrlDerived: onDerived });
 
-    await connectAndClose(`ws://localhost:${proxyPort}/nats-ws`, {
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/nats-ws`), {
       'x-forwarded-host': 'custom.host.com',
     });
 
@@ -97,8 +104,8 @@ describe('attachNatsWsProxy — URL derivation', () => {
     const onDerived = vi.fn();
     const { proxyPort } = await setupProxy({ onWsUrlDerived: onDerived });
 
-    await connectAndClose(`ws://localhost:${proxyPort}/nats-ws`);
-    await connectAndClose(`ws://localhost:${proxyPort}/nats-ws`);
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/nats-ws`));
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/nats-ws`));
 
     expect(onDerived).toHaveBeenCalledTimes(1);
   });
@@ -110,7 +117,7 @@ describe('attachNatsWsProxy — URL derivation', () => {
       onWsUrlDerived: onDerived,
     });
 
-    await connectAndClose(`ws://localhost:${proxyPort}/admin/longtail/nats-ws`, {
+    await connectAndClose(ticketed(`ws://localhost:${proxyPort}/admin/longtail/nats-ws`), {
       'x-forwarded-proto': 'https',
       'x-forwarded-host': 'api.example.com',
     });
@@ -137,12 +144,12 @@ describe('attachNatsWsProxy — URL derivation', () => {
   it('bridges messages bidirectionally', async () => {
     const { proxyPort } = await setupProxy();
 
-    const ws = new WebSocket(`ws://localhost:${proxyPort}/nats-ws`);
+    const ws = new WebSocket(ticketed(`ws://localhost:${proxyPort}/nats-ws`));
 
     const echo = await new Promise<string>((resolve, reject) => {
       ws.on('open', () => {
         // Small delay to let the proxy establish the upstream connection
-        setTimeout(() => ws.send('hello'), 50);
+        setTimeout(() => ws.send('PING\r\n'), 50);
       });
       ws.on('message', (data) => {
         ws.close();
@@ -151,6 +158,6 @@ describe('attachNatsWsProxy — URL derivation', () => {
       ws.on('error', reject);
     });
 
-    expect(echo).toBe('hello');
+    expect(echo).toBe('PING\r\n');
   });
 });

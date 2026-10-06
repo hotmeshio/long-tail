@@ -91,6 +91,18 @@ export type {
   LTSSOConfig,
 } from './auth';
 
+export type { CapabilityAccess, CapabilityGate, CapabilitySet } from './capability';
+
+export type {
+  LTGrantPreset,
+  LTGrantPolicy,
+  LTGrantRole,
+  LTGrantSnapshot,
+  LTGrantSummary,
+  LTOAuthClient,
+  LTOAuthServerConfig,
+} from './oauth-server';
+
 export type {
   LTUserStatus,
   LTRoleType,
@@ -152,6 +164,7 @@ export type {
 } from './export';
 
 export type {
+  LTToolManifestEntry,
   LTStartConfig,
   LTInstance,
   LTWorkerConfig,

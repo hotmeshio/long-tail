@@ -232,7 +232,7 @@ Start a workflow by its registered type. The workflow must have `invocable: true
 |-------|------|----------|-------------|
 | `data` | `object` | yes | Business data passed to the workflow as `envelope.data` |
 | `metadata` | `object` | no | Control flow metadata passed as `envelope.metadata` |
-| `execute_as` | `string` | no | Service account `external_id` to run as (admin only) |
+| `execute_as` | `string` | no | Account `external_id` or id to run as. Requires admin access and must satisfy the act-as rule below. |
 
 The input gate validates against the `metadata` in the request; the dashboard sends the config's `envelope_schema.metadata` with every invoke it starts.
 
@@ -268,12 +268,16 @@ The workflow starts on its configured `task_queue` with a generated workflow ID 
 | `403` | `{ "error": "Workflow is not invocable" }` | `invocable` is `false` |
 | `403` | `{ "error": "User not registered" }` | RBAC check failed — no matching user |
 | `403` | `{ "error": "Insufficient role for invocation" }` | User lacks a required invocation role |
+| `403` | `{ "error": "execute_as may not exceed your own authority" }` | The caller may not act as the `execute_as` account |
+| `404` | `{ "error": "execute_as principal \"...\" not found" }` | No account matches `execute_as` |
 | `404` | `{ "error": "Workflow not found" }` | No config exists for this type |
 | `422` | `{ "error": "data failed input schema validation (n violations)", "code": "schema_validation", "violations": [{ "field", "message" }], "role": null, "schemaVersion": null, "workflowType" }` | The config declares `input_schema` and `data` violates it; `x-lt-options` over pinned `input_lookups` constrains values to the resolved edition |
 
 **Authorization:**
 
-When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one of the listed roles (checked against `lt_user_roles` via the user's `external_id`). Superadmins bypass this check.
+When `invocation_roles` is empty, any authenticated user can invoke. When set, the user must hold at least one of the listed roles. Roles are read from the caller's current grants in `lt_user_roles`, not from token claims. A superadmin grant, or the `admin` role held with `admin` type, invokes any workflow. `capabilityInvoke` requires a superadmin grant.
+
+`execute_as` follows the act-as rule: a superadmin may act as anyone. A caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type. Nobody else may.
 
 ### List the caller's invokable workflows
 
@@ -307,6 +311,8 @@ These endpoints let you check on running or completed workflows. The `workflowId
 GET /api/workflows/:workflowId/status
 ```
 
+**Auth:** Requires builder access (superadmin or the `engineer` role).
+
 **Response 200:**
 
 ```json
@@ -329,6 +335,8 @@ GET /api/workflows/:workflowId/result
 ```
 
 Returns the result if the workflow is complete, or `202` if it's still running. Never blocks.
+
+**Auth:** Requires builder access, or being the person who started the run or the account it runs as (`lt_tasks.initiated_by` / `executing_as`). Others receive `403`.
 
 **Response 200** (complete):
 
@@ -361,6 +369,8 @@ Returns the result if the workflow is complete, or `202` if it's still running. 
 
 ## Execution History Export
 
+Every `/api/workflow-states` endpoint requires builder access, except `/:workflowId/execution`, which follows the same rule as `GET /api/workflows/:workflowId/result`.
+
 Every workflow's full execution history is exportable in JSON. Two formats are available: a raw state export (HotMesh-native) and a structured execution event history with typed events, ISO timestamps, durations, and cross-references.
 
 Because workflows are durably executed — state is transactionally checkpointed to Postgres after every step — the export is a complete, faithful record of everything that happened. Every activity scheduled, every result returned, every signal received, every child workflow spawned. Nothing is reconstructed or approximated.
@@ -370,6 +380,8 @@ Because workflows are durably executed — state is transactionally checkpointed
 ```
 GET /api/workflows/:workflowId/export
 ```
+
+**Auth:** Requires builder access.
 
 Returns the raw workflow state from HotMesh. For full control over facet filtering and execution format, use the dedicated `/api/workflow-states` endpoints below.
 
@@ -658,6 +670,8 @@ POST /api/workflows/:workflowId/terminate
 
 Interrupt a running workflow. The workflow is immediately terminated.
 
+**Auth:** Requires builder access.
+
 **Path parameters:**
 
 | Parameter | Description |
@@ -688,16 +702,17 @@ Interrupt a running workflow. The workflow is immediately terminated.
 | `DELETE` | `/:type/config` | admin | Delete a workflow configuration (cascade) |
 | `GET` | `/:type/input-lookups` | RBAC | Resolve the config's pinned knowledge lookups (invoke predicate) |
 | `POST` | `/:type/invoke` | RBAC | Invoke a workflow (requires `invocable: true`) |
-| `GET` | `/:workflowId/status` | any | Workflow status |
-| `GET` | `/:workflowId/result` | any | Get workflow result (200 if complete, 202 if running) |
-| `POST` | `/:workflowId/terminate` | any | Terminate a running workflow |
-| `GET` | `/:workflowId/export` | any | Raw state export (convenience alias) |
+| `GET` | `/:workflowId/status` | builder | Workflow status |
+| `GET` | `/:workflowId/result` | builder or run owner | Get workflow result (200 if complete, 202 if running) |
+| `POST` | `/:workflowId/terminate` | builder | Terminate a running workflow |
+| `GET` | `/:workflowId/export` | builder | Raw state export (convenience alias) |
 
 ### `/api/workflow-states`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/:workflowId` | any | Raw state export with facet filtering |
-| `GET` | `/:workflowId/execution` | any | Structured execution history |
-| `GET` | `/:workflowId/status` | any | Status semaphore |
-| `GET` | `/:workflowId/state` | any | Current workflow state snapshot |
+| `GET` | `/:workflowId` | builder | Raw state export with facet filtering |
+| `GET` | `/:workflowId/execution` | builder or run owner | Structured execution history |
+| `GET` | `/:workflowId/envelopes` | builder | Input and output envelopes |
+| `GET` | `/:workflowId/status` | builder | Status semaphore |
+| `GET` | `/:workflowId/state` | builder | Current workflow state snapshot |

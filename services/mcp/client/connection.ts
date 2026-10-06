@@ -1,8 +1,10 @@
 export {
   registerBuiltinServer,
+  getBuiltinToolManifest,
   connectToServer,
   disconnectFromServer,
   resolveClient,
+  resolveBuiltinServerName,
   connectAutoServers,
   disconnectAll,
   isConnected,

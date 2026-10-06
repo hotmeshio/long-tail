@@ -1,8 +1,11 @@
+import type { LTToolManifestEntry } from '../../types';
+
 // ── Knowledge store tool manifests ───────────────────────────────────────────
 
-export const KNOWLEDGE_TOOLS = [
+export const KNOWLEDGE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'store_knowledge',
+    gate: 'builder',
     description: 'Store a value in a 3-level additive hierarchy: domain > key > field. Upserts by domain+key — fields accumulate across calls. Same domain+key+field overwrites that field. When field is provided, data can be any type. When omitted, data must be an object.',
     read_safe: false,
     inputSchema: {
@@ -19,6 +22,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'get_knowledge',
+    gate: 'builder',
     description: 'Retrieve a single knowledge entry by domain and key. Pass version to fetch a pinned immutable edition.',
     read_safe: true,
     inputSchema: {
@@ -33,6 +37,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'list_knowledge_versions',
+    gate: 'builder',
     description: 'List every immutable edition of a knowledge entry, newest first, with the current one marked. Every data-changing write mints a new version.',
     read_safe: true,
     inputSchema: {
@@ -46,6 +51,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'search_knowledge',
+    gate: 'builder',
     description: 'Search knowledge entries using JSONB containment queries. The query object matches entries whose data contains the specified key-value pairs.',
     read_safe: true,
     inputSchema: {
@@ -61,6 +67,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'list_knowledge',
+    gate: 'builder',
     description: 'List knowledge entries in a domain, optionally filtered by tags. Returns most recently updated first.',
     read_safe: true,
     inputSchema: {
@@ -76,6 +83,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'delete_knowledge',
+    gate: 'builder',
     description: 'Delete a knowledge entry by domain and key.',
     read_safe: false,
     inputSchema: {
@@ -89,6 +97,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'list_domains',
+    gate: 'builder',
     description: 'List all knowledge domains with entry counts and last-updated timestamps.',
     read_safe: true,
     inputSchema: {
@@ -98,6 +107,7 @@ export const KNOWLEDGE_TOOLS = [
   },
   {
     name: 'append_knowledge',
+    gate: 'builder',
     description: 'Append a value to an array field within a knowledge entry. Creates the entry and array if they do not exist.',
     read_safe: false,
     inputSchema: {
@@ -109,6 +119,38 @@ export const KNOWLEDGE_TOOLS = [
         value: { description: 'Value to append to the array' },
       },
       required: ['domain', 'key', 'path', 'value'],
+    },
+  },
+  {
+    name: 'set_knowledge_field',
+    gate: 'builder',
+    description: 'Set a value at a dot-notation path within a knowledge entry without overwriting sibling fields. Creates the entry if it does not exist.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'Knowledge domain' },
+        key: { type: 'string', description: 'Document key' },
+        path: { type: 'string', description: 'Dot-notation path to the field' },
+        value: { description: 'Value to set, any JSON type' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags to union with existing tags' },
+      },
+      required: ['domain', 'key', 'path', 'value'],
+    },
+  },
+  {
+    name: 'remove_knowledge_field',
+    gate: 'builder',
+    description: 'Remove a field from a knowledge entry by dot-path. The entry survives; only the targeted path is deleted.',
+    read_safe: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'Knowledge domain' },
+        key: { type: 'string', description: 'Document key' },
+        path: { type: 'string', description: 'Dot-notation path to remove' },
+      },
+      required: ['domain', 'key', 'path'],
     },
   },
 ];

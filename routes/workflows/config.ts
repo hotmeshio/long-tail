@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
+import { assertMayActAs, InvocationError } from '../../services/workflow-invocation';
 
 import * as api from '../../api/workflows';
 import { requireAdmin } from '../../modules/auth';
@@ -44,6 +45,16 @@ router.get('/:type/input-lookups', async (req, res) => {
  * Requires admin or superadmin role.
  */
 router.put('/:type/config', requireAdmin, async (req, res) => {
+  // Every invocation of this workflow runs as execute_as, so it may not exceed the caller.
+  if (req.body.execute_as) {
+    try {
+      await assertMayActAs(req.auth!.userId, req.body.execute_as);
+    } catch (err: any) {
+      if (!(err instanceof InvocationError)) throw err;
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
+  }
   const result = await api.upsertWorkflowConfig({
     type: req.params.type as string,
     invocable: req.body.invocable,

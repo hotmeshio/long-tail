@@ -11,7 +11,7 @@ Image analysis and description using LLM vision. Analyzes images to extract stru
 
 ## Compile Hints
 
-Vision tools process one image at a time. The argument name is `image` (NOT `image_path`). It accepts a storage path, data URI, or https:// URL. Vision tools do NOT use browser sessions. Do NOT wire page_id or _handle to vision tools. analyze_image output fields: description (string), text_content (string), objects (array).
+Vision tools process one image at a time. The argument name is `image` (NOT `image_path`). It accepts a storage path, data URI, or https:// URL. Reading a storage path requires builder access, as the file browser does; a data URI or https:// URL needs none. Vision tools do NOT use browser sessions. Do NOT wire page_id or _handle to vision tools. analyze_image output fields: description (string), text_content (string), objects (array).
 
 ## Tools
 

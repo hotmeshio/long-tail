@@ -11,6 +11,7 @@ import {
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 import { actingIdentitySatisfied } from './identity';
 import { peekGrant, settleGrant } from './grant';
+import { assertReadAccess } from '../escalations/helpers';
 import { conflict, notPrimed, type StepContext } from './context';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
@@ -65,7 +66,9 @@ export async function executeScanChoice(
 
     // 3. The row anchors the target: the scheme's facet on the escalation the
     // screen presented. A missing binding is loud misconfiguration.
-    const row = await escalationService.getEscalation(input.escalationId);
+    // A row the actor may not read answers exactly as a missing one does.
+    const loaded = await escalationService.getEscalation(input.escalationId);
+    const row = loaded && !(await assertReadAccess(effectiveAuth.userId, loaded)) ? loaded : null;
     const target = row?.metadata?.[scheme.target_facet];
     if (!row || typeof target !== 'string' || !target) {
       return {

@@ -21,6 +21,9 @@ vi.mock('../../api/scan-codes/locate', () => ({
 vi.mock('../../api/scan-codes/verbs', () => ({
   dispatchChoiceVerb: vi.fn(),
 }));
+vi.mock('../../api/escalations/helpers', () => ({
+  assertReadAccess: vi.fn(async () => null),
+}));
 
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
@@ -28,6 +31,7 @@ import { actingIdentitySatisfied } from '../../api/scan-codes/identity';
 import { peekGrant } from '../../api/scan-codes/grant';
 import { locateForStep } from '../../api/scan-codes/locate';
 import { dispatchChoiceVerb } from '../../api/scan-codes/verbs';
+import { assertReadAccess } from '../../api/escalations/helpers';
 import { executeScanChoice } from '../../api/scan-codes/choice';
 import { SCAN_OUTCOMES } from '../../types';
 
@@ -85,6 +89,15 @@ describe('executeScanChoice — the pointer is never authority', () => {
     esc.getEscalation.mockResolvedValue({ id: 'esc-1', metadata: {} } as any);
     const result = await executeScanChoice(pointer, auth);
     expect(result.data?.outcome).toBe(SCAN_OUTCOMES.UNCONFIGURED);
+  });
+
+  it('a row the actor may not read is UNCONFIGURED, exactly as a missing row, and reveals no target', async () => {
+    vi.mocked(assertReadAccess).mockResolvedValueOnce({ status: 403, error: 'Not authorized to view this escalation' });
+    const result = await executeScanChoice(pointer, auth);
+    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.UNCONFIGURED);
+    expect((result.data as any)?.parsed).toBeUndefined();
+    expect(locate).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
   });
 
   it('a row that moved out of the presented state is CONFLICT', async () => {

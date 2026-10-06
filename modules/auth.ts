@@ -1,10 +1,10 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from '../lib/http';
 import jwt from 'jsonwebtoken';
 
 import { config } from './config';
 import { getSSOConfig } from './sso';
 import { loggerRegistry } from '../lib/logger';
-import { isSuperAdmin } from '../services/user';
+import { mayAdminister, mayBuild, mayManageRoles, mayReadWorkflowRun, type CapabilityPrincipal } from './capabilities';
 import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
 import { resolvePrincipal } from '../services/iam/principal';
@@ -171,6 +171,16 @@ export const requireAuth: RequestHandler = async (req: Request, res: Response, n
 };
 
 /**
+ * `requireAuth` without the SSO fallback: only a credential the request
+ * carries itself (the configured adapter, else a Bearer JWT or bot key).
+ * For endpoints a cross-site page must not reach through the host's cookie.
+ */
+export const requireCredentialAuth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  const mw = _authMiddleware || createAuthMiddleware(new JwtAuthAdapter());
+  return mw(req, res, next);
+};
+
+/**
  * Replace the auth adapter used by `requireAuth`.
  * Call before starting the server.
  */
@@ -178,113 +188,48 @@ export function setAuthAdapter(adapter: LTAuthAdapter): void {
   _authMiddleware = createAuthMiddleware(adapter);
 }
 
-/**
- * Middleware that requires admin access. Must be placed AFTER requireAuth.
- *
- * Checks isSuperAdmin() via the database first, then falls back to the
- * JWT `role` claim for stateless admin checks. Returns 403 otherwise.
- */
-export const requireAdmin: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    if (!req.auth?.userId) {
-      res.status(403).json({ error: 'Forbidden' });
-      return;
-    }
-    // Fast path: trust the JWT role claim for admin/superadmin
-    if (req.auth.role === 'admin' || req.auth.role === 'superadmin') {
-      next();
-      return;
-    }
-    // Slow path: check database for superadmin role type
-    if (await isSuperAdmin(req.auth.userId)) {
-      next();
-      return;
-    }
-    res.status(403).json({ error: 'Forbidden: admin access required' });
-  } catch {
-    res.status(403).json({ error: 'Forbidden' });
-  }
-};
+type CapabilityCheck = (principal: CapabilityPrincipal | undefined) => Promise<boolean>;
 
-/**
- * Middleware that requires builder access. Must be placed AFTER requireAuth.
- *
- * Builders are superadmin or users with the 'engineer' role.
- * This is the backend equivalent of the dashboard's `isBuilder` check.
- */
-export const requireBuilder: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    if (!req.auth?.userId) {
+/** Express gate over a capability predicate. Must be placed AFTER requireAuth. */
+function requireCapability(check: CapabilityCheck, denial: string): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.auth?.userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      if (await check(req.auth)) {
+        next();
+        return;
+      }
+      res.status(403).json({ error: denial });
+    } catch {
       res.status(403).json({ error: 'Forbidden' });
-      return;
     }
-    // Fast path: trust the JWT role claim for superadmin
-    if (req.auth.role === 'superadmin') {
-      next();
-      return;
-    }
-    // Check database for superadmin role type
-    if (await isSuperAdmin(req.auth.userId)) {
-      next();
-      return;
-    }
-    // Check database for engineer role (builder)
-    const { hasRole } = await import('../services/user/roles');
-    if (await hasRole(req.auth.userId, 'engineer')) {
-      next();
-      return;
-    }
-    res.status(403).json({ error: 'Forbidden: builder access required' });
-  } catch {
-    res.status(403).json({ error: 'Forbidden' });
-  }
-};
+  };
+}
 
-/**
- * Middleware that requires role-management access. Must be placed AFTER requireAuth.
- *
- * Grants access to superadmins, admin-type users, and engineers — the backend
- * equivalent of the dashboard's `isBuilder || isOps`. Ops (admin type) manage
- * users and roles; builders (superadmin, engineer) are a superset. This is the
- * gate for reading and writing role definitions.
- */
-export const requireRoleManager: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+/** Admin access: admin or superadmin claim, or a superadmin in the database. */
+export const requireAdmin = requireCapability(mayAdminister, 'Forbidden: admin access required');
+
+/** Builder access: superadmin or the 'engineer' role. Backend twin of the dashboard's `isBuilder`. */
+export const requireBuilder = requireCapability(mayBuild, 'Forbidden: builder access required');
+
+/** Role-management access: admin access or the 'engineer' role. Backend twin of `isBuilder || isOps`. */
+export const requireRoleManager = requireCapability(mayManageRoles, 'Forbidden: role-management access required');
+
+/** Reads of one workflow run (`:workflowId`): builder access, or the person who started it or it runs as. */
+export const requireWorkflowReader: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.auth?.userId) {
-      res.status(403).json({ error: 'Forbidden' });
-      return;
-    }
-    // Fast path: trust the JWT role claim for admin/superadmin
-    if (req.auth.role === 'admin' || req.auth.role === 'superadmin') {
+    if (req.auth?.userId && await mayReadWorkflowRun(req.auth, String(req.params.workflowId))) {
       next();
       return;
     }
-    // Slow path: check database for superadmin role type
-    if (await isSuperAdmin(req.auth.userId)) {
-      next();
-      return;
-    }
-    // Check database for engineer role (builder)
-    const { hasRole } = await import('../services/user/roles');
-    if (await hasRole(req.auth.userId, 'engineer')) {
-      next();
-      return;
-    }
-    res.status(403).json({ error: 'Forbidden: role-management access required' });
-  } catch {
-    res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: 'Forbidden: workflow read access required' });
+  } catch (err: any) {
+    // A failed lookup is not an access decision: report it, and serve nothing.
+    loggerRegistry.error(`[long-tail] workflow read check failed: ${err?.message}`);
+    res.status(500).json({ error: 'Workflow read check failed' });
   }
 };
 

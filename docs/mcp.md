@@ -9,9 +9,9 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
     - [Compiled Workflows as Tools](#compiled-workflows-as-tools)
     - [The Cycle](#the-cycle)
 - [Connecting an Agent to Long Tail](#connecting-an-agent-to-long-tail) — the `/mcp` endpoint, service accounts, multi-environment `.mcp.json`, example prompts
+- [Connecting Long Tail Instances](#connecting-long-tail-instances): one instance calling another's tools over MCP
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
-- [Document Vision Server](#document-vision-server) — AI tools as 3 MCP tools
-- [MCP-Native Workflow](#mcp-native-workflow) — both sides MCP, end to end
+- [Document Vision Server](#document-vision-server): AI tools as MCP tools
 - [Server Registration Lifecycle](#server-registration-lifecycle) — two paths, startup sequence, when things connect
 - [External MCP Servers](#external-mcp-servers) — Path B: dashboard/API registration
 - [Built-in Servers](#built-in-servers) — servers that ship by default
@@ -153,7 +153,7 @@ Long Tail is itself an MCP server. Any MCP-aware client — Claude Code, Claude 
 |---|---|
 | URL | `POST https://<host>/mcp` |
 | Transport | Streamable HTTP, stateless — one request and one response per call |
-| Auth | `Authorization: Bearer <token>` — a signed user token (JWT) or a service-account key |
+| Auth | `Authorization: Bearer <token>`: an OAuth access token (people, see below), a service-account key (machines), or a signed user token (JWT). The host's session cookie does not authenticate `/mcp`. |
 
 ### Access: which tools, and which records
 
@@ -164,19 +164,73 @@ Two things decide what a connected agent can do, and both must pass.
 - `mcp:read` — the read-only tools: listing, searching, diagnosing, stream and escalation stats, exports. Anything that only reports.
 - `mcp:full` — those, plus the tools that change state: create an escalation, claim and resolve one, invoke a workflow, update a configuration, prune the database.
 
-A deployment can also be set read-only as a whole, which holds every key to read access whatever its scope, and can hide entire groups of tools. Production is the place to do this by default.
+A deployment can also be set read-only as a whole with `mcp.exposure.readOnly` in `start()`, which exposes only read-safe tools to every key and OAuth grant whatever its scope, and can hide entire groups of tools (`allowServers`, `denyServers`). Production is the place to do this by default.
 
-**Role decides which records.** Scope opens a tool; the account's role decides whether the action is allowed on a given target. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations — it cannot route work to finance or manage users. Administrative tools (users, roles, configuration, pruning) require an admin or superadmin role.
+**Role decides which tools and which records.** Each tool declares the capability its caller needs, the same gates the dashboard's REST routes use, and a tool appears only to accounts that hold it:
 
-Put plainly: **scope is which tools, role is which records.** A read key answers questions; a full key with the right role also acts.
+| Capability | Who holds it | Tools |
+|---|---|---|
+| Caller | Any account | Escalations, tasks, workflow invocation, a run's status and execution history (for a builder, or the person who started the run or it runs as), scan codes, docs, reads of users, roles and configuration, the account's own OAuth connections |
+| Admin | Admin or superadmin | Workflow configuration, diagnostics, pruning, assigning and removing a user's roles |
+| Builder | Superadmin, or the `engineer` role | Users, bot accounts, knowledge, YAML workflows, agents, topics, MCP server connections and calling an external server's tools, control plane, workflow envelopes and state exports, terminating workflows, HTTP requests, file reads and writes, Claude Code tasks |
+| Role manager | Admin, superadmin, or the `engineer` role | Roles, personas, scan rules, announcements |
+| Superadmin | Superadmin | Other users' OAuth connections, the human-queue tools workflows use to create and resolve escalations |
 
-Creating an escalation shows both at work. `escalate_to_human` changes state, so the key needs `mcp:full`, and the account needs a role allowed to route to that queue. Reading the same queue back — `get_available_work`, `check_resolution` — needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
+Within a tool, the account's role decides whether the action is allowed on a given target. Workflow invocation runs as the account and follows the workflow's invocation roles. Assigning a role follows the same rule as the dashboard: only a superadmin assigns the superadmin type, and an admin without the `engineer` role assigns only roles they hold. An account with `mcp:full` but only the `reviewer` role can resolve reviewer escalations; it cannot route work to finance or manage users.
+
+A built-in tool declares its capability with `gate` on its manifest entry. A tool whose entry has no `gate` is not exposed at `/mcp`. A host's in-process servers (`mcp.serverFactories` with a `config.toolManifest`) declare `gate` the same way; it applies when the tool is called over REST or chosen by an LLM inside a workflow, and a host tool with no `gate` requires builder.
+
+Builder is the most powerful capability after superadmin. It includes registering an MCP server with the `stdio` transport, which runs a command on the Long Tail host with that host's environment and network. Grant the `engineer` role with the same care as host access.
+
+Put plainly: **scope is read or write; role is which tools and which records.** A read key answers questions; a full key with the right role also acts.
+
+Resolving an escalation shows both at work. `admin_resolve_escalation` changes state, so the key needs `mcp:full`, and the account needs write access to that escalation's role. Reading the same queue first, with `find_escalations` or `search_by_facets`, needs only `mcp:read`. The rule holds for every tool: reading is cheap to grant, writing is deliberate.
 
 **Read-safe workflow invocation.** A workflow registered with `read_safe: true` in its config (a side-effect-free lookup) is invocable by read-scoped callers through `invoke_workflow_read_safe` — the read-safe variant of `invoke_workflow`. Any workflow may be attempted; one without the flag fails with a clear error, so the flag on the config is the whole contract. Declare it on the worker profile (`readSafe: true`) or set it through the workflow-config admin surface; the flag is fail-closed and defaults off.
 
+### Connect with OAuth
+
+People connect with OAuth: add the URL to the client, sign in once in the browser, and pick what the client may do. No key goes in any file.
+
+```bash
+claude mcp add --transport http long-tail https://<host>/mcp
+```
+
+Then run `/mcp` in Claude Code and pick Authenticate. The browser opens the consent page, which shows the app, the account and where it returns, and offers two choices:
+
+| Choice | The client may |
+|---|---|
+| Allow read-only | Read what you can read, and run workflows marked read-safe |
+| Allow as me | Do anything you can do: claim, resolve, invoke and administer wherever your roles allow |
+
+Allow as me appears only when it grants more than read-only: when you can write in some role, or hold an admin tier. Either way the client acts as you, so every result is limited to your roles, and every action is recorded as you.
+
+Access tokens last 5 minutes; the client refreshes them silently with a refresh token that rotates on each use and lasts 30 days. Every request reads the grant: a client acts with your roles as they are now, and a disconnected app, a revoked token or a deactivated account stops working on the next request. Disconnect a client under **Connected apps** in the user menu; the same happens when the client revokes its token.
+
+**Enable it** with `auth.oauthServer` in `start()`, or `LT_OAUTH_ISSUER` in the environment:
+
+```typescript
+start({
+  auth: {
+    oauthServer: {
+      issuer: 'https://api.example.com/longtail', // the public base URL Long Tail is served under
+      allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'], // exact https redirects, beyond loopback
+    },
+  },
+});
+```
+
+Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, `localhost`, `[::1]`, any port) are always allowed, which covers Claude Code and Claude Desktop; an `https` redirect is allowed only when it equals a URI in `allowedRedirectUris`.
+
+**Embedded deployments** mount two routers, and let four paths reach Long Tail without the host's login:
+
+- `adapter.getRouter()` under the base path, as today, and `adapter.getWellKnownRouter()` at the host's root. The well-known router answers only its two documents and passes every other request on.
+- Let these through the host's session gate: `/mcp`, `/api/oauth/register`, `/api/oauth/token`, `/api/oauth/revoke` (and `/api/oauth/metadata` if used). They carry their own credentials.
+- Keep `/api/oauth/authorize` and the dashboard behind the host's login: that is where the person signs in before consenting.
+
 ### 1. Create a service account
 
-In the dashboard: **Admin → Bot Accounts → Create**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
+In the dashboard: create one under **Accounts → Service Accounts**, assign the role(s) the account should act under, then generate an API key and choose its scope — `mcp:read` for an investigator, `mcp:full` for an operator that also makes changes. The raw key is shown once. The same is available as admin tools: `create_bot_account`, then `create_bot_api_key`.
 
 Give each environment its own account and key, scoped to the least it needs.
 
@@ -246,115 +300,85 @@ The full tool reference is in [the admin server doc](api/mcp/admin.md). A read k
 **Settings** — *read*
 - "What versions and features is this deployment running?"
 
+## Connecting Long Tail Instances
+
+One Long Tail instance can call another's tools over MCP. Each instance keeps its own database, roles, queues and workflows; the connection is a registered MCP server on the calling instance that points at the other instance's `/mcp`, authenticated with a service account the other instance issues. Separate teams (engineering, operations, sales) can each run an instance, and a shared instance can reach into all of them, without either side sharing a database or a login.
+
+### Set up the connection
+
+**On the instance being called (the remote):**
+
+1. Create a service account under **Accounts → Service Accounts**, or `POST /api/bot-accounts`. Give it the roles the connection should act under, and nothing more.
+2. Generate an API key for it with the scope the connection needs: `mcp:read` for a connection that only reads and runs read-safe workflows, `mcp:full` for one that also claims, resolves and invokes. The raw key is shown once.
+
+**On the calling instance:**
+
+3. Register the remote's `/mcp` as a network server. In the dashboard: **Servers & Tools → Register Server**, choose **Network Service**, enter `https://<remote-host>/mcp`, choose **Streamable HTTP**, and put the key in **Headers (JSON)** as `{ "Authorization": "Bearer <key>" }`. Or over the API:
+
+```bash
+curl -X POST https://<this-host>/api/mcp/servers \
+  -H "Authorization: Bearer $LT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "operations-longtail",
+    "transport_type": "streamable-http",
+    "transport_config": {
+      "url": "https://ops.example.com/mcp",
+      "headers": { "Authorization": "Bearer <remote service-account key>" }
+    },
+    "tags": ["longtail", "operations"],
+    "auto_connect": true
+  }'
+```
+
+4. Test and connect: the **Test** step (or `POST /api/mcp/servers/test-connection`) lists the tools the remote offers this account; `POST /api/mcp/servers/:id/connect` connects and caches the tool list. With `auto_connect: true` the connection opens at every start.
+
+Registration, testing and connecting require builder access on the calling instance.
+
+### What each side enforces
+
+**The remote decides what the connection can do.** It treats the connection as its service account: it lists only the tools that account's roles allow, applies the key's scope (`mcp:read` sees read-only tools), honors its own `mcp.exposure` settings, filters every result to the account's read scope, and records every action as that account. Changing the account's roles on the remote changes what the connection can do on the next call.
+
+**The calling instance decides who may use the connection.** The stored key carries the remote account's authority, so calling an external server's tools directly is a builder capability: over REST (`POST /api/mcp/servers/:id/tools/:tool/call`) and in AI tool loops, a person without builder access is refused. Workflows and compiled pipelines that a builder deploys call the remote as part of their own run, which is how everyone else reaches it: through a deployed workflow, with its own invocation roles, rather than through the raw connection.
+
+The key is part of `transport_config`, which is returned only to builders.
+
+### Keys
+
+- **Rotate:** generate a new key on the remote, update the server's headers on the calling instance (`PUT /api/mcp/servers/:id`, or edit the server), then revoke the old key on the remote.
+- **Revoke:** revoking the key on the remote ends the connection on its next call.
+- **One account per connection:** give each calling instance its own service account on the remote, so each connection's access and audit trail stay separate.
+
+### Troubleshooting
+
+| Symptom | Meaning |
+|---|---|
+| Test fails with `Unauthorized` | The remote rejected the key: missing, mistyped, revoked, or not sent (check **Headers**) |
+| A tool is missing from the list | The remote account's roles do not allow it, or the key is `mcp:read` and the tool changes state |
+| A call answers `Tool ... not found` | The same: the remote does not offer that tool to this account |
+| A call answers `need builder access` | The calling instance refused it: calling external tools directly needs builder access there |
+
 ## Human Queue Server
 
 The Human Queue is a built-in MCP server that exposes Long Tail's escalation API as standard MCP tools. Any MCP-compatible client — Claude, LangGraph, CrewAI, a custom agent — can connect and work the queue.
 
+These tools act with full authority, so at `/mcp` they are listed for superadmin accounts. Workflows and agents inside Long Tail call them directly. An external agent with any other role works the queue through the role-checked escalation tools: `find_escalations`, `claim_escalation`, `admin_resolve_escalation`.
+
 ### Tools
 
-#### `escalate_to_human`
+| Tool | Purpose |
+|------|---------|
+| `escalate_to_human` | Create an escalation for human review |
+| `check_resolution` | Check whether an escalation is resolved and read its payload |
+| `get_escalation_lookups` | Read the knowledge lookups pinned on an escalation |
+| `get_available_work` | List pending, unclaimed escalations for a role |
+| `claim_and_resolve` | Claim and resolve an escalation in one atomic call |
+| `resolve_escalation` | Resolve an escalation that is already claimed |
+| `resolve_batch_item` | Fill one declared item of a batch escalation |
+| `accumulate_item` | Add one item to an open accumulator escalation |
+| `remove_item` | Remove one held item from an open accumulator |
+| `escalate_and_wait` | Create an escalation and pause the workflow until it is resolved |
 
-Create a new escalation for human review.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `role` | string | yes | Target role (e.g., `"reviewer"`) |
-| `message` | string | yes | What needs human review |
-| `data` | object | no | Contextual data for the reviewer |
-| `type` | string | no | Classification (default: `"mcp"`) |
-| `subtype` | string | no | Subtype (default: `"tool_call"`) |
-| `priority` | number | no | 1 (highest) to 4 (lowest), default: 2 |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "pending",
-  "role": "reviewer",
-  "created_at": "2025-01-15T10:30:00Z"
-}
-```
-
-#### `check_resolution`
-
-Check the status of an escalation.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `escalation_id` | string | yes | The escalation ID to check |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "pending"
-}
-```
-
-When resolved:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "resolved",
-  "resolver_payload": { "approved": true, "note": "..." },
-  "resolved_at": "2025-01-15T11:00:00Z"
-}
-```
-
-Returns `isError: true` if the escalation doesn't exist.
-
-#### `get_available_work`
-
-List pending, unassigned escalations for a role.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `role` | string | yes | Role to filter by |
-| `limit` | number | no | Max results (default: 10) |
-
-Returns:
-
-```json
-{
-  "count": 2,
-  "escalations": [
-    {
-      "escalation_id": "uuid",
-      "type": "mcp",
-      "subtype": "tool_call",
-      "description": "Address mismatch for MBR-2024-001",
-      "priority": 2,
-      "role": "reviewer",
-      "created_at": "2025-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-#### `claim_and_resolve`
-
-Claim an escalation and resolve it in one atomic operation.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `escalation_id` | string | yes | The escalation to resolve |
-| `resolver_id` | string | yes | Who/what is resolving (e.g., `"my-agent"`) |
-| `payload` | object | yes | Resolution data |
-
-Returns:
-
-```json
-{
-  "escalation_id": "uuid",
-  "status": "resolved",
-  "resolved_at": "2025-01-15T11:00:00Z"
-}
-```
-
-Returns `isError: true` if the escalation isn't available (already claimed, already resolved, or doesn't exist).
+Parameters and examples for each are in the [Human Queue reference](api/mcp/human-queue.md).
 
 ### Scope and one-time users
 
@@ -389,21 +413,20 @@ const work = await client.callTool({
 
 **Over stdio or SSE:** Connect your MCP client to Long Tail's Streamable HTTP endpoint or spawn the server as a subprocess. The tools and responses are identical regardless of transport.
 
-The Human Queue handles the people side. The Document Vision server handles the AI side — wrapping model capabilities as MCP tools.
+The Human Queue handles the people side. The Vision server handles the AI side, wrapping model capabilities as MCP tools.
 
 ## Document Vision Server
 
-The Document Vision server (`services/mcp/vision-server.ts`) wraps AI processing activities as MCP tools. It follows the same singleton pattern as the Human Queue server — Zod schemas at module level, `createVisionServer()` / `stopVisionServer()` lifecycle.
-
-The included implementation wraps OpenAI Vision extraction and member database validation. The pattern applies to any AI capability you want to expose as MCP tools.
+The Vision server (`system/mcp-servers/vision.ts`, server ID `long-tail-vision`) wraps LLM vision calls as MCP tools. Zod schemas sit at module level, and `createVisionServer()` returns a fresh `McpServer` instance per call because the MCP SDK allows one transport per server. Full parameter reference: [Vision tools](api/mcp/vision.md).
 
 ### Tools
 
 | Tool | Arguments | Returns |
 |------|-----------|---------|
-| `list_document_pages` | *(none)* | `{ pages: string[] }` |
-| `extract_member_info` | `{ image_ref, page_number }` | `{ member_info: MemberInfo \| null }` |
-| `validate_member` | `{ member_info: MemberInfo }` | `{ result, databaseRecord? }` |
+| `analyze_image` | `{ image, prompt? }` | `{ description, text_content, objects }` |
+| `describe_image` | `{ image, context? }` | `{ description }` |
+
+`image` accepts a storage path, a data URI, or an `https://` URL. Images larger than 7680px on either side are downscaled before the model call. Without an LLM API key, both tools return `{ error: 'LLM API key not configured' }`.
 
 ### Connecting
 
@@ -412,7 +435,7 @@ Same `InMemoryTransport` pattern as the Human Queue:
 ```typescript
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createVisionServer } from '@hotmeshio/long-tail/services/mcp/vision-server';
+import { createVisionServer } from '../system/mcp-servers/vision';
 
 const server = await createVisionServer();
 const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -421,13 +444,11 @@ await server.connect(serverTransport);
 const client = new McpClient({ name: 'my-vision-client', version: '1.0.0' });
 await client.connect(clientTransport);
 
-// Discover tools
 const { tools } = await client.listTools();
 
-// Call a tool
 const result = await client.callTool({
-  name: 'list_document_pages',
-  arguments: {},
+  name: 'describe_image',
+  arguments: { image: 'screenshots/page-1.png' },
 });
 ```
 
@@ -436,90 +457,16 @@ const result = await client.callTool({
 To wrap your own AI capabilities as MCP tools, follow the same pattern:
 
 1. Define Zod schemas at module level (avoids TS2589 deep inference errors)
-2. Use the singleton pattern with `create` / `stop` lifecycle
+2. Expose a `create` / `stop` lifecycle
 3. Register tools with `(server as any).registerTool()` (type cast required by SDK)
 
-See `services/mcp/vision-server.ts` and `services/mcp/server.ts` for working examples.
-
-## MCP-Native Workflow
-
-The `verify-document-mcp` workflow demonstrates both MCP servers working together. Every activity call — listing pages, extracting data, validating members — routes through the Vision MCP server. When the workflow escalates, the Human Queue MCP server manages the review cycle. Both sides speak the same protocol.
-
-### How It Works
-
-```
-verify-document-mcp workflow
-  |
-  +-- proxyActivities --> MCP client -- InMemoryTransport --> Vision MCP Server
-  |                                                            +- list_document_pages
-  |                                                            +- extract_member_info (-> OpenAI Vision)
-  |                                                            +- validate_member (-> member DB)
-  |
-  +-- return { type: 'escalation' }
-       |
-       +-- interceptor --> Human Queue MCP Server
-                            +- check_resolution
-                            +- get_available_work
-                            +- claim_and_resolve
-```
-
-### The Activity Wrapper Pattern
-
-The key insight: MCP tool calls are wrapped as activities with the **same function signatures** as direct implementations. The workflow doesn't know (or care) that MCP is underneath — it just calls `extractMemberInfo()`. But each call routes through the MCP protocol, making every AI tool invocation protocol-native.
-
-```typescript
-import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createVisionServer } from '../../services/mcp/vision-server';
-
-let client: McpClient | null = null;
-
-async function getClient(): Promise<McpClient> {
-  if (client) return client;
-  const server = await createVisionServer();
-  const [ct, st] = InMemoryTransport.createLinkedPair();
-  await server.connect(st);
-  client = new McpClient({ name: 'verify-mcp-client', version: '1.0.0' });
-  await client.connect(ct);
-  return client;
-}
-
-export async function extractMemberInfo(
-  imageRef: string,
-  pageNumber: number,
-): Promise<MemberInfo | null> {
-  const c = await getClient();
-  const result = await c.callTool({
-    name: 'extract_member_info',
-    arguments: { image_ref: imageRef, page_number: pageNumber },
-  });
-  return parseResult(result).member_info;
-}
-```
-
-Because the signatures match the original activities, the workflow uses `proxyActivities()` at module scope — the standard pattern. Each proxied call is a durable checkpoint. If the process crashes after a Vision MCP tool call completes, replay uses the cached result.
-
-### The Pipeline
-
-1. **List pages** via MCP tool `list_document_pages`
-2. **Extract** member info from each page via MCP tool `extract_member_info` (routes to OpenAI Vision)
-3. **Merge** multi-page extractions into a single record
-4. **Validate** against member database via MCP tool `validate_member`
-5. **Return or escalate** — match returns; mismatch escalates to the Human Queue
-
-When the workflow escalates, agents can query and resolve the escalation through the Human Queue MCP server — the same protocol used for the AI tools.
+See `system/mcp-servers/vision.ts` and `services/mcp/server-lifecycle.ts` for working examples.
 
 ### Running the Tests
 
 ```bash
-# Vision server tool tests (no OpenAI key needed for most)
-npm run test:mcp:vision
-
-# Full integration (needs OpenAI key for extraction + workflow tests)
-OPENAI_API_KEY=sk-... npm run test:mcp:vision
-
-# With verbose output
-npx vitest run tests/workflows/verify-document-mcp.test.ts --reporter=verbose
+# Vision server tool tests
+npm run test:vision
 ```
 
 The examples above use built-in servers. Long Tail can also connect to any external MCP server.
@@ -722,7 +669,9 @@ Point Long Tail at a URL. The server runs elsewhere.
 }
 ```
 
-For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`.
+For Streamable HTTP, use `"transport_type": "streamable-http"`. Same `transport_config`. A server that authenticates its callers takes `headers`, sent with every request: `"transport_config": { "url": "...", "headers": { "Authorization": "Bearer <token>" } }`.
+
+**Another Long Tail instance** is a remote server like any other. See [Connecting Long Tail Instances](#connecting-long-tail-instances).
 
 **Dashboard:** Select **Network Service**, enter the URL, choose SSE or Streamable HTTP, walk through Discovery/Test/Review.
 
@@ -918,7 +867,7 @@ When `mcp.server.enabled` is `true` (the default), the Human Queue server starts
 
 ## REST API
 
-All routes are mounted at `/api/mcp`.
+All routes are mounted at `/api/mcp`. Each route carries the same gate as its `/mcp` twin: registering, editing, deleting, testing, connecting and disconnecting a server require builder access (superadmin or the `engineer` role). Server reads are open to any account; `transport_config` is returned to builders only.
 
 ### Server Registration
 
@@ -958,6 +907,8 @@ curl -X POST http://localhost:3000/api/mcp/servers/$ID/tools/search/call \
   -H 'Content-Type: application/json' \
   -d '{ "arguments": { "query": "hello" } }'
 ```
+
+A tool call runs as the caller, or as the `execute_as` account when the caller may act as it, and a built-in tool passes the same manifest gate it carries at `/mcp`.
 
 Server registrations are persisted in PostgreSQL so they survive restarts.
 
@@ -1031,41 +982,39 @@ The shared test utility at `tests/setup/mcp.ts` wraps this pattern as `createMcp
 ### Running MCP Tests
 
 ```bash
-# Human Queue protocol tests (8 tests — real client, real server, real DB)
-npm run test:mcp
+# Human Queue protocol tests plus MCP registry, CRUD, and REST tests (real client, real server, real DB)
+npx vitest run tests/services/mcp/servers.test.ts
 
 # Vision MCP server tool tests
-npm run test:mcp:vision
+npm run test:vision
 
-# Full integration with OpenAI Vision
-OPENAI_API_KEY=sk-... npm run test:mcp:vision
-
-# All tests
+# All backend tests except those that call a live model
 npm test
+
+# Fast backend tests: skips tests/workflows and *.llm.test.ts, blanks LLM keys
+npm run test:fast
+
+# Tests that call a live model
+npm run test:llm
 ```
 
 ### What the Protocol Tests Prove
 
-The `tests/mcp.test.ts` suite includes 8 tests:
+The `MCP protocol (InMemoryTransport)` block in `tests/services/mcp/servers.test.ts` includes 9 tests:
 
-1. **Tool discovery** — `listTools()` returns the expected tools
-2. **Create** — `escalate_to_human` writes a real PostgreSQL record
-3. **Check** — `check_resolution` reads status from DB
-4. **List** — `get_available_work` filters by role
-5. **Resolve** — `claim_and_resolve` atomically claims and resolves
-6. **Full lifecycle** — escalate -> check -> list -> resolve -> check -> list (empty)
-7. **Error: not found** — checking a nonexistent ID returns `isError: true`
-8. **Error: already resolved** — claiming a resolved escalation returns `isError: true`
+1. **Tool discovery**: `listTools()` returns the 7 tools registered by `services/mcp/server`
+2. **Create**: `escalate_to_human` writes a real PostgreSQL record
+3. **Check**: `check_resolution` reads status from DB
+4. **List**: `get_available_work` filters by role
+5. **Resolve**: `claim_and_resolve` atomically claims and resolves
+6. **Outcome metadata**: `claim_and_resolve` records outcome metadata on the row
+7. **Full lifecycle**: escalate -> check -> list -> resolve -> check -> list (empty)
+8. **Error: not found**: checking a nonexistent ID returns `isError: true`
+9. **Error: already resolved**: claiming a resolved escalation returns `isError: true`
 
-The `tests/workflows/verify-document-mcp.test.ts` suite adds:
+`tests/services/mcp/vision-server.test.ts` covers the Vision server: tool discovery (`analyze_image`, `describe_image`), the missing-LLM-key error for each tool, and independent server instances.
 
-1. **Vision tool discovery** — `listTools()` returns 3 Vision tools
-2. **list_document_pages** — returns page refs from storage
-3. **validate_member** — match, mismatch, and not_found cases
-4. **extract_member_info** — extracts via OpenAI Vision (needs API key)
-5. **Full MCP-native workflow** — extraction -> validation -> escalation -> Human Queue MCP resolution
-
-Every test verifies both the MCP response and the actual database state.
+Every protocol test verifies both the MCP response and the actual database state.
 
 ## Custom Adapters
 

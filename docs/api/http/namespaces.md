@@ -33,6 +33,8 @@ GET /api/namespaces
 POST /api/namespaces
 ```
 
+**Auth:** Requires builder access (superadmin or the `engineer` role).
+
 Creates or upserts a namespace. Typically called automatically during YAML workflow deployment.
 
 **Request body:**

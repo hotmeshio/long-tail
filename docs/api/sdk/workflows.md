@@ -23,12 +23,12 @@ const result = await lt.workflows.invoke({
 | `type` | `string` | Yes | Workflow function name |
 | `data` | `Record<string, any>` | No | Envelope data payload |
 | `metadata` | `Record<string, any>` | No | Envelope metadata |
-| `execute_as` | `string` | No | Service account for proxy invocation |
+| `execute_as` | `string` | No | Account id or `external_id` to run as. Requires admin access and the act-as rule below. |
 | `options` | `Record<string, any>` | No | Passthrough to Durable WorkflowOptions |
 
 **Returns:** `LTApiResult<{ workflowId, message }>`  (status 202)
 
-**Auth:** Required
+**Auth:** Required. When `invocation_roles` is set, the caller must hold one of them; roles are read from the caller's current grants in the database. Empty `invocation_roles` admits any authenticated caller. A superadmin grant, or the `admin` role held with `admin` type, invokes any workflow. `capabilityInvoke` requires a superadmin grant. For `execute_as`, a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type; otherwise `403`.
 
 ---
 

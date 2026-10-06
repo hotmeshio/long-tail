@@ -21,13 +21,13 @@ These servers ship with the product and reflect the core API surface:
 
 | Server | Category | Tools | Description |
 |--------|----------|-------|-------------|
-| [long-tail-admin](admin.md) | System | 71 | Unified system management — tasks, escalations, agents, workflows, users, etc. |
-| [long-tail-human-queue](human-queue.md) | Automation | 5 | Escalation workflow primitives (durable pause + signal) |
+| [long-tail-admin](admin.md) | System | 119 | Unified system management — tasks, escalations, agents, workflows, users, etc. |
+| [long-tail-human-queue](human-queue.md) | Automation | 10 | Escalation workflow primitives (durable pause + signal) |
 | [long-tail-file-storage](file-storage.md) | Data | 4 | Managed file storage (MinIO/GCS/S3) |
 | [long-tail-http-fetch](http-fetch.md) | Data | 3 | HTTP client for external requests |
 | [long-tail-schema-exchange](schema-exchange.md) | Data | 2 | Schema-validated HTTP exchange with credential resolution |
 | [long-tail-oauth](oauth.md) | System | 3 | OAuth token management and refresh |
-| [long-tail-knowledge](knowledge.md) | Data | 7 | Persistent JSONB knowledge store |
+| [long-tail-knowledge](knowledge.md) | Data | 10 | Persistent JSONB knowledge store |
 | [long-tail-docs](docs.md) | Reference | 3 | Documentation search and retrieval |
 | [long-tail-events](events.md) | Communication | 4 | Event bus pub/sub |
 | [long-tail-vision](vision.md) | Analysis | 2 | Image analysis via LLM vision (AI key required) |
@@ -38,15 +38,18 @@ These servers ship with the product and reflect the core API surface:
 
 These servers are included as examples of how to extend Long Tail with additional MCP capabilities. They demonstrate the registration pattern for adding browser automation or other domain-specific tools:
 
-| Server | Category | Description |
-|--------|----------|-------------|
-| long-tail-playwright | Automation | Low-level browser automation via Playwright (requires binary) |
-| long-tail-playwright-cli | Automation | High-level browser automation |
-| long-tail-gmail | Communication | Gmail integration (OAuth) |
-| long-tail-image-tools | Media | Image processing via sharp |
+| Server | Category | Tools | Description |
+|--------|----------|-------|-------------|
+| long-tail-playwright | Automation | 9 | Low-level browser automation via Playwright (requires binary) |
+| long-tail-playwright-cli | Automation | 5 | High-level browser automation |
+| long-tail-gmail | Communication | 5 | Gmail integration (OAuth) |
+| long-tail-image-tools | Media | 12 | Image processing via sharp |
+| [long-tail-ortho](ortho.md) | Automation | 4 | Drives the `ortho-pipeline` example workflow: submit orders, complete stage escalations, track status |
 
 See `examples/mcp-servers/` for the registration pattern.
 
 ## Read-Safe Classification
 
-Every tool is classified as either **read-safe** (query-only, no side effects) or **write** (modifies state). When `mcp.exposure.readOnly` is enabled, only read-safe tools are available to external MCP consumers.
+Every tool is classified as either **read-safe** (query-only, no side effects) or **write** (modifies state). When `mcp.exposure.readOnly` is enabled, only read-safe tools are available to external MCP consumers. A caller whose key or OAuth grant is read-only sees the same read-safe subset.
+
+Each tool also declares a role gate (`caller`, `admin`, `builder`, `roleManager`, or `superadmin`), and a tool appears only to accounts that hold it. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section.

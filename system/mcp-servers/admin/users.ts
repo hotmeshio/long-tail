@@ -7,6 +7,8 @@ import { z } from 'zod';
 import * as userService from '../../../services/user';
 import * as roleService from '../../../services/role';
 import { patchUserProperties as patchUserPropertiesApi } from '../../../api/users';
+import { mayGrantRole, mayGrantRoles, mayManageAccount, mayRevokeRole, type GrantDecision } from '../../../modules/capabilities';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import {
   listUsersSchema,
   createUserSchema,
@@ -20,6 +22,12 @@ import {
   getRoleSchemaSchema,
   listRoleSchemaVersionsSchema,
 } from './schemas';
+
+/** An MCP error for a refused decision; null when the call may go on. */
+function refusal(decision: GrantDecision) {
+  if (decision.allowed) return null;
+  return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: decision.error }) }] };
+}
 
 export function registerUserTools(server: McpServer): void {
 
@@ -67,7 +75,10 @@ export function registerUserTools(server: McpServer): void {
         'claim and resolve escalations for their assigned roles.',
       inputSchema: createUserSchema,
     },
-    async (args: z.infer<typeof createUserSchema>) => {
+    async (args: z.infer<typeof createUserSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? refusal(await mayGrantRoles(caller.userId, args.roles)) : null;
+      if (refused) return refused;
       // roles carry optional read_scope/write_scope (default all/all); createUser
       // normalizes admin/superadmin to all/all and stores member scope verbatim.
       for (const r of args.roles) {
@@ -104,7 +115,14 @@ export function registerUserTools(server: McpServer): void {
         'their own pre-assigned escalation).',
       inputSchema: addUserRoleSchema,
     },
-    async (args: z.infer<typeof addUserRoleSchema>) => {
+    async (args: z.infer<typeof addUserRoleSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      if (caller) {
+        const decision = await mayGrantRole(caller.userId, { role: args.role, type: args.type });
+        if (!decision.allowed) {
+          return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: decision.error }) }] };
+        }
+      }
       const read = args.read_scope ?? userService.DEFAULT_READ_SCOPE;
       const write = args.write_scope ?? userService.DEFAULT_WRITE_SCOPE;
       if (!userService.isValidScopePair(read, write)) {
@@ -131,7 +149,10 @@ export function registerUserTools(server: McpServer): void {
       description: 'Remove a role from a user.',
       inputSchema: removeUserRoleSchema,
     },
-    async (args: z.infer<typeof removeUserRoleSchema>) => {
+    async (args: z.infer<typeof removeUserRoleSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? refusal(await mayRevokeRole(caller.userId, args.user_id, args.role)) : null;
+      if (refused) return refused;
       const removed = await userService.removeUserRole(args.user_id, args.role);
       if (!removed) {
         return {
@@ -157,7 +178,10 @@ export function registerUserTools(server: McpServer): void {
         'uniqueness among active users.',
       inputSchema: patchUserPropertiesSchema,
     },
-    async (args: z.infer<typeof patchUserPropertiesSchema>) => {
+    async (args: z.infer<typeof patchUserPropertiesSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? refusal(await mayManageAccount(caller.userId, args.user_id)) : null;
+      if (refused) return refused;
       const result = await patchUserPropertiesApi({
         id: args.user_id,
         set: args.set,

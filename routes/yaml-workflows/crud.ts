@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
 
 import * as api from '../../api/yaml-workflows';
+import { requireBuilder } from '../../modules/auth';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
  * Generate a YAML workflow from a completed execution.
  * Body: { workflow_id, task_queue, workflow_name, name, description? }
  */
-router.post('/', async (req, res) => {
+router.post('/', requireBuilder, async (req, res) => {
   const result = await api.createYamlWorkflow(req.body);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -47,7 +48,7 @@ router.get('/app-ids', async (_req, res) => {
  * Unlike POST /, this does not require a source execution — the YAML is provided directly.
  * Body: { name, description?, yaml_content, input_schema?, activity_manifest?, tags?, app_id? }
  */
-router.post('/direct', async (req, res) => {
+router.post('/direct', requireBuilder, async (req, res) => {
   const result = await api.createYamlWorkflowDirect(req.body);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -57,7 +58,7 @@ router.post('/direct', async (req, res) => {
  * Compile a durable TypeScript workflow into a YAML DAG.
  * Body: { source, is_file_path?, workflow_name, name, description?, app_id?, subscribes?, tags? }
  */
-router.post('/from-durable', async (req, res) => {
+router.post('/from-durable', requireBuilder, async (req, res) => {
   const result = await api.createYamlWorkflowFromDurable(req.body);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -69,7 +70,7 @@ router.post('/from-durable', async (req, res) => {
  * Get a single YAML workflow.
  */
 router.get('/:id', async (req, res) => {
-  const result = await api.getYamlWorkflow({ id: req.params.id });
+  const result = await api.getYamlWorkflow({ id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -77,8 +78,8 @@ router.get('/:id', async (req, res) => {
  * PUT /api/yaml-workflows/:id
  * Update a YAML workflow's metadata.
  */
-router.put('/:id', async (req, res) => {
-  const result = await api.updateYamlWorkflow({ id: req.params.id, ...req.body });
+router.put('/:id', requireBuilder, async (req, res) => {
+  const result = await api.updateYamlWorkflow({ ...req.body, id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -87,9 +88,9 @@ router.put('/:id', async (req, res) => {
  * Re-generate the YAML from the original source execution.
  * Only allowed for non-archived workflows.
  */
-router.post('/:id/regenerate', async (req, res) => {
+router.post('/:id/regenerate', requireBuilder, async (req, res) => {
   const result = await api.regenerateYamlWorkflow({
-    id: req.params.id,
+    id: String(req.params.id),
     task_queue: req.body.task_queue,
     compilation_feedback: req.body.compilation_feedback,
   });
@@ -100,8 +101,8 @@ router.post('/:id/regenerate', async (req, res) => {
  * DELETE /api/yaml-workflows/:id
  * Delete a YAML workflow (must be draft or archived).
  */
-router.delete('/:id', async (req, res) => {
-  const result = await api.deleteYamlWorkflow({ id: req.params.id });
+router.delete('/:id', requireBuilder, async (req, res) => {
+  const result = await api.deleteYamlWorkflow({ id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

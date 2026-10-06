@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from './registered-tools';
 import { registerHumanQueueTools } from './server-tools';
 
 let server: McpServer | null = null;
@@ -30,7 +31,7 @@ export async function createHumanQueueServer(options?: {
 
   registerHumanQueueTools(server);
 
-  loggerRegistry.info(`[lt-mcp:server] ${name} ready (5 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:server] ${name} ready (${registeredToolCount(server)} tools registered)`);
   return server;
 }
 

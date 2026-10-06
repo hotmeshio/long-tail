@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
+import { requireBuilder, requireWorkflowReader } from '../../modules/auth';
 
 import * as api from '../../api/workflows';
 
@@ -43,9 +44,9 @@ router.post('/:type/invoke', async (req, res) => {
  * Get the status of a workflow. Optional `app_id` query param selects the
  * HotMesh namespace for resolution (default: durable).
  */
-router.get('/:workflowId/status', async (req, res) => {
+router.get('/:workflowId/status', requireBuilder, async (req, res) => {
   const result = await api.getWorkflowStatus({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
     appId: typeof req.query.app_id === 'string' ? req.query.app_id : undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -57,9 +58,9 @@ router.get('/:workflowId/status', async (req, res) => {
  * Never blocks — always returns immediately. Optional `app_id` query param
  * selects the HotMesh namespace for resolution (default: durable).
  */
-router.get('/:workflowId/result', async (req, res) => {
+router.get('/:workflowId/result', requireWorkflowReader, async (req, res) => {
   const result = await api.getWorkflowResult({
-    workflowId: req.params.workflowId,
+    workflowId: String(req.params.workflowId),
     appId: typeof req.query.app_id === 'string' ? req.query.app_id : undefined,
   });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -69,8 +70,8 @@ router.get('/:workflowId/result', async (req, res) => {
  * POST /api/workflows/:workflowId/terminate
  * Interrupt/terminate a running workflow.
  */
-router.post('/:workflowId/terminate', async (req, res) => {
-  const result = await api.terminateWorkflow({ workflowId: req.params.workflowId });
+router.post('/:workflowId/terminate', requireBuilder, async (req, res) => {
+  const result = await api.terminateWorkflow({ workflowId: String(req.params.workflowId) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -78,8 +79,8 @@ router.post('/:workflowId/terminate', async (req, res) => {
  * GET /api/workflows/:workflowId/export
  * Export workflow state. Convenience alias for /api/workflow-states/:workflowId.
  */
-router.get('/:workflowId/export', async (req, res) => {
-  const result = await api.exportWorkflow({ workflowId: req.params.workflowId });
+router.get('/:workflowId/export', requireBuilder, async (req, res) => {
+  const result = await api.exportWorkflow({ workflowId: String(req.params.workflowId) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

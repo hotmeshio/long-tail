@@ -1,10 +1,18 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { requireAdmin, requireBuilder, requireRoleManager } from '../modules/auth';
+import { mayGrantRole, mayGrantRoles, mayManageAccount, mayRevokeRole, type GrantDecision } from '../modules/capabilities';
 import * as api from '../api/users';
 import * as personasApi from '../api/personas';
 
 const router = Router();
+
+/** Answer a refused decision with 403; true when the request may go on. */
+function allowed(decision: GrantDecision, res: { status: (code: number) => { json: (body: unknown) => void } }): boolean {
+  if (decision.allowed) return true;
+  res.status(403).json({ error: decision.error });
+  return false;
+}
 
 // ── User CRUD ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +69,7 @@ router.get('/:id', async (req, res) => {
  * Body: { external_id, email?, display_name?, roles?: [{ role, type }], metadata? }
  */
 router.post('/', requireBuilder, async (req, res) => {
+  if (!allowed(await mayGrantRoles(req.auth!.userId, (req.body || {}).roles), res)) return;
   const result = await api.createUser(req.body || {});
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -71,6 +80,7 @@ router.post('/', requireBuilder, async (req, res) => {
  * Body: { email?, display_name?, status?, metadata? }
  */
 router.put('/:id', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.updateUser({ id: req.params.id as string, ...(req.body || {}) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -82,6 +92,7 @@ router.put('/:id', requireBuilder, async (req, res) => {
  * Body: { set?: { key: value }, remove?: [key], rename?: { old: new } }
  */
 router.patch('/:id/properties', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const { set, remove, rename } = req.body || {};
   const result = await api.patchUserProperties({
     id: req.params.id as string,
@@ -97,6 +108,7 @@ router.patch('/:id/properties', requireBuilder, async (req, res) => {
  * Delete a user. Builder only.
  */
 router.delete('/:id', requireBuilder, async (req, res) => {
+  if (!allowed(await mayManageAccount(req.auth!.userId, String(req.params.id)), res)) return;
   const result = await api.deleteUser({ id: req.params.id as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -127,29 +139,10 @@ router.get('/:id/roles', async (req, res) => {
  */
 router.post('/:id/roles', requireAdmin, async (req, res) => {
   const { role, type, read_scope, write_scope } = req.body || {};
-  const userId = req.auth!.userId;
-
-  // Superadmin bypasses all scoping
-  const { isSuperAdmin } = await import('../services/user/rbac');
-  if (!(await isSuperAdmin(userId))) {
-    // Non-superadmin can never assign superadmin type
-    if (type === 'superadmin') {
-      res.status(403).json({ error: 'Only superadmin can assign superadmin role type' });
-      return;
-    }
-
-    // Check if caller has the engineer role (builder) — can assign any non-superadmin role
-    const { hasRole: checkRole } = await import('../services/user/roles');
-    const isEngineer = await checkRole(userId, 'engineer');
-
-    if (!isEngineer) {
-      // Non-builder admin: can only assign roles they themselves hold
-      const callerHasRole = await checkRole(userId, role);
-      if (!callerHasRole) {
-        res.status(403).json({ error: `You can only assign roles you hold. You do not have the '${role}' role.` });
-        return;
-      }
-    }
+  const decision = await mayGrantRole(req.auth!.userId, { role, type });
+  if (!decision.allowed) {
+    res.status(403).json({ error: decision.error });
+    return;
   }
 
   const result = await api.addUserRole({ id: req.params.id as string, role, type, read_scope, write_scope });
@@ -161,6 +154,8 @@ router.post('/:id/roles', requireAdmin, async (req, res) => {
  * Remove a role from a user.
  */
 router.delete('/:id/roles/:role', requireAdmin, async (req, res) => {
+  const decision = await mayRevokeRole(req.auth!.userId, String(req.params.id), String(req.params.role));
+  if (!allowed(decision, res)) return;
   const result = await api.removeUserRole({ id: req.params.id as string, role: req.params.role as string });
   res.status(result.status).json(result.data ?? { error: result.error });
 });

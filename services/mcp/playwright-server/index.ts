@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { registeredToolCount } from '../registered-tools';
 
 import { registerTools } from './tools';
 
@@ -21,6 +22,6 @@ export async function createPlaywrightServer(options?: {
   const name = options?.name || 'long-tail-playwright';
   const instance = new McpServer({ name, version: '1.0.0' });
   registerTools(instance);
-  loggerRegistry.info(`[lt-mcp:playwright] ${name} ready (8 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:playwright] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }

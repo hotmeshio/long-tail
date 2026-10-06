@@ -2,6 +2,8 @@
  * Task query tools — mirrors routes/tasks.ts
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
+import { getEscalationReadScope, scopeAdmits } from '../../../api/escalations/helpers';
 import { z } from 'zod';
 
 import * as taskService from '../../../services/task';
@@ -60,11 +62,14 @@ export function registerTaskTools(server: McpServer): void {
         'Returns the full history of a multi-step workflow execution.',
       inputSchema: getProcessDetailSchema,
     },
-    async (args: z.infer<typeof getProcessDetailSchema>) => {
-      const [tasks, escalations] = await Promise.all([
+    async (args: z.infer<typeof getProcessDetailSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const [tasks, all] = await Promise.all([
         taskService.getProcessTasks(args.origin_id),
         escalationService.getEscalationsByOriginId(args.origin_id),
       ]);
+      const scope = caller ? await getEscalationReadScope(caller.userId) : null;
+      const escalations = scope ? all.filter((e) => scopeAdmits(scope, caller!.userId, e)) : all;
       return {
         content: [{
           type: 'text' as const,

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response } from '../lib/http';
 import * as fs from 'fs';
 import * as path from 'path';
 
