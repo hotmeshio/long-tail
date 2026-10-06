@@ -8,7 +8,10 @@ import type { ScanExecuteResponse } from '../../../../api/scan-codes';
 let interceptor: ((raw: string) => boolean) | null = null;
 vi.mock('../../../../hooks/useScanInput', () => ({
   useScanInput: () => ({
-    setCodeInterceptor: (fn: ((raw: string) => boolean) | null) => { interceptor = fn; },
+    pushCodeInterceptor: (fn: (raw: string) => boolean) => {
+      interceptor = fn;
+      return () => { interceptor = null; };
+    },
   }),
 }));
 

@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 // server found the grant dead. The provider must drop its copy, or every
 // following scan repeats the badge screen until the TTL lapses.
 vi.mock('../useAuth', () => ({ useAuth: () => ({ user: { userId: 'station-1' } }) }));
+vi.mock('../useKioskMode', () => ({ useKioskMode: () => ({ role: 'binning-associate' }) }));
 vi.mock('../../api/settings', () => ({ useSettings: () => ({ data: { features: { scanCodes: true } } }) }));
 vi.mock('../../api/client', () => ({
   setActingTokenProvider: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('../../api/client', () => ({
 vi.mock('../../api/scan-codes', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   executeScanCode: vi.fn(),
+  useScanSchemes: () => ({ data: undefined }),
 }));
 
 import { executeScanCode } from '../../api/scan-codes';
@@ -59,7 +61,7 @@ describe('useScanInput — dead grant self-heal', () => {
     // the next scan runs unprimed
     execute.mockResolvedValueOnce({ outcome: 'choices', choices: [] });
     await act(() => result.current.scan.submitCode('10:3:ORD-9'));
-    expect(execute.mock.calls[2][1]).toEqual({});
+    expect(execute.mock.calls[2][1]).toEqual({ stationRole: 'binning-associate' });
   });
 
   it('leaves the identity alone when not_primed answers an unprimed scan', async () => {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ScanBarcode, Plus } from 'lucide-react';
 import { useScanSchemes, useUpsertScanScheme, SCAN_SCHEME_KINDS, type ScanSchemeKind } from '../../../api/scan-codes';
 import { useRoleDetails } from '../../../api/roles';
+import { GrantScopeField } from './GrantScopeField';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
 
 /** The first free two-digit scheme index (10-99), or null when all are taken. */
@@ -59,7 +60,9 @@ export function ScanCodesPage() {
                   target facet <span className="font-mono">{scheme.target_facet}</span>
                   {' · '}{scheme.encoding === 'fixed'
                     ? `fixed, ${scheme.target_length} digit target`
-                    : `delimited by "${scheme.delimiter}"`}
+                    : scheme.encoding === 'gtin'
+                      ? 'manufacturer barcodes (UPC / EAN)'
+                      : `delimited by "${scheme.delimiter}"`}
                 </div>
               </div>
               <span className={`text-2xs uppercase tracking-widest ${scheme.enabled ? 'text-status-success' : 'text-text-quaternary'}`}>
@@ -109,10 +112,11 @@ function NewSchemeForm({
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ScanSchemeKind>(SCAN_SCHEME_KINDS.ACTION);
   const [targetFacet, setTargetFacet] = useState('');
-  const [encoding, setEncoding] = useState<'' | 'fixed' | 'delimited'>('');
+  const [encoding, setEncoding] = useState<'' | 'fixed' | 'delimited' | 'gtin'>('');
   const [targetLength, setTargetLength] = useState(8);
   const [grantTtlSeconds, setGrantTtlSeconds] = useState(3600);
   const [grantMaxUses, setGrantMaxUses] = useState(0);
+  const [grantScope, setGrantScope] = useState<'action' | 'subject'>('action');
 
   const priorityFacets = Array.from(
     new Set((roles?.roles ?? []).map((r) => r.priority_facet).filter(Boolean) as string[]),
@@ -133,6 +137,7 @@ function NewSchemeForm({
       target_length: encoding === 'fixed' ? targetLength : null,
       grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
       grant_max_uses: isIdentity ? grantMaxUses : 0,
+      grant_scope: isIdentity ? grantScope : 'action',
     });
     onDone(version);
   };
@@ -196,7 +201,7 @@ function NewSchemeForm({
           </label>
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Grant max uses</span>
-            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n scans.</span>
+            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n acts.</span>
             <input
               type="number" min={0}
               value={grantMaxUses}
@@ -204,16 +209,18 @@ function NewSchemeForm({
               className="input w-[12rem]"
             />
           </label>
+          <GrantScopeField value={grantScope} onChange={setGrantScope} />
         </div>
       )}
       <div className="flex flex-wrap gap-4">
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Code style <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">Delimited for QR / Code 128, fixed digits for numeric UPC labels.</span>
+          <span className="block text-2xs text-text-tertiary mb-1">Delimited for QR / Code 128, fixed digits for numeric labels, manufacturer barcodes for the codes printed on products.</span>
           <select value={encoding} onChange={(e) => setEncoding(e.target.value as any)} className="select">
             <option value="" disabled>Choose…</option>
             <option value="delimited">Delimited text (QR / Code 128)</option>
             <option value="fixed">Fixed digits (UPC)</option>
+            {!isIdentity && <option value="gtin">Manufacturer barcode (UPC / EAN)</option>}
           </select>
         </label>
         {encoding === 'fixed' && (

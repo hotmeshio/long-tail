@@ -57,4 +57,16 @@ describe('outcome-display', () => {
     })).toBe('Nothing here.');
     expect(outcomeMarkdown({ outcome: SCAN_OUTCOMES.EXECUTED })).toBeNull();
   });
+
+  it('the bench outcomes say what happened: refused names the right container, held asks for the next scan', () => {
+    expect(OUTCOME_TONE[SCAN_OUTCOMES.REFUSED]).toBe('text-status-error');
+    expect(outcomeMarkdown({ outcome: SCAN_OUTCOMES.REFUSED, refusal: { markdown: 'This bag goes in **SF-A-2**.' } }))
+      .toBe('This bag goes in **SF-A-2**.');
+    expect(outcomeMarkdown({
+      outcome: SCAN_OUTCOMES.HELD,
+      subject: { code: '11:0:X', escalationId: 'e', label: 'X', expiresAt: '', expect: { schemes: [14], prompt: 'Scan the bin.' } },
+    })).toBe('Scan the bin.');
+    expect(outcomeMarkdown({ outcome: SCAN_OUTCOMES.SUBJECT_STALE, error: 'Scan it again.' })).toBe('Scan it again.');
+  });
 });
+

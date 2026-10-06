@@ -14,10 +14,12 @@ import type { HelpTokenContext } from '../../lib/x-lt-help';
  * guarded statements the API exposes, so a stale panel gets the server's
  * answer rather than a local guess.
  */
-export function EscalationItemsPanel({ escalationId, items, canWrite, labelTemplate, labelContext }: {
+export function EscalationItemsPanel({ escalationId, items, canWrite, labelTemplate, labelContext, guardWrite }: {
   escalationId: string;
   items: EscalationItems;
   canWrite: boolean;
+  /** Runs a write behind the page's badge challenge (a shared station); absent, writes run directly. */
+  guardWrite?: (verb: string, run: () => void) => void;
   /** The container role's `x-lt-item-label` template; absent, items show their key. */
   labelTemplate?: unknown;
   /** The escalation domains the template may read beside `item`. */
@@ -30,6 +32,7 @@ export function EscalationItemsPanel({ escalationId, items, canWrite, labelTempl
   const [formError, setFormError] = useState<string | null>(null);
 
   const writable = canWrite && items.kind === 'accumulate';
+  const write = (verb: string, run: () => void) => (guardWrite ? guardWrite(verb, run) : run());
   const isFull = items.max !== null && items.count >= items.max;
 
   const submit = () => {
@@ -47,9 +50,9 @@ export function EscalationItemsPanel({ escalationId, items, canWrite, labelTempl
       }
     }
     setFormError(null);
-    add.mutate({ id: escalationId, itemKey: key, payload }, {
+    write('add an item', () => add.mutate({ id: escalationId, itemKey: key, payload }, {
       onSuccess: () => { setItemKey(''); setPayloadText(''); },
-    });
+    }));
   };
 
   const noun = items.kind === 'batch' ? 'filled' : 'held';
@@ -112,7 +115,7 @@ export function EscalationItemsPanel({ escalationId, items, canWrite, labelTempl
               {writable && (
                 <button
                   type="button"
-                  onClick={() => remove.mutate({ id: escalationId, itemKey: item.itemKey })}
+                  onClick={() => write('remove an item', () => remove.mutate({ id: escalationId, itemKey: item.itemKey }))}
                   disabled={remove.isPending}
                   className="icon-link opacity-50 group-hover:opacity-100 shrink-0 p-0.5"
                   title={`Remove ${label ?? item.itemKey}`}

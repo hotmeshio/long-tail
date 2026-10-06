@@ -6,6 +6,7 @@ import {
   setActingIdentityClear,
   setActingIdentitySpent,
   ACTING_TOKEN_HEADER,
+  ACTING_REMAINING_HEADER,
   ApiError,
 } from '../client';
 
@@ -47,26 +48,45 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+function spentResponse(remaining: string | null, body: unknown = { ok: true }, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(remaining !== null ? { [ACTING_REMAINING_HEADER]: remaining } : {}),
+    },
+  });
+}
+
 describe('apiFetch — acting identity spent hook', () => {
-  it('reports the token after any response to a request that carried it', async () => {
+  it('reports the uses left when the server spent the grant', async () => {
     const spent = vi.fn();
     setActingTokenProvider(() => 'eph:v1:acting_identity:one');
     setActingIdentitySpent(spent);
-    fetchSpy.mockResolvedValue(jsonResponse({ ok: true }));
+    fetchSpy.mockResolvedValue(spentResponse('0'));
     await apiFetch('/escalations/e-1/resolve', { method: 'POST' });
-    expect(spent).toHaveBeenCalledWith('eph:v1:acting_identity:one');
+    expect(spent).toHaveBeenCalledWith('eph:v1:acting_identity:one', 0);
 
-    fetchSpy.mockResolvedValue(jsonResponse({ error: 'nope' }, 409));
+    fetchSpy.mockResolvedValue(spentResponse('unbounded'));
+    await apiFetch('/escalations/e-1/resolve', { method: 'POST' });
+    expect(spent).toHaveBeenLastCalledWith('eph:v1:acting_identity:one', null);
+  });
+
+  it('stays silent when the server did not spend the grant', async () => {
+    const spent = vi.fn();
+    setActingTokenProvider(() => 'eph:v1:acting_identity:one');
+    setActingIdentitySpent(spent);
+    fetchSpy.mockResolvedValue(spentResponse(null, { error: 'nope' }, 409));
     await apiFetch('/escalations/e-1/resolve', { method: 'POST' }).catch(() => {});
-    expect(spent).toHaveBeenCalledTimes(2);
+    expect(spent).not.toHaveBeenCalled();
   });
 
   it('stays silent when no acting token rode the request', async () => {
     const spent = vi.fn();
     setActingTokenProvider(() => null);
     setActingIdentitySpent(spent);
-    fetchSpy.mockResolvedValue(jsonResponse({ ok: true }));
-    await apiFetch('/escalations');
+    fetchSpy.mockResolvedValue(spentResponse('0'));
+    await apiFetch('/escalations', { method: 'POST' });
     expect(spent).not.toHaveBeenCalled();
   });
 });
@@ -74,7 +94,7 @@ describe('apiFetch — acting identity spent hook', () => {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('apiFetch — acting identity header', () => {
-  it('attaches X-LT-Acting-Token to every request while a grant is held', async () => {
+  it('attaches X-LT-Acting-Token to writes while a grant is held', async () => {
     setActingTokenProvider(() => 'eph:v1:acting_identity:a');
     fetchSpy.mockResolvedValueOnce(jsonResponse({ ok: true }));
 
@@ -95,6 +115,19 @@ describe('apiFetch — acting identity header', () => {
 
     const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers[ACTING_TOKEN_HEADER]).toBeUndefined();
+  });
+
+  it('reads never carry the grant, so a background refetch can never spend it', async () => {
+    const spent = vi.fn();
+    setActingTokenProvider(() => 'eph:v1:acting_identity:a');
+    setActingIdentitySpent(spent);
+    fetchSpy.mockResolvedValueOnce(spentResponse('0'));
+
+    await apiFetch('/escalations?role=binning');
+
+    const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers[ACTING_TOKEN_HEADER]).toBeUndefined();
+    expect(spent).not.toHaveBeenCalled();
   });
 
   it('sends no acting header when no provider is registered', async () => {

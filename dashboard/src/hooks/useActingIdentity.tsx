@@ -19,8 +19,8 @@ export interface ActingIdentity {
   displayName: string;
   /** ISO expiry copy; the keystore enforces the real one. */
   expiresAt: string | null;
-  /** A one-exchange grant: retired after the first request that carries it. */
-  singleUse: boolean;
+  /** The grant binds to the first subject it acts on (identity scheme grant_scope 'subject'). */
+  subjectScoped: boolean;
 }
 
 interface ActingIdentityContextValue {
@@ -32,6 +32,11 @@ interface ActingIdentityContextValue {
    */
   prime(response: ScanExecuteResponse): string | null;
   clear(): void;
+  /**
+   * Apply what a scan response says happened to the grant it carried: retire
+   * it when no uses remain, or when a subject-scoped grant's subject is done.
+   */
+  settle(token: string, response: ScanExecuteResponse): void;
   /** Whole seconds until the grant lapses; 0 when none or already lapsed. */
   remainingSeconds(): number;
 }
@@ -75,19 +80,27 @@ export function ActingIdentityProvider({ children }: { children: ReactNode }) {
       actorId: response.actor.id,
       displayName: response.actor.displayName,
       expiresAt: response.expiresAt ?? null,
-      singleUse: response.maxUses === 1,
+      subjectScoped: response.grantScope === 'subject',
     });
     return previous;
   }, []);
 
   const clear = useCallback(() => setIdentity(null), []);
 
-  // A single-shot grant dies on the server at its first exchange; retire the
-  // client copy at the same moment, matched by token so a newer grant primed
-  // in the meantime is never dropped.
-  const spent = useCallback((token: string) => {
+  // Retire the client copy when the server says the grant is used up,
+  // matched by token so a newer grant primed in the meantime is never dropped.
+  const spent = useCallback((token: string, remaining: number | null) => {
     const current = identityRef.current;
-    if (current?.singleUse && current.actingToken === token) setIdentity(null);
+    if (remaining === 0 && current?.actingToken === token) setIdentity(null);
+  }, []);
+
+  const settle = useCallback((token: string, response: ScanExecuteResponse) => {
+    const current = identityRef.current;
+    if (!current || current.actingToken !== token || !response.acting) return;
+    const { consumed, remaining, bound } = response.acting;
+    if (consumed && remaining === 0) setIdentity(null);
+    // A grant bound to one subject is spent for good once that subject is done.
+    else if (bound && response.clearSubject) setIdentity(null);
   }, []);
 
   // Register the grant with the API client: every request carries the acting
@@ -111,8 +124,8 @@ export function ActingIdentityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ identity, prime, clear, remainingSeconds }),
-    [identity, prime, clear, remainingSeconds],
+    () => ({ identity, prime, clear, settle, remainingSeconds }),
+    [identity, prime, clear, settle, remainingSeconds],
   );
 
   return <ActingIdentityContext.Provider value={value}>{children}</ActingIdentityContext.Provider>;

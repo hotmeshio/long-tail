@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createWedgeMachine, type WedgeConfig } from '../lib/scan-sources/keyboard-wedge';
+import { createWedgeMachine, type TailShape, type WedgeConfig } from '../lib/scan-sources/keyboard-wedge';
 import { removeFromActiveEditable } from '../lib/scan-sources/editable-repair';
 
 /** One observed keydown, as the capture machine saw it. */
@@ -24,12 +24,15 @@ export interface ScanKeyDiag {
 export function useWedgeCapture({
   active,
   wedgeConfig,
+  tailShapes,
   diagnosticsOn,
   onScan,
   onDiag,
 }: {
   active: boolean;
   wedgeConfig: WedgeConfig;
+  /** The code shapes the configured schemes read. */
+  tailShapes?: TailShape[];
   diagnosticsOn: boolean;
   onScan: (code: string) => void;
   onDiag: (entry: ScanKeyDiag) => void;
@@ -42,7 +45,7 @@ export function useWedgeCapture({
 
   useEffect(() => {
     if (!active) return;
-    const machine = createWedgeMachine(wedgeConfig);
+    const machine = createWedgeMachine(wedgeConfig, tailShapes);
     let autoFireTimer: ReturnType<typeof setTimeout> | null = null;
 
     const clearAutoFire = () => {
@@ -135,5 +138,5 @@ export function useWedgeCapture({
       clearAutoFire();
       window.removeEventListener('keydown', onKeyDown, { capture: true });
     };
-  }, [active, wedgeConfig]);
+  }, [active, wedgeConfig, tailShapes]);
 }

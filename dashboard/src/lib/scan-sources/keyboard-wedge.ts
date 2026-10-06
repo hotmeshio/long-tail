@@ -11,13 +11,17 @@
  * Shift keys for capitals and ':', stalls mid-burst — because nothing has to
  * be recognized mid-flight.
  *
- * The code vocabulary is ours, so the shape is strict:
- *   delimited — [1-9][0-9]:[0-9]:target, target of [a-zA-Z0-9._-]
- *   fixed     — 2 scheme digits + 1 category digit + 5+ target digits (digits only)
- * Typing a valid code and pressing Enter fires it too, anywhere — that is the
- * contract, not an accident: the scanner IS a keyboard, so the keyboard is a
- * scanner.
+ * The shapes come from the configured schemes (see buildTailShapes):
+ *   delimited: VV:C:target per scheme version, target of [a-zA-Z0-9._-]
+ *   fixed:     VV + category + exactly the scheme's target digits
+ *   gtin:      a whole 8/12/13/14-digit run whose check digit holds
+ * Until the schemes load, generic shapes stand in. Typing a delimited code
+ * and pressing Enter fires it too, anywhere: the scanner IS a keyboard. A
+ * digits-only code fires only at scanner speed, so a typed PO number or
+ * count followed by Enter stays in its field.
  */
+
+import { isValidGtin } from '../../../../shared/scan-code';
 
 export interface WedgeConfig {
   /** Max ms between keys before the accumulator restarts. Generous by design —
@@ -68,24 +72,82 @@ export function saveWedgeConfig(config: Partial<WedgeConfig>): WedgeConfig {
 }
 
 /**
- * The scan-code shapes, anchored to the END of the accumulated keys — the
- * code may follow unrelated text typed earlier in the same field.
- * Lowercase targets are the recommended vocabulary; capitals are accepted
- * and preserved (metadata matching is case-sensitive).
+ * One recognizable code shape, anchored to the END of the accumulated keys
+ * (the code may follow unrelated text typed earlier in the same field). The
+ * code is capture group 1; the group before it is a boundary, so a code never
+ * starts in the middle of a longer run of digits.
  */
-const TAIL_SHAPES = [
-  /[1-9][0-9]:[0-9]:[a-zA-Z0-9._-]+$/, // delimited: ##:#:target
-  /[1-9][0-9]{7,}$/,                   // fixed: 2 scheme + 1 category + 5+ target digits
+export interface TailShape {
+  pattern: RegExp;
+  /** Digits only: fires only when the code arrived at scanner speed. */
+  digitsOnly: boolean;
+  /** Extra acceptance test on the matched code (e.g. a GTIN check digit). */
+  accept?: (code: string) => boolean;
+}
+
+/** The scheme fields capture reads. */
+export interface CaptureScheme {
+  version: number;
+  encoding: 'fixed' | 'delimited' | 'gtin';
+  delimiter: string;
+  target_length: number | null;
+  enabled: boolean;
+}
+
+/** Generic shapes for before the schemes load. */
+export const DEFAULT_TAIL_SHAPES: TailShape[] = [
+  { pattern: /(?:^|[^0-9])([1-9][0-9]:[0-9]:[a-zA-Z0-9._-]+)$/, digitsOnly: false },
+  { pattern: /(?:^|[^0-9])([1-9][0-9]{7,})$/, digitsOnly: true },
 ];
 
-/** The longest scan-code tail of the buffer, or null. */
-export function matchScanTail(buffer: string): string | null {
-  let best: string | null = null;
-  for (const shape of TAIL_SHAPES) {
-    const m = buffer.match(shape);
-    if (m && (!best || m[0].length > best.length)) best = m[0];
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** The shapes the configured schemes read. Identity (badge) schemes included. */
+export function buildTailShapes(schemes: CaptureScheme[]): TailShape[] {
+  const shapes: TailShape[] = [];
+  for (const scheme of schemes.filter((s) => s.enabled)) {
+    if (scheme.encoding === 'delimited') {
+      const d = escapeRegExp(scheme.delimiter);
+      shapes.push({
+        pattern: new RegExp(`(?:^|[^0-9])(${scheme.version}${d}[0-9]${d}[a-zA-Z0-9._-]+)$`),
+        digitsOnly: false,
+      });
+    } else if (scheme.encoding === 'fixed') {
+      const digits = 1 + (scheme.target_length ?? 0);
+      shapes.push({
+        pattern: new RegExp(`(?:^|[^0-9])(${scheme.version}[0-9]{${digits},${digits + 1}})$`),
+        digitsOnly: true,
+      });
+    } else if (scheme.encoding === 'gtin') {
+      shapes.push({
+        pattern: /(?:^|[^0-9])([0-9]{8}|[0-9]{12,14})$/,
+        digitsOnly: true,
+        accept: isValidGtin,
+      });
+    }
+  }
+  return shapes.length ? shapes : DEFAULT_TAIL_SHAPES;
+}
+
+/** The longest scan-code tail of the buffer, with its shape, or null. */
+export function matchScanShape(
+  buffer: string,
+  shapes: TailShape[] = DEFAULT_TAIL_SHAPES,
+): { code: string; shape: TailShape } | null {
+  let best: { code: string; shape: TailShape } | null = null;
+  for (const shape of shapes) {
+    const code = buffer.match(shape.pattern)?.[1];
+    if (!code || (shape.accept && !shape.accept(code))) continue;
+    if (!best || code.length > best.code.length) best = { code, shape };
   }
   return best;
+}
+
+/** The longest scan-code tail of the buffer, or null. */
+export function matchScanTail(buffer: string, shapes: TailShape[] = DEFAULT_TAIL_SHAPES): string | null {
+  return matchScanShape(buffer, shapes)?.code ?? null;
 }
 
 export interface WedgeKey {
@@ -129,8 +191,27 @@ const NEUTRAL_KEYS = new Set(['Shift', 'CapsLock']);
 
 const PASS: WedgeStep = { suppress: false, emit: null };
 
-export function createWedgeMachine(config: WedgeConfig = WEDGE_DEFAULTS) {
+export function createWedgeMachine(
+  config: WedgeConfig = WEDGE_DEFAULTS,
+  shapes: TailShape[] = DEFAULT_TAIL_SHAPES,
+) {
   let state: WedgeState = { buffer: '', times: [], lastKeyMs: 0 };
+
+  /** True when the code's characters arrived at scanner speed. */
+  function scannerPaced(code: string): boolean {
+    const times = state.times.slice(-code.length);
+    if (times.length < 2) return false;
+    const avgKeyMs = (times[times.length - 1] - times[0]) / (times.length - 1);
+    return avgKeyMs <= config.autoFireMaxAvgKeyMs;
+  }
+
+  /** The tail to emit now, honoring minLength and the digits-only speed gate. */
+  function capturable(): string | null {
+    const match = matchScanShape(state.buffer, shapes);
+    if (!match || match.code.length < config.minLength) return null;
+    if (match.shape.digitsOnly && !scannerPaced(match.code)) return null;
+    return match.code;
+  }
 
   function reset(): void {
     state = { buffer: '', times: [], lastKeyMs: 0 };
@@ -142,11 +223,9 @@ export function createWedgeMachine(config: WedgeConfig = WEDGE_DEFAULTS) {
     if (NEUTRAL_KEYS.has(key)) return PASS;
 
     if (config.terminators.includes(key)) {
-      const code = matchScanTail(state.buffer);
+      const code = capturable();
       reset();
-      if (code && code.length >= config.minLength) {
-        return { suppress: true, emit: code, consumedLength: code.length };
-      }
+      if (code) return { suppress: true, emit: code, consumedLength: code.length };
       return PASS;
     }
 
@@ -177,12 +256,8 @@ export function createWedgeMachine(config: WedgeConfig = WEDGE_DEFAULTS) {
    * fires it after `autoFireQuietMs` of silence and resets the machine.
    */
   function pendingAutoFire(): { code: string; consumedLength: number } | null {
-    const code = matchScanTail(state.buffer);
-    if (!code || code.length < config.minLength) return null;
-    const times = state.times.slice(-code.length);
-    if (times.length < 2) return null;
-    const avgKeyMs = (times[times.length - 1] - times[0]) / (times.length - 1);
-    if (avgKeyMs > config.autoFireMaxAvgKeyMs) return null;
+    const code = capturable();
+    if (!code || !scannerPaced(code)) return null;
     return { code, consumedLength: code.length };
   }
 

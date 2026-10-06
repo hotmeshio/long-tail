@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { PillMultiSelect } from '../../../components/common/form/PillMultiSelect';
 import { SCAN_VERBS, type ScanStep, type ScanVerb } from '../../../api/scan-codes';
 import { ScanChoiceEditor } from './ScanChoiceEditor';
+import { SubjectStepFields } from './SubjectStepFields';
 
 export const VERB_LABELS: Record<ScanVerb, string> = {
   [SCAN_VERBS.SHOW_DETAIL]: 'Show the item',
@@ -15,6 +16,8 @@ export const VERB_LABELS: Record<ScanVerb, string> = {
   [SCAN_VERBS.CANCEL]: 'Cancel',
   [SCAN_VERBS.ACCUMULATE]: 'Add to an accumulator',
   [SCAN_VERBS.PRESENT]: 'Show reality + choices',
+  [SCAN_VERBS.HOLD]: 'Hold it for the next scan',
+  [SCAN_VERBS.FILL]: 'Check off one expected item',
 };
 
 /** One condition/action step: the query, the verb, and the verb's parameters. */
@@ -61,6 +64,7 @@ export function StepRow({
   const needsTargetRole = step.verb === SCAN_VERBS.ESCALATE;
   const isAccumulate = step.verb === SCAN_VERBS.ACCUMULATE;
   const itemMode = isAccumulate && !!step.params?.accumulate?.containerFacet;
+  const subjectMode = isAccumulate && !!(step.params?.accumulate?.from || step.params?.accumulate?.into);
   const patchAccumulate = (patch: Partial<NonNullable<NonNullable<ScanStep['params']>['accumulate']>>) =>
     patchParams({ accumulate: { ...step.params?.accumulate, ...patch } });
   const needsPayload = step.verb === SCAN_VERBS.RESOLVE
@@ -116,7 +120,16 @@ export function StepRow({
           <span className="block text-2xs text-text-tertiary mb-1">The action this step performs on a match.</span>
           <select
             value={step.verb}
-            onChange={(e) => onPatch({ verb: e.target.value as ScanVerb, params: undefined, confirm: undefined, choices: undefined, autoSelectSingle: undefined })}
+            onChange={(e) => {
+              const verb = e.target.value as ScanVerb;
+              const fills = verb === SCAN_VERBS.FILL;
+              onPatch({
+                verb,
+                params: fills ? { fill: { into: 'subject' } } : undefined,
+                confirm: undefined, choices: undefined, autoSelectSingle: undefined,
+                subject: fills ? { schemes: [] } : undefined, match: undefined, refuse: undefined,
+              });
+            }}
             className="select"
           >
             {Object.entries(VERB_LABELS).map(([verb, label]) => (
@@ -153,7 +166,7 @@ export function StepRow({
             </select>
           </label>
         )}
-        {isAccumulate && (
+        {isAccumulate && !subjectMode && (
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Container facet</span>
             <span className="block text-2xs text-text-tertiary mb-1">
@@ -168,11 +181,11 @@ export function StepRow({
             />
           </label>
         )}
-        {isAccumulate && !itemMode && (
+        {isAccumulate && !itemMode && !step.params?.accumulate?.into && (
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Item key <span className="text-status-error">*</span></span>
             <span className="block text-2xs text-text-tertiary mb-1">
-              The key the item is held under. {'{scan.target}'} fills from the scan; {'{claim.orderId}'} reads the acting user's live claim.
+              The key the item is held under. {'{scan.target}'} fills from the scan; {'{subject.<facet>}'} reads the held item; {'{claim.<facet>}'} the acting user's live claim.
             </span>
             <input
               value={step.params?.itemKey ?? ''}
@@ -209,7 +222,7 @@ export function StepRow({
             </span>
           </label>
         )}
-        {!isPresent && (
+        {!isPresent && !step.subject && step.verb !== SCAN_VERBS.HOLD && step.verb !== SCAN_VERBS.FILL && (
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Confirmation</span>
             <span className="block text-2xs text-text-tertiary mb-1">Ask before acting — the prompt shows on the item.</span>
@@ -244,6 +257,8 @@ export function StepRow({
           </label>
         )}
       </div>
+
+      <SubjectStepFields step={step} onPatch={onPatch} />
 
       {needsPayload && (
         <label className="block">

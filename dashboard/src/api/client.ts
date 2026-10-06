@@ -38,6 +38,9 @@ export function getToken(): string | null {
 
 export const ACTING_TOKEN_HEADER = 'X-LT-Acting-Token';
 
+/** Uses the grant has left after a work route spent one (`unbounded` = TTL only). */
+export const ACTING_REMAINING_HEADER = 'X-LT-Acting-Remaining';
+
 let actingTokenProvider: (() => string | null) | null = null;
 let actingIdentityClear: (() => void) | null = null;
 
@@ -45,15 +48,14 @@ export function setActingTokenProvider(fn: (() => string | null) | null) {
   actingTokenProvider = fn;
 }
 
-let actingIdentitySpent: ((token: string) => void) | null = null;
+let actingIdentitySpent: ((token: string, remaining: number | null) => void) | null = null;
 
 /**
- * Called after every response to a request that carried the acting token.
- * The identity provider uses it to retire a single-shot grant the moment its
- * one exchange has happened, so the client never holds a token the server
- * has already consumed.
+ * Called when the server reports a spend of the acting grant. The identity
+ * provider retires the grant when no uses remain, so the client never holds
+ * a token the server has already used up, and never drops one it has not.
  */
-export function setActingIdentitySpent(fn: ((token: string) => void) | null) {
+export function setActingIdentitySpent(fn: ((token: string, remaining: number | null) => void) | null) {
   actingIdentitySpent = fn;
 }
 
@@ -127,7 +129,9 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  const actingToken = actingTokenProvider?.() ?? null;
+  // Only a write can spend the grant; reads never carry it.
+  const method = (options.method ?? 'GET').toUpperCase();
+  const actingToken = method === 'GET' ? null : actingTokenProvider?.() ?? null;
   if (actingToken) {
     headers[ACTING_TOKEN_HEADER] = actingToken;
   }
@@ -137,9 +141,11 @@ export async function apiFetch<T>(
     headers,
   });
 
-  // The server exchanged the grant on this request; a single-shot grant is
-  // spent now, whatever the response said.
-  if (actingToken) actingIdentitySpent?.(actingToken);
+  // A work route that spent the grant says how many uses are left.
+  const remaining = actingToken ? res.headers.get(ACTING_REMAINING_HEADER) : null;
+  if (actingToken && remaining !== null) {
+    actingIdentitySpent?.(actingToken, remaining === 'unbounded' ? null : Number(remaining));
+  }
 
   // A dead badge grant answers 401 with an acting-identity error — the session
   // itself is fine, so this never enters the refresh/logout path. Clear the
