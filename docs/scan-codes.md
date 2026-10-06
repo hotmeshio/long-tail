@@ -23,6 +23,7 @@ canonical action surface. A scan is an **ECA rule** over that surface:
 - [Rules and steps](#rules-and-steps)
 - [Confirmation](#confirmation)
 - [Info-choice screens](#info-choice-screens)
+- [Holding an item: the bench motion](#holding-an-item-the-bench-motion)
 - [Identity schemes and acting identity](#identity-schemes-and-acting-identity)
 - [Station deployments](#station-deployments)
 - [The fallback screen](#the-fallback-screen)
@@ -31,6 +32,7 @@ canonical action surface. A scan is an **ECA rule** over that surface:
 - [Scanner setup](#scanner-setup)
 - [Admin configuration](#admin-configuration)
 - [The printer demo](#the-printer-demo)
+- [The bag and bin demo](#the-bag-and-bin-demo)
 
 ## The code
 
@@ -62,6 +64,14 @@ A scheme (`lt_config_scan_schemes`, indexed 10–99) declares:
     `1015949975930`. Fits UPC-A/EAN/ITF labels; a trailing check digit is
     accepted. Two digits of version + one of category + `target_length`
     digits of target.
+  - `gtin` — manufacturer barcodes: UPC-A, EAN-13, EAN-8 and GTIN-14, as
+    printed on products. The code carries no version or category; a valid
+    check digit identifies it. The target is the 14-digit GTIN (a UPC-A
+    `036000291452` targets `00036000291452`), `{scan.code}` keeps the code as
+    scanned, and the scheme's one rule is category `0`. A deployment has at
+    most one gtin scheme, and while it is enabled no enabled fixed scheme may
+    accept an 8, 12, 13 or 14 digit code: the scheme write is refused, naming
+    both schemes, so a digits-only code always has exactly one reading.
 
 ## Rules and steps
 
@@ -111,8 +121,8 @@ Verbs are the canonical escalation actions:
 
 A `resolve` step applies it inside the atomic resolve: `mine` resolves the
 actor's own claim, the most recently claimed first when there are several,
-so a shelf scan bins the bag in the associate's hand even when another bag
-for the same shelf is waiting. With no matching row the step falls through.
+so a container scan places the item in the associate's hand even when
+another item for the same container is waiting. With no matching row the step falls through.
 
 String values inside `itemKey`, `resolverPayload`, and `metadata` interpolate
 `{scan.target}`, `{scan.category}`, and `{scan.scannedAt}`. Two facet bags
@@ -121,15 +131,15 @@ extend them: `{claim.<facet>}` reads the acting user's single live claim
 make the step fall through), and `{item.<facet>}` reads the row an item-mode
 `accumulate` step located. A token that cannot resolve falls through instead
 of writing the literal, and the rule editor rejects `{item.…}` on any other
-step. A bag-first ladder therefore names the order from the claim:
-`"itemKey": "{claim.orderId}"` on the shelf scan. Every mutating verb stamps
+step. An item-first ladder therefore names the item from the claim:
+`"itemKey": "{claim.itemId}"` on the container scan. Every mutating verb stamps
 provenance facets onto the row it touches — `scanScheme`, `scanCategory`,
 `scanActionName`, `scannedAt` — so scan-driven transitions stay queryable.
 
 `accumulate` has two modes. With `params.accumulate.containerFacet` the
 scanned target is the ITEM: the step locates the item's own pending row
-through the scheme facet, reads that facet from the row (a bag row carrying
-`binKey: "B-7"`), and adds the target to the pending accumulator whose
+through the scheme facet, reads that facet from the row (an item row carrying
+`containerKey: "C-7"`), and adds the target to the pending accumulator whose
 metadata carries the same value, writing the item's row as the reciprocal in
 the same statement (`reciprocal: false` skips it). The container pick
 considers only pending rows that carry the accumulator declaration, so a
@@ -138,27 +148,27 @@ release row sharing the facet during a pack-out is never the target.
 
 ```jsonc
 "accumulate": {
-  "containerFacet": "boxKey",
+  "containerFacet": "containerKey",
   "container": {
-    "roles": ["match-filling"],   // container queues (containerRoles is an alias)
-    "types": ["matchBox"],        // escalation type
-    "subtypes": ["box"],          // escalation subtype
+    "roles": ["packing"],         // container queues (containerRoles is an alias)
+    "types": ["container"],       // escalation type
+    "subtypes": ["open"],         // escalation subtype
     "facets": { "open": true }    // extra metadata guards
   }
 }
 ```
 
 A design that parks each item as its own accumulator in the same queue as
-its container (a bag's slot beside its box, both carrying `boxKey`) declares
-the container's type or subtype, so the add lands in the box and never in a
-sibling's slot. The item's own row is never its container. Without it the scanned target is the CONTAINER and the step
+its container (an item's slot beside its container, both carrying
+`containerKey`) declares the container's type or subtype, so the add lands in
+the container and never in a sibling's slot. The item's own row is never its container. Without it the scanned target is the CONTAINER and the step
 adds `params.itemKey` (a template) to it. An item with no row or no container
 facet falls through to the next step; a container already holding the item
 reports a conflict. When the item's row exists but no pending container
 carries its facet (the previous container closed and its successor has not
 parked yet), the step answers `no_open_container` with the item row, the
 facet, and the rule's fallback markdown, so the station reads "Container
-closing, scan again" instead of the bag with no hint.
+closing, scan again" instead of the item with no hint.
 
 Ordering is the power move: put the expected state first and a broad
 `show-detail` last. A machine whose twin is in the wrong queue still answers
@@ -182,7 +192,7 @@ guarded call every other surface uses.
 
 ## Info-choice screens
 
-Some objects carry one code for their whole life — an item tag, an order
+Some objects carry one code for their whole life — an item tag, a record
 label. One code, many possible intents, and the right one depends on where
 the object is in its journey. The `present` verb closes that gap: the step
 locates the row, states its reality, and returns a configured, labeled
@@ -231,6 +241,121 @@ duration, form on screen. An unsatisfied identity requirement never
 auto-fires as the wrong actor — the scan stops over at the badge screen and
 completes on its own once a badge primes.
 
+## Holding an item: the bench motion
+
+At a bench where items go into containers, every act is one item going into
+one container, or one expected item checked off a record. The motion is three scans with nothing in between: **the item, your badge, the
+container**. The container scan is the act. The item scan only says which
+item; the badge says who.
+
+**`hold`** is the item scan. The step locates the row and answers `held`
+with a **subject**: the code that held it, the row id, a label, an expiry,
+and what to scan next. It writes nothing and spends no badge use. The
+station keeps the subject (device-local, in memory) and sends it back with
+the next scans as `subject: { code, escalationId }`. Scanning another item
+replaces it; it lapses on its own after `ttlSeconds` (default 45).
+
+```jsonc
+{ "query": { "roles": ["packing"] }, "verb": "hold",
+  "params": { "hold": { "ttlSeconds": 300, "label": "{scan.target}",
+    "headline": "{item.containerCode}", "subline": "{item.locationName}",
+    "expect": { "schemes": [14], "prompt": "Walk to this container and scan it.\n\n{item.labelNote}" } } } }
+```
+
+**What the station shows.** With `hold.headline` the destination leads the
+screen: the headline (e.g. `{item.containerCode}`) in very large type, `hold.subline`
+under it (e.g. `{item.locationName}`), the held item itself as a quieter line
+above, then the `expect.prompt`. A template that renders empty drops its line,
+so a row-level note such as `{item.labelNote}` appears only when the workflow
+set one ("Take the new label from the printer and stick it on C-12").
+Any step that writes may carry `done: { markdown }`: the copy the station shows,
+large, once the write lands and until the next scan ("Place it in
+**{container.containerCode}**. All good."). It reads the same bags its refusal copy
+reads. A fill that leaves items to scan shows its done copy as the progress
+line under the hold.
+
+The server trusts nothing about the subject. Each request re-parses its
+code, re-reads the row under the station's read scope, requires the row to
+still carry the code's target and to be pending. A subject that fails is
+stale: steps that need one are skipped, and when nothing else matches the
+answer is `subject_stale` with `clearSubject: true`.
+
+**Subject steps** run only while a subject from one of `subject.schemes` is
+held, and act on it. The `{subject.<facet>}` template bag reads the held
+row.
+
+| Step | What the container scan does |
+|---|---|
+| `accumulate` with `accumulate.from: "subject"` | The held item joins the accumulator the scan names (found by the scheme facet, narrowed by `accumulate.container`). The held row is written as the reciprocal in the same statement, so a held row parked as a one-slot accumulator completes and its workflow wakes. `params.itemKey` names the item, e.g. `{subject.itemId}`. |
+| `accumulate` with `accumulate.into: "subject"` | The held row collects the scanned code (`itemKey` defaults to `{scan.target}`). Use it when the container has no row yet: the first item for a container tells the workflow which container was scanned. |
+| `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. `fill.into: "scanned"` fills the row the scan itself names. |
+
+**`match` and `refuse`** check the pairing before anything is written.
+`match.target` lists templates the scanned target must equal (e.g.
+`["{subject.containerCode}"]`); `match.facets` lists facets the located container
+must share with the held row (e.g. `["containerKey"]`). A miss answers `refused`
+with `refuse.markdown` rendered, and nothing is written. The copy may read
+`{container.<facet>}` (the container the scan named) and `{fill.pending}`
+(what a fill still expects), so the station says what is wrong and where the
+item goes: "That's Acme West's container. This one goes in **C-12**." When the
+write itself loses a race (the container closed, another bench took the free
+container), the answer is `refused` with `refuse.conflict`, and a step that
+declares `refuse.conflict` also clears the subject so the next item scan
+reads fresh state. Exactly one of two racing acts wins whenever both name
+the same row: the reciprocal statement writes both rows or neither.
+
+**One rule, several kinds of held item.** `subject.facets` makes a step
+apply only while the held row carries those facet values; otherwise the step
+is skipped and the next one runs. A placing bench uses it to tell an item
+whose destination already has a container from one that needs a free
+container: the item row carries `placement: 'assigned'` or `'unassigned'`, and
+the container label's rule has one step for each.
+
+```jsonc
+// 14:0, container label
+[
+  { "verb": "accumulate", "requireActingIdentity": true,
+    "subject": { "schemes": [11], "facets": { "placement": "assigned" } },
+    "match": { "target": ["{subject.containerCode}"] },
+    "refuse": { "markdown": "That's {container.locationName}'s container. This one goes in **{subject.containerCode}**." },
+    "params": { "itemKey": "{subject.itemId}",
+      "accumulate": { "from": "subject", "container": { "types": ["container"], "subtypes": ["open"] } } } },
+  { "verb": "accumulate", "requireActingIdentity": true,
+    "subject": { "schemes": [11], "facets": { "placement": "unassigned" } },
+    "match": { "target": ["{subject.offeredContainers}"] },
+    "refuse": { "markdown": "Choose a free container: {subject.offeredContainers}.",
+                "conflict": "That container was just taken. Scan the item again.",
+                "missing": "That container was just taken. Scan the item again." },
+    "params": { "itemKey": "{subject.itemId}",
+      "accumulate": { "from": "subject", "container": { "types": ["container"], "subtypes": ["free"] } } } },
+  { "query": { "roles": ["packing"] }, "verb": "present", "choices": [ /* Close this container, View container */ ] }
+]
+```
+
+The workflow stamps the containers it offers on the item row (`offeredContainers`). A
+`match.target` entry that is a lone token naming a list facet allows every
+entry, so any offered container takes the item and any other is refused with
+the offer listed. A free container is a `max: 1` accumulator row, so of two
+items racing for one free container exactly one lands; the other is refused with the
+conflict copy. `refuse.missing` covers an offered container with no open row (taken
+a moment ago): the scan is refused instead of falling through to the next
+step. The third step has no subject gate: scanning a container with no item
+held offers to close it.
+
+Someone else's live claim on the held row refuses the act with their name
+(`subject.claimedByOther: "allow"` lifts this). An item already in the
+scanned container answers `executed` with `already: true`, and nothing is
+written twice.
+
+The badge can come before the item or between the item and the container. A
+container scan that needs a badge answers `not_primed` with
+`replayable: true`; the station keeps the subject, asks for the badge, and
+replays the container scan once the badge primes.
+
+Subject steps sit beside the steps a rule already has: with no subject held
+they are skipped, so the same rule keeps working for scans made without the
+item scan first.
+
 ## Identity schemes and acting identity
 
 A scheme with `kind: "identity"` is the badge layer. Its `target_facet`
@@ -247,7 +372,39 @@ scheme's policy:
 | Scheme field | Meaning |
 |---|---|
 | `grant_ttl_seconds` | How long the grant lives (1–86400). |
-| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n requests that carry it, scans and work verbs alike (a strict one-request policy is `1`). The primed response carries `maxUses`; a single-shot grant is retired on the device the moment its one request returns, and a scan that comes back `not_primed` while a grant is held drops that grant, so the next scan runs unprimed instead of repeating the badge screen. A badge-gated submit likewise retires its badge once the write lands. |
+| `grant_max_uses` | `0` = TTL-bound; `n` = the grant covers n acts (a strict one-act policy is `1`). |
+| `grant_scope` | `action` (default): each act spends one use. `subject`: the first act binds the grant to the held subject; further acts on that subject spend nothing, and the grant acts on no other subject. One badge then covers one item's whole motion (every part checked off one record) and never carries to the next item. |
+
+**The station decides the policy.** One printed badge works at every bench,
+but benches want different policies: a workstation grants one act per badge
+scan (claim, then submit, takes two scans), a high-volume placing bench grants
+ten minutes of acts. A role may declare its stations' policy in `properties.badge_grant`:
+
+```jsonc
+"properties": { "kiosk": true, "badge_grant": { "ttl_seconds": 600, "max_uses": 0 } }
+```
+
+A badge scanned on a device signed in as a member of that role mints under
+it; fields left out keep the badge scheme's values (`scope` is the role's
+`grant_scope`). A device that belongs to several roles with different
+policies uses the role it is locked to (the dashboard sends its kiosk role as
+`stationRole` with every scan); with no role policy, or no way to choose
+between several, the badge scheme's own policy applies. The policy is
+validated where the role is written: an unusable `badge_grant` is a 400 from
+the role API and fails a code-owned role's startup apply. The role page edits
+it under **Members → Badge at this station**.
+
+A grant is spent by **acts**, not by looking. A scan that shows, presents,
+holds, or refuses reads the grant without spending it; a mutating verb spends
+one use just before it writes, and a write that does not land (the step
+falls through, the scan is refused) gives the use back. Every scan response
+that carried a grant reports `acting: { consumed, remaining, bound }`, and
+the escalation work routes report the uses left in the
+`X-LT-Acting-Remaining` header. The device retires its copy of the grant when
+the server reports none left, or when a subject-bound grant's subject is
+done; reads never carry the grant at all. A scan that comes back
+`not_primed` while a grant is held drops that grant, so the next scan runs
+unprimed instead of repeating the badge screen.
 
 The grant rides subsequent scans as `actingToken`. Verbs then run **as the
 badged person under their own live RBAC** — the grant confers attribution,
@@ -333,6 +490,12 @@ to continue. The badge scan primes the session and the pending action
 completes on its own. With a live grant the stop-over never appears — the
 identity layer is invisible when all is well.
 
+A field can take a scan while the form is open: with
+[`x-lt-scan`](hitl/x-lt-scan.md), scanning a container into a claimed form
+fills its container field (checked against what the record expects), and
+`x-lt-scan-submit` submits once the scan fields are filled, which raises the
+badge prompt. A scan no field accepts runs globally as usual.
+
 Badge tokens are printed credentials: seed them as long random strings,
 bind them server-side (`lt_users.metadata`), and treat badge possession
 with the same physical policy as any badge system. Unknown badges answer
@@ -347,9 +510,10 @@ renders the markdown; a configured route navigates.
 
 ## Executing a scan
 
-`POST /api/scan-codes/execute` takes `{ "code": "10:1:SN-123" }` and runs
-as the calling user under normal RBAC. Every terminal state is a structured
-200 outcome:
+`POST /api/scan-codes/execute` takes `{ "code": "10:1:SN-123" }` (plus
+`actingToken` and `subject` when the station holds them) and runs as the
+calling user under normal RBAC. Every terminal state is a structured 200
+outcome:
 
 | Outcome | Meaning |
 |---------|---------|
@@ -362,6 +526,15 @@ as the calling user under normal RBAC. Every terminal state is a structured
 | `invalid_code` | The string parses under no enabled scheme |
 | `forbidden` | The caller's roles bar the matched action |
 | `conflict` | A concurrent actor won the row |
+| `choices` | A `present` step located its row; `escalation` + `choices` included |
+| `held` | A `hold` step located its row; `subject` included |
+| `refused` | The scan was understood and not acted on; nothing written; `refusal.markdown` (and `refusal.expected`) included |
+| `subject_stale` | The held subject moved on; `clearSubject: true` |
+| `not_primed` | The act needs a badge; `notPrimed` included, `replayable: true` when the scan may run again once one primes |
+| `identity_primed` / `identity_unknown` | A badge scan matched a person, or did not |
+
+A step's payload rejected by the role's form schema answers `refused` with
+the reason, never a raw 422.
 
 The endpoint is source-agnostic — anything that produces a string can drive
 it: a barcode scanner, an RFID reader, a camera decode, an MCP tool
@@ -381,8 +554,18 @@ When enabled, the dashboard listens for scans globally — any page, any focus
 state. A scanner paired as an HID keyboard "types" its decode and finishes
 with Enter; capture is **pattern-anchored**: a capture-phase window listener
 accumulates keystrokes freely, and when the terminator arrives it checks
-whether the recent keys end with a scan-code shape
-(`[1-9][0-9]:[0-9]:target` or the digits-only fixed form).
+whether the recent keys end with a scan-code shape. The shapes come from the
+configured schemes: each delimited version's `VV:C:target`, each fixed
+scheme's exact digit lengths, and for a gtin scheme a whole 8, 12, 13 or 14
+digit run whose check digit holds (a leading zero is part of the code). A
+code never starts inside a longer run of digits.
+
+- **Digits-only codes fire only at scanner speed** (avg ≤ 50 ms/key). A
+  typed PO number or count followed by Enter stays in its field, even when
+  its digits happen to form a valid barcode.
+- **An open form can take the scan first.** A field with
+  [`x-lt-scan`](hitl/x-lt-scan.md) that accepts the scan's scheme is filled
+  instead; every other scan, and every badge, runs globally.
 
 - On a match, the terminator is swallowed, the code's characters are
   stripped back out of whatever editable held focus (byte-exact, at the
@@ -487,3 +670,20 @@ of each machine:
 Each rule ends on a broad `show-detail` and the "no twin found" fallback.
 Walk it hardware-free: run the twin farm, open the scan panel, and paste
 `10:1:<a-printing-serial>`.
+
+## The bag and bin demo
+
+`examples/seed-scan-bins.ts` puts the bench motion on the
+[rollup-bin](../examples/workflows/rollup-bin/) example. Start a `rollupBin`
+with a `binKey` and a few `rollupMember` bags carrying the same `binKey`,
+then at the scan station:
+
+| Scan | Code | What happens |
+|---|---|---|
+| Bag | `12:0:<orderId>` | The station holds the bag and shows its bin, large |
+| Badge | `11:0:<badge>` | Primes the person (before the bag works too) |
+| Bin | `13:0:<binKey>` | The bag joins the bin and its own row completes; the station shows "Drop it in **bin-7**. All good." until the next scan |
+
+Scan a different bin's label instead and the station refuses with the bag's
+bin named, and nothing is written. Scan the bin before the badge and the
+station asks for the badge, then places the bag on its own.
