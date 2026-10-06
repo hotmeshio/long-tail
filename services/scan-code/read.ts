@@ -14,6 +14,7 @@ function mapScheme(row: any): ScanScheme {
     kind: row.kind ?? 'action',
     grant_ttl_seconds: row.grant_ttl_seconds ?? null,
     grant_max_uses: row.grant_max_uses ?? 0,
+    grant_scope: row.grant_scope ?? 'action',
     enabled: row.enabled,
     created_at: row.created_at,
     updated_at: row.updated_at,

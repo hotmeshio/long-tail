@@ -10,7 +10,10 @@ vi.mock('../../services/escalation', () => ({
 }));
 vi.mock('../../api/scan-codes/identity', () => ({
   actingIdentitySatisfied: vi.fn(),
-  resolveActingAuth: vi.fn(),
+}));
+vi.mock('../../api/scan-codes/grant', () => ({
+  peekGrant: vi.fn(),
+  settleGrant: vi.fn(),
 }));
 vi.mock('../../api/scan-codes/locate', () => ({
   locateForStep: vi.fn(),
@@ -21,7 +24,8 @@ vi.mock('../../api/scan-codes/verbs', () => ({
 
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
-import { actingIdentitySatisfied, resolveActingAuth } from '../../api/scan-codes/identity';
+import { actingIdentitySatisfied } from '../../api/scan-codes/identity';
+import { peekGrant } from '../../api/scan-codes/grant';
 import { locateForStep } from '../../api/scan-codes/locate';
 import { dispatchChoiceVerb } from '../../api/scan-codes/verbs';
 import { executeScanChoice } from '../../api/scan-codes/choice';
@@ -30,7 +34,7 @@ import { SCAN_OUTCOMES } from '../../types';
 const svc = vi.mocked(scanCodeService);
 const esc = vi.mocked(escalationService);
 const satisfied = vi.mocked(actingIdentitySatisfied);
-const acting = vi.mocked(resolveActingAuth);
+const acting = vi.mocked(peekGrant);
 const claim = vi.mocked(dispatchChoiceVerb);
 const locate = vi.mocked(locateForStep);
 
@@ -111,7 +115,10 @@ describe('executeScanChoice — the pointer is never authority', () => {
   });
 
   it('a live grant swaps the effective actor for the dispatch', async () => {
-    acting.mockResolvedValue({ ok: true, auth: { userId: 'person-1' } });
+    acting.mockResolvedValue({
+      ok: true, auth: { userId: 'person-1' },
+      grant: { token: 'eph:v1:acting_identity:x', peeked: { remaining: 1, bound: false }, spent: null },
+    });
     await executeScanChoice({ ...pointer, actingToken: 'eph:v1:acting_identity:x' }, auth);
     const [, ctx] = claim.mock.calls[0];
     expect(ctx.auth.userId).toBe('person-1');

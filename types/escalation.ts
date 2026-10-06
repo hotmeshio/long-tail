@@ -53,6 +53,9 @@ export type RemoveAccumulatedItemOutcome = Types.RemoveAccumulatedItemOutcome;
  * (`batch_items`) lives on the unindexed envelope — payloads are plumbing,
  * not facets.
  */
+/** Longest item key the escalation store accepts (the SDK's ESCALATION_BATCH_ITEM_KEY_MAX_LENGTH). */
+export const ESCALATION_ITEM_KEY_MAX_LENGTH = 128;
+
 export const ESCALATION_BATCH_KEYS = {
   /** Metadata: item keys still awaiting submission (queryable via `@>`). */
   PENDING: 'batch_pending',

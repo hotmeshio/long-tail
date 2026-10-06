@@ -922,6 +922,11 @@ export const executeScanCodeSchema = z.object({
   code: z.string().min(1).describe('Raw scan string, e.g. "10:1:SN123" or "10175433211"'),
   actingToken: z.string().optional().describe('An acting-identity grant (eph:v1:acting_identity:*) — verbs run as the badged person'),
   previousActingToken: z.string().optional().describe('The grant an identity scan replaces — best-effort revoked on mint'),
+  subject: z.object({
+    code: z.string().describe('The raw code that held the subject'),
+    escalationId: z.string().describe('The row the hold returned'),
+  }).optional().describe('The subject the station is holding (from a prior "held" outcome); subject steps act on it'),
+  stationRole: z.string().optional().describe("The role the device is locked to; a badge scan mints under that role's properties.badge_grant"),
 });
 
 export const executeScanChoiceSchema = z.object({
@@ -943,11 +948,40 @@ const scanStepParamsSchema = z.object({
   description: z.string().optional(),
   closeCurrent: z.enum(['resolve', 'cancel']).optional(),
   durationMinutes: z.number().int().min(1).optional(),
+  itemKey: z.string().optional().describe("accumulate: item key template, e.g. '{subject.itemId}'"),
+  accumulate: z.object({
+    containerFacet: z.string().optional().describe('Item mode: the scan names the item; the container shares this facet'),
+    containerRoles: z.array(z.string()).optional(),
+    container: z.object({
+      roles: z.array(z.string()).optional(),
+      types: z.array(z.string()).optional(),
+      subtypes: z.array(z.string()).optional(),
+      facets: z.record(z.any()).optional(),
+    }).optional().describe('Which pending accumulator may be the container'),
+    reciprocal: z.boolean().optional(),
+    from: z.literal('subject').optional().describe('The held subject joins the scanned container (its row is the reciprocal)'),
+    into: z.literal('subject').optional().describe("The held subject's row collects the scanned code"),
+  }).optional(),
+  hold: z.object({
+    ttlSeconds: z.number().int().min(5).max(600).optional().describe('Seconds the station holds the subject (default 45)'),
+    label: z.string().optional().describe('What the station calls the subject (template)'),
+    headline: z.string().optional().describe("Where the item goes, shown largest, e.g. '{item.containerCode}' (template)"),
+    subline: z.string().optional().describe("The line under the headline, e.g. '{item.locationName}' (template)"),
+    expect: z.object({
+      schemes: z.array(z.number().int().min(10).max(99)),
+      prompt: z.string().optional().describe('Markdown asking for the next scan (template)'),
+    }).optional(),
+  }).optional().describe('hold verb options'),
+  fill: z.object({
+    into: z.enum(['subject', 'scanned']),
+    separator: z.string().length(1).optional().describe("Between a code and its ordinal in batch keys (default '#')"),
+    payload: z.record(z.any()).optional(),
+  }).optional().describe('fill verb options'),
 });
 
 const scanChoiceSchema = z.object({
   label: z.string().describe('Button text the associate reads'),
-  verb: z.enum(['show-detail', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel']),
+  verb: z.enum(['show-detail', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel', 'hold']),
   params: scanStepParamsSchema.optional(),
   confirm: z.object({ prompt: z.string() }).optional(),
   requireActingIdentity: z.boolean().optional().describe('The choice executes only under a real acting identity (badge or a write-capable login)'),
@@ -959,12 +993,13 @@ export const upsertScanSchemeSchema = z.object({
   name: z.string().describe('Scheme display name'),
   description: z.string().optional(),
   target_facet: z.string().describe("The metadata key the target resolves against: an escalation metadata key for action schemes, an lt_users.metadata key (e.g. badge_id) for identity schemes"),
-  encoding: z.enum(['fixed', 'delimited']).optional().describe('fixed = digits only (UPC), delimited = text with separators'),
+  encoding: z.enum(['fixed', 'delimited', 'gtin']).optional().describe('fixed = digits only with a scheme prefix, delimited = text with separators, gtin = manufacturer barcodes (UPC-A/EAN-13/EAN-8/GTIN-14) with no prefix; one rule, category 0'),
   delimiter: z.string().optional().describe('Separator character for delimited encoding (default ":")'),
   target_length: z.number().int().min(1).optional().describe('Target digit count for fixed encoding'),
   kind: z.enum(['action', 'identity']).optional().describe("action = ECA steps over escalations (default); identity = a badge that mints a short-lived acting-identity grant"),
   grant_ttl_seconds: z.number().int().min(1).max(86400).optional().describe('Identity kind: how long a minted acting grant lives'),
-  grant_max_uses: z.number().int().min(0).optional().describe('Identity kind: 0 = TTL-bound; n = the grant covers n scan requests'),
+  grant_max_uses: z.number().int().min(0).optional().describe('Identity kind: 0 = TTL-bound; n = the grant covers n acts'),
+  grant_scope: z.enum(['action', 'subject']).optional().describe("Identity kind: 'action' spends a use per act (default); 'subject' binds to the first held subject it acts on and acts on it freely"),
   enabled: z.boolean().optional(),
 });
 
@@ -980,12 +1015,30 @@ export const upsertScanRuleSchema = z.object({
       facets: z.record(z.any()).optional().describe('Extra metadata guards'),
     }),
     cardinality: z.enum(['first', 'many']).optional(),
-    verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel', 'present']),
+    verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel', 'accumulate', 'present', 'hold', 'fill']),
     confirm: z.object({ prompt: z.string() }).optional(),
     params: scanStepParamsSchema.optional(),
     requireActingIdentity: z.boolean().optional().describe('The step executes only under a real acting identity — a badge grant, or a login whose own write scope covers the step'),
     choices: z.array(scanChoiceSchema).optional().describe("present verb only: the labeled choice set rendered under the located reality"),
     autoSelectSingle: z.boolean().optional().describe('present verb with exactly one confirm-less choice: the scan executes it directly — one scan, one action; an unsatisfied identity requirement still presents the badge stop-over'),
+    subject: z.object({
+      schemes: z.array(z.number().int().min(10).max(99)),
+      claimedByOther: z.enum(['refuse', 'allow']).optional(),
+      facets: z.record(z.union([z.string(), z.number(), z.boolean()])).optional()
+        .describe("The held row must carry these facet values, else the step is skipped, e.g. { placement: 'unassigned' }"),
+    }).optional().describe('The step acts on the held subject and runs only while one from these schemes is held'),
+    match: z.object({
+      target: z.array(z.string()).optional().describe("The scanned target must equal one of these, e.g. ['{subject.containerCode}']; a lone token naming a list facet ('{subject.offeredContainers}') allows every entry"),
+      facets: z.array(z.string()).optional().describe('The located container must share these facets with the subject'),
+    }).optional().describe('Checked before the write; a miss refuses with nothing written'),
+    refuse: z.object({
+      markdown: z.string().describe('What the station says on a failed match (template; may read {container.*})'),
+      conflict: z.string().optional().describe('What the station says when the write loses a race'),
+      missing: z.string().optional().describe('From-subject accumulate: what the station says when the pairing holds but no open container carries the scanned code (else the next step runs)'),
+    }).optional(),
+    done: z.object({
+      markdown: z.string().describe("What the station says once the write lands, e.g. 'Place it in **{container.containerCode}**.' (template)"),
+    }).optional(),
   })).describe('Ordered condition/action steps — first match wins'),
   fallback: z.object({
     markdown: z.string().optional(),

@@ -9,7 +9,8 @@ import {
   type ScanStep,
 } from '../../types';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
-import { actingIdentitySatisfied, resolveActingAuth } from './identity';
+import { actingIdentitySatisfied } from './identity';
+import { peekGrant, settleGrant } from './grant';
 import { conflict, notPrimed, type StepContext } from './context';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
@@ -47,19 +48,19 @@ export async function executeScanChoice(
       };
     }
 
-    // 2. The acting grant, exchanged before anything reads or writes.
+    // 2. The acting grant, read (not spent) before anything reads or writes.
     let effectiveAuth = auth;
-    let acting = false;
+    let grant: StepContext['grant'];
     if (input.actingToken) {
-      const resolved = await resolveActingAuth(input.actingToken);
-      if (!resolved.ok) {
+      const peeked = await peekGrant(input.actingToken);
+      if (!peeked.ok) {
         return {
           status: 200,
-          data: { outcome: SCAN_OUTCOMES.NOT_PRIMED, notPrimed: rule.notPrimed, error: resolved.error },
+          data: { outcome: SCAN_OUTCOMES.NOT_PRIMED, notPrimed: rule.notPrimed, replayable: true, error: peeked.error },
         };
       }
-      effectiveAuth = resolved.auth;
-      acting = true;
+      effectiveAuth = peeked.auth;
+      grant = peeked.grant;
     }
 
     // 3. The row anchors the target: the scheme's facet on the escalation the
@@ -80,7 +81,8 @@ export async function executeScanChoice(
       scannedAt: new Date().toISOString(),
       auth: effectiveAuth,
       stationAuth: auth,
-      acting,
+      acting: !!grant,
+      grant,
     };
 
     // 4. The identity gate, per the choice.
@@ -99,8 +101,12 @@ export async function executeScanChoice(
 
     // 6. Dispatch through the same atomic executors a direct scan uses.
     const synthesized: ScanStep = { query: step.query, verb: choice.verb, params: choice.params };
-    const result = await dispatchChoiceVerb(synthesized, ctx, presented);
-    return decorate(result, ctx, input);
+    const result = decorate(await dispatchChoiceVerb(synthesized, ctx, presented), ctx, input);
+
+    // 7. Settle the badge: refund a spend whose act did not land
+    const acting = await settleGrant(ctx, result);
+    if (acting && result.data) result.data = { ...result.data, acting };
+    return result;
   } catch (err: any) {
     return { status: 500, error: err.message };
   }

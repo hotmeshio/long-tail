@@ -7,16 +7,21 @@ vi.mock('../../services/user', () => ({
 vi.mock('../../services/iam/ephemeral', async (importOriginal) => ({
   ...(await importOriginal<any>()),
   storeEphemeral: vi.fn(),
-  exchangeEphemeralToken: vi.fn(),
+  consumeEphemeral: vi.fn(),
+  peekEphemeral: vi.fn(),
   revokeEphemeral: vi.fn(),
 }));
 vi.mock('../../api/escalations/helpers', () => ({
   getEscalationWriteScope: vi.fn(),
 }));
+vi.mock('../../api/scan-codes/badge-policy', () => ({
+  stationGrantPolicy: vi.fn(),
+}));
 
 import * as userService from '../../services/user';
 import * as ephemeral from '../../services/iam/ephemeral';
 import { getEscalationWriteScope } from '../../api/escalations/helpers';
+import { stationGrantPolicy } from '../../api/scan-codes/badge-policy';
 import {
   executeIdentityScan,
   resolveActingAuth,
@@ -49,7 +54,7 @@ describe('executeIdentityScan', () => {
     const result = await executeIdentityScan(parsed, scheme, rule);
     expect(users.getUserByMetadataValue).toHaveBeenCalledWith('badge_id', 'BADGE-TOKEN-1');
     expect(eph.storeEphemeral).toHaveBeenCalledWith('user-1', {
-      ttlSeconds: 300, maxUses: 0, label: 'acting_identity',
+      ttlSeconds: 300, maxUses: 0, label: 'acting_identity', bindOnUse: false,
     });
     expect(result.data?.outcome).toBe(SCAN_OUTCOMES.IDENTITY_PRIMED);
     expect(result.data?.actor).toEqual({ id: 'user-1', displayName: 'Maria' });
@@ -89,25 +94,44 @@ describe('executeIdentityScan', () => {
   });
 });
 
+describe('executeIdentityScan — the station decides the policy', () => {
+  it('mints under the station role\'s policy and tells the device', async () => {
+    users.getUserByMetadataValue.mockResolvedValue({ id: 'user-1', display_name: 'Maria', external_id: 'maria' } as any);
+    eph.storeEphemeral.mockResolvedValue(UUID);
+    vi.mocked(stationGrantPolicy).mockResolvedValue({ ttlSeconds: 600, maxUses: 0, scope: 'action', role: 'binning-associate' });
+
+    const result = await executeIdentityScan(parsed, scheme, rule, undefined, { userId: 'station-1', stationRole: 'binning-associate' });
+    expect(stationGrantPolicy).toHaveBeenCalledWith(scheme, 'station-1', 'binning-associate');
+    expect(eph.storeEphemeral).toHaveBeenCalledWith('user-1', {
+      ttlSeconds: 600, maxUses: 0, label: 'acting_identity', bindOnUse: false,
+    });
+    expect(result.data).toMatchObject({ maxUses: 0, grantScope: 'action' });
+    expect(Date.parse(result.data!.expiresAt!) - Date.now()).toBeGreaterThan(590_000);
+  });
+});
+
 describe('resolveActingAuth', () => {
-  it('exchanges a live grant into the acting user', async () => {
-    eph.exchangeEphemeralToken.mockResolvedValue('user-1');
+  it('spends a live grant and acts as its person', async () => {
+    eph.consumeEphemeral.mockResolvedValue({ value: 'user-1', remaining: 0, bound: false });
     users.getUser.mockResolvedValue({ id: 'user-1', status: 'active' } as any);
     const result = await resolveActingAuth(`eph:v1:acting_identity:${UUID}`);
-    expect(result).toEqual({ ok: true, auth: { userId: 'user-1' } });
+    expect(result).toEqual({
+      ok: true, auth: { userId: 'user-1' }, grant: { consumed: true, remaining: 0, bound: false },
+    });
+    expect(eph.consumeEphemeral).toHaveBeenCalledWith(UUID, null);
   });
 
   it('rejects wrong-label tokens without touching the keystore', async () => {
     const result = await resolveActingAuth(`eph:v1:llm_password:${UUID}`);
     expect(result.ok).toBe(false);
-    expect(eph.exchangeEphemeralToken).not.toHaveBeenCalled();
+    expect(eph.consumeEphemeral).not.toHaveBeenCalled();
   });
 
   it('a dead grant or inactive user is a loud failure, never a fallback', async () => {
-    eph.exchangeEphemeralToken.mockResolvedValue(null);
+    eph.consumeEphemeral.mockResolvedValue(null);
     expect((await resolveActingAuth(`eph:v1:acting_identity:${UUID}`)).ok).toBe(false);
 
-    eph.exchangeEphemeralToken.mockResolvedValue('user-1');
+    eph.consumeEphemeral.mockResolvedValue({ value: 'user-1', remaining: null, bound: false });
     users.getUser.mockResolvedValue({ id: 'user-1', status: 'suspended' } as any);
     expect((await resolveActingAuth(`eph:v1:acting_identity:${UUID}`)).ok).toBe(false);
   });

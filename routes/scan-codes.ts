@@ -18,6 +18,8 @@ router.post('/execute', async (req, res) => {
     code: req.body.code,
     actingToken: req.body.actingToken,
     previousActingToken: req.body.previousActingToken,
+    subject: req.body.subject,
+    stationRole: req.body.stationRole,
   }, req.auth!);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
@@ -76,6 +78,7 @@ router.put('/schemes/:version', requireRoleManager, async (req, res) => {
     kind: req.body.kind,
     grant_ttl_seconds: req.body.grant_ttl_seconds,
     grant_max_uses: req.body.grant_max_uses,
+    grant_scope: req.body.grant_scope,
     enabled: req.body.enabled,
   });
   res.status(result.status).json(result.data ?? { error: result.error });

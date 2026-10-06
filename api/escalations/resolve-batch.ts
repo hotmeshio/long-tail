@@ -42,8 +42,13 @@ export async function resolveBatchItem(
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
-    if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
-    if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for resolution' };
+    if (escalation.status === 'cancelled') {
+      return { status: 409, error: 'Escalation is cancelled', data: { error: 'Escalation is cancelled', outcome: 'already-cancelled' } };
+    }
+    if (escalation.status !== 'pending') {
+      const error = 'Escalation not available for resolution';
+      return { status: 409, error, data: { error, outcome: `already-${escalation.status}` } };
+    }
 
     // Advisory shape gate — cheap, readable rejection. The SDK's guarded
     // statement re-checks and is the atomic arbiter (outcome 'not-batch').
@@ -252,20 +257,24 @@ function batchOutcomeResult(
       return {
         status: 409,
         error: 'Batch item already submitted',
-        data: { error: 'Batch item already submitted', itemKey },
+        data: { error: 'Batch item already submitted', itemKey, outcome: 'duplicate-item' },
       };
     case 'claimed-by-other':
-      return { status: 409, error: 'Escalation is claimed by another user' };
+      return { status: 409, error: 'Escalation is claimed by another user', data: { error: 'Escalation is claimed by another user', outcome: 'claimed-by-other' } };
     case 'claim-expired':
-      return { status: 409, error: 'Your claim has expired — re-claim this escalation to resolve it' };
+      return { status: 409, error: 'Your claim has expired — re-claim this escalation to resolve it', data: { error: 'Your claim has expired — re-claim this escalation to resolve it', outcome: 'claim-expired' } };
     case 'not-found':
-      return { status: 404, error: 'Escalation not found' };
+      return { status: 404, error: 'Escalation not found', data: { error: 'Escalation not found', outcome: 'not-found' } };
     case 'unknown-item':
-      return { status: 400, error: 'itemKey is not in the declared batch' };
+      return { status: 400, error: 'itemKey is not in the declared batch', data: { error: 'itemKey is not in the declared batch', outcome: 'unknown-item' } };
     case 'not-batch':
-      return { status: 400, error: 'Escalation is not a batch' };
+      return { status: 400, error: 'Escalation is not a batch', data: { error: 'Escalation is not a batch', outcome: 'not-batch' } };
     default:
       // already-resolved / already-cancelled / already-expired
-      return { status: 409, error: 'Escalation not available for resolution' };
+      return {
+        status: 409,
+        error: 'Escalation not available for resolution',
+        data: { error: 'Escalation not available for resolution', outcome: result.outcome },
+      };
   }
 }

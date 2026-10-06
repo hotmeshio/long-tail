@@ -1,13 +1,17 @@
 import {
   SCAN_ENCODINGS,
+  SCAN_GRANT_SCOPES,
   SCAN_SCHEME_KINDS,
   SCAN_VERBS,
   SCAN_MUTATING_VERBS,
+  GTIN_LENGTHS,
   type ScanChoice,
   type ScanScheme,
   type ScanStep,
 } from '../../types';
+import { fixedCodeLengths } from '../../shared/scan-code';
 import { FACET_KEY } from '../escalation/facet-sql';
+import { assertValidSubjectStep } from './validate-subject';
 
 const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
 /** Double-scan selection tokens — short, label-printable, never scheme-shaped. */
@@ -25,6 +29,12 @@ export function assertValidScheme(scheme: Partial<ScanScheme>): void {
   if (!scheme.name) throw new Error('scheme name is required');
   if (!scheme.target_facet) throw new Error('scheme target_facet is required');
   const encoding = scheme.encoding ?? SCAN_ENCODINGS.FIXED;
+  if (!(Object.values(SCAN_ENCODINGS) as string[]).includes(encoding)) {
+    throw new Error(`unknown scheme encoding "${encoding}"`);
+  }
+  if (encoding === SCAN_ENCODINGS.GTIN && (scheme.kind ?? SCAN_SCHEME_KINDS.ACTION) !== SCAN_SCHEME_KINDS.ACTION) {
+    throw new Error('gtin encoding applies only to action schemes');
+  }
   if (encoding === SCAN_ENCODINGS.FIXED) {
     if (!Number.isInteger(scheme.target_length) || scheme.target_length! < 1) {
       throw new Error('fixed encoding requires a positive integer target_length');
@@ -51,8 +61,46 @@ export function assertValidScheme(scheme: Partial<ScanScheme>): void {
     if (!Number.isInteger(scheme.grant_max_uses ?? 0) || (scheme.grant_max_uses ?? 0) < 0) {
       throw new Error('grant_max_uses must be a non-negative integer');
     }
-  } else if (scheme.grant_ttl_seconds != null || (scheme.grant_max_uses ?? 0) !== 0) {
+    const scope = scheme.grant_scope ?? SCAN_GRANT_SCOPES.ACTION;
+    if (!(Object.values(SCAN_GRANT_SCOPES) as string[]).includes(scope)) {
+      throw new Error(`unknown grant_scope "${scope}"`);
+    }
+  } else if (scheme.grant_ttl_seconds != null || (scheme.grant_max_uses ?? 0) !== 0
+    || (scheme.grant_scope ?? SCAN_GRANT_SCOPES.ACTION) !== SCAN_GRANT_SCOPES.ACTION) {
     throw new Error('grant policy applies only to identity schemes');
+  }
+}
+
+/**
+ * A scheme must read codes no other scheme reads. Delimited and fixed
+ * schemes are told apart by their version prefix; a gtin scheme has none,
+ * so there is at most one, and no enabled fixed scheme may accept a GTIN
+ * length while it is enabled. Throws naming both schemes.
+ */
+export function assertSchemesCoexist(candidate: Partial<ScanScheme>, existing: ScanScheme[]): void {
+  const others = existing.filter((s) => s.version !== candidate.version);
+  const encoding = candidate.encoding ?? SCAN_ENCODINGS.FIXED;
+  const enabled = candidate.enabled ?? true;
+  if (encoding === SCAN_ENCODINGS.GTIN) {
+    const gtin = others.find((s) => s.encoding === SCAN_ENCODINGS.GTIN);
+    if (gtin) {
+      throw new Error(`scheme ${gtin.version} ("${gtin.name}") already reads manufacturer barcodes; only one gtin scheme is allowed`);
+    }
+    if (!enabled) return;
+    const clash = others.find((s) => s.enabled && s.encoding === SCAN_ENCODINGS.FIXED
+      && fixedCodeLengths(s).some((n) => GTIN_LENGTHS.includes(n)));
+    if (clash) {
+      throw new Error(`fixed scheme ${clash.version} ("${clash.name}") accepts ${fixedCodeLengths(clash).join(' or ')}-digit codes, which a gtin scheme also reads; change its target_length or leave the gtin scheme disabled`);
+    }
+    return;
+  }
+  if (encoding === SCAN_ENCODINGS.FIXED && enabled) {
+    const lengths = fixedCodeLengths({ target_length: candidate.target_length ?? null });
+    if (!lengths.some((n) => GTIN_LENGTHS.includes(n))) return;
+    const gtin = others.find((s) => s.enabled && s.encoding === SCAN_ENCODINGS.GTIN);
+    if (gtin) {
+      throw new Error(`a fixed scheme accepting ${lengths.join(' or ')}-digit codes collides with gtin scheme ${gtin.version} ("${gtin.name}"); change target_length or disable the gtin scheme`);
+    }
   }
 }
 
@@ -74,7 +122,8 @@ function assertValidChoices(choices: ScanChoice[] | undefined, at: string): void
     if (!choice || typeof choice !== 'object') throw new Error(`${cat} must be an object`);
     if (!choice.label) throw new Error(`${cat}: label is required`);
     if (!VALID_VERBS.has(choice.verb)) throw new Error(`${cat}: unknown verb "${choice.verb}"`);
-    if (choice.verb === SCAN_VERBS.PRESENT || choice.verb === SCAN_VERBS.SHOW_LIST) {
+    if (choice.verb === SCAN_VERBS.PRESENT || choice.verb === SCAN_VERBS.SHOW_LIST
+      || choice.verb === SCAN_VERBS.FILL) {
       throw new Error(`${cat}: ${choice.verb} cannot be a choice verb`);
     }
     if (choice.confirm && !choice.confirm.prompt) {
@@ -166,12 +215,21 @@ export function assertValidSteps(steps: ScanStep[]): void {
           && (!container.facets || typeof container.facets !== 'object' || Array.isArray(container.facets))) {
           throw new Error(`${at}: params.accumulate.container.facets must be an object`);
         }
-        if (!options?.containerFacet) {
-          throw new Error(`${at}: params.accumulate.container requires params.accumulate.containerFacet`);
+        if (!options?.containerFacet && options?.from !== 'subject') {
+          throw new Error(`${at}: params.accumulate.container requires params.accumulate.containerFacet or from: 'subject'`);
         }
       }
-      if (!options?.containerFacet && !step.params?.itemKey) {
+      if (!options?.containerFacet && !options?.into && !step.params?.itemKey) {
         throw new Error(`${at}: accumulate requires params.itemKey or params.accumulate.containerFacet`);
+      }
+    }
+    assertValidSubjectStep(step, at);
+    if (step.done !== undefined) {
+      if (!step.done || typeof step.done !== 'object' || typeof step.done.markdown !== 'string' || !step.done.markdown) {
+        throw new Error(`${at}: done.markdown is required`);
+      }
+      if (!SCAN_MUTATING_VERBS.includes(step.verb)) {
+        throw new Error(`${at}: done applies only to steps that write`);
       }
     }
     assertValidTemplateTokens(step, at);
@@ -193,23 +251,40 @@ export function assertValidSteps(steps: ScanStep[]): void {
   });
 }
 
-const BAG_TOKEN = /\{(claim|item)\.([^}]*)\}/g;
+const BAG_TOKEN = /\{(claim|item|subject|container|fill)\.([^}]*)\}/g;
 
 /**
- * `{claim.<facet>}` and `{item.<facet>}` name facet keys; `{item.…}` reads
- * the located row, which only an item-mode accumulate step has.
+ * Bag tokens name facet keys and may only read what the step has:
+ * `{item.…}` the row an item-mode accumulate or a hold located,
+ * `{subject.…}` the held subject (steps with a subject gate), and
+ * `{container.…}` / `{fill.…}` only inside refusal and done copy, where a
+ * subject accumulate or a fill has read them.
  */
 function assertValidTemplateTokens(step: ScanStep, at: string): void {
-  const text = JSON.stringify(step.params ?? {});
-  const itemMode = step.verb === SCAN_VERBS.ACCUMULATE && !!step.params?.accumulate?.containerFacet;
-  for (const match of text.matchAll(BAG_TOKEN)) {
-    const [token, bag, facet] = match;
-    if (!FACET_KEY.test(facet)) {
-      throw new Error(`${at}: template token ${token} must name a facet key`);
+  const itemRow = (step.verb === SCAN_VERBS.ACCUMULATE && !!step.params?.accumulate?.containerFacet)
+    || step.verb === SCAN_VERBS.HOLD;
+  const check = (value: unknown, inRefusal: boolean) => {
+    for (const match of JSON.stringify(value ?? {}).matchAll(BAG_TOKEN)) {
+      const [token, bag, facet] = match;
+      if (!FACET_KEY.test(facet)) {
+        throw new Error(`${at}: template token ${token} must name a facet key`);
+      }
+      if (bag === 'item' && !itemRow) {
+        throw new Error(`${at}: ${token} reads the located item row, which only an item-mode accumulate or a hold step has`);
+      }
+      if (bag === 'subject' && !step.subject) {
+        throw new Error(`${at}: ${token} reads the held subject, which only a step with a subject gate has`);
+      }
+      if (bag === 'container' && !(inRefusal && step.params?.accumulate?.from === 'subject')) {
+        throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a from-subject accumulate step`);
+      }
+      if (bag === 'fill' && !(inRefusal && step.verb === SCAN_VERBS.FILL)) {
+        throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a fill step`);
+      }
     }
-    if (bag === 'item' && !itemMode) {
-      throw new Error(`${at}: ${token} reads the located item row, which only an item-mode accumulate step has`);
-    }
-  }
+  };
+  check(step.params, false);
+  check(step.match, false);
+  check(step.refuse, true);
+  check(step.done, true);
 }
-

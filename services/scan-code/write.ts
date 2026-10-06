@@ -1,6 +1,7 @@
 import { getPool } from '../../lib/db';
 import {
   SCAN_ENCODINGS,
+  SCAN_GRANT_SCOPES,
   SCAN_SCHEME_KINDS,
   type ScanScheme,
   type ScanRule,
@@ -17,8 +18,14 @@ import {
   APPLY_SCHEME,
   APPLY_ACTION,
 } from './sql';
-import { assertValidIdentityRule, assertValidScheme, assertValidSteps } from './validate';
-import { getScanScheme } from './read';
+import { assertSchemesCoexist, assertValidIdentityRule, assertValidScheme, assertValidSteps } from './validate';
+import { getScanScheme, listScanSchemes } from './read';
+
+/** Field validation, then the cross-scheme check against what is stored. */
+async function assertSchemeInput(input: ScanSchemeInput): Promise<void> {
+  assertValidScheme(input);
+  assertSchemesCoexist(input, await listScanSchemes());
+}
 
 export interface ScanSchemeInput {
   version: number;
@@ -31,6 +38,7 @@ export interface ScanSchemeInput {
   kind?: ScanScheme['kind'];
   grant_ttl_seconds?: number | null;
   grant_max_uses?: number;
+  grant_scope?: ScanScheme['grant_scope'];
   enabled?: boolean;
 }
 
@@ -57,6 +65,7 @@ function schemeParams(input: ScanSchemeInput): unknown[] {
     input.grant_ttl_seconds ?? null,
     input.grant_max_uses ?? 0,
     input.enabled ?? true,
+    input.grant_scope ?? SCAN_GRANT_SCOPES.ACTION,
   ];
 }
 
@@ -83,7 +92,7 @@ async function assertStepsForScheme(input: ScanRuleInput): Promise<void> {
 }
 
 export async function upsertScanScheme(input: ScanSchemeInput): Promise<ScanScheme> {
-  assertValidScheme(input);
+  await assertSchemeInput(input);
   const { rows } = await getPool().query(UPSERT_SCHEME, schemeParams(input));
   return rows[0];
 }
@@ -121,7 +130,7 @@ export async function deleteScanRule(
 
 /** Insert-if-absent seeding — DB is the source of truth, never overwrite. */
 export async function seedScanScheme(input: ScanSchemeInput): Promise<boolean> {
-  assertValidScheme(input);
+  await assertSchemeInput(input);
   const { rowCount } = await getPool().query(SEED_SCHEME, schemeParams(input));
   return (rowCount ?? 0) > 0;
 }
@@ -138,7 +147,7 @@ export async function seedScanRule(input: ScanRuleInput): Promise<boolean> {
  * declaration a zero-row no-op.
  */
 export async function applyScanScheme(input: ScanSchemeInput): Promise<'applied' | 'unchanged'> {
-  assertValidScheme(input);
+  await assertSchemeInput(input);
   const { rowCount } = await getPool().query(APPLY_SCHEME, schemeParams(input));
   return (rowCount ?? 0) > 0 ? 'applied' : 'unchanged';
 }

@@ -10,6 +10,7 @@ import { SEED_USERS, SEED_ROLES, SEED_ENVELOPES, SEED_CHAINS, SEED_PERSONAS } fr
 import { seedOrthoRoles } from './seed-ortho';
 import { seedTwinRoles } from './seed-twin';
 import { seedScanCodes, seedBadgeScheme } from './seed-scan-codes';
+import { seedBinScanCodes } from './seed-scan-bins';
 import { seedRichFormRole } from './seed-rich-form';
 import { seedAcmeRoles } from './seed-acme';
 import { seedRelatedEscalationsRoles } from './seed-related-escalations';
@@ -119,6 +120,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedTwinRoles();
   await seedScanCodes();
   await seedBadgeScheme();
+  await seedBinScanCodes();
   await seedRichFormRole();
   await seedAcmeRoles();
   await seedRelatedEscalationsRoles();

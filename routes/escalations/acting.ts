@@ -7,6 +7,12 @@ import type { LTApiAuth } from '../../types/sdk';
 export const ACTING_TOKEN_HEADER = 'x-lt-acting-token';
 
 /**
+ * Uses the grant has left after this request spent one: a count, or
+ * `unbounded` while only the TTL limits it. The client retires its grant on 0.
+ */
+export const ACTING_REMAINING_HEADER = 'x-lt-acting-remaining';
+
+/**
  * The effective actor for an escalation WORK verb (claim, release, resolve):
  * the badged person when an acting grant rides the request, otherwise the
  * authenticated principal. A supplied-but-dead grant answers 401 and returns
@@ -24,5 +30,7 @@ export async function effectiveWorkAuth(
     res.status(401).json({ error: resolved.error });
     return null;
   }
+  const { remaining } = resolved.grant;
+  res.setHeader(ACTING_REMAINING_HEADER, remaining === null ? 'unbounded' : String(remaining));
   return resolved.auth;
 }

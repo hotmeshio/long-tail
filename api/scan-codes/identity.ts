@@ -9,6 +9,7 @@ import { restrictScopeRoles } from '../escalations/metadata';
 import { getEscalationWriteScope } from '../escalations/helpers';
 import {
   ACTING_IDENTITY_LABEL,
+  SCAN_GRANT_SCOPES,
   SCAN_OUTCOMES,
   type ParsedScanCode,
   type ScanExecuteResponse,
@@ -18,8 +19,9 @@ import {
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
 import type { StepContext } from './context';
+import { stationGrantPolicy } from './badge-policy';
 
-export { resolveActingAuth, type ActingAuthResult } from '../../services/iam/acting-identity';
+export { resolveActingAuth, peekActingAuth, type ActingAuthResult } from '../../services/iam/acting-identity';
 
 // ── Acting identity — the badge layer over the scan surface ────────────────
 //
@@ -42,8 +44,18 @@ export async function executeIdentityScan(
   scheme: ScanScheme,
   rule: ScanRule,
   previousActingToken?: string,
+  station?: { userId: string; stationRole?: string },
 ): Promise<LTApiResult<ScanExecuteResponse>> {
-  const user = await userService.getUserByMetadataValue(scheme.target_facet, parsed.target);
+  // Two users bound to one badge is a configuration fault: refuse the badge
+  // and name the fault, never pick one of them.
+  let user: Awaited<ReturnType<typeof userService.getUserByMetadataValue>>;
+  let unknownReason = 'badge not recognized';
+  try {
+    user = await userService.getUserByMetadataValue(scheme.target_facet, parsed.target);
+  } catch (err: any) {
+    user = null;
+    unknownReason = `badge is bound to more than one person: ${err.message}`;
+  }
   if (!user) {
     return {
       status: 200,
@@ -52,7 +64,7 @@ export async function executeIdentityScan(
         parsed,
         rule: { schemeVersion: rule.scheme_version, category: rule.category, name: rule.name },
         fallback: rule.fallback,
-        error: 'badge not recognized',
+        error: unknownReason,
       },
     };
   }
@@ -65,12 +77,17 @@ export async function executeIdentityScan(
     }
   }
 
+  // The station decides the policy: its role's badge_grant, else the scheme's.
+  const policy = station
+    ? await stationGrantPolicy(scheme, station.userId, station.stationRole)
+    : { ttlSeconds: scheme.grant_ttl_seconds ?? 0, maxUses: scheme.grant_max_uses ?? 0, scope: scheme.grant_scope ?? SCAN_GRANT_SCOPES.ACTION };
   const uuid = await storeEphemeral(user.id, {
-    ttlSeconds: scheme.grant_ttl_seconds ?? undefined,
-    maxUses: scheme.grant_max_uses,
+    ttlSeconds: policy.ttlSeconds || undefined,
+    maxUses: policy.maxUses,
     label: ACTING_IDENTITY_LABEL,
+    bindOnUse: policy.scope === SCAN_GRANT_SCOPES.SUBJECT,
   });
-  const expiresAt = new Date(Date.now() + (scheme.grant_ttl_seconds ?? 0) * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + policy.ttlSeconds * 1000).toISOString();
   return {
     status: 200,
     data: {
@@ -80,7 +97,8 @@ export async function executeIdentityScan(
       actor: { id: user.id, displayName: user.display_name || user.external_id },
       actingToken: formatEphemeralToken(uuid, ACTING_IDENTITY_LABEL),
       expiresAt,
-      maxUses: scheme.grant_max_uses ?? 0,
+      maxUses: policy.maxUses,
+      grantScope: policy.scope,
     },
   };
 }
