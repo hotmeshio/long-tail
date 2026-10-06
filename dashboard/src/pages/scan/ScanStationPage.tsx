@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useActingIdentity } from '../../hooks/useActingIdentity';
-import { SCAN_CHOICES_STATE } from '../../hooks/useScanInput';
+import { SCAN_CHOICES_STATE, useScanInput } from '../../hooks/useScanInput';
 import {
   executeScanChoice,
   SCAN_OUTCOMES,
@@ -11,7 +11,16 @@ import {
   type ScanPresentedChoice,
   type ScanVerb,
 } from '../../api/scan-codes';
-import { StationIdle, PrimedChrome, InfoChoiceScreen, BadgePrompt } from '../../components/scan/station';
+import {
+  StationIdle,
+  PrimedChrome,
+  InfoChoiceScreen,
+  BadgePrompt,
+  HoldScreen,
+  RefusalPanel,
+  ScanBadgePrompt,
+  DonePanel,
+} from '../../components/scan/station';
 import { SimpleMarkdown } from '../../components/common/display/SimpleMarkdown';
 
 const NOTICE_DISMISS_MS = 8_000;
@@ -22,6 +31,22 @@ const DETAIL_VERBS: ScanVerb[] = [
   SCAN_VERBS.CLAIM,
   SCAN_VERBS.CLAIM_SHOW_DETAIL,
 ];
+
+/** Responses from the bench motion (hold, place, refuse); badge scans and choices are not. */
+function isBenchResponse(response: ScanExecuteResponse): boolean {
+  switch (response.outcome) {
+    case SCAN_OUTCOMES.HELD:
+    case SCAN_OUTCOMES.REFUSED:
+    case SCAN_OUTCOMES.SUBJECT_STALE:
+      return true;
+    case SCAN_OUTCOMES.NOT_PRIMED:
+      return !!response.replayable;
+    case SCAN_OUTCOMES.EXECUTED:
+      return !!(response.clearSubject || response.progress);
+    default:
+      return false;
+  }
+}
 
 interface StationNotice {
   at: number;
@@ -48,7 +73,8 @@ export function ScanStationPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { identity, clear } = useActingIdentity();
+  const { identity, clear, settle } = useActingIdentity();
+  const { lastResult, subject, dropSubject, adoptResponse, pendingScan, dropPendingScan } = useScanInput();
   const [screen, setScreen] = useState<ScanExecuteResponse | null>(null);
   const [pendingBadge, setPendingBadge] = useState<PendingBadge | null>(null);
   const [notice, setNotice] = useState<StationNotice | null>(null);
@@ -70,6 +96,19 @@ export function ScanStationPage() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location, navigate]);
 
+  // A bench scan (hold, refusal, placed) replaces whatever the station showed.
+  const bench = lastResult?.response ?? null;
+  const benchAt = lastResult?.at ?? 0;
+  useEffect(() => {
+    if (!bench || !isBenchResponse(bench)) return;
+    setScreen(null);
+    setPendingBadge(null);
+    setNotice(null);
+    if (bench.outcome === SCAN_OUTCOMES.SUBJECT_STALE) {
+      setNotice({ at: Date.now(), tone: 'text-status-warning', text: bench.error || 'Scan it again.' });
+    }
+  }, [bench, benchAt]);
+
   // Notices self-dismiss — one timeout keyed to the notice.
   useEffect(() => {
     if (!notice) return;
@@ -89,7 +128,14 @@ export function ScanStationPage() {
         escalationId: String(screen.escalation.id),
         actingToken: identity?.actingToken,
       });
+      // A claim spends the badge: retire it when the server says none is left.
+      if (identity?.actingToken) settle(identity.actingToken, result);
+      adoptResponse(result);
       switch (result.outcome) {
+        case SCAN_OUTCOMES.HELD:
+          setScreen(null);
+          setPendingBadge(null);
+          break;
         case SCAN_OUTCOMES.EXECUTED:
           setScreen(null);
           setPendingBadge(null);
@@ -139,7 +185,7 @@ export function ScanStationPage() {
     } finally {
       setBusy(false);
     }
-  }, [screen, identity, navigate, clear]);
+  }, [screen, identity, navigate, clear, settle, adoptResponse]);
 
   const holdForBadge = useCallback((choice: ScanPresentedChoice) => {
     setPendingBadge({ choice, returnTo: 'choices' });
@@ -152,6 +198,12 @@ export function ScanStationPage() {
 
   const stationName = user?.displayName || user?.username || 'Scan station';
   const showChoices = !!(screen?.choices && screen.escalation);
+  const refusal = bench?.outcome === SCAN_OUTCOMES.REFUSED ? bench : null;
+  const executedBench = bench?.outcome === SCAN_OUTCOMES.EXECUTED && isBenchResponse(bench) ? bench : null;
+  const progress = subject && executedBench ? executedBench.progress : null;
+  const doneMarkdown = executedBench && !subject
+    ? executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.')
+    : null;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -165,6 +217,27 @@ export function ScanStationPage() {
           onExecute={executeChoice}
           onCancel={cancelBadge}
         />
+      ) : pendingScan ? (
+        <ScanBadgePrompt
+          what={subject ? (subject.headline ? `${subject.label} → ${subject.headline}` : subject.label) : null}
+          notPrimedMarkdown={bench?.notPrimed?.markdown}
+          onCancel={dropPendingScan}
+        />
+      ) : refusal ? (
+        <RefusalPanel
+          markdown={refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.'}
+          expected={refusal.refusal?.expected}
+        />
+      ) : subject ? (
+        <HoldScreen
+          subject={subject}
+          primedName={identity?.displayName ?? null}
+          progress={progress}
+          note={subject && executedBench ? executedBench.done?.markdown ?? null : null}
+          onRelease={dropSubject}
+        />
+      ) : doneMarkdown ? (
+        <DonePanel key={benchAt} markdown={doneMarkdown} nextPrompt="Scan the next item" />
       ) : showChoices ? (
         <InfoChoiceScreen
           key={String(screen!.escalation!.id)}
@@ -176,7 +249,7 @@ export function ScanStationPage() {
           onWithheldSelect={holdForBadge}
         />
       ) : (
-        <StationIdle stationName={stationName} />
+        <StationIdle stationName={stationName} primedName={identity?.displayName ?? null} />
       )}
       {notice && (
         <div role="status" className="mt-8 pt-3 border-t border-surface-border">

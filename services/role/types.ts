@@ -17,6 +17,10 @@ export interface EscalationChain {
  *    MEMBER of exactly this one role, the dashboard drops the left nav, the
  *    role's escalation list becomes home, and navigation is held to the list,
  *    the detail page, and the scan screens. Multi-role users get full chrome.
+ *  - BADGE_GRANT: RoleBadgeGrant — the badge policy at this role's stations.
+ *    A badge scanned on a device signed in as a member of this role mints
+ *    its acting grant under this policy instead of the badge scheme's own
+ *    (see api/scan-codes/badge-policy.ts).
  *  - LINK_VARIABLES: RoleLinkVariable[] — metadata facet names members bind
  *    per device. Pins may reference `{lt:name}` as a whole facet value
  *    (e.g. `facets={"region":"{lt:region}"}`); the dashboard substitutes
@@ -29,7 +33,18 @@ export const ROLE_PROPERTY_KEYS = {
   WORKED_BY: 'worked_by',
   KIOSK: 'kiosk',
   LINK_VARIABLES: 'link_variables',
+  BADGE_GRANT: 'badge_grant',
 } as const;
+
+/** A station role's badge policy. Absent fields keep the badge scheme's value. */
+export interface RoleBadgeGrant {
+  /** How long a badge scan stays primed (1-86400 s). */
+  ttl_seconds?: number;
+  /** 0 = TTL-bound; n = the grant covers n acts. */
+  max_uses?: number;
+  /** 'action' spends a use per act; 'subject' binds to one held item. */
+  scope?: 'action' | 'subject';
+}
 
 /**
  * One link-variable declaration inside `properties.link_variables`. `name` is

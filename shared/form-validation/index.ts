@@ -22,3 +22,4 @@ export * from './validate-resolver-payload';
 export * from './invoke-context';
 export * from './display-only-widgets';
 export * from './x-lt-invoke';
+export * from './x-lt-scan';

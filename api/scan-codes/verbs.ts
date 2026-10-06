@@ -1,7 +1,6 @@
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
 import { claimByMetadata, resolveByMetadata, restrictScopeRoles } from '../escalations/metadata';
-import { accumulateItemByMetadata } from '../escalations/accumulate';
 import { createEscalation } from '../escalations/create';
 import { releaseEscalation } from '../escalations/claim';
 import { getEscalationReadScope, getEscalationWriteScope } from '../escalations/helpers';
@@ -19,35 +18,18 @@ import {
   forbidden,
   interpolatedMetadata,
   provenance,
-  stepTemplate,
+  refused,
   targetFilter,
+  templated,
   type StepContext,
 } from './context';
-import { locateForStep } from './locate';
+import { spendGrant } from './grant';
+import { holdStep } from './hold';
 
 // ── Mutating verbs — each a single atomic operation under the ACTOR's RBAC ──
 // ctx.auth is the effective actor: the badged person when a grant rode the
 // request, otherwise the authenticated principal. Attribution and write
 // scoping both derive from it, live, inside the escalation APIs.
-
-/**
- * Interpolates a step's params, or falls through when a `{claim.…}` or
- * `{item.…}` token has nothing to read: a literal token never reaches a row.
- */
-async function templated<T>(
-  step: ScanStep,
-  ctx: StepContext,
-  render: (tpl: scanCodeService.ScanTemplateContext) => T,
-  item?: LTEscalationRecord,
-): Promise<T | null> {
-  const tpl = await stepTemplate(step, ctx, item);
-  try {
-    return render(tpl);
-  } catch (err) {
-    if (err instanceof scanCodeService.ScanTemplateError) return null;
-    throw err;
-  }
-}
 
 export async function claimStep(
   step: ScanStep,
@@ -55,6 +37,8 @@ export async function claimStep(
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   const metadata = await templated(step, ctx, (tpl) => interpolatedMetadata(step, ctx, tpl));
   if (metadata === null) return null;
+  const notPrimed = await spendGrant(ctx);
+  if (notPrimed) return notPrimed;
   const result = await claimByMetadata({
     key: ctx.scheme.target_facet,
     value: ctx.parsed.target,
@@ -83,6 +67,8 @@ export async function resolveStep(
     metadata: interpolatedMetadata(step, ctx, tpl),
   }));
   if (rendered === null) return null;
+  const notPrimed = await spendGrant(ctx);
+  if (notPrimed) return notPrimed;
   const result = await resolveByMetadata({
     key: ctx.scheme.target_facet,
     value: ctx.parsed.target,
@@ -96,6 +82,7 @@ export async function resolveStep(
   if (result.status === 404) return null;
   if (result.status === 403) return forbidden(result.error);
   if (result.status === 409) return conflict(result.error);
+  if (result.status === 400 || result.status === 422) return refused(result.error ?? 'the payload was not accepted');
   if (result.status !== 200) return result;
   const escalation = result.data.escalation
     ?? (result.data.escalationId ? { id: result.data.escalationId } : undefined);
@@ -119,6 +106,8 @@ export async function escalateStep(
     if (cancelled.data?.outcome !== SCAN_OUTCOMES.EXECUTED) return cancelled;
   }
 
+  const notPrimed = await spendGrant(ctx);
+  if (notPrimed) return notPrimed;
   const created = await createEscalation({
     type: step.params?.escalationType ?? 'scan',
     role: step.params!.targetRole!,
@@ -152,6 +141,8 @@ export async function releaseStep(
     limit: 1,
   });
   if (escalations.length === 0) return null;
+  const notPrimed = await spendGrant(ctx);
+  if (notPrimed) return notPrimed;
   const result = await releaseEscalation({ id: escalations[0].id }, ctx.auth);
   if (result.status === 403) return forbidden(result.error);
   if (result.status === 409) return conflict(result.error);
@@ -173,6 +164,8 @@ export async function dispatchChoiceVerb(
   switch (step.verb) {
     case SCAN_VERBS.SHOW_DETAIL:
       return executed(row, step); // already located under the actor's scope
+    case SCAN_VERBS.HOLD:
+      return (await holdStep(step, ctx, row as LTEscalationRecord))!;
     case SCAN_VERBS.CLAIM:
     case SCAN_VERBS.CLAIM_SHOW_DETAIL:
       return (await claimStep(step, ctx)) ?? (await missReason(step, ctx, 'the item is no longer claimable'));
@@ -210,6 +203,8 @@ export async function cancelStep(
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   // Claim-as-lock: the atomic claim pins the row to this caller (or extends
   // their claim), serializing concurrent double-scans before the cancel.
+  const notPrimed = await spendGrant(ctx);
+  if (notPrimed) return notPrimed;
   const claimed = await claimByMetadata({
     key: ctx.scheme.target_facet,
     value: ctx.parsed.target,
@@ -225,95 +220,4 @@ export async function cancelStep(
   return executed(cancelled, step);
 }
 
-/**
- * Adds the scanned item to an accumulator. Two modes, one atomic write:
- *
- * - Item-locate (`params.accumulate.containerFacet`): the scan locates the
- *   item's own pending row through the scheme facet, reads the container
- *   facet value it carries, and adds the target to the container that shares
- *   it, writing the item row as the reciprocal in the same statement. An
- *   item with no row, or no container facet, falls through. An item whose
- *   container has closed and whose successor has not parked yet answers
- *   `no_open_container` with the item row, so the station can say "scan
- *   again" instead of showing the bag with no hint.
- * - Container-locate (no `containerFacet`): the scan locates the container
- *   by the scheme facet and adds `params.itemKey` (template).
- *
- * Templates may read `{claim.<facet>}` (the actor's live claim) and, in item
- * mode, `{item.<facet>}` (the located row); an unresolvable token falls
- * through. The write is the SDK's guarded statement; the locate only picks
- * ids. A container already holding the item answers conflict, never a
- * second add.
- */
-export async function accumulateStep(
-  step: ScanStep,
-  ctx: StepContext,
-): Promise<LTApiResult<ScanExecuteResponse> | null> {
-  const options = step.params?.accumulate;
-  let item: LTEscalationRecord | undefined;
-  if (options?.containerFacet) {
-    const located = await locateForStep(step, ctx, 1);
-    item = located?.escalations[0];
-    if (!item) return null;
-  }
-  const rendered = await templated(step, ctx, (tpl) => ({
-    payload: step.params?.resolverPayload
-      ? scanCodeService.interpolateScanTemplate(step.params.resolverPayload, tpl)
-      : undefined,
-    metadata: { ...interpolatedMetadata(step, ctx, tpl), ...provenance(ctx) },
-    itemKey: options?.containerFacet
-      ? ctx.parsed.target
-      : scanCodeService.interpolateScanTemplate(step.params!.itemKey!, tpl),
-  }), item);
-  if (rendered === null) return null;
-
-  let request: Parameters<typeof accumulateItemByMetadata>[0];
-  let container: { facet: string; value: string } | undefined;
-  if (options?.containerFacet && item) {
-    const containerValue = (item.metadata as Record<string, any> | null)?.[options.containerFacet];
-    if (containerValue === undefined || containerValue === null || containerValue === '') return null;
-    container = { facet: options.containerFacet, value: String(containerValue) };
-    request = {
-      key: container.facet,
-      value: container.value,
-      itemKey: rendered.itemKey,
-      payload: rendered.payload,
-      metadata: rendered.metadata,
-      restrictRoles: options.container?.roles ?? options.containerRoles,
-      container: options.container
-        ? { types: options.container.types, subtypes: options.container.subtypes, facets: options.container.facets }
-        : undefined,
-      ...(options.reciprocal === false ? {} : { reciprocal: { id: item.id } }),
-    };
-  } else {
-    request = {
-      key: ctx.scheme.target_facet,
-      value: ctx.parsed.target,
-      itemKey: rendered.itemKey,
-      payload: rendered.payload,
-      metadata: rendered.metadata,
-      restrictRoles: step.query?.roles,
-    };
-  }
-
-  const result = await accumulateItemByMetadata(request, ctx.auth);
-  if (result.status === 404) {
-    if (!container || !item) return null;
-    return {
-      status: 200,
-      data: {
-        outcome: SCAN_OUTCOMES.NO_OPEN_CONTAINER,
-        verb: step.verb,
-        escalation: item,
-        container,
-        fallback: ctx.rule.fallback,
-        error: `No open container carries ${container.facet} = ${container.value}`,
-      },
-    };
-  }
-  if (result.status === 403) return forbidden(result.error);
-  if (result.status === 409) return conflict(result.error);
-  if (result.status !== 200) return result;
-  const escalation = result.data.escalationId ? { id: result.data.escalationId, ...result.data } : undefined;
-  return executed(escalation, step);
-}
+export { accumulateStep } from './verb-accumulate';

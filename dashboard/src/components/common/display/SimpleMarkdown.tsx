@@ -17,7 +17,12 @@ function renderInline(text: string): string {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-accent-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
-export function SimpleMarkdown({ content, compact }: { content: string; compact?: boolean }) {
+/**
+ * `inherit` renders text at the surrounding size and tone, for display copy
+ * set large by its container (the scan station). `compact` and the default
+ * set their own small sizes.
+ */
+export function SimpleMarkdown({ content, compact, inherit }: { content: string; compact?: boolean; inherit?: boolean }) {
   // Extract fenced code blocks before line-by-line processing
   const segments: Array<{ type: 'code'; lang: string; code: string } | { type: 'text'; text: string }> = [];
   const fencePattern = /^```(\w*)\n([\s\S]*?)^```$/gm;
@@ -34,9 +39,11 @@ export function SimpleMarkdown({ content, compact }: { content: string; compact?
     segments.push({ type: 'text', text: content.slice(lastIndex) });
   }
 
-  const sizeClasses = compact
-    ? { text: 'text-xs', heading: 'text-xs', list: 'text-xs', code: 'text-2xs' }
-    : { text: 'text-sm', heading: 'text-sm', list: 'text-sm', code: 'text-xs' };
+  const sizeClasses = inherit
+    ? { text: '', heading: '', list: '', code: 'text-[0.85em]', tone: '' }
+    : compact
+      ? { text: 'text-xs', heading: 'text-xs', list: 'text-xs', code: 'text-2xs', tone: 'text-text-secondary' }
+      : { text: 'text-sm', heading: 'text-sm', list: 'text-sm', code: 'text-xs', tone: 'text-text-secondary' };
 
   const allParts: string[] = [];
   for (const segment of segments) {
@@ -52,7 +59,7 @@ export function SimpleMarkdown({ content, compact }: { content: string; compact?
 
   return (
     <div
-      className="prose-sm"
+      className={inherit ? undefined : 'prose-sm'}
       dangerouslySetInnerHTML={{ __html: allParts.join('\n') }}
     />
   );
@@ -60,7 +67,7 @@ export function SimpleMarkdown({ content, compact }: { content: string; compact?
 
 function renderTextBlock(
   text: string,
-  sz: { text: string; heading: string; list: string; code: string },
+  sz: { text: string; heading: string; list: string; code: string; tone: string },
 ): string[] {
   const lines = text.split('\n');
   const htmlParts: string[] = [];
@@ -130,13 +137,13 @@ function renderTextBlock(
     // List items
     if (/^[-*] /.test(trimmed)) {
       if (!inList) { htmlParts.push('<ul class="space-y-1 my-1">'); inList = true; }
-      htmlParts.push(`<li class="${sz.list} text-text-secondary flex gap-2"><span class="text-text-tertiary shrink-0">-</span><span>${renderInline(trimmed.slice(2))}</span></li>`);
+      htmlParts.push(`<li class="${sz.list} ${sz.tone} flex gap-2"><span class="text-text-tertiary shrink-0">-</span><span>${renderInline(trimmed.slice(2))}</span></li>`);
       continue;
     }
 
     // Paragraph
     if (inList) { htmlParts.push('</ul>'); inList = false; }
-    htmlParts.push(`<p class="${sz.text} text-text-secondary my-1">${renderInline(trimmed)}</p>`);
+    htmlParts.push(`<p class="${sz.text} ${sz.tone} my-1">${renderInline(trimmed)}</p>`);
   }
 
   // Flush any remaining table

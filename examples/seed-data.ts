@@ -48,6 +48,9 @@ export const SEED_USERS = [
       { role: 'printer-fleet', type: 'member' as const },
       { role: 'printer-harvest', type: 'member' as const },
       { role: 'printer-service', type: 'member' as const },
+      // The bag-and-bin bench (examples/seed-scan-bins.ts): places bags in bins.
+      { role: 'bag', type: 'member' as const },
+      { role: 'bin', type: 'member' as const },
     ],
     // The badge binding the identity scan resolves: scan 11:0:BADGE-REVIEWER-7431
     // on a station device and mutations attribute to this user.
@@ -65,6 +68,8 @@ export const SEED_USERS = [
       { role: 'printer-fleet', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
       { role: 'printer-harvest', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
       { role: 'printer-service', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
+      { role: 'bag', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
+      { role: 'bin', type: 'member' as const, read_scope: 'all' as const, write_scope: 'none' as const },
     ],
   },
   {

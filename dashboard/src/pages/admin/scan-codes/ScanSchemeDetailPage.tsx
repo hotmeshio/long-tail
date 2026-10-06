@@ -4,6 +4,7 @@ import { ScanBarcode, SlidersHorizontal, ListChecks, Plus, Trash2 } from 'lucide
 import { useScanScheme, useUpsertScanScheme, useDeleteScanScheme, SCAN_SCHEME_KINDS, type ScanRule, type ScanScheme, type ScanSchemeKind } from '../../../api/scan-codes';
 import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDeleteModal';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { GrantScopeField } from './GrantScopeField';
 import { ScanRuleEditor } from './ScanRuleEditor';
 
 /** The first free single-digit category (0-9), or null when all are taken. */
@@ -70,9 +71,11 @@ export function ScanSchemeDetailPage() {
 
   const sampleTarget = scheme.encoding === 'fixed' ? '7'.repeat(scheme.target_length ?? 8) : 'SN-1234';
   const codeFor = (category: string) =>
-    scheme.encoding === 'fixed'
-      ? `${scheme.version}${category}${sampleTarget}`
-      : `${scheme.version}${scheme.delimiter}${category}${scheme.delimiter}${sampleTarget}`;
+    scheme.encoding === 'gtin'
+      ? '036000291452'
+      : scheme.encoding === 'fixed'
+        ? `${scheme.version}${category}${sampleTarget}`
+        : `${scheme.version}${scheme.delimiter}${category}${scheme.delimiter}${sampleTarget}`;
 
   return (
     <div className="space-y-10">
@@ -165,6 +168,7 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: 
   const [targetFacet, setTargetFacet] = useState(scheme.target_facet);
   const [grantTtlSeconds, setGrantTtlSeconds] = useState(scheme.grant_ttl_seconds ?? 3600);
   const [grantMaxUses, setGrantMaxUses] = useState(scheme.grant_max_uses ?? 0);
+  const [grantScope, setGrantScope] = useState<'action' | 'subject'>(scheme.grant_scope ?? 'action');
   const [enabled, setEnabled] = useState(scheme.enabled);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -174,7 +178,8 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: 
     || targetFacet !== scheme.target_facet
     || enabled !== scheme.enabled
     || kind !== scheme.kind
-    || (isIdentity && (grantTtlSeconds !== scheme.grant_ttl_seconds || grantMaxUses !== scheme.grant_max_uses));
+    || (isIdentity && (grantTtlSeconds !== scheme.grant_ttl_seconds || grantMaxUses !== scheme.grant_max_uses
+      || grantScope !== (scheme.grant_scope ?? 'action')));
 
   return (
     <SectionGroup
@@ -234,7 +239,7 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: 
         {isIdentity && (
           <label className="block">
             <span className="block text-xs text-text-secondary mb-1">Grant max uses</span>
-            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n scans.</span>
+            <span className="block text-2xs text-text-tertiary mb-1">0 = TTL-bound; n = the grant covers n acts.</span>
             <input
               type="number" min={0}
               value={grantMaxUses}
@@ -243,6 +248,7 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: 
             />
           </label>
         )}
+        {isIdentity && <GrantScopeField value={grantScope} onChange={setGrantScope} />}
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Status</span>
           <span className="block text-2xs text-text-tertiary mb-1">Disable to reject every scan of this version.</span>
@@ -266,6 +272,7 @@ function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: 
               kind,
               grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
               grant_max_uses: isIdentity ? grantMaxUses : 0,
+              grant_scope: isIdentity ? grantScope : 'action',
               enabled,
             })}
             className="btn-primary text-xs"

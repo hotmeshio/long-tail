@@ -153,8 +153,15 @@ describe('accumulateStep — outcome mapping', () => {
     expect(conflict?.data?.error).toMatch(/already held/);
   });
 
-  it('passes other statuses through untouched', async () => {
+  it('a rejected payload is a refusal with the reason, never a raw 422', async () => {
     add.mockResolvedValue({ status: 422, error: 'invalid' });
-    expect((await accumulateStep(itemLocate(), ctx))?.status).toBe(422);
+    const result = await accumulateStep(itemLocate(), ctx);
+    expect(result?.status).toBe(200);
+    expect(result?.data).toMatchObject({ outcome: SCAN_OUTCOMES.REFUSED, error: 'invalid' });
+  });
+
+  it('passes other statuses through untouched', async () => {
+    add.mockResolvedValue({ status: 500, error: 'boom' });
+    expect((await accumulateStep(itemLocate(), ctx))?.status).toBe(500);
   });
 });

@@ -13,11 +13,30 @@ import {
 } from '../../types';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
+/** The held subject, re-derived from the client's pointer on this request. */
+export interface HeldSubject {
+  row: LTEscalationRecord;
+  parsed: ParsedScanCode;
+  scheme: ScanScheme;
+  code: string;
+}
+
+/** The acting grant riding the request, and whether this request spent it. */
+export interface GrantLedger {
+  token: string;
+  /** Before this request touched it. */
+  peeked: { remaining: number | null; bound: boolean };
+  /** Set once this request spends a use; null until then. */
+  spent: { remaining: number | null; bound: boolean } | null;
+}
+
 /** Everything a step executor needs about the scan that reached it. */
 export interface StepContext {
   scheme: ScanScheme;
   rule: ScanRule;
   parsed: ParsedScanCode;
+  /** The code as the station scanned it; absent when a choice re-derived the target. */
+  rawCode?: string;
   scannedAt: string;
   /** The effective actor — the acting (badged) user when a grant rode the request. */
   auth: LTApiAuth;
@@ -25,6 +44,12 @@ export interface StepContext {
   stationAuth: LTApiAuth;
   /** True when `auth` came from an acting-identity grant. */
   acting: boolean;
+  /** The grant behind `acting`; spent only when an act lands. */
+  grant?: GrantLedger;
+  /** The subject the station holds, when its pointer still checks out. */
+  subject?: HeldSubject;
+  /** The station sent a subject pointer that no longer checks out. */
+  subjectStale?: boolean;
 }
 
 export function targetFilter(step: ScanStep, ctx: StepContext): Record<string, any> {
@@ -32,7 +57,18 @@ export function targetFilter(step: ScanStep, ctx: StepContext): Record<string, a
 }
 
 export function templateContext(ctx: StepContext): scanCodeService.ScanTemplateContext {
-  return { target: ctx.parsed.target, category: ctx.parsed.category, scannedAt: ctx.scannedAt };
+  return {
+    target: ctx.parsed.target,
+    category: ctx.parsed.category,
+    scannedAt: ctx.scannedAt,
+    code: ctx.parsed.raw ?? ctx.parsed.target,
+    ...(ctx.subject ? { subject: subjectBag(ctx.subject.row) } : {}),
+  };
+}
+
+/** The `{subject.x}` bag: the held row's metadata plus its id. */
+export function subjectBag(row: LTEscalationRecord): Record<string, unknown> {
+  return { ...(row.metadata ?? {}), id: row.id };
 }
 
 /**
@@ -103,13 +139,60 @@ export function conflict(error?: string): LTApiResult<ScanExecuteResponse> {
   return { status: 200, data: { outcome: SCAN_OUTCOMES.CONFLICT, error } };
 }
 
-export function notPrimed(ctx: StepContext): LTApiResult<ScanExecuteResponse> {
+export function notPrimed(ctx: StepContext, error?: string): LTApiResult<ScanExecuteResponse> {
   return {
     status: 200,
     data: {
       outcome: SCAN_OUTCOMES.NOT_PRIMED,
       notPrimed: ctx.rule.notPrimed,
-      error: 'an acting identity is required — scan your badge',
+      replayable: true,
+      error: error ?? 'an acting identity is required — scan your badge',
     },
   };
 }
+
+/** Nothing was written; say why, and name what the step expected. */
+export function refused(
+  markdown: string,
+  extra: Partial<ScanExecuteResponse> = {},
+): LTApiResult<ScanExecuteResponse> {
+  return {
+    status: 200,
+    data: { outcome: SCAN_OUTCOMES.REFUSED, refusal: { markdown }, error: markdown, ...extra },
+  };
+}
+
+/**
+ * Interpolates a step's params, or falls through when a `{claim.…}` or
+ * `{item.…}` token has nothing to read: a literal token never reaches a row.
+ */
+export async function templated<T>(
+  step: ScanStep,
+  ctx: StepContext,
+  render: (tpl: scanCodeService.ScanTemplateContext) => T,
+  item?: LTEscalationRecord,
+): Promise<T | null> {
+  const tpl = await stepTemplate(step, ctx, item);
+  try {
+    return render(tpl);
+  } catch (err) {
+    if (err instanceof scanCodeService.ScanTemplateError) return null;
+    throw err;
+  }
+}
+
+/**
+ * Attach the step's `done` copy to a write that landed. `tpl` carries the
+ * bags the copy may read (the container a subject step located, a fill's
+ * batch); an unreadable token renders empty rather than failing the act.
+ */
+export function withDone(
+  result: LTApiResult<ScanExecuteResponse>,
+  step: ScanStep,
+  tpl: scanCodeService.ScanTemplateContext,
+): LTApiResult<ScanExecuteResponse> {
+  const data = result.data;
+  if (!step.done || !data || data.outcome !== SCAN_OUTCOMES.EXECUTED || data.already || data.done) return result;
+  return { ...result, data: { ...data, done: { markdown: scanCodeService.renderScanCopy(step.done.markdown, tpl) } } };
+}
+

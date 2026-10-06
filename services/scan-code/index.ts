@@ -22,10 +22,18 @@ export {
   parseScanCode,
   interpolateScanTemplate,
   mentionsClaimToken,
+  renderScanCopy,
   ScanTemplateError,
   type ScanParseResult,
   type ScanParseFailure,
   type ScanTemplateContext,
 } from './parse';
 
-export { assertValidScheme, assertValidSteps } from './validate';
+export {
+  assertValidScheme,
+  assertValidSteps,
+  assertValidIdentityRule,
+  assertSchemesCoexist,
+} from './validate';
+
+export { isValidGtin, normalizeGtin } from '../../shared/scan-code';

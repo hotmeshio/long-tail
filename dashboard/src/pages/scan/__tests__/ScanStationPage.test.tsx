@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   identity: { current: null as { actingToken: string; displayName: string; expiresAt: string | null } | null },
   clear: vi.fn(),
+  settle: vi.fn(),
+  lastResult: { current: null as unknown },
+  subject: { current: null as unknown },
+  pendingScan: { current: null as unknown },
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -22,12 +26,21 @@ vi.mock('../../../hooks/useActingIdentity', () => ({
     identity: mocks.identity.current,
     prime: vi.fn(),
     clear: mocks.clear,
+    settle: mocks.settle,
     remainingSeconds: () => 0,
   }),
 }));
 vi.mock('../../../hooks/useScanInput', () => ({
   SCAN_CHOICES_STATE: 'scanChoices',
-  useScanInput: () => ({ setCodeInterceptor: () => {} }),
+  useScanInput: () => ({
+    pushCodeInterceptor: () => () => {},
+    lastResult: mocks.lastResult.current,
+    subject: mocks.subject.current,
+    dropSubject: vi.fn(),
+    adoptResponse: vi.fn(),
+    pendingScan: mocks.pendingScan.current,
+    dropPendingScan: vi.fn(),
+  }),
 }));
 vi.mock('../../../api/scan-codes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/scan-codes')>()),
@@ -89,6 +102,19 @@ describe('ScanStationPage', () => {
     renderStation(choicesResponse());
     fireEvent.click(screen.getByRole('button', { name: /Claim & Work/ }));
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/escalations/detail/esc-1'));
+  });
+
+  it('a claim choice hands the server\'s word on the badge to the identity, so a spent badge retires', async () => {
+    mocks.identity.current = { actingToken: 'eph:v1:acting_identity:m', displayName: 'Maria', expiresAt: null };
+    const result = {
+      outcome: 'executed' as const, verb: 'claim' as const,
+      escalation: { id: 'esc-1', role: 'packing', status: 'pending' },
+      acting: { consumed: true, remaining: 0, bound: false },
+    };
+    executeMock.mockResolvedValue(result);
+    renderStation(choicesResponse());
+    fireEvent.click(screen.getByRole('button', { name: /Claim & Work/ }));
+    await waitFor(() => expect(mocks.settle).toHaveBeenCalledWith('eph:v1:acting_identity:m', result));
   });
 
   it('a resolve choice executed returns to idle with a done notice', async () => {

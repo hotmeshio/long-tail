@@ -1,5 +1,6 @@
 import * as roleService from '../services/role';
-import { PORTAL_KEY, PORTAL_LIMITS, type PortalCount, type RolePin, type RolePortal } from '../services/role/types';
+import { PORTAL_KEY, PORTAL_LIMITS, ROLE_PROPERTY_KEYS, type PortalCount, type RolePin, type RolePortal } from '../services/role/types';
+import { badgeGrantError } from '../services/role/badge-grant';
 import { FACET_KEY } from '../services/escalation/facet-sql';
 import type { LTApiResult } from '../types/sdk';
 
@@ -295,6 +296,8 @@ export async function updateRole(input: {
         return { status: 400, error: 'default_pins must be [{ label, url, badge? }] with dashboard-relative urls' };
       }
     }
+    const grantError = badgeGrantError(input.properties?.[ROLE_PROPERTY_KEYS.BADGE_GRANT]);
+    if (grantError) return { status: 400, error: grantError };
     if (input.portals != null && !isPortalList(input.portals)) {
       return {
         status: 400,

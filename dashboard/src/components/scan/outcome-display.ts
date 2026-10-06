@@ -15,6 +15,9 @@ export const OUTCOME_LABELS: Record<ScanOutcome, string> = {
   [SCAN_OUTCOMES.NOT_PRIMED]: 'Badge required',
   [SCAN_OUTCOMES.CHOICES]: 'Choices presented',
   [SCAN_OUTCOMES.NO_OPEN_CONTAINER]: 'Container closing, scan again',
+  [SCAN_OUTCOMES.HELD]: 'Holding',
+  [SCAN_OUTCOMES.REFUSED]: 'Not placed',
+  [SCAN_OUTCOMES.SUBJECT_STALE]: 'Scan it again',
 };
 
 /** Status tone per outcome (text-safe tokens). */
@@ -32,6 +35,9 @@ export const OUTCOME_TONE: Record<ScanOutcome, string> = {
   [SCAN_OUTCOMES.NOT_PRIMED]: 'text-status-warning',
   [SCAN_OUTCOMES.CHOICES]: 'text-status-success',
   [SCAN_OUTCOMES.NO_OPEN_CONTAINER]: 'text-status-warning',
+  [SCAN_OUTCOMES.HELD]: 'text-status-success',
+  [SCAN_OUTCOMES.REFUSED]: 'text-status-error',
+  [SCAN_OUTCOMES.SUBJECT_STALE]: 'text-status-warning',
 };
 
 /**
@@ -51,5 +57,8 @@ export function outcomeMarkdown(response: ScanExecuteResponse): string | null {
   if (response.outcome === SCAN_OUTCOMES.IDENTITY_UNKNOWN) return response.fallback?.markdown ?? null;
   if (response.outcome === SCAN_OUTCOMES.NOT_PRIMED) return response.notPrimed?.markdown ?? null;
   if (response.outcome === SCAN_OUTCOMES.NO_OPEN_CONTAINER) return response.fallback?.markdown ?? null;
+  if (response.outcome === SCAN_OUTCOMES.REFUSED) return response.refusal?.markdown ?? response.error ?? null;
+  if (response.outcome === SCAN_OUTCOMES.HELD) return response.subject?.expect?.prompt ?? null;
+  if (response.outcome === SCAN_OUTCOMES.SUBJECT_STALE) return response.error ?? null;
   return null;
 }

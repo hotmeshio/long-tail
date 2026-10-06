@@ -40,10 +40,13 @@ export function registerScanCodeTools(server: McpServer): void {
     {
       title: 'Execute Scan Code',
       description:
-        'Execute a raw scan code (version:category:target). Parses against the ' +
-        'configured schemes, walks the rule\'s condition/action steps, and returns ' +
-        'a structured outcome (executed, confirm_required, matched_list, ' +
-        'no_match_fallback, unconfigured, invalid_code, forbidden, conflict).',
+        'Execute a raw scan code (version:category:target, or a manufacturer barcode ' +
+        'under a gtin scheme). Parses against the configured schemes, walks the ' +
+        'rule\'s condition/action steps, and returns a structured outcome: executed, ' +
+        'matched_list, confirm_required, choices, held (a subject to pass back as ' +
+        '`subject` on the next scan), refused (nothing written; refusal names why), ' +
+        'subject_stale, no_open_container, no_match_fallback, not_primed, ' +
+        'identity_primed, identity_unknown, unconfigured, invalid_code, forbidden, conflict.',
       inputSchema: executeScanCodeSchema,
     },
     async (args: z.infer<typeof executeScanCodeSchema>) => {
@@ -51,6 +54,8 @@ export function registerScanCodeTools(server: McpServer): void {
         code: args.code,
         actingToken: args.actingToken,
         previousActingToken: args.previousActingToken,
+        subject: args.subject,
+        stationRole: args.stationRole,
       }, await systemAuth());
       return asText(result.data ?? { error: result.error });
     },
@@ -122,6 +127,7 @@ export function registerScanCodeTools(server: McpServer): void {
         name: args.name,
         steps: args.steps,
         fallback: args.fallback,
+        notPrimed: args.notPrimed,
         enabled: args.enabled,
       });
       return asText(result.data ?? { error: result.error });

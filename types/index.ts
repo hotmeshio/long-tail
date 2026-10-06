@@ -225,6 +225,15 @@ export type {
   ScanExecuteRequest,
   ScanPendingAction,
   ScanExecuteResponse,
+  ScanAccumulateParams,
+  ScanHoldParams,
+  ScanFillParams,
+  ScanSubjectGate,
+  ScanMatch,
+  ScanRefusal,
+  ScanSubjectRef,
+  ScanHeldSubject,
+  ScanGrantScope,
 } from './scan-code';
 
 export type {
@@ -244,6 +253,13 @@ export {
   SCAN_PROVENANCE_KEYS,
   SCAN_TEMPLATE_TOKENS,
   SCAN_TEMPLATE_BAGS,
+  SCAN_GRANT_SCOPES,
+  SCAN_HOLD_TTL_DEFAULT_SECONDS,
+  SCAN_HOLD_TTL_MIN_SECONDS,
+  SCAN_HOLD_TTL_MAX_SECONDS,
+  SCAN_FILL_SEPARATOR_DEFAULT,
+  GTIN_CATEGORY,
+  GTIN_LENGTHS,
   ACTING_IDENTITY_LABEL,
 } from './scan-code';
 

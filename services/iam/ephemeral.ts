@@ -4,6 +4,9 @@ import { loggerRegistry } from '../../lib/logger';
 import {
   INSERT_EPHEMERAL,
   EXCHANGE_EPHEMERAL,
+  PEEK_EPHEMERAL,
+  CONSUME_EPHEMERAL,
+  REFUND_EPHEMERAL,
   DELETE_EPHEMERAL,
   CLEANUP_EXPIRED_EPHEMERAL,
 } from './sql';
@@ -73,6 +76,8 @@ export interface StoreEphemeralOptions {
   ttlSeconds?: number;
   /** Human-readable label for debugging. */
   label?: string;
+  /** The first ref-carrying spend binds the token to that ref (see consumeEphemeral). */
+  bindOnUse?: boolean;
 }
 
 /**
@@ -96,7 +101,7 @@ export async function storeEphemeral(
 
   const { rows } = await pool.query(
     INSERT_EPHEMERAL(expiresAt),
-    [Buffer.from(encrypted, 'base64'), opts.label || null, maxUses],
+    [Buffer.from(encrypted, 'base64'), opts.label || null, maxUses, opts.bindOnUse ?? false],
   );
   return rows[0].token;
 }
@@ -126,6 +131,46 @@ export async function exchangeEphemeral(token: string): Promise<string | null> {
   }
 
   return decrypt((buf as Buffer).toString('base64'));
+}
+
+/** A live token's value and how many uses it has left (null = unbounded). */
+export interface EphemeralGrant {
+  value: string;
+  remaining: number | null;
+  /** True once the token is bound to a ref; it then acts only on that ref. */
+  bound: boolean;
+}
+
+function toGrant(row: { value: Buffer; use_count: number; max_uses: number; bound_ref: string | null }): EphemeralGrant {
+  const bound = row.bound_ref !== null;
+  return {
+    value: decrypt(row.value.toString('base64')),
+    remaining: bound || row.max_uses === 0 ? null : Math.max(0, row.max_uses - row.use_count),
+    bound,
+  };
+}
+
+/** Read a live token without spending a use. */
+export async function peekEphemeral(token: string): Promise<EphemeralGrant | null> {
+  const { rows } = await getPool().query(PEEK_EPHEMERAL, [token]);
+  return rows.length ? toGrant(rows[0]) : null;
+}
+
+/**
+ * Spend one use of a token. A token stored with `bindOnUse` binds to `ref`
+ * on its first ref-carrying spend; after that it spends freely on that ref
+ * and never on another. Returns null when expired, exhausted, or bound
+ * elsewhere. An exhausted row stays until its TTL so a spend whose act
+ * missed can be refunded.
+ */
+export async function consumeEphemeral(token: string, ref: string | null = null): Promise<EphemeralGrant | null> {
+  const { rows } = await getPool().query(CONSUME_EPHEMERAL, [token, ref]);
+  return rows.length ? toGrant(rows[0]) : null;
+}
+
+/** Undo one spend whose act did not land. `unbind` undoes the binding that spend made. */
+export async function refundEphemeral(token: string, unbind: boolean): Promise<void> {
+  await getPool().query(REFUND_EPHEMERAL, [token, unbind]);
 }
 
 /**

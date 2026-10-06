@@ -3,7 +3,7 @@ import type { WorkflowIconName } from './workflow-icons';
 import type { EscalationLookupRef } from './escalation';
 
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
-import type { ScanEncoding, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
+import type { ScanEncoding, ScanGrantScope, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
 import type { LTOAuthStartConfig } from './oauth';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
@@ -288,6 +288,8 @@ export interface LTScanSchemeConfig {
   kind?: ScanSchemeKind;
   grant_ttl_seconds?: number | null;
   grant_max_uses?: number;
+  /** Identity kind: 'action' (default) spends a use per act; 'subject' binds to one held subject. */
+  grant_scope?: ScanGrantScope;
   enabled?: boolean;
   /** The scheme's rules, one per category. */
   rules?: LTScanRuleConfig[];

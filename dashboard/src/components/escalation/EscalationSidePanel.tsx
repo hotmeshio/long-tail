@@ -197,6 +197,7 @@ export function EscalationSidePanel({
   activePanel,
   onPanelChange,
   canWriteItems,
+  guardItemWrite,
 }: {
   esc: LTEscalationRecord;
   schema: Record<string, unknown> | null;
@@ -221,6 +222,8 @@ export function EscalationSidePanel({
   onPanelChange?: (id: string) => void;
   /** The actor may add and remove items on a pending accumulator row. */
   canWriteItems?: boolean;
+  /** Runs an item write behind the page's badge challenge. */
+  guardItemWrite?: (verb: string, run: () => void) => void;
 }) {
   const navigate = useNavigate();
   const ALL_VIEW_IDS = Object.values(ESCALATION_PANEL_VIEWS) as readonly string[];
@@ -301,6 +304,7 @@ export function EscalationSidePanel({
               escalationId={esc.id}
               items={items}
               canWrite={!!canWriteItems && esc.status === 'pending'}
+              guardWrite={guardItemWrite}
               labelTemplate={schema?.[ITEM_LABEL_KEY]}
               labelContext={{ escalation: esc as unknown as Record<string, unknown>, metadata: esc.metadata ?? null, envelope, payload }}
             />

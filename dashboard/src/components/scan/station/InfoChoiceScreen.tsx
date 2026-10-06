@@ -54,7 +54,7 @@ export function InfoChoiceScreen({
   onExecute: (choice: ScanPresentedChoice) => void;
   onWithheldSelect: (choice: ScanPresentedChoice) => void;
 }) {
-  const { setCodeInterceptor } = useScanInput();
+  const { pushCodeInterceptor } = useScanInput();
   const [pendingChoice, setPendingChoice] = useState<ScanPresentedChoice | null>(null);
 
   const escalation = (response.escalation ?? {}) as Record<string, unknown>;
@@ -71,16 +71,13 @@ export function InfoChoiceScreen({
   const liveRef = useRef({ choices, hasActingIdentity, select });
   liveRef.current = { choices, hasActingIdentity, select };
 
-  useEffect(() => {
-    setCodeInterceptor((raw) => {
-      const live = liveRef.current;
-      const match = matchChoiceByCode(live.choices, live.hasActingIdentity, raw);
-      if (!match) return false;
-      live.select(match);
-      return true;
-    });
-    return () => setCodeInterceptor(null);
-  }, [setCodeInterceptor]);
+  useEffect(() => pushCodeInterceptor((raw) => {
+    const live = liveRef.current;
+    const match = matchChoiceByCode(live.choices, live.hasActingIdentity, raw);
+    if (!match) return false;
+    live.select(match);
+    return true;
+  }), [pushCodeInterceptor]);
 
   const assignedTo = (escalation.assigned_to as string | null) ?? null;
   const claimState = !assignedTo ? 'Unclaimed' : assignedTo === selfId ? 'Claimed by you' : 'Claimed';

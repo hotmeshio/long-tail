@@ -8,7 +8,7 @@ import { checkResolverPayload } from '../../services/escalation/resolver-validat
 import * as userService from '../../services/user';
 import { isUuid } from '../../lib/uuid';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
-import { ESCALATION_ACCUMULATE_KEYS, ESCALATION_BATCH_KEYS } from '../../types/escalation';
+import { ESCALATION_ACCUMULATE_KEYS, ESCALATION_BATCH_KEYS, ESCALATION_ITEM_KEY_MAX_LENGTH } from '../../types/escalation';
 import type { AccumulatedItem, ContainerSelector, LTEscalationRecord } from '../../types';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
@@ -59,6 +59,15 @@ function isBatch(escalation: LTEscalationRecord): boolean {
 }
 
 const NO_ACCUMULATOR_FOR_FACET = 'No pending accumulator found for this metadata';
+
+/** The add's item-key error, or null when the key is usable. */
+function itemKeyError(itemKey: string | undefined): LTApiResult | null {
+  if (!itemKey) return { status: 400, error: 'itemKey is required' };
+  if (typeof itemKey !== 'string' || itemKey.length > ESCALATION_ITEM_KEY_MAX_LENGTH) {
+    return { status: 400, error: `itemKey must be a string of at most ${ESCALATION_ITEM_KEY_MAX_LENGTH} characters` };
+  }
+  return null;
+}
 
 /**
  * The container a facet names: the highest priority pending row that carries
@@ -204,14 +213,20 @@ export async function accumulateItem(
 ): Promise<LTApiResult> {
   try {
     const { id, itemKey, metadata } = input;
-    if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const keyError = itemKeyError(itemKey);
+    if (keyError) return keyError;
     const initiator = await resolveActor(input.initiatedBy, auth);
     if ('error' in initiator) return initiator.error;
 
     const escalation = await escalationService.getEscalation(id);
     if (!escalation) return { status: 404, error: 'Escalation not found' };
-    if (escalation.status === 'cancelled') return { status: 409, error: 'Escalation is cancelled' };
-    if (escalation.status !== 'pending') return { status: 409, error: 'Escalation not available for accumulation' };
+    if (escalation.status === 'cancelled') {
+      return { status: 409, error: 'Escalation is cancelled', data: { error: 'Escalation is cancelled', outcome: 'already-cancelled' } };
+    }
+    if (escalation.status !== 'pending') {
+      const error = 'Escalation not available for accumulation';
+      return { status: 409, error, data: { error, outcome: `already-${escalation.status}` } };
+    }
     if (!isAccumulator(escalation)) return { status: 400, error: 'Escalation is not an accumulator' };
 
     if (await assertReadAccess(auth.userId, escalation)) {
@@ -252,7 +267,8 @@ export async function accumulateItemBySignalKey(
   try {
     const { signalKey, itemKey, metadata } = input;
     if (!signalKey) return { status: 400, error: 'signalKey is required' };
-    if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const keyError = itemKeyError(itemKey);
+    if (keyError) return keyError;
     const initiator = await resolveActor(input.initiatedBy, auth);
     if ('error' in initiator) return initiator.error;
 
@@ -305,7 +321,8 @@ export async function accumulateItemByMetadata(
   try {
     const { key, value, itemKey, metadata } = input;
     if (!key || !value) return { status: 400, error: 'key and value are required' };
-    if (!itemKey) return { status: 400, error: 'itemKey is required' };
+    const keyError = itemKeyError(itemKey);
+    if (keyError) return keyError;
     const initiator = await resolveActor(input.initiatedBy, auth);
     if ('error' in initiator) return initiator.error;
     const selectorError = containerSelectorError(input.container);
@@ -591,21 +608,21 @@ function accumulateOutcomeResult(
         },
       };
     case 'duplicate-item':
-      return { status: 409, error: 'Item already held', data: { error: 'Item already held', itemKey } };
+      return { status: 409, error: 'Item already held', data: { error: 'Item already held', itemKey, outcome: 'duplicate-item' } };
     case 'full':
-      return { status: 409, error: 'Accumulator is full', data: { error: 'Accumulator is full', itemKey } };
+      return { status: 409, error: 'Accumulator is full', data: { error: 'Accumulator is full', itemKey, outcome: 'full' } };
     case 'claimed-by-other':
-      return { status: 409, error: 'Escalation is claimed by another user' };
+      return { status: 409, error: 'Escalation is claimed by another user', data: { error: 'Escalation is claimed by another user', outcome: 'claimed-by-other' } };
     case 'claim-expired':
-      return { status: 409, error: 'Your claim has expired; re-claim this escalation to add to it' };
+      return { status: 409, error: 'Your claim has expired; re-claim this escalation to add to it', data: { error: 'Your claim has expired; re-claim this escalation to add to it', outcome: 'claim-expired' } };
     case 'not-found':
-      return { status: 404, error: 'Escalation not found' };
+      return { status: 404, error: 'Escalation not found', data: { error: 'Escalation not found', outcome: 'not-found' } };
     case 'not-accumulator':
-      return { status: 400, error: 'Escalation is not an accumulator' };
+      return { status: 400, error: 'Escalation is not an accumulator', data: { error: 'Escalation is not an accumulator', outcome: 'not-accumulator' } };
     case 'reciprocal-not-found':
-      return { status: 404, error: 'Reciprocal escalation not found' };
+      return { status: 404, error: 'Reciprocal escalation not found', data: { error: 'Reciprocal escalation not found', outcome: 'reciprocal-not-found' } };
     case 'reciprocal-not-accumulator':
-      return { status: 400, error: 'Reciprocal escalation is not an accumulator' };
+      return { status: 400, error: 'Reciprocal escalation is not an accumulator', data: { error: 'Reciprocal escalation is not an accumulator', outcome: 'reciprocal-not-accumulator' } };
     case 'reciprocal-duplicate':
       return { status: 409, error: 'Reciprocal escalation already holds this container', data: { error: 'Reciprocal escalation already holds this container', outcome: result.outcome } };
     case 'reciprocal-full':
@@ -613,7 +630,11 @@ function accumulateOutcomeResult(
     case 'reciprocal-terminal':
       return { status: 409, error: 'Reciprocal escalation is no longer pending', data: { error: 'Reciprocal escalation is no longer pending', outcome: result.outcome } };
     default:
-      return { status: 409, error: 'Escalation not available for accumulation' };
+      return {
+        status: 409,
+        error: 'Escalation not available for accumulation',
+        data: { error: 'Escalation not available for accumulation', outcome: result.outcome },
+      };
   }
 }
 

@@ -20,6 +20,15 @@ export * as TaskService from './services/task';
 export * as EscalationService from './services/escalation';
 export * as ConfigService from './services/config';
 export * as UserService from './services/user';
+export {
+  assertValidScheme as assertValidScanScheme,
+  assertValidSteps as assertValidScanSteps,
+  assertValidIdentityRule as assertValidScanIdentityRule,
+  isValidGtin,
+  normalizeGtin,
+  type ScanSchemeInput,
+  type ScanRuleInput,
+} from './services/scan-code';
 export * as TopicService from './services/topics';
 export { seedSystemTopics, seedConfigTopics } from './services/topics/system-topics';
 export { ltConfig } from './modules/ltconfig';

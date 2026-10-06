@@ -1,3 +1,4 @@
+import { scanSinkError } from './x-lt-scan';
 import { resolveFieldOptions, X_LT_OPTIONS } from './x-lt-options';
 import { hasInterpolation, interpolatePath, resolveCtxPath } from './ctx-path';
 
@@ -173,6 +174,9 @@ export function validateFieldConstraints(
       return `Must be one of: ${allowed.map((o) => String(o.value)).join(', ')}`;
     }
   }
+
+  const scanError = scanSinkError(value, fieldSchema, ctx);
+  if (scanError) return scanError;
 
   if (Array.isArray(value)) {
     return isEditableList(fieldSchema) ? validateListConstraints(value, fieldSchema, allowed, ctx) : undefined;

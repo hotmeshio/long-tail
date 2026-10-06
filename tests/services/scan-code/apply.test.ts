@@ -34,7 +34,7 @@ const RULE = {
   scheme_version: VERSION,
   category: '1',
   name: 'Locate',
-  steps: [{ verb: 'show-detail' as any }],
+  steps: [{ query: {}, verb: 'show-detail' as const }],
 };
 
 describe('scan-code — startup apply', () => {
@@ -60,7 +60,7 @@ describe('scan-code — startup apply', () => {
     expect(await applyScanRule(RULE)).toBe('applied');
     expect(await applyScanRule(RULE)).toBe('unchanged');
 
-    const changed = { ...RULE, steps: [{ verb: 'claim' as any }, { verb: 'show-detail' as any }] };
+    const changed = { ...RULE, steps: [{ query: {}, verb: 'claim' as const }, { query: {}, verb: 'show-detail' as const }] };
     expect(await applyScanRule(changed)).toBe('applied');
     expect((await getScanRule(VERSION, '1'))?.steps).toHaveLength(2);
   });

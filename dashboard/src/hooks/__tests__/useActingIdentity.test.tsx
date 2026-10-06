@@ -24,7 +24,7 @@ function primedResponse(token: string, displayName: string, ttlMs: number, maxUs
 }
 
 /** The spent callback the provider registered with the API client. */
-function spentHook(): (token: string) => void {
+function spentHook(): (token: string, remaining: number | null) => void {
   const calls = vi.mocked(setActingIdentitySpent).mock.calls;
   const fn = calls[calls.length - 1]?.[0];
   if (!fn) throw new Error('provider did not register a spent hook');
@@ -141,33 +141,50 @@ describe('useActingIdentity', () => {
     expect(result.current.remainingSeconds()).toBe(0);
   });
 
-  // ── Single-shot grants ──────────────────────────────────────────────────────
-  // The server exchanges a max-uses-1 grant exactly once. Holding the client
-  // copy past that request leaves every later scan carrying a dead token.
+  // ── Retirement follows the server ──────────────────────────────────────────
+  // The client drops its grant only when the server reports none left: a read
+  // never spends it, and a newer grant is never dropped for a stale token.
 
-  it('marks a maxUses 1 grant single-use and a TTL grant not', () => {
+  it('records whether a grant binds to one subject', () => {
     const { result } = renderHook(() => useActingIdentity(), { wrapper });
-    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1)); });
-    expect(result.current.identity?.singleUse).toBe(true);
+    act(() => { result.current.prime({ ...primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1), grantScope: 'subject' }); });
+    expect(result.current.identity?.subjectScoped).toBe(true);
     act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:b', 'Sam', 60_000, 0)); });
-    expect(result.current.identity?.singleUse).toBe(false);
+    expect(result.current.identity?.subjectScoped).toBe(false);
   });
 
-  it('retires a single-use grant the moment a request carrying it returns', () => {
+  it('retires the grant when a work route reports no uses left, and keeps it otherwise', () => {
     const { result } = renderHook(() => useActingIdentity(), { wrapper });
-    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1)); });
-    act(() => { spentHook()('eph:v1:acting_identity:a'); });
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 2)); });
+    act(() => { spentHook()('eph:v1:acting_identity:a', 1); });
+    expect(result.current.identity?.displayName).toBe('Dana');
+    act(() => { spentHook()('eph:v1:acting_identity:a', null); });
+    expect(result.current.identity?.displayName).toBe('Dana');
+    act(() => { spentHook()('eph:v1:acting_identity:a', 0); });
     expect(result.current.identity).toBeNull();
   });
 
-  it('keeps a TTL grant across requests and never drops a newer grant on a stale token', () => {
+  it('never drops a newer grant on a stale token', () => {
     const { result } = renderHook(() => useActingIdentity(), { wrapper });
-    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 0)); });
-    act(() => { spentHook()('eph:v1:acting_identity:a'); });
-    expect(result.current.identity?.displayName).toBe('Dana');
-
+    act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:a', 'Dana', 60_000, 1)); });
     act(() => { result.current.prime(primedResponse('eph:v1:acting_identity:b', 'Sam', 60_000, 1)); });
-    act(() => { spentHook()('eph:v1:acting_identity:a'); });
+    act(() => { spentHook()('eph:v1:acting_identity:a', 0); });
     expect(result.current.identity?.displayName).toBe('Sam');
+  });
+
+  it('settle retires a grant a scan used up, or a bound grant whose subject is done', () => {
+    const { result } = renderHook(() => useActingIdentity(), { wrapper });
+    const token = 'eph:v1:acting_identity:a';
+    act(() => { result.current.prime(primedResponse(token, 'Dana', 60_000, 1)); });
+    act(() => { result.current.settle(token, { outcome: 'held', acting: { consumed: false, remaining: 1, bound: false } }); });
+    expect(result.current.identity?.displayName).toBe('Dana');
+    act(() => { result.current.settle(token, { outcome: 'executed', acting: { consumed: true, remaining: 0, bound: false } }); });
+    expect(result.current.identity).toBeNull();
+
+    act(() => { result.current.prime(primedResponse(token, 'Dana', 60_000, 1)); });
+    act(() => { result.current.settle(token, { outcome: 'executed', progress: { filled: 1, total: 2, remaining: 1 }, acting: { consumed: true, remaining: null, bound: true } }); });
+    expect(result.current.identity?.displayName).toBe('Dana');
+    act(() => { result.current.settle(token, { outcome: 'executed', clearSubject: true, acting: { consumed: true, remaining: null, bound: true } }); });
+    expect(result.current.identity).toBeNull();
   });
 });

@@ -17,6 +17,9 @@ export const SCAN_OUTCOMES = {
   NOT_PRIMED: 'not_primed',
   CHOICES: 'choices',
   NO_OPEN_CONTAINER: 'no_open_container',
+  HELD: 'held',
+  REFUSED: 'refused',
+  SUBJECT_STALE: 'subject_stale',
 } as const;
 export type ScanOutcome = (typeof SCAN_OUTCOMES)[keyof typeof SCAN_OUTCOMES];
 
@@ -31,6 +34,8 @@ export const SCAN_VERBS = {
   CANCEL: 'cancel',
   ACCUMULATE: 'accumulate',
   PRESENT: 'present',
+  HOLD: 'hold',
+  FILL: 'fill',
 } as const;
 export type ScanVerb = (typeof SCAN_VERBS)[keyof typeof SCAN_VERBS];
 
@@ -47,14 +52,16 @@ export interface ScanScheme {
   name: string;
   description: string | null;
   target_facet: string;
-  encoding: 'fixed' | 'delimited';
+  encoding: 'fixed' | 'delimited' | 'gtin';
   delimiter: string;
   target_length: number | null;
   kind: ScanSchemeKind;
   /** Identity kind only: how long a minted acting grant lives (1–86400 s). */
   grant_ttl_seconds: number | null;
-  /** Identity kind only: 0 = TTL-bound; n = the grant covers n scan requests. */
+  /** Identity kind only: 0 = TTL-bound; n = the grant covers n acts. */
   grant_max_uses: number;
+  /** Identity kind only: 'action' spends a use per act; 'subject' binds to one held subject. */
+  grant_scope: 'action' | 'subject';
   enabled: boolean;
 }
 
@@ -75,6 +82,14 @@ export interface ScanStep {
   autoSelectSingle?: boolean;
   /** The step executes only under a real acting identity (badge or a write-capable login). */
   requireActingIdentity?: boolean;
+  /** The step acts on the held subject and runs only while one from these schemes is held. */
+  subject?: { schemes: number[]; claimedByOther?: 'refuse' | 'allow'; facets?: Record<string, string | number | boolean> };
+  /** Checked before the write; a miss refuses with nothing written. */
+  match?: { target?: string[]; facets?: string[] };
+  /** What the station says on a failed match, or a lost race. */
+  refuse?: { markdown: string; conflict?: string; missing?: string };
+  /** What the station says once the write lands. Markdown template. */
+  done?: { markdown: string };
 }
 
 export interface ScanStepParams {
@@ -95,7 +110,41 @@ export interface ScanStepParams {
     containerRoles?: string[];
     /** Item mode: also write the item's own row as the reciprocal (default true). */
     reciprocal?: boolean;
+    /** Which pending accumulator may be the container. */
+    container?: { roles?: string[]; types?: string[]; subtypes?: string[]; facets?: Record<string, unknown> };
+    /** The held subject joins the scanned container. */
+    from?: 'subject';
+    /** The held subject's row collects the scanned code. */
+    into?: 'subject';
   };
+  /** Hold verb options. */
+  hold?: {
+    ttlSeconds?: number;
+    label?: string;
+    /** Where the item goes, shown largest. Template. */
+    headline?: string;
+    /** The line under the headline. Template. */
+    subline?: string;
+    expect?: { schemes: number[]; prompt?: string };
+  };
+  /** Fill verb options. */
+  fill?: { into: 'subject' | 'scanned'; separator?: string; payload?: Record<string, unknown> };
+}
+
+/** The station's pointer to the item it is holding. */
+export interface ScanSubjectRef {
+  code: string;
+  escalationId: string;
+}
+
+/** A subject as the station shows it. */
+export interface ScanHeldSubject extends ScanSubjectRef {
+  label: string;
+  headline?: string;
+  subline?: string;
+  expiresAt: string;
+  expect?: { schemes: number[]; prompt?: string };
+  claimedBy?: { id: string; displayName: string };
 }
 
 /** One labeled choice on a PRESENT step. */
@@ -146,7 +195,7 @@ export interface ScanPendingAction {
 
 export interface ScanExecuteResponse {
   outcome: ScanOutcome;
-  parsed?: { version: number; category: string; target: string };
+  parsed?: { version: number; category: string; target: string; raw?: string };
   rule?: { schemeVersion: number; category: string; name: string };
   stepIndex?: number;
   verb?: ScanVerb;
@@ -170,8 +219,26 @@ export interface ScanExecuteResponse {
   actingToken?: string;
   /** Display copy of the grant's expiry (the keystore enforces it). */
   expiresAt?: string;
-  /** IDENTITY_PRIMED: the scheme's grant_max_uses; 1 is a single-shot grant, 0 lives to its TTL. */
+  /** IDENTITY_PRIMED: the scheme's grant_max_uses; 0 lives to its TTL. */
   maxUses?: number;
+  /** IDENTITY_PRIMED: how the grant is spent. */
+  grantScope?: 'action' | 'subject';
+  /** What happened to the grant this request carried. */
+  acting?: { consumed: boolean; remaining: number | null; bound: boolean };
+  /** HELD: the subject the station holds now. */
+  subject?: ScanHeldSubject;
+  /** The station drops its held subject. */
+  clearSubject?: boolean;
+  /** REFUSED: what to say, and the target(s) the step expected. */
+  refusal?: { markdown: string; expected?: string[] };
+  /** A fill: how far the batch has come. */
+  progress?: { filled: number; total: number; remaining: number };
+  /** An executed add that found the item already in place. */
+  already?: boolean;
+  /** EXECUTED: the step's done copy, rendered. */
+  done?: { markdown: string };
+  /** NOT_PRIMED that may be replayed once a badge primes. */
+  replayable?: boolean;
   error?: string;
 }
 
@@ -189,7 +256,7 @@ export interface ScanChoiceExecuteRequest {
 
 export function executeScanCode(
   code: string,
-  opts?: { actingToken?: string; previousActingToken?: string },
+  opts?: { actingToken?: string; previousActingToken?: string; subject?: ScanSubjectRef; stationRole?: string },
 ): Promise<ScanExecuteResponse> {
   return apiFetch('/scan-codes/execute', {
     method: 'POST',
@@ -197,6 +264,8 @@ export function executeScanCode(
       code,
       ...(opts?.actingToken ? { actingToken: opts.actingToken } : {}),
       ...(opts?.previousActingToken ? { previousActingToken: opts.previousActingToken } : {}),
+      ...(opts?.subject ? { subject: opts.subject } : {}),
+      ...(opts?.stationRole ? { stationRole: opts.stationRole } : {}),
     }),
   });
 }

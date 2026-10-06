@@ -11,6 +11,10 @@ const delimited: ScanScheme = {
   encoding: SCAN_ENCODINGS.DELIMITED,
   delimiter: ':',
   target_length: null,
+  kind: 'action',
+  grant_ttl_seconds: null,
+  grant_max_uses: 0,
+  grant_scope: 'action',
   enabled: true,
 };
 
@@ -22,6 +26,10 @@ const fixed: ScanScheme = {
   encoding: SCAN_ENCODINGS.FIXED,
   delimiter: ':',
   target_length: 8,
+  kind: 'action',
+  grant_ttl_seconds: null,
+  grant_max_uses: 0,
+  grant_scope: 'action',
   enabled: true,
 };
 

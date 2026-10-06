@@ -53,6 +53,7 @@ import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
 import { StationWriteChallenge } from '../../../components/scan/station/StationWriteChallenge';
 import { apiFetch } from '../../../api/client';
+import { useFormScanSink } from '../../../hooks/useFormScanSink';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -184,6 +185,8 @@ function EscalationDetailView({ id }: { id: string }) {
   // (the guard query is socket-invalidated, so it refetches with no polling).
   const autoResolveFiredRef = useRef(false);
   const autoResolveActionRef = useRef<(() => void) | null>(null);
+  // A form that fills from scans submits through the same path as the button.
+  const scanSubmitRef = useRef<(json: string) => void>(() => {});
 
   const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
 
@@ -364,6 +367,18 @@ function EscalationDetailView({ id }: { id: string }) {
   }, [acting, pendingWrite, esc?.assigned_to, clearActing]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
+
+  // An open, editable form takes scans its x-lt-scan fields accept.
+  const sinkClaimed = !!esc && isEffectivelyClaimed(esc);
+  const sinkTerminal = esc?.status === 'resolved' || esc?.status === 'cancelled';
+  const scanNotice = useFormScanSink({
+    enabled: scanEnabled && !!esc && sinkClaimed && !sinkTerminal
+      && (esc.assigned_to === effectiveActorId || isReadOnlyLogin(myRoles)),
+    json,
+    onJsonChange: setJson,
+    context: esc ? buildShowIfContext(esc, lookupCtx) : undefined,
+    onScanSubmit: (next) => scanSubmitRef.current(next),
+  });
 
   if (isLoading) {
     return (
@@ -559,6 +574,21 @@ function EscalationDetailView({ id }: { id: string }) {
     handleResolve(result.payload!);
   };
 
+  scanSubmitRef.current = (nextJson: string) => {
+    if (submitGuard.blocked) return;
+    const result = buildResolverPayload(nextJson, buildShowIfContext(esc, lookupCtx));
+    if (result.parseError) return;
+    if (result.errors.length > 0) {
+      setSubmitAttempted(true);
+      setFormErrors(result.errors);
+      setSidePanelOpen(true);
+      savePanelOpen(true);
+      setPanelActiveView(ESCALATION_PANEL_VIEWS.ERRORS);
+      return;
+    }
+    handleResolve(result.payload!);
+  };
+
   const handleEscalate = (targetRole: string) => {
     if (!targetRole) return;
     guardStationWrite('escalate', async () => {
@@ -699,6 +729,16 @@ function EscalationDetailView({ id }: { id: string }) {
                 isRetrying={claim.isPending || resolve.isPending}
               />
 
+              {scanNotice && editable && (
+                <p
+                  role="status"
+                  key={scanNotice.at}
+                  className={`text-sm mb-3 ${scanNotice.error ? 'text-status-error' : 'text-status-success'}`}
+                >
+                  {scanNotice.error ?? `Scanned into ${fieldTitle(effectiveSchema, scanNotice.field)}`}
+                </p>
+              )}
+
               <EscalationFormSection
                 esc={esc}
                 resolverPayload={resolverPayload}
@@ -791,7 +831,8 @@ function EscalationDetailView({ id }: { id: string }) {
         formErrors={formErrors}
         activePanel={panelActiveView}
         onPanelChange={setPanelActiveView}
-        canWriteItems={actionBarMode === 'available' || claimedByMe || canManage}
+        canWriteItems={actionBarMode === 'available' || claimedByMe || canManage || stationWorkable}
+        guardItemWrite={guardStationWrite}
       />
 
       {/* The admin hand-off: the gesture IS reassign, so takeover is implied. */}
@@ -849,4 +890,11 @@ function EscalationDetailView({ id }: { id: string }) {
       )}
     </div>
   );
+}
+
+/** The field's label for status copy: its title, else its key. */
+function fieldTitle(schema: unknown, field: string): string {
+  const props = (schema as { properties?: Record<string, { title?: unknown }> } | null)?.properties;
+  const title = props?.[field]?.title;
+  return typeof title === 'string' && title ? title : field;
 }
