@@ -1,4 +1,4 @@
--- Migration 037: OAuth authorization server for /mcp
+-- Migration 038: OAuth authorization server for /mcp
 --
 -- MCP clients register, a person consents to a grant, and the client holds a
 -- refresh token for that grant. Access tokens are self-contained JWTs and are
