@@ -81,7 +81,7 @@ function ShellLayout() {
 
   // Kiosk sessions live on the role list, the detail page, and the scan
   // screens; the home page and every other route redirect to the locked home.
-  if (kiosk && homePath && !isKioskAllowedPath(location.pathname)) {
+  if (kiosk && homePath && !isKioskAllowedPath(location.pathname, location.search)) {
     return <Navigate to={homePath} replace />;
   }
 

@@ -42,6 +42,13 @@ export interface ScanStepQuery {
   availability?: ScanAvailability;
   /** Extra metadata guards beyond the scheme's target facet. */
   facets?: Record<string, any>;
+  /**
+   * Escalation types / subtypes the located row must have. Steps that locate
+   * and then act by id only (show, list, present, hold, fill, accumulate);
+   * with `availability: 'mine'`, at most one of each.
+   */
+  types?: string[];
+  subtypes?: string[];
 }
 
 export interface ScanStepParams {
@@ -93,6 +100,13 @@ export interface ScanAccumulateParams {
   from?: 'subject';
   /** Into-subject mode: the held subject's row is the accumulator; the item is the scanned code. */
   into?: 'subject';
+  /**
+   * Into-subject mode: the scanned code's own pending row (the scheme's
+   * target facet = the scanned target, narrowed by this selector and the
+   * actor's read scope) is written as the reciprocal in the same statement
+   * as the subject's entry. Absent, nothing else is written.
+   */
+  item?: ContainerSelector & { roles?: string[] };
 }
 
 export interface ScanHoldParams {
@@ -149,10 +163,18 @@ export interface ScanRefusal {
   /** The atomic write lost a race (the container closed, the slot was taken). */
   conflict?: string;
   /**
-   * From-subject accumulate: the pairing held but no open container carries
-   * the scanned code. Without it the step falls through to the next one.
+   * Subject accumulate: the pairing held but the row the scan names was not
+   * found (the open container for from-subject, the item's own row for
+   * into-subject with `item`). Without it the step falls through.
    */
   missing?: string;
+}
+
+/** One labeled fact on the info-choice screen. */
+export interface ScanFact {
+  label: string;
+  /** Template rendered against the located row (`{item.<facet>}`) and the scan tokens. */
+  value: string;
 }
 
 export interface ScanStep {
@@ -164,6 +186,13 @@ export interface ScanStep {
   params?: ScanStepParams;
   /** PRESENT only: the labeled choice set rendered under the located reality. */
   choices?: ScanChoice[];
+  /**
+   * PRESENT only: the facts the station states about the located row, in
+   * order. Each value is a template (`{item.binCode}`, `{scan.target}`); a
+   * token with nothing to read renders empty. Absent, the station lists the
+   * row's metadata.
+   */
+  facts?: ScanFact[];
   /**
    * PRESENT only: when the step holds exactly ONE confirm-less choice, the
    * scan executes it directly instead of presenting — one scan, one action.

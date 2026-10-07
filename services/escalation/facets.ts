@@ -48,6 +48,7 @@ export function ensureFacetReady(): Promise<void> {
 /** Item-level faceted search — filter/sort over top-level columns and metadata facets. */
 export async function searchByFacets(
   query: FacetQuery,
+  opts: { total?: boolean } = {},
 ): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
   await ensureFacetReady();
   const pool = getPool();
@@ -62,9 +63,13 @@ export async function searchByFacets(
       `SELECT * FROM public.lt_escalations WHERE ${where} ORDER BY ${order} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset],
     ),
-    pool.query(`SELECT count(*)::int AS total FROM public.lt_escalations WHERE ${where}`, params),
+    // A caller that only picks among a few rows skips the count.
+    opts.total === false
+      ? null
+      : pool.query(`SELECT count(*)::int AS total FROM public.lt_escalations WHERE ${where}`, params),
   ]);
-  return { escalations: toEscalationRecords(rows.rows as any), total: count.rows[0]?.total ?? 0 };
+  const escalations = toEscalationRecords(rows.rows as any);
+  return { escalations, total: count ? count.rows[0]?.total ?? 0 : escalations.length };
 }
 
 /**

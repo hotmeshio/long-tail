@@ -36,4 +36,4 @@ export {
   assertSchemesCoexist,
 } from './validate';
 
-export { isValidGtin, normalizeGtin } from '../../shared/scan-code';
+export { isValidGtin, normalizeGtin, displayGtin } from '../../shared/scan-code';

@@ -18,12 +18,15 @@ export function HoldScreen({
   subject,
   primedName,
   progress,
+  progressLabel = 'checked off',
   note,
   onRelease,
 }: {
   subject: StationSubject;
   primedName: string | null;
   progress?: { filled: number; total: number; remaining: number } | null;
+  /** What the count measures: a fill checks items off, an accumulate adds them. */
+  progressLabel?: string;
   /** The last act's done copy while the item is still held (a fill in progress). */
   note?: string | null;
   onRelease: () => void;
@@ -80,7 +83,7 @@ export function HoldScreen({
         </div>
       ) : progress && progress.total > 0 && (
         <p className="text-base text-text-primary mt-4 tabular-nums" data-testid="hold-progress">
-          {progress.filled} of {progress.total} checked off
+          {progress.filled} of {progress.total} {progressLabel}
         </p>
       )}
       {subject.claimedBy && (

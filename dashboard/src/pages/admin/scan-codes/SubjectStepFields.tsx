@@ -1,4 +1,5 @@
 import { SCAN_VERBS, type ScanStep } from '../../../api/scan-codes';
+import { IntoSubjectItemFields } from './IntoSubjectItemFields';
 
 type Params = NonNullable<ScanStep['params']>;
 
@@ -103,11 +104,15 @@ export function SubjectStepFields({
   if (step.verb !== SCAN_VERBS.ACCUMULATE && !fillsSubject) return null;
 
   const setMode = (next: '' | 'from' | 'into') => {
-    const { from: _f, into: _i, ...rest } = accumulate;
+    const { from: _f, into: _i, item, ...rest } = accumulate;
     onPatch({
       params: {
         ...params,
-        accumulate: { ...rest, ...(next === 'from' ? { from: 'subject' as const } : next === 'into' ? { into: 'subject' as const } : {}) },
+        accumulate: {
+          ...rest,
+          ...(next === 'from' ? { from: 'subject' as const } : {}),
+          ...(next === 'into' ? { into: 'subject' as const, ...(item ? { item } : {}) } : {}),
+        },
       },
       subject: next ? step.subject ?? { schemes: [] } : undefined,
       match: next ? step.match : undefined,
@@ -228,6 +233,7 @@ export function SubjectStepFields({
           />
         </label>
       )}
+      {mode === 'into' && <IntoSubjectItemFields step={step} onPatch={onPatch} />}
       {actsOnSubject && (
         <label className="block basis-full">
           <span className="block text-xs text-text-secondary mb-1">When it lands</span>
@@ -247,7 +253,7 @@ export function SubjectStepFields({
         <label className="block basis-full">
           <span className="block text-xs text-text-secondary mb-1">When it is the wrong one</span>
           <span className="block text-2xs text-text-tertiary mb-1">
-            What the station says. {'{subject.<facet>}'} reads the held item{mode === 'from' ? <>, {'{container.<facet>}'} the scanned container</> : null}{fillsSubject ? <>, {'{fill.pending}'} what is still expected</> : null}.
+            What the station says. {'{subject.<facet>}'} reads the held item{mode === 'from' ? <>, {'{container.<facet>}'} the scanned container</> : null}{mode === 'into' && accumulate.item ? <>, {'{item.<facet>}'} the scanned item's row</> : null}{fillsSubject ? <>, {'{fill.pending}'} what is still expected</> : null}.
           </span>
           <input
             value={step.refuse?.markdown ?? ''}

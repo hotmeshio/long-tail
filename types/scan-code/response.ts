@@ -80,6 +80,8 @@ export interface ScanExecuteResponse {
   notPrimed?: ScanRuleFallback;
   /** The labeled choice set (CHOICES). */
   choices?: ScanPresentedChoice[];
+  /** CHOICES: the step's curated facts, rendered; absent when the step declares none. */
+  facts?: { label: string; value: string }[];
   /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */
   container?: { facet: string; value: string };
   /** CHOICES: the step would auto-execute its single choice — only identity stopped it. */

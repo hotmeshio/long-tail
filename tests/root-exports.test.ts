@@ -17,7 +17,7 @@ describe('package root exports', () => {
   it('exports the scan config types and validators dependents declare rules with', () => {
     const scan = source.match(/export \{([^}]*)\} from '\.\/services\/scan-code'/)?.[1] ?? '';
     for (const name of ['assertValidScanScheme', 'assertValidScanSteps', 'assertValidScanIdentityRule',
-      'normalizeGtin', 'isValidGtin', 'ScanSchemeInput', 'ScanRuleInput']) {
+      'normalizeGtin', 'displayGtin', 'isValidGtin', 'ScanSchemeInput', 'ScanRuleInput']) {
       expect(scan).toContain(name);
     }
   });

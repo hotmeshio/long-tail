@@ -121,9 +121,10 @@ export const ESCALATION_METADATA_KEYS = {
  */
 export const ESCALATION_ENVELOPE_KEYS = {
   /**
-   * Versioned knowledge lookup refs: `EscalationLookupRef[]`. Each ref pins
-   * an immutable knowledge edition; its presence on the row grants the
-   * escalation's role the right to fetch that edition via
+   * Versioned knowledge lookup refs: `EscalationLookupRef[]`. Each ref names
+   * a knowledge entry, pinned to one edition or following the current one;
+   * its presence on the row grants the escalation's role the right to fetch
+   * that entry's edition via
    * GET /escalations/:id/lookups, and the resolved content addresses in
    * forms as the `lookup.<as ?? key>` context domain. Set ergonomically via
    * `conditional`'s `lookups` config field.
@@ -131,17 +132,26 @@ export const ESCALATION_ENVELOPE_KEYS = {
   LOOKUPS: 'lookups',
 } as const;
 
+/** A lookup ref `version` that follows the entry's newest edition. */
+export const LOOKUP_VERSION_CURRENT = 'current' as const;
+
 /**
- * One versioned knowledge lookup reference. `version` is required by design:
- * a ref names an immutable edition, never a moving target. Evolve the list by
- * writing the entry (a new version mints automatically) and repinning here.
- * `as` renames the ref's form-context address when the key alone is ambiguous.
+ * One knowledge lookup reference. `version` pins an immutable edition; absent
+ * or `'current'`, the ref follows the entry's newest edition: a pending row
+ * reads the edition in force when it renders, and a closed row reads the
+ * edition that was current when it closed. `as` renames the ref's
+ * form-context address when the key alone is ambiguous.
  */
 export interface EscalationLookupRef {
   domain: string;
   key: string;
-  version: number;
+  version?: number | typeof LOOKUP_VERSION_CURRENT;
   as?: string;
+}
+
+/** True when the ref follows the newest edition rather than pinning one. */
+export function isCurrentLookupRef(ref: Pick<EscalationLookupRef, 'version'>): boolean {
+  return ref.version === undefined || ref.version === LOOKUP_VERSION_CURRENT;
 }
 
 /**
@@ -151,7 +161,7 @@ export interface EscalationLookupRef {
  */
 export function assertLookupRefs(refs: unknown): asserts refs is EscalationLookupRef[] {
   if (!Array.isArray(refs)) {
-    throw new Error('lookups must be an array of { domain, key, version } refs');
+    throw new Error('lookups must be an array of { domain, key, version? } refs');
   }
   for (const ref of refs) {
     const r = (ref ?? {}) as Record<string, unknown>;
@@ -159,9 +169,10 @@ export function assertLookupRefs(refs: unknown): asserts refs is EscalationLooku
       || typeof r.key !== 'string' || r.key.length === 0) {
       throw new Error('Each lookup ref requires a non-empty domain and key');
     }
-    if (typeof r.version !== 'number' || !Number.isInteger(r.version) || r.version < 1) {
+    const pinned = typeof r.version === 'number' && Number.isInteger(r.version) && r.version >= 1;
+    if (r.version !== undefined && r.version !== LOOKUP_VERSION_CURRENT && !pinned) {
       throw new Error(
-        `Lookup ref ${r.domain}/${r.key} requires a positive integer version — refs pin immutable editions`,
+        `Lookup ref ${r.domain}/${r.key}: version must be a positive integer, 'current', or absent`,
       );
     }
     if (r.as !== undefined && (typeof r.as !== 'string' || r.as.length === 0)) {

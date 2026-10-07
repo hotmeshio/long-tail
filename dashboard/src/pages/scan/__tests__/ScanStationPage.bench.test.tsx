@@ -84,6 +84,16 @@ describe('ScanStationPage — the bench', () => {
     expect(screen.getByTestId('hold-progress')).toHaveTextContent('1 of 3 checked off');
   });
 
+  it('an add into the held box shows how many are in', () => {
+    mocks.subject.current = { ...SUBJECT, expect: undefined };
+    mocks.lastResult.current = {
+      code: '11:0:K7Q2M9XA', source: 'keyboard-wedge', at: Date.now(), error: null, navigated: true,
+      response: { outcome: 'executed', verb: 'accumulate', clearSubject: false, progress: { filled: 2, total: 5, remaining: 3 } },
+    };
+    renderStation();
+    expect(screen.getByTestId('hold-progress')).toHaveTextContent('2 of 5 added');
+  });
+
   it('with a headline the destination leads: bin code largest, place name under it, the item quieter above', () => {
     mocks.subject.current = { ...SUBJECT, headline: 'SF-A-2', subline: 'Acme East', expect: { schemes: [14], prompt: 'Walk to this bin and scan it.' } };
     renderStation();

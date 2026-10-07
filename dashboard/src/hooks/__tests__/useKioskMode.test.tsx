@@ -97,8 +97,17 @@ describe('useKioskMode', () => {
 });
 
 describe('isKioskAllowedPath', () => {
+  it('the unfiltered list is every queue at once, so a kiosk goes home from it', () => {
+    expect(isKioskAllowedPath('/escalations/available')).toBe(false);
+    expect(isKioskAllowedPath('/escalations/available', '?status=available')).toBe(false);
+  });
+
+  it('a scan show-list narrowed by facets stays, with or without a role', () => {
+    expect(isKioskAllowedPath('/escalations/available', '?facets=%7B%22orderId%22%3A%22o-1%22%7D&status=resolved')).toBe(true);
+  });
+
   it('allows the list, detail, and scan screens', () => {
-    expect(isKioskAllowedPath('/escalations/available')).toBe(true);
+    expect(isKioskAllowedPath('/escalations/available', '?role=gluer&status=available')).toBe(true);
     expect(isKioskAllowedPath('/escalations/detail/abc-123')).toBe(true);
     expect(isKioskAllowedPath('/scan/station')).toBe(true);
     expect(isKioskAllowedPath('/portal/gluer/floor')).toBe(true);
