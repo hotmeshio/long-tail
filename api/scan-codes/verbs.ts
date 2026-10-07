@@ -31,9 +31,11 @@ import { holdStep } from './hold';
 // request, otherwise the authenticated principal. Attribution and write
 // scoping both derive from it, live, inside the escalation APIs.
 
+/** Claims the scanned row; a presented choice passes the row it showed. */
 export async function claimStep(
   step: ScanStep,
   ctx: StepContext,
+  presentedId?: string,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   const metadata = await templated(step, ctx, (tpl) => interpolatedMetadata(step, ctx, tpl));
   if (metadata === null) return null;
@@ -45,6 +47,7 @@ export async function claimStep(
     durationMinutes: step.params?.durationMinutes,
     metadata: { ...metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
+    assertId: presentedId,
   }, ctx.auth);
   if (result.status === 404) return null;
   if (result.status === 403) return forbidden(result.error);
@@ -92,16 +95,17 @@ export async function resolveStep(
 export async function escalateStep(
   step: ScanStep,
   ctx: StepContext,
+  presentedId?: string,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   // Close the located escalation first when configured — the close doubles as
   // the condition check AND the double-scan guard (second scan finds nothing
   // to close and falls through).
   if (step.params?.closeCurrent === 'resolve') {
-    const closed = await resolveStep({ ...step, params: { ...step.params, resolverPayload: step.params?.resolverPayload ?? {} } }, ctx);
+    const closed = await resolveStep({ ...step, params: { ...step.params, resolverPayload: step.params?.resolverPayload ?? {} } }, ctx, presentedId);
     if (closed === null) return null;
     if (closed.data?.outcome !== SCAN_OUTCOMES.EXECUTED) return closed;
   } else if (step.params?.closeCurrent === 'cancel') {
-    const cancelled = await cancelStep(step, ctx);
+    const cancelled = await cancelStep(step, ctx, presentedId);
     if (cancelled === null) return null;
     if (cancelled.data?.outcome !== SCAN_OUTCOMES.EXECUTED) return cancelled;
   }
@@ -126,9 +130,11 @@ export async function escalateStep(
 export async function releaseStep(
   step: ScanStep,
   ctx: StepContext,
+  presentedId?: string,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   // Locate the caller's own claim; release-by-id re-asserts the assignee
   // inside the SDK, so a lost race resolves to 409, never a foreign release.
+  if (presentedId) return releaseById(presentedId, step, ctx);
   const scope = await getEscalationReadScope(ctx.auth.userId);
   const readable = [...scope.allRoles, ...scope.selfRoles];
   const roles = restrictScopeRoles(readable, scope.global, step.query?.roles);
@@ -141,20 +147,29 @@ export async function releaseStep(
     limit: 1,
   });
   if (escalations.length === 0) return null;
+  return releaseById(escalations[0].id, step, ctx);
+}
+
+async function releaseById(
+  id: string,
+  step: ScanStep,
+  ctx: StepContext,
+): Promise<LTApiResult<ScanExecuteResponse>> {
   const notPrimed = await spendGrant(ctx);
   if (notPrimed) return notPrimed;
-  const result = await releaseEscalation({ id: escalations[0].id }, ctx.auth);
+  const result = await releaseEscalation({ id }, ctx.auth);
   if (result.status === 403) return forbidden(result.error);
-  if (result.status === 409) return conflict(result.error);
+  if (result.status === 409 || result.status === 404) return conflict(result.error);
   if (result.status !== 200) return result;
   return executed(result.data.escalation, step);
 }
 
 /**
- * Dispatch one CHOICE verb against an already-presented row. Unlike the step
- * walk (where a miss falls through to the next step), the screen showed this
- * exact row — so a miss answers with the truth: FORBIDDEN when the actor
- * holds no write scope here, CONFLICT when a concurrent actor won the race.
+ * Dispatch one CHOICE verb against an already-presented row. Every verb that
+ * writes the row writes that row by id, so a code shared by several rows
+ * never moves the write elsewhere. Unlike the step walk (where a miss falls
+ * through to the next step), a miss answers with the truth: FORBIDDEN when
+ * the actor holds no write scope here, CONFLICT when a concurrent actor won.
  */
 export async function dispatchChoiceVerb(
   step: ScanStep,
@@ -168,15 +183,15 @@ export async function dispatchChoiceVerb(
       return (await holdStep(step, ctx, row as LTEscalationRecord))!;
     case SCAN_VERBS.CLAIM:
     case SCAN_VERBS.CLAIM_SHOW_DETAIL:
-      return (await claimStep(step, ctx)) ?? (await missReason(step, ctx, 'the item is no longer claimable'));
+      return (await claimStep(step, ctx, row.id)) ?? (await missReason(step, ctx, 'the item is no longer claimable'));
     case SCAN_VERBS.RESOLVE:
       return (await resolveStep(step, ctx, row.id)) ?? (await missReason(step, ctx, 'the item is no longer resolvable'));
     case SCAN_VERBS.ESCALATE:
-      return (await escalateStep(step, ctx)) ?? (await missReason(step, ctx, 'the item already moved on'));
+      return (await escalateStep(step, ctx, row.id)) ?? (await missReason(step, ctx, 'the item already moved on'));
     case SCAN_VERBS.RELEASE:
-      return (await releaseStep(step, ctx)) ?? conflict('no claim of yours to release');
+      return (await releaseStep(step, ctx, row.id)) ?? conflict('no claim of yours to release');
     case SCAN_VERBS.CANCEL:
-      return (await cancelStep(step, ctx)) ?? (await missReason(step, ctx, 'the item is no longer cancellable'));
+      return (await cancelStep(step, ctx, row.id)) ?? (await missReason(step, ctx, 'the item is no longer cancellable'));
     default:
       throw new Error(`unknown choice verb "${step.verb}"`);
   }
@@ -200,6 +215,7 @@ async function missReason(
 export async function cancelStep(
   step: ScanStep,
   ctx: StepContext,
+  presentedId?: string,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   // Claim-as-lock: the atomic claim pins the row to this caller (or extends
   // their claim), serializing concurrent double-scans before the cancel.
@@ -210,6 +226,7 @@ export async function cancelStep(
     value: ctx.parsed.target,
     metadata: provenance(ctx),
     restrictRoles: step.query?.roles,
+    assertId: presentedId,
   }, ctx.auth);
   if (claimed.status === 404) return null;
   if (claimed.status === 403) return forbidden(claimed.error);

@@ -29,11 +29,20 @@ describe('query.types and query.subtypes', () => {
     }
   });
 
-  it('are refused on a present step offering a claim choice', () => {
+  it('narrow a present step with any choice, since every choice writes the row it showed', () => {
     expect(check({
       query: { subtypes: ['open'] }, verb: 'present', autoSelectSingle: true,
-      choices: [{ label: 'Start packing', verb: 'claim-show-detail', params: { durationMinutes: 30 } }],
-    })).toThrow(/claim-show-detail choice/);
+      choices: [{ label: 'Start', verb: 'claim-show-detail', params: { durationMinutes: 30 } }],
+    })).not.toThrow();
+    expect(check({
+      query: { types: ['bin'] }, verb: 'present',
+      choices: [
+        { label: 'Claim', verb: 'claim' },
+        { label: 'Cancel', verb: 'cancel' },
+        { label: 'Release', verb: 'release' },
+        { label: 'Send on', verb: 'escalate', params: { targetRole: 'review', closeCurrent: 'resolve' } },
+      ],
+    })).not.toThrow();
   });
 
   it("take one entry each with availability 'mine'", () => {

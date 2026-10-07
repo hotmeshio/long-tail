@@ -44,8 +44,8 @@ export interface ScanStepQuery {
   facets?: Record<string, any>;
   /**
    * Escalation types / subtypes the located row must have. Steps that locate
-   * and then act by id only (show, list, present, hold, fill, accumulate);
-   * with `availability: 'mine'`, at most one of each.
+   * and then act by id only (show, list, present with any choice, hold, fill,
+   * accumulate); with `availability: 'mine'`, at most one of each.
    */
   types?: string[];
   subtypes?: string[];

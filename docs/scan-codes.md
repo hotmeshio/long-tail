@@ -99,12 +99,12 @@ Each step:
 ```
 
 `query.types` and `query.subtypes` narrow steps that locate a row and then
-act on it by id: `show-detail`, `show-list`, `present` (its resolve choices
-land on the row shown), `hold`, `fill`, and `accumulate` (container-locate
-mode narrows the container). Claim, cancel, release, resolve and escalate
-steps, and `present` steps offering one of those as a choice, re-locate by
-the target facet inside their atomic statement, so the upsert refuses
-types/subtypes there. With `availability: "mine"` each takes one entry.
+act on it by id: `show-detail`, `show-list`, `present` (with any choice; each
+choice writes the row shown), `hold`, `fill`, and `accumulate`
+(container-locate mode narrows the container). Claim, cancel, release,
+resolve and escalate steps locate by the target facet inside their atomic
+statement, so the upsert refuses types/subtypes on them; to narrow one, offer
+it as a `present` choice. With `availability: "mine"` each takes one entry.
 
 Verbs are the canonical escalation actions:
 
@@ -228,10 +228,14 @@ unsatisfied. Picking one calls `POST /api/scan-codes/execute-choice` with a
 pointer (scheme, category, step index, choice index, escalation id) — and a
 pointer is never authority: the server re-reads live config, re-locates the
 row under the step's query, re-applies the identity gate, and runs the verb
-through the same atomic executors a direct scan uses. A resolve choice
-resolves the exact row the screen presented, re-checked under the step's
-query in the same statement. A row that moved on between render and tap
-answers `conflict`, exactly as a lost double-scan.
+through the same atomic executors a direct scan uses. Every choice writes
+the exact row the screen presented, by id: claim, cancel, resolve and an
+escalate's `closeCurrent` re-check that row (pending, the scanned code, the
+step's roles, no live claim by someone else) in the same statement, and
+release releases that row when it is the actor's claim. When one code names
+several pending rows, the write never lands on a different one. A row that
+moved on between render and tap answers `conflict`, exactly as a lost
+double-scan.
 
 A `present` step names the facts the station states about the row with
 `facts`: up to 12 labeled templates, rendered server-side against the row
@@ -350,7 +354,8 @@ reciprocal of the container's entry, so the two land together or not at all:
 ```
 
 The item row is a pending accumulator whose scheme facet equals the scanned
-target, in `item.roles` (intersected with the actor's read scope), narrowed by
+target (a plain row carrying the same code is not a candidate: only an
+accumulator can take the reciprocal entry), in `item.roles` (intersected with the actor's read scope), narrowed by
 `item.types`, `item.subtypes` and `item.facets`; the held row is never a
 candidate. Parked as `max: 1`, it completes in the same statement and its
 workflow wakes with the container's id in `$accumulated`. No such row answers
