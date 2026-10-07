@@ -38,6 +38,8 @@ export async function locateForStep(
     return escalationService.listEscalations({
       metadata: facets,
       status,
+      type: step.query?.types?.[0],
+      subtype: step.query?.subtypes?.[0],
       assigned_to: ctx.auth.userId,
       visibleRoles: roles ?? undefined,
       limit,
@@ -48,6 +50,8 @@ export async function locateForStep(
   if (roles !== null && roles.length === 0) return null;
   return escalationService.searchByFacets({
     roles: roles ?? undefined,
+    types: step.query?.types,
+    subtypes: step.query?.subtypes,
     facets,
     status,
     available: availability === SCAN_AVAILABILITY.AVAILABLE

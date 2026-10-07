@@ -107,6 +107,8 @@ export function useKioskMode(): KioskState {
   }, [myRoles, roleDetails, selected, selectRole]);
 }
 
+const KIOSK_ROLE_LIST_PATH = '/escalations/available';
+
 /** Path prefixes a kiosk session may occupy; everything else redirects home. */
 export const KIOSK_ALLOWED_PREFIXES = [
   '/escalations',       // the role list + escalation detail
@@ -115,6 +117,12 @@ export const KIOSK_ALLOWED_PREFIXES = [
   '/login',
 ];
 
-export function isKioskAllowedPath(pathname: string): boolean {
+export function isKioskAllowedPath(pathname: string, search = ''): boolean {
+  // The unfiltered list is every queue at once. A station's list names its
+  // role; a scan's show-list narrows by facets (a whole journey across roles).
+  if (pathname === KIOSK_ROLE_LIST_PATH) {
+    const params = new URLSearchParams(search);
+    if (!params.get('role') && !params.get('facets')) return false;
+  }
   return KIOSK_ALLOWED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(`${p}?`));
 }

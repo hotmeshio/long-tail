@@ -233,7 +233,7 @@ const parameterizedFormConfig: LTWorkerConfig = {
 };
 
 const lookupCascadeConfig: LTWorkerConfig = {
-  description: 'Lookup cascade — reference example for versioned knowledge lookups: one static role form whose dropdowns read version-pinned knowledge editions (x-lt-options from the lookup domain), a cascading country → region pair (lookup.geo.regions.{{resolver.country}} — region stays disabled until a country is chosen), and a lookup-sourced checklist. Invoke with materials_version 1 vs 2 to see two rows offer different material sets from the same form.',
+  description: 'Lookup cascade — reference example for versioned knowledge lookups: one static role form whose dropdowns read versioned knowledge editions (x-lt-options from the lookup domain), a cascading country → region pair (lookup.geo.regions.{{resolver.country}} — region stays disabled until a country is chosen), and a lookup-sourced checklist. Invoke with materials_version 1 vs 2 to see two rows offer different material sets from the same form, or current to follow the newest edition.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: CASCADE_ROLE,

@@ -68,12 +68,20 @@ export async function findByMetadata(
  * the claim never happens. No pre-flight find, no TOCTOU.
  */
 export async function claimByMetadata(
-  input: { key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>; provisionIfAbsent?: ProvisionIfAbsent; restrictRoles?: string[] },
+  input: {
+    key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>;
+    provisionIfAbsent?: ProvisionIfAbsent; restrictRoles?: string[];
+    /** Claims only this row, when it still matches every other condition. */
+    assertId?: string;
+  },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
     if (!input.key || !input.value) {
       return { status: 400, error: 'key and value are required' };
+    }
+    if (input.assertId !== undefined && !isUuid(input.assertId)) {
+      return { status: 404, error: 'No pending escalation found for this metadata' };
     }
 
     const resolved = await resolveAssignee(input.assignee, auth, input.provisionIfAbsent);
@@ -89,6 +97,15 @@ export async function claimByMetadata(
     const allowedRoles = restrictScopeRoles(
       writeScope.allRoles, writeScope.global, input.restrictRoles,
     );
+
+    if (input.assertId !== undefined) {
+      const asserted = await escalationService.claimAssertedByMetadata(
+        input.assertId, input.key, input.value, claimUserId, input.durationMinutes,
+        input.metadata, allowedRoles,
+      );
+      if (!asserted) return { status: 404, error: 'No pending escalation found for this metadata' };
+      return { status: 200, data: asserted };
+    }
 
     const result = await escalationService.claimByMetadata(
       input.key, input.value, claimUserId, input.durationMinutes,

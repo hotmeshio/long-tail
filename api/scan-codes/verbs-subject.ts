@@ -32,7 +32,8 @@ import { claimedByOther } from './subject';
 // the pairing first (match), refusing with nothing written when it is wrong,
 // then writes by id in one atomic statement: the subject joins the scanned
 // container with its own row as the reciprocal (from: 'subject'), or the
-// subject's row collects the scanned code (into: 'subject').
+// subject's row collects the scanned code (into: 'subject', in
+// verb-into-subject.ts).
 
 const STOCK_REFUSAL = 'That is not where this one goes.';
 const STOCK_CONFLICT = 'That container just closed. Scan it again, or the next one.';
@@ -40,13 +41,21 @@ const STOCK_PLACED = 'This one is already placed.';
 
 type ScanResult = LTApiResult<ScanExecuteResponse>;
 
-/** The step's template bags with the subject (and the container, once located). */
-function bags(ctx: StepContext, container?: LTEscalationRecord): scanCodeService.ScanTemplateContext {
-  return { ...templateContext(ctx), ...(container ? { container: container.metadata ?? {} } : {}) };
+/** The step's template bags with the subject, the container, and the scanned item's row once located. */
+export function bags(
+  ctx: StepContext,
+  container?: LTEscalationRecord,
+  item?: LTEscalationRecord,
+): scanCodeService.ScanTemplateContext {
+  return {
+    ...templateContext(ctx),
+    ...(container ? { container: container.metadata ?? {} } : {}),
+    ...(item ? { item: item.metadata ?? {} } : {}),
+  };
 }
 
 /** Refuse the act when someone else holds a live claim on the subject. */
-async function claimGuard(step: ScanStep, ctx: StepContext, subject: HeldSubject): Promise<ScanResult | null> {
+export async function claimGuard(step: ScanStep, ctx: StepContext, subject: HeldSubject): Promise<ScanResult | null> {
   if (step.subject?.claimedByOther === 'allow') return null;
   const other = await claimedByOther(subject.row, ctx.auth.userId);
   return other ? refused(`Claimed by **${other.displayName}**.`) : null;
@@ -66,11 +75,11 @@ async function locateContainer(step: ScanStep, ctx: StepContext): Promise<LTEsca
     status: 'pending',
     exists: [ESCALATION_ACCUMULATE_KEYS.COUNT],
     limit: 2,
-  });
+  }, { total: false });
   return found.escalations.filter((row) => row.id !== ctx.subject?.row.id);
 }
 
-const WHOLE_BAG_TOKEN = /^\{(subject|container)\.([a-zA-Z0-9_]+)\}$/;
+const WHOLE_BAG_TOKEN = /^\{(subject|container|item)\.([a-zA-Z0-9_]+)\}$/;
 
 /**
  * One match.target template as the values it allows. A template that is a
@@ -81,7 +90,7 @@ const WHOLE_BAG_TOKEN = /^\{(subject|container)\.([a-zA-Z0-9_]+)\}$/;
 function expandTarget(template: string, tpl: scanCodeService.ScanTemplateContext): string[] {
   const whole = template.match(WHOLE_BAG_TOKEN);
   if (whole) {
-    const value = (tpl[whole[1] as 'subject' | 'container'] as Record<string, unknown> | undefined)?.[whole[2]];
+    const value = (tpl[whole[1] as 'subject' | 'container' | 'item'] as Record<string, unknown> | undefined)?.[whole[2]];
     if (Array.isArray(value)) return value.filter((v) => v !== null && v !== '').map(String);
   }
   try {
@@ -95,10 +104,15 @@ function expandTarget(template: string, tpl: scanCodeService.ScanTemplateContext
  * The pre-write guard. Returns the refusal when the pairing is wrong, null
  * when it holds (or the step declares no match).
  */
-export function matchGuard(step: ScanStep, ctx: StepContext, container?: LTEscalationRecord): ScanResult | null {
+export function matchGuard(
+  step: ScanStep,
+  ctx: StepContext,
+  container?: LTEscalationRecord,
+  item?: LTEscalationRecord,
+): ScanResult | null {
   const match = step.match;
   if (!match) return null;
-  const tpl = bags(ctx, container);
+  const tpl = bags(ctx, container, item);
   const expected = (match.target ?? []).flatMap((t) => expandTarget(t, tpl));
   const targetOk = match.target === undefined || expected.includes(ctx.parsed.target);
   const subjectMeta = (ctx.subject?.row.metadata ?? {}) as Record<string, unknown>;
@@ -111,13 +125,25 @@ export function matchGuard(step: ScanStep, ctx: StepContext, container?: LTEscal
   return refused(markdown, { refusal: { markdown, ...(expected.length ? { expected } : {}) } });
 }
 
-/** Map a failed add onto what the bench says. 404 falls through. */
-function failedAdd(step: ScanStep, ctx: StepContext, result: LTApiResult, container?: LTEscalationRecord): ScanResult | null {
+const PLACED_OUTCOMES = ['reciprocal-terminal', 'reciprocal-full', 'reciprocal-duplicate'];
+
+/**
+ * Map a failed add onto what the bench says. 404 falls through. `keepSubject`
+ * leaves the hold in place when the reciprocal was already placed (the
+ * subject is the container the actor is still filling).
+ */
+export function failedAdd(
+  step: ScanStep,
+  ctx: StepContext,
+  result: LTApiResult,
+  container?: LTEscalationRecord,
+  keepSubject = false,
+): ScanResult | null {
   const outcome = (result.data as { outcome?: string } | undefined)?.outcome;
   if (result.status === 404) return null;
   if (result.status === 403) return forbidden(result.error);
-  if (outcome === 'reciprocal-terminal' || outcome === 'reciprocal-full' || outcome === 'reciprocal-duplicate') {
-    return refused(STOCK_PLACED, { clearSubject: true });
+  if (outcome && PLACED_OUTCOMES.includes(outcome)) {
+    return refused(STOCK_PLACED, { clearSubject: !keepSubject });
   }
   if (outcome === 'claimed-by-other' || outcome === 'claim-expired') return conflict(result.error);
   if (result.status === 409) {
@@ -128,8 +154,9 @@ function failedAdd(step: ScanStep, ctx: StepContext, result: LTApiResult, contai
   return refused(result.error ?? STOCK_REFUSAL);
 }
 
-function rendered(step: ScanStep, ctx: StepContext, itemKeyDefault?: string) {
-  const tpl = templateContext(ctx);
+/** The step's itemKey, payload and metadata, or null when a template token has nothing to read. */
+export function rendered(step: ScanStep, ctx: StepContext, itemKeyDefault?: string, item?: LTEscalationRecord) {
+  const tpl = bags(ctx, undefined, item);
   try {
     return {
       itemKey: scanCodeService.interpolateScanTemplate(step.params?.itemKey ?? itemKeyDefault ?? '', tpl),
@@ -199,45 +226,8 @@ export async function accumulateFromSubject(step: ScanStep, ctx: StepContext): P
   }, step, bags(ctx, container));
 }
 
-/** The subject's own row collects the scanned code. */
-export async function accumulateIntoSubject(step: ScanStep, ctx: StepContext): Promise<ScanResult | null> {
-  const subject = ctx.subject!;
-  const claimed = await claimGuard(step, ctx, subject);
-  if (claimed) return claimed;
-  const mismatch = matchGuard(step, ctx);
-  if (mismatch) return mismatch;
-
-  const values = rendered(step, ctx, '{scan.target}');
-  if (!values) return null;
-  const notPrimed = (await identityGate(step, ctx)) ?? (await spendGrant(ctx));
-  if (notPrimed) return notPrimed;
-  const result = await accumulateItem({
-    id: subject.row.id,
-    itemKey: values.itemKey,
-    payload: values.payload,
-    metadata: values.metadata,
-  }, ctx.auth);
-
-  if (result.status !== 200) {
-    if ((result.data as { outcome?: string } | undefined)?.outcome === 'duplicate-item') {
-      return already(step, subject.row);
-    }
-    return failedAdd(step, ctx, result);
-  }
-  const data = result.data as { outcome: string; count: number; remaining: number | null };
-  return withDone({
-    status: 200,
-    data: {
-      outcome: SCAN_OUTCOMES.EXECUTED,
-      verb: step.verb,
-      escalation: { id: subject.row.id, ...result.data },
-      clearSubject: data.outcome === 'completed',
-    },
-  }, step, bags(ctx));
-}
-
 /** The item is already where the scan says: harmless, nothing written. */
-function already(step: ScanStep, row: LTEscalationRecord): ScanResult {
+export function already(step: ScanStep, row: LTEscalationRecord, keepSubject = false): ScanResult {
   return {
     status: 200,
     data: {
@@ -245,7 +235,7 @@ function already(step: ScanStep, row: LTEscalationRecord): ScanResult {
       verb: step.verb,
       escalation: { id: row.id },
       already: true,
-      clearSubject: true,
+      clearSubject: !keepSubject,
     },
   };
 }

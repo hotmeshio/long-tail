@@ -121,10 +121,10 @@ describe('admin workflow config MCP tools', () => {
   it('upsert_workflow_config refuses malformed lookup refs before writing', async () => {
     const result = await tools.get('upsert_workflow_config')!({
       ...upsertWorkflowConfigSchema.parse({ workflow_type: 'fleetTools' }),
-      input_lookups: [{ domain: 'fleet', key: 'serial-numbers' }],
+      input_lookups: [{ domain: 'fleet', key: 'serial-numbers', version: 1.5 }],
     });
     expect(result.isError).toBe(true);
-    expect(parse(result).error).toMatch(/positive integer version/);
+    expect(parse(result).error).toMatch(/positive integer, 'current', or absent/);
     expect(mockUpsertWorkflowConfig).not.toHaveBeenCalled();
   });
 

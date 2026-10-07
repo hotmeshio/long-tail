@@ -12,6 +12,8 @@ import {
 import { fixedCodeLengths } from '../../shared/scan-code';
 import { FACET_KEY } from '../escalation/facet-sql';
 import { assertValidSubjectStep } from './validate-subject';
+import { assertValidQueryKinds } from './validate-query';
+import { assertValidFacts } from './validate-facts';
 
 const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
 /** Double-scan selection tokens — short, label-printable, never scheme-shaped. */
@@ -236,6 +238,8 @@ export function assertValidSteps(steps: ScanStep[]): void {
     if (step.query && step.query.roles && !Array.isArray(step.query.roles)) {
       throw new Error(`${at}: query.roles must be an array`);
     }
+    assertValidQueryKinds(step, at);
+    assertValidFacts(step, at);
     // Claim and cancel lock via claim-by-metadata, whose SQL filter is the
     // target facet + roles only — extra facet guards would be silently
     // ignored there, so reject them at write time. (Locate, resolve, and
@@ -255,28 +259,32 @@ const BAG_TOKEN = /\{(claim|item|subject|container|fill)\.([^}]*)\}/g;
 
 /**
  * Bag tokens name facet keys and may only read what the step has:
- * `{item.…}` the row an item-mode accumulate or a hold located,
+ * `{item.…}` the row an item-mode accumulate, an into-subject accumulate
+ * with `item`, or a hold located (and, in a present step's facts, the row it
+ * presents),
  * `{subject.…}` the held subject (steps with a subject gate), and
  * `{container.…}` / `{fill.…}` only inside refusal and done copy, where a
- * subject accumulate or a fill has read them.
+ * subject accumulate or a fill has read them (into-subject: the held row).
  */
 function assertValidTemplateTokens(step: ScanStep, at: string): void {
-  const itemRow = (step.verb === SCAN_VERBS.ACCUMULATE && !!step.params?.accumulate?.containerFacet)
+  const accumulate = step.verb === SCAN_VERBS.ACCUMULATE ? step.params?.accumulate : undefined;
+  const itemRow = !!accumulate?.containerFacet || (accumulate?.into === 'subject' && !!accumulate.item)
     || step.verb === SCAN_VERBS.HOLD;
-  const check = (value: unknown, inRefusal: boolean) => {
+  const containerCopy = accumulate?.from === 'subject' || accumulate?.into === 'subject';
+  const check = (value: unknown, inRefusal: boolean, inFacts = false) => {
     for (const match of JSON.stringify(value ?? {}).matchAll(BAG_TOKEN)) {
       const [token, bag, facet] = match;
       if (!FACET_KEY.test(facet)) {
         throw new Error(`${at}: template token ${token} must name a facet key`);
       }
-      if (bag === 'item' && !itemRow) {
-        throw new Error(`${at}: ${token} reads the located item row, which only an item-mode accumulate or a hold step has`);
+      if (bag === 'item' && !itemRow && !inFacts) {
+        throw new Error(`${at}: ${token} reads the located item row, which only an item-mode accumulate, an into-subject accumulate with item, or a hold step has`);
       }
       if (bag === 'subject' && !step.subject) {
         throw new Error(`${at}: ${token} reads the held subject, which only a step with a subject gate has`);
       }
-      if (bag === 'container' && !(inRefusal && step.params?.accumulate?.from === 'subject')) {
-        throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a from-subject accumulate step`);
+      if (bag === 'container' && !(inRefusal && containerCopy)) {
+        throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a subject accumulate step`);
       }
       if (bag === 'fill' && !(inRefusal && step.verb === SCAN_VERBS.FILL)) {
         throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a fill step`);
@@ -287,4 +295,5 @@ function assertValidTemplateTokens(step: ScanStep, at: string): void {
   check(step.match, false);
   check(step.refuse, true);
   check(step.done, true);
+  check(step.facts, false, true);
 }

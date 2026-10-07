@@ -56,7 +56,7 @@ describe('subject steps', () => {
     expect(check(binIt({
       refuse: { markdown: 'x', missing: 'y' }, match: { target: ['{subject.binCode}'] },
       params: { accumulate: { into: 'subject' } },
-    }))).toThrow(/only to a from-subject/);
+    }))).toThrow(/only to a from-subject accumulate, or an into-subject accumulate with item/);
   });
 
   it('refusal copy needs markdown; a subject step cannot confirm', () => {
@@ -69,6 +69,48 @@ describe('subject steps', () => {
       .toThrow(/only in the refusal or done copy/);
     expect(() => assertValidSteps([{ query: {}, verb: 'resolve', params: { resolverPayload: { o: '{subject.orderId}' } } }]))
       .toThrow(/subject gate/);
+  });
+});
+
+describe('into-subject with item', () => {
+  const packBag = (over: Partial<ScanStep> = {}): ScanStep => ({
+    query: { roles: ['bin-packer'], status: 'pending' }, verb: 'accumulate', subject: { schemes: [14] },
+    match: { target: ['{subject.memberCodes}'] },
+    refuse: { markdown: 'Not this bin.', missing: 'Not waiting.', conflict: 'Box closed.' },
+    done: { markdown: '{item.itemCode} in. {container.accumulate_count} of {container.accumulate_max}.' },
+    params: {
+      itemKey: '{scan.target}', resolverPayload: { stickerCode: '{scan.target}' },
+      accumulate: { into: 'subject', item: { roles: ['ship'], facets: { shape: 'consolidated' } } },
+    },
+    ...over,
+  } as ScanStep);
+
+  it('accepts the packing step with item, refuse.missing, and item/container copy', () => {
+    expect(check(packBag())).not.toThrow();
+  });
+
+  it('item applies only to into-subject', () => {
+    expect(check(binIt({ params: { itemKey: 'x', accumulate: { from: 'subject', item: {} } } }))).toThrow(/only to an into-subject/);
+  });
+
+  it('item.roles, types and subtypes are non-empty string arrays; facets keys are facet keys', () => {
+    const withItem = (item: any) => packBag({ params: { accumulate: { into: 'subject', item } } });
+    expect(check(withItem({ roles: [] }))).toThrow(/item.roles/);
+    expect(check(withItem({ roles: 'ship' }))).toThrow(/item.roles/);
+    expect(check(withItem({ types: [''] }))).toThrow(/item.types/);
+    expect(check(withItem({ subtypes: 3 }))).toThrow(/item.subtypes/);
+    expect(check(withItem({ facets: { 'bad key': 1 } }))).toThrow(/facet key/);
+    expect(check(withItem([]))).toThrow(/must be an object/);
+  });
+
+  it('{item.x} needs the item selector', () => {
+    expect(check(packBag({ params: { itemKey: '{item.orderId}', accumulate: { into: 'subject' } }, refuse: undefined, done: undefined })))
+      .toThrow(/reads the located item row/);
+  });
+
+  it('{container.x} stays out of params', () => {
+    expect(check(packBag({ params: { itemKey: '{container.binCode}', accumulate: { into: 'subject', item: {} } } })))
+      .toThrow(/only in the refusal or done copy/);
   });
 });
 

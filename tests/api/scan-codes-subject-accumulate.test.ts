@@ -13,7 +13,7 @@ import { restrictScopeRoles } from '../../api/escalations/metadata';
 import * as escalationService from '../../services/escalation';
 import { claimedByOther } from '../../api/scan-codes/subject';
 import { identityGate, spendGrant } from '../../api/scan-codes/grant';
-import { accumulateFromSubject, accumulateIntoSubject } from '../../api/scan-codes/verbs-subject';
+import { accumulateFromSubject } from '../../api/scan-codes/verbs-subject';
 import { SCAN_OUTCOMES, type ScanStep } from '../../types';
 
 const add = vi.mocked(accumulateItem);
@@ -162,24 +162,5 @@ describe('accumulateFromSubject — free bins', () => {
     search.mockResolvedValue({ escalations: [], total: 0 } as any);
     expect((await accumulateFromSubject(freeBin(), unbound('SF-C-1')))?.data?.refusal?.markdown)
       .toBe('That bin was just taken. Scan the order again.');
-  });
-});
-
-describe('accumulateIntoSubject', () => {
-  const into: ScanStep = {
-    query: {}, verb: 'accumulate', subject: { schemes: [11] }, match: { target: ['{subject.binCode}'] },
-    params: { resolverPayload: { binCode: '{scan.target}' }, accumulate: { into: 'subject' } },
-  };
-
-  it('the bag row collects the tub code and completes', async () => {
-    add.mockResolvedValue({ status: 200, data: { outcome: 'completed', count: 1, remaining: 0, escalationId: 'bag-row' } });
-    const result = await accumulateIntoSubject(into, ctx());
-    expect(add).toHaveBeenCalledWith(expect.objectContaining({ id: 'bag-row', itemKey: 'SF-A-2', payload: { binCode: 'SF-A-2' } }), { userId: 'maria' });
-    expect(result?.data).toMatchObject({ outcome: SCAN_OUTCOMES.EXECUTED, clearSubject: true });
-  });
-
-  it('a tub that is not the offered one is refused', async () => {
-    expect((await accumulateIntoSubject(into, ctx('SF-C-1')))?.data?.outcome).toBe(SCAN_OUTCOMES.REFUSED);
-    expect(add).not.toHaveBeenCalled();
   });
 });

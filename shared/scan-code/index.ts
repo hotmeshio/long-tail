@@ -6,4 +6,4 @@ export {
   type ScanParseFailure,
   type ScanParseResult,
 } from './parse';
-export { isValidGtin, normalizeGtin, GTIN_CODE_LENGTHS } from './gtin';
+export { isValidGtin, normalizeGtin, displayGtin, GTIN_CODE_LENGTHS } from './gtin';

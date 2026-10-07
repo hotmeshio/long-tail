@@ -53,6 +53,13 @@ describe('searchByFacets', () => {
     expect(String(select[0])).toContain('metadata @> $'); // GIN containment for facets
     expect(select[1]).toContain('diabetic-print');
   });
+
+  it('skips the count when the caller asks for rows only', async () => {
+    mockQuery.mockReset().mockResolvedValue({ rows: [{ id: 'e1' }] });
+    const result = await searchByFacets({ facets: { binKey: 'b-1' }, limit: 3 }, { total: false });
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes('AS total'))).toBe(false);
+    expect(result.total).toBe(1);
+  });
 });
 
 describe('searchGroups', () => {

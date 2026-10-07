@@ -10,6 +10,9 @@ import { SimpleMarkdown } from '../common/display/SimpleMarkdown';
 export function ScanOutcomeBody({ result, compact = false }: { result: ScanResult; compact?: boolean }) {
   const { response } = result;
   const text = compact ? 'text-xs' : 'text-sm';
+  const markdown = response ? outcomeMarkdown(response) : null;
+  // A refusal's error is its markdown; show it once, rendered.
+  const detail = response?.error && response.error !== markdown ? response.error : null;
   return (
     <div className="min-w-0">
       <div className={`${text} font-mono text-text-secondary truncate`}>{result.code}</div>
@@ -18,10 +21,10 @@ export function ScanOutcomeBody({ result, compact = false }: { result: ScanResul
           <div className={`${text} font-medium ${OUTCOME_TONE[response.outcome]}`}>
             {outcomeHeadline(response)}
           </div>
-          {response.error && <div className="text-xs text-text-tertiary mt-0.5">{response.error}</div>}
-          {outcomeMarkdown(response) && (
+          {detail && <div className="text-xs text-text-tertiary mt-0.5">{detail}</div>}
+          {markdown && (
             <div className="text-xs text-text-secondary mt-1.5">
-              <SimpleMarkdown content={outcomeMarkdown(response)!} compact />
+              <SimpleMarkdown content={markdown} compact />
             </div>
           )}
         </>

@@ -21,6 +21,7 @@ export type {
   AccumulatorTrigger,
   AccumulateItemOutcome,
   RemoveAccumulatedItemOutcome,
+  EscalationLookupRef,
 } from './escalation';
 
 export {
@@ -30,6 +31,8 @@ export {
   ESCALATION_BATCH_KEYS,
   ESCALATION_ACCUMULATE_KEYS,
   ACCUMULATOR_RESULT_KEYS,
+  LOOKUP_VERSION_CURRENT,
+  isCurrentLookupRef,
 } from './escalation';
 
 export type {
@@ -226,6 +229,7 @@ export type {
   ScanPendingAction,
   ScanExecuteResponse,
   ScanAccumulateParams,
+  ScanFact,
   ScanHoldParams,
   ScanFillParams,
   ScanSubjectGate,

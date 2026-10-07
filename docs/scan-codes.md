@@ -88,7 +88,8 @@ Each step:
     "roles": ["printer-fleet"],        // expected queue(s)
     "status": "pending",               // pending | resolved | cancelled
     "availability": "available",       // available | claimed | mine | any
-    "facets": { "state": "printing" }  // extra metadata guards
+    "facets": { "state": "printing" }, // extra metadata guards
+    "subtypes": ["open"]               // optional: types / subtypes the row must have
   },
   "cardinality": "first",              // first | many
   "verb": "resolve",
@@ -96,6 +97,14 @@ Each step:
   "params": { /* verb-specific */ }
 }
 ```
+
+`query.types` and `query.subtypes` narrow steps that locate a row and then
+act on it by id: `show-detail`, `show-list`, `present` (with any choice; each
+choice writes the row shown), `hold`, `fill`, and `accumulate`
+(container-locate mode narrows the container). Claim, cancel, release,
+resolve and escalate steps locate by the target facet inside their atomic
+statement, so the upsert refuses types/subtypes on them; to narrow one, offer
+it as a `present` choice. With `availability: "mine"` each takes one entry.
 
 Verbs are the canonical escalation actions:
 
@@ -219,10 +228,32 @@ unsatisfied. Picking one calls `POST /api/scan-codes/execute-choice` with a
 pointer (scheme, category, step index, choice index, escalation id) — and a
 pointer is never authority: the server re-reads live config, re-locates the
 row under the step's query, re-applies the identity gate, and runs the verb
-through the same atomic executors a direct scan uses. A resolve choice
-resolves the exact row the screen presented, re-checked under the step's
-query in the same statement. A row that moved on between render and tap
-answers `conflict`, exactly as a lost double-scan.
+through the same atomic executors a direct scan uses. Every choice writes
+the exact row the screen presented, by id: claim, cancel, resolve and an
+escalate's `closeCurrent` re-check that row (pending, the scanned code, the
+step's roles, no live claim by someone else) in the same statement, and
+release releases that row when it is the actor's claim. When one code names
+several pending rows, the write never lands on a different one. A row that
+moved on between render and tap answers `conflict`, exactly as a lost
+double-scan.
+
+A `present` step names the facts the station states about the row with
+`facts`: up to 12 labeled templates, rendered server-side against the row
+(`{item.<facet>}`) and the scan tokens, shown in order. A token the row cannot
+fill renders as a dash.
+
+```jsonc
+"facts": [
+  { "label": "Bin", "value": "{item.binCode}" },
+  { "label": "Clinic", "value": "{item.facilityName}" },
+  { "label": "Bags", "value": "{item.memberCount}" }
+]
+```
+
+Without `facts`, the station lists the row's metadata, leaving out the
+bookkeeping a bench never acts on: scan provenance (`scannedAt`,
+`scanScheme`, `scanCategory`, `scanStation`, `scanActionName`),
+`resolved_by`, `schema_version`, and the accumulate and batch counters.
 
 A choice's `code` is a short printable token (letters, digits, underscore,
 dash) enabling double-scan selection: scan the object, then scan an action
@@ -271,8 +302,9 @@ set one ("Take the new label from the printer and stick it on C-12").
 Any step that writes may carry `done: { markdown }`: the copy the station shows,
 large, once the write lands and until the next scan ("Place it in
 **{container.containerCode}**. All good."). It reads the same bags its refusal copy
-reads. A fill that leaves items to scan shows its done copy as the progress
-line under the hold.
+reads. A fill or an into-subject add that leaves slots open shows its done
+copy under the hold; without done copy the station shows the count ("2 of 5
+checked off" for a fill, "2 of 5 added" for an add).
 
 The server trusts nothing about the subject. Each request re-parses its
 code, re-reads the row under the station's read scope, requires the row to
@@ -287,8 +319,8 @@ row.
 | Step | What the container scan does |
 |---|---|
 | `accumulate` with `accumulate.from: "subject"` | The held item joins the accumulator the scan names (found by the scheme facet, narrowed by `accumulate.container`). The held row is written as the reciprocal in the same statement, so a held row parked as a one-slot accumulator completes and its workflow wakes. `params.itemKey` names the item, e.g. `{subject.itemId}`. |
-| `accumulate` with `accumulate.into: "subject"` | The held row collects the scanned code (`itemKey` defaults to `{scan.target}`). Use it when the container has no row yet: the first item for a container tells the workflow which container was scanned. |
-| `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. `fill.into: "scanned"` fills the row the scan itself names. |
+| `accumulate` with `accumulate.into: "subject"` | The held row collects the scanned code (`itemKey` defaults to `{scan.target}`). Use it when the container has no row yet: the first item for a container tells the workflow which container was scanned. With `accumulate.item`, the scanned code's own pending row is written as the reciprocal in the same statement (see below). On a bounded accumulator the answer carries `progress` and the subject stays held while slots remain. |
+| `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. On a `gtin` scheme a refusal's `expected` lists codes as the package prints them (EAN-13, or EAN-8), not the stored 14-digit form. `fill.into: "scanned"` fills the row the scan itself names. |
 
 **`match` and `refuse`** check the pairing before anything is written.
 `match.target` lists templates the scanned target must equal (e.g.
@@ -303,6 +335,37 @@ container), the answer is `refused` with `refuse.conflict`, and a step that
 declares `refuse.conflict` also clears the subject so the next item scan
 reads fresh state. Exactly one of two racing acts wins whenever both name
 the same row: the reciprocal statement writes both rows or neither.
+
+**The item's own row on an into-subject add.** A held container that collects
+item codes (a box being packed from a bin) often has items that each wait on
+their own row. `accumulate.item` locates that row and writes it as the
+reciprocal of the container's entry, so the two land together or not at all:
+
+```jsonc
+// 11:0, item label, while the box is held
+{ "query": { "roles": ["packing"], "status": "pending" }, "verb": "accumulate",
+  "requireActingIdentity": true, "subject": { "schemes": [14] },
+  "match": { "target": ["{subject.memberCodes}"] },
+  "refuse": { "markdown": "Not one of this bin's items.",
+              "missing": "That item is not waiting to be packed." },
+  "done": { "markdown": "{item.itemCode} is in. {container.accumulate_count} of {container.accumulate_max}." },
+  "params": { "itemKey": "{scan.target}",
+    "accumulate": { "into": "subject", "item": { "roles": ["ship"], "facets": { "shape": "consolidated" } } } } }
+```
+
+The item row is a pending accumulator whose scheme facet equals the scanned
+target (a plain row carrying the same code is not a candidate: only an
+accumulator can take the reciprocal entry), in `item.roles` (intersected with the actor's read scope), narrowed by
+`item.types`, `item.subtypes` and `item.facets`; the held row is never a
+candidate. Parked as `max: 1`, it completes in the same statement and its
+workflow wakes with the container's id in `$accumulated`. No such row answers
+`refused` with `refuse.missing` (or falls through without it); two answer
+`conflict`. An item already placed elsewhere is refused with the box still
+held, an item scanned twice into it answers `already` with the box still
+held, and a live claim on the item row by someone else refuses with their
+name (checked before the write; the statement itself does not re-check it). `{item.<facet>}` reads the item row in `itemKey`, the payload,
+metadata and copy; `{container.<facet>}` in the copy reads the held row as the
+add left it.
 
 **One rule, several kinds of held item.** `subject.facets` makes a step
 apply only while the held row carries those facet values; otherwise the step
@@ -444,7 +507,10 @@ signed-in user is a **member of exactly that one role** — the station-login
 shape — the dashboard locks the viewport: the left nav is gone entirely, the
 role's escalation list is home (`/` and every other surface redirect to it),
 and the session is held to the list, the escalation detail page, the role's
-portals, and the scan screens (choice, badge). A role that declares
+portals, and the scan screens (choice, badge). The list with neither a
+`role` nor a `facets` filter is every queue at once, so it redirects home
+too, including right after sign-in; a scan's `show-list` (narrowed by
+facets) stays. A role that declares
 [portals](./hitl/portal.md) lands on its first one as home instead of the list. The header toolbar and event feed remain. A user
 holding more than one role, or an admin-type grant, always gets full chrome —
 kiosk is for the single-role floor login, never a way to hide the product from
@@ -470,12 +536,16 @@ submit opens a badge prompt naming that claimant. The resolve fires the moment
 a matching badge primes; a badge that is not the claimant's is named and the
 submit is held.
 
-The gate is on **use**, not on grant lifetime. Acting grants are single-use:
-the claim already spent the grant it was minted with, so the submit owes a
-fresh tap — every write consumes its own grant. A held token proves nothing
-about whether a submit can succeed, so the surface never lets one skip the
-badge. Editing persists nothing locally, so the identity gate sits at the one
-place a record actually changes, once per change.
+The gate is on **use**, not on grant lifetime. A live grant that names the
+claimant and has uses left carries the submit and spends one use, as a scan
+act does (release, cancel and escalate always ask); the badge prompt shows only when no such grant is held. The station
+holds a grant only while it has uses left, so a single-use badge spent by the
+claim makes the submit ask for a fresh tap, while a role's
+`badge_grant: { ttl_seconds: 600, max_uses: 0 }` lets one badge claim and
+submit for ten minutes. A grant bound to a scanned subject (`grant_scope:
+"subject"`) belongs to that scan and still asks. Editing persists nothing
+locally, so the identity gate sits at the one place a record actually
+changes, once per change.
 
 Mutations attribute to the badged person (`assigned_to`, `resolved_by`)
 with the device recorded beside them (`scanStation` in the scan

@@ -21,9 +21,9 @@ beforeEach(() => {
 
 describe('PUT workflow config with input_lookups', () => {
   it('refuses a malformed ref with the field named and writes nothing', async () => {
-    const result = await upsertWorkflowConfig({ type: 'fleetTools', input_lookups: [{ domain: 'fleet', key: 'serial-numbers' } as any] });
+    const result = await upsertWorkflowConfig({ type: 'fleetTools', input_lookups: [{ domain: 'fleet', key: 'serial-numbers', version: 'latest' } as any] });
     expect(result.status).toBe(400);
-    expect(result.error).toMatch(/positive integer version/);
+    expect(result.error).toMatch(/positive integer, 'current', or absent/);
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 

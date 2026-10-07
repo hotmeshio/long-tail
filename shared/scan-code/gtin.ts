@@ -20,3 +20,14 @@ export function isValidGtin(code: string): boolean {
 export function normalizeGtin(code: string): string {
   return code.padStart(14, '0');
 }
+
+/**
+ * A stored 14-digit GTIN as the package prints it: EAN-8 when it was padded
+ * from eight digits, otherwise EAN-13 (a UPC-A reads as its EAN-13 with a
+ * leading zero). Anything else comes back unchanged.
+ */
+export function displayGtin(code: string): string {
+  if (code.length !== 14 || !isValidGtin(code)) return code;
+  if (code.startsWith('000000') && isValidGtin(code.slice(6))) return code.slice(6);
+  return code.startsWith('0') ? code.slice(1) : code;
+}

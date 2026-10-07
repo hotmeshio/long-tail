@@ -510,13 +510,27 @@ function EscalationDetailView({ id }: { id: string }) {
     goBack();
   };
 
+  // A live grant naming the claimant carries the submit and spends a use; the
+  // client holds a grant only while it has uses left. A subject-bound grant
+  // belongs to the scan it was bound by, so it still asks for a badge. Other
+  // station writes (release, cancel, escalate) always ask.
+  const grantCarriesWrite = !!acting && acting.actorId === esc.assigned_to && !acting.subjectScoped;
+
   const guardStationWrite = (verb: string, run: () => void | Promise<void>) => {
-    if (writeNeedsBadge) {
+    if (writeNeedsBadge && !(grantCarriesWrite && verb === 'submit')) {
       clearActing();
       setPendingWrite({ verb, run });
       return;
     }
-    void run();
+    if (!writeNeedsBadge) {
+      void run();
+      return;
+    }
+    // The server is the judge of a carried grant; one it no longer honors
+    // turns into the badge challenge for the same write.
+    void Promise.resolve().then(run).catch((err) => {
+      if (err instanceof ApiError && err.status === 401) setPendingWrite({ verb, run });
+    });
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
@@ -794,8 +808,8 @@ function EscalationDetailView({ id }: { id: string }) {
           onCancel={() => setCancelModalOpen(true)}
           assignedTo={esc.assigned_to}
           assignedUntil={esc.assigned_until}
-          actingName={acting && claimedByMe ? acting.displayName : null}
-          submitNeedsBadge={writeNeedsBadge}
+          actingName={acting && (claimedByMe || grantCarriesWrite) ? acting.displayName : null}
+          submitNeedsBadge={writeNeedsBadge && !grantCarriesWrite}
           onSubmitAttempt={() => setSubmitAttempted(true)}
           onValidationErrors={(errors) => {
             setFormErrors(errors);

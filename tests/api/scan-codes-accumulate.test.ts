@@ -86,6 +86,13 @@ describe('accumulateStep — container-locate mode', () => {
     expect(locate).not.toHaveBeenCalled();
     expect(add.mock.calls[0][0]).toMatchObject({ key: 'orderId', value: 'ORD-9', itemKey: 'inspection-3', restrictRoles: ['bin'] });
     expect(add.mock.calls[0][0].reciprocal).toBeUndefined();
+    expect(add.mock.calls[0][0].container).toBeUndefined();
+  });
+
+  it('narrows the container by query types and subtypes', async () => {
+    const step = { query: { roles: ['bin'], subtypes: ['packing'] }, verb: SCAN_VERBS.ACCUMULATE, params: { itemKey: 'x' } } as ScanStep;
+    await accumulateStep(step, ctx);
+    expect(add.mock.calls[0][0].container).toEqual({ types: undefined, subtypes: ['packing'] });
   });
 });
 
