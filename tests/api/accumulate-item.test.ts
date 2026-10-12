@@ -244,11 +244,13 @@ describe('getEscalationItems (api)', () => {
       envelope: JSON.stringify({
         batch_items: { weld: { ok: true }, cut: { ok: true } },
         batch_filled_at: { cut: '2026-01-01T00:00:01Z', weld: '2026-01-01T00:00:02Z' },
+        batch_filled_by: { weld: 'user-weld' },
       }),
     }));
     const result = await getEscalationItems({ id: BIN_ID }, AUTH);
     expect(result.data).toMatchObject({ kind: 'batch', count: 2, max: 3, pending: ['paint'] });
     expect(result.data!.items.map((i) => i.itemKey)).toEqual(['cut', 'weld']);
+    expect(result.data!.items.map((i) => i.actor)).toEqual([undefined, 'user-weld']);
   });
 
   it('answers 400 for a row without items and 404 for an unknown row', async () => {
