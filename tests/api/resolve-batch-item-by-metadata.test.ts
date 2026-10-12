@@ -92,7 +92,7 @@ describe('resolveBatchItemByMetadata (api) — single-call path (no enforcing ro
     expect((result.data as any).outcome).toBe('accepted');
     expect(mockBatchByMeta).toHaveBeenCalledWith(
       'orderId', 'ORD-1', 'cut', { ok: true }, undefined,
-      { resolved_by: 'user-uuid' }, { id: 'user-uuid' },
+      { resolved_by: 'user-uuid' }, { id: 'user-uuid' }, 'user-uuid',
     );
     expect(mockFindByMetadata).not.toHaveBeenCalled();
   });
@@ -111,7 +111,7 @@ describe('resolveBatchItemByMetadata (api) — single-call path (no enforcing ro
     );
     expect(mockBatchByMeta).toHaveBeenCalledWith(
       'orderId', 'ORD-1', 'cut', { ok: true }, ['station-a'],
-      { resolved_by: 'user-uuid' }, { id: 'user-uuid' },
+      { resolved_by: 'user-uuid' }, { id: 'user-uuid' }, 'user-uuid',
     );
   });
 
@@ -140,7 +140,7 @@ describe('resolveBatchItemByMetadata (api) — two-phase enforcement', () => {
     // phase 2 targets the asserted row id — never a second facet selection
     expect(mockBatchItem).toHaveBeenCalledWith(
       'esc-batch', 'cut', { status: 'done' },
-      { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' },
+      { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' }, 'user-uuid',
     );
     expect(mockBatchByMeta).not.toHaveBeenCalled();
   });

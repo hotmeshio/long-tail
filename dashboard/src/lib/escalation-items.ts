@@ -26,6 +26,7 @@ const ACCUMULATE_ITEMS = 'accumulate_items';
 const ACCUMULATE_MAX = 'accumulate_max';
 const BATCH_ITEMS = 'batch_items';
 const BATCH_FILLED_AT = 'batch_filled_at';
+const BATCH_FILLED_BY = 'batch_filled_by';
 const BATCH_KEYS = 'batch_keys';
 const BATCH_PENDING = 'batch_pending';
 
@@ -66,10 +67,12 @@ export function escalationItems(
   if (Array.isArray(pending)) {
     const filled = isRecord(envelope?.[BATCH_ITEMS]) ? (envelope![BATCH_ITEMS] as Record<string, unknown>) : {};
     const stamps = isRecord(envelope?.[BATCH_FILLED_AT]) ? (envelope![BATCH_FILLED_AT] as Record<string, unknown>) : {};
+    const actors = isRecord(envelope?.[BATCH_FILLED_BY]) ? (envelope![BATCH_FILLED_BY] as Record<string, unknown>) : {};
     const items = Object.entries(filled).map(([itemKey, payload]) => ({
       itemKey,
       at: typeof stamps[itemKey] === 'string' ? (stamps[itemKey] as string) : '',
       ...(isRecord(payload) ? { payload } : {}),
+      ...(typeof actors[itemKey] === 'string' ? { actor: actors[itemKey] as string } : {}),
     } as EscalationItem)).sort(byArrival);
     const keys = metadata[BATCH_KEYS];
     return {

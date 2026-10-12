@@ -25,6 +25,14 @@ export type BatchItemOutcome = Types.BatchItemOutcome;
 export type AccumulateConfig = Types.AccumulateConfig;
 
 /**
+ * One batch entry satisfied before the wait begins (`conditional`'s `filled`
+ * field, keyed by item key): its `payload`, the `at` it was satisfied from
+ * the source of record, and an optional `actor`. Re-exported from the
+ * HotMesh SDK.
+ */
+export type BatchFilledEntry = Types.BatchFilledEntry;
+
+/**
  * What an accumulator wait resolves with on every terminal path except
  * cancel: the ordered `$accumulated` collection and the `$trigger` that
  * ended the wait (`count` | `timeout` | `resolve`). `P` types each item's
@@ -67,6 +75,8 @@ export const ESCALATION_BATCH_KEYS = {
   ITEMS: 'batch_items',
   /** Envelope: `Record<itemKey, iso8601>` fill timestamps from the database clock. */
   FILLED_AT: 'batch_filled_at',
+  /** Envelope: `Record<itemKey, userId>`, the actor of each attributed fill. */
+  FILLED_BY: 'batch_filled_by',
   /** Envelope: set by `partialOnTimeout`; the timer delivers the filled items. */
   PARTIAL_ON_TIMEOUT: 'batch_partial_on_timeout',
 } as const;

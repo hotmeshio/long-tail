@@ -30,6 +30,22 @@ describe('escalationItems', () => {
     );
     expect(view).toMatchObject({ kind: 'batch', count: 2, max: 3, pending: ['paint'] });
     expect(view!.items.map((i) => i.itemKey)).toEqual(['cut', 'weld']);
+    expect(view!.items.every((i) => i.actor === undefined)).toBe(true);
+  });
+
+  it('reads each batch entry actor beside its stamp', () => {
+    const view = escalationItems(
+      { metadata: { batch_pending: [], batch_keys: ['cut', 'weld'] } },
+      {
+        batch_items: { cut: { ok: true }, weld: { ok: true } },
+        batch_filled_at: { cut: '2026-01-01T00:00:01Z', weld: '2026-01-01T00:00:02Z' },
+        batch_filled_by: { cut: 'user-cut' },
+      },
+    );
+    expect(view!.items).toEqual([
+      { itemKey: 'cut', at: '2026-01-01T00:00:01Z', payload: { ok: true }, actor: 'user-cut' },
+      { itemKey: 'weld', at: '2026-01-01T00:00:02Z', payload: { ok: true } },
+    ]);
   });
 
   it('returns null for a row without items', () => {

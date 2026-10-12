@@ -100,10 +100,22 @@ The declaration folds into the row at creation, inside the same Leg1 commit:
 - `metadata.batch_keys` — the immutable declared list (progress = `batch_keys` minus `batch_pending`)
 - `envelope.batch_items` — the accumulated `Record<itemKey, payload>` map (payloads are plumbing, so they live on the unindexed envelope; payload keys are caller-owned)
 - `envelope.batch_filled_at` — `Record<itemKey, iso8601>`, stamped by the database clock inside each fill statement — the collection timeline as row truth
+- `envelope.batch_filled_by` — `Record<itemKey, userId>`, the actor of each fill, written in the same statement (every API fill records its caller)
 
 Items are submitted via `POST /api/escalations/:id/resolve-batch-item`, `POST /api/escalations/resolve-batch-item-by-signal-key` (the deterministic home signal id — no UUID lookup, no facet duplication), or `POST /api/escalations/resolve-batch-item-by-metadata` (see [Resolution — Batch items](resolution.md)). Each item validates against the same versioned role form a single-item resolver gets, `schemaVersion` pins included. Each fill is one guarded statement: the payload lands only while its key is still pending (duplicates return `duplicate-item` untouched), and the LAST fill resolves the row, stores the assembled collection as `resolver_payload`, and wakes this wait — atomically. The completing submission's `$resolution` rides the delivered collection.
 
 `timeout` and cancellation keep their standard semantics (`false` / `null`); a plain resolve on a batch row remains an admin override that resolves the whole row with the payload given. Add `partialOnTimeout: true` (hotmesh 0.29.0+) and the timer instead resumes the wait with the items filled so far plus `$trigger: 'timeout'`, the same value the expired row stores as `resolver_payload`.
+
+Entries already satisfied before the wait begins go in `filled` (hotmesh 0.31.0+), keyed by item key with their `payload`, the `at` they were satisfied (from the source of record, never a clock read in the workflow), and an optional `actor`. The row starts with that progress: those keys are left out of `batch_pending`, their payloads, times, and actors are written beside the rest, and the completing wake delivers them with the collection. Every key in `filled` must be declared in `batch`, and at least one must stay open; a `filled` that covers every key throws, so skip the wait instead.
+
+```typescript
+const parts = await conditional<Record<'cut' | 'weld' | 'paint', StationResultV1>>(signalId, {
+  role: 'assembly',
+  metadata: { orderId },
+  batch: ['cut', 'weld', 'paint'],
+  filled: { cut: { payload: { station: 'cut-1', ok: true }, at: cutRecord.completedAt, actor: cutRecord.userId } },
+});
+```
 
 ### Open accumulation — items arrive over time
 

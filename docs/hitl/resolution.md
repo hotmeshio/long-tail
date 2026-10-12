@@ -107,7 +107,7 @@ Interim items return `accepted` with the remaining count and publish `escalation
 
 Each item validates against the same versioned role form a single-item resolve uses, canonical 422 included. Batch fills are claim-agnostic — a batch collects contributions from multiple principals, the same rationale as the signal-key path — while `assertClaim: true` (by-id form) opts into the caller's own live-claim assertion inside the guarded statement.
 
-Item keys are non-empty strings up to 128 characters; prefer URL-friendly names (`u1-L`). Payload keys inside each item are caller-owned — the platform reserves no names inside `batch_items` values. Every fill stamps `envelope.batch_filled_at[itemKey]` with the database clock in the same statement, so the row carries the collection timeline as row truth. After an SLA expiry (`conditional` returns `false`) the terminal row retains the partial `batch_items` and their timestamps — read them back with `GET /api/escalations/:id` or `getEscalationBySignalKey` from an activity.
+Item keys are non-empty strings up to 128 characters; prefer URL-friendly names (`u1-L`). Payload keys inside each item are caller-owned — the platform reserves no names inside `batch_items` values. Every fill stamps `envelope.batch_filled_at[itemKey]` with the database clock and `envelope.batch_filled_by[itemKey]` with the caller in the same statement, so the row carries the collection timeline and who filled each item as row truth. After an SLA expiry (`conditional` returns `false`) the terminal row retains the partial `batch_items` and their timestamps — read them back with `GET /api/escalations/:id` or `getEscalationBySignalKey` from an activity.
 
 ### Accumulator items
 

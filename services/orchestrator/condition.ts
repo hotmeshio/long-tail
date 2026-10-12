@@ -163,7 +163,10 @@ function toEngineConfig(
  * items persist on the terminal row for audit. Add `partialOnTimeout: true`
  * (hotmesh 0.29.0+) and the timer instead resumes with the items filled so
  * far plus `$trigger: 'timeout'`. A plain resolve on a batch row remains an
- * admin override that resolves the whole row with its payload.
+ * admin override that resolves the whole row with its payload. Entries
+ * already satisfied go in `filled` (hotmesh 0.31.0+), keyed by item key
+ * with `payload`, `at` from the source of record, and an optional `actor`;
+ * the row starts with that progress and delivers them with the collection.
  *
  * **Open accumulation — items arrive over time (hotmesh 0.29.0+).** Declare
  * `accumulate` and the escalation holds items added via `accumulateItem`

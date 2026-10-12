@@ -17,7 +17,7 @@ export interface ResolveBatchItemOutcome {
 /**
  * Fills one declared item of a batch escalation in a single atomic SDK
  * statement (guarded fill + facet recompute + resolve-and-wake on the last
- * item). Interim fills publish `escalation.updated` with progress; the
+ * item). `actor` is recorded under `envelope.batch_filled_by[itemKey]`. Interim fills publish `escalation.updated` with progress; the
  * completing fill publishes the standard `escalation.resolved`. Failure
  * outcomes publish nothing — the row was untouched.
  */
@@ -28,6 +28,7 @@ export async function resolveBatchItem(
   metadata?: Record<string, any>,
   assertClaim?: string,
   resolvedBy?: { id: string; email?: string },
+  actor?: string,
 ): Promise<ResolveBatchItemOutcome> {
   if (!isUuid(id)) return { outcome: 'not-found', remaining: -1, escalation: null };
   const client = await escalations();
@@ -38,6 +39,7 @@ export async function resolveBatchItem(
     metadata,
     assertClaim,
     resolvedBy,
+    actor,
   });
   return settleBatchOutcome(result, itemKey);
 }
@@ -54,6 +56,7 @@ export async function resolveBatchItemBySignalKey(
   payload: Record<string, any>,
   metadata?: Record<string, any>,
   resolvedBy?: { id: string; email?: string },
+  actor?: string,
 ): Promise<ResolveBatchItemOutcome> {
   const client = await escalations();
   const result = await client.resolveBatchItem({
@@ -62,6 +65,7 @@ export async function resolveBatchItemBySignalKey(
     payload,
     metadata,
     resolvedBy,
+    actor,
   });
   return settleBatchOutcome(result, itemKey);
 }
@@ -79,6 +83,7 @@ export async function resolveBatchItemByMetadata(
   roles?: string[],
   metadata?: Record<string, any>,
   resolvedBy?: { id: string; email?: string },
+  actor?: string,
 ): Promise<ResolveBatchItemOutcome> {
   const client = await escalations();
   const result = await client.resolveBatchItemByMetadata({
@@ -89,6 +94,7 @@ export async function resolveBatchItemByMetadata(
     payload,
     metadata,
     resolvedBy,
+    actor,
   });
   return settleBatchOutcome(result, itemKey);
 }
