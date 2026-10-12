@@ -15,6 +15,7 @@ export type {
   LTEscalationRecord,
   EscalationResolution,
   BatchItemOutcome,
+  BatchFilledEntry,
   AccumulateConfig,
   AccumulatorResult,
   AccumulatedItem,

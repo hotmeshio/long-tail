@@ -17,7 +17,8 @@ import { restrictScopeRoles } from './metadata';
  *
  * Each item validates against the SAME versioned form schema a single-item
  * resolver gets (metadata.form_schema → pinned lt_role_schemas → live role
- * schema), including the submit guard.
+ * schema), including the submit guard. Every fill records the caller as the
+ * entry's actor (`envelope.batch_filled_by[itemKey]`).
  *
  * Claim semantics: claim-agnostic by default — a batch accumulates
  * contributions from multiple principals, so the single-owner claim lock is
@@ -86,6 +87,7 @@ export async function resolveBatchItem(
       { ...metadata, resolved_by: auth.userId },
       input.assertClaim ? auth.userId : undefined,
       await resolverIdentity(auth),
+      auth.userId,
     );
     return batchOutcomeResult(result, itemKey, escalation.workflow_id);
   } catch (err: any) {
@@ -143,6 +145,7 @@ export async function resolveBatchItemBySignalKey(
       redacted,
       { ...metadata, resolved_by: auth.userId },
       await resolverIdentity(auth),
+      auth.userId,
     );
     return batchOutcomeResult(result, itemKey, escalation.workflow_id);
   } catch (err: any) {
@@ -191,7 +194,7 @@ export async function resolveBatchItemByMetadata(
       // Single atomic call — selection, fill, and (on the last item) the
       // resolve + wake all inside the SDK statement.
       const result = await escalationService.resolveBatchItemByMetadata(
-        key, value, itemKey, resolverPayload, allowedRoles ?? undefined, outcome, resolvedBy,
+        key, value, itemKey, resolverPayload, allowedRoles ?? undefined, outcome, resolvedBy, auth.userId,
       );
       return batchOutcomeResult(result, itemKey, result.escalation?.workflow_id ?? null);
     }
@@ -215,7 +218,7 @@ export async function resolveBatchItemByMetadata(
     // batch state; a row that went terminal between phases maps to 409.
     const redacted = await redactPasswords(resolverPayload, (row.metadata as any)?.form_schema);
     const result = await escalationService.resolveBatchItem(
-      row.id, itemKey, redacted, outcome, undefined, resolvedBy,
+      row.id, itemKey, redacted, outcome, undefined, resolvedBy, auth.userId,
     );
     if (result.outcome === 'not-found') {
       return { status: 409, error: 'A concurrent resolution is already in progress for this escalation' };

@@ -855,7 +855,7 @@ await lt.escalations.resolveBatchItemBySignalKey({ signalKey, itemKey, resolverP
 await lt.escalations.resolveBatchItemByMetadata({ key, value, itemKey, resolverPayload, metadata?, restrictRoles? });
 ```
 
-**Returns:** `LTApiResult<{ outcome, remaining, escalationId, signaled?, workflowId? }>`. 409 on a duplicate item, 400 on an undeclared key or a non-batch row.
+**Returns:** `LTApiResult<{ outcome, remaining, escalationId, signaled?, workflowId? }>`. 409 on a duplicate item, 400 on an undeclared key or a non-batch row. Each fill records the caller under `envelope.batch_filled_by[itemKey]`.
 
 **Auth:** Required
 
