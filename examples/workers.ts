@@ -13,6 +13,8 @@ import * as batchSignalWorkflow from './workflows/batch-signal';
 import * as batchFanoutWorkflow from './workflows/batch-fanout';
 import * as rollupBinWorkflow from './workflows/rollup-bin';
 import { ROLLUP_BIN_ROLE, ROLLUP_MEMBER_ROLE } from './workflows/rollup-bin';
+import * as consolidationWorkflow from './workflows/consolidation';
+import { CONSOLIDATION_ROLES, SERVICE_LEVELS } from './workflows/consolidation';
 import * as richFormWorkflow from './workflows/rich-form';
 import * as acmeStationsWorkflow from './workflows/acme-stations';
 import { ACME_ADDONS_ROLE } from './workflows/acme-stations/forms';
@@ -179,6 +181,28 @@ const rollupMemberConfig: LTWorkerConfig = {
   defaultRole: ROLLUP_MEMBER_ROLE,
   envelopeSchema: {
     data: { orderId: 'order-123', binKey: 'bin-7', role: ROLLUP_MEMBER_ROLE },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const consolidationOrderConfig: LTWorkerConfig = {
+  description: 'One order through two stations (prep, check), each a wait carrying the order\'s destination and service level, then staged until it is placed in its destination\'s container with a reciprocal add.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: CONSOLIDATION_ROLES.PREP,
+  envelopeSchema: {
+    data: { orderId: 'order-101', destination: 'north', serviceLevel: SERVICE_LEVELS.STANDARD },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const consolidationBinConfig: LTWorkerConfig = {
+  description: 'A container per destination: an open accumulator whose list shows what it holds, split by service level, and what is still coming toward it from the stations.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: CONSOLIDATION_ROLES.BIN,
+  envelopeSchema: {
+    data: { binKey: 'A-3', destination: 'north', max: 12, timeout: '8h' },
     metadata: { source: 'dashboard' },
   },
 };
@@ -616,6 +640,8 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: batchFanoutWorkflow.batchFanoutChild, config: batchFanoutChildConfig },
   { taskQueue: 'long-tail-examples', workflow: rollupBinWorkflow.rollupBin, config: rollupBinConfig },
   { taskQueue: 'long-tail-examples', workflow: rollupBinWorkflow.rollupMember, config: rollupMemberConfig },
+  { taskQueue: 'long-tail-examples', workflow: consolidationWorkflow.consolidationOrder, config: consolidationOrderConfig },
+  { taskQueue: 'long-tail-examples', workflow: consolidationWorkflow.consolidationBin, config: consolidationBinConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },

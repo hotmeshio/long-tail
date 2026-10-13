@@ -17,7 +17,9 @@ Every string is a markdown/text template run through the same `{{domain.path}}` 
 | `x-lt-active` | schema | The live item card: `{ title, subtitle?, body?, fields?: [{ label, value }] }` |
 | `x-lt-history` | schema | History column: `{ row: { title, subtitle?, meta? }, limit?, status? }` |
 | `x-lt-columns` | schema | Column definitions for `facet-table` layout: `[{ label, value, format?, priority?, width? }]` |
-| `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity |
+| `x-lt-group-by` | schema | `facet-board`: the `"domain.path"` whose value identifies each entity. `facet-table`: a `"metadata.<key>"` whose rows read as one line (see [Grouped rows](#grouped-rows)) |
+| `x-lt-related` | schema | `facet-table`: named related sets, a row's items or rows in other roles (see [Related sets](#related-sets)) |
+| `x-lt-row-detail` | schema | `facet-table`: sections a row expands into, each listing a related set |
 | `x-lt-card` | schema | `facet-board`: the per-entity card — `{ title, state?, fields?: [{ label, value, format? }] }` |
 | `x-lt-row-action` | schema | The per-row action button: `{ action?, label?, durationMinutes? }` — see below |
 
@@ -144,3 +146,88 @@ Cards are fully interactive (`x-lt-group-by` should be a `metadata.*` path so th
 - **The header magnifier** opens the card's refine dialog — the entity identity plus every field bound to a pure `{{metadata.KEY}}` token, as touch-sized toggle rows. Selections AND into one query: **Filter <role>**, **Search everywhere**, or **Add to filters** (merge into the live set). The same row gesture the facet table carries, always visible — no hover required.
 
 The reference: `examples/seed-fleet-sim.ts` — one advert per machine, a `format: "age"` "Since" field, and role default pins (see [pinned-views.md](pinned-views.md)).
+
+
+---
+
+## Related sets
+
+A `facet-table` row is often a **container**: it holds items (an accumulator or batch row), and other rows are on their way to it. A related set names one of those collections once; columns and row details refer to it by name.
+
+```jsonc
+"x-lt-related": {
+  "contents": { "source": "items" },
+  "coming": {
+    "source": "query",
+    "query": {
+      "segment": "order-prep",                              // or "roles": ["order-prep", "order-check"]
+      "facets": { "destination": "{{metadata.destination}}" },
+      "narrow": { "serviceLevel": "{{metadata.lane}}" },     // applies when the row has a lane
+      "status": "pending"                                   // the default
+    }
+  }
+}
+```
+
+- **`items`**: the row's held items (`envelope.accumulate_items`, or a batch row's `batch_items`). Each item reads through its own `payload` and, for a reciprocal add, through the **reciprocal row** (the item's own escalation).
+- **`query`**: rows in other roles whose metadata contains the row's facets. Facet values are `{{domain.path}}` templates over the host row; a lone token keeps the value's JSON type, so a numeric facet matches a numeric facet. `roles` lists the roles in display order; `segment` names a Pace Board sequence by its first role (the chain composed with `parent_role`), so the sequence and its station titles come from the board. A host whose facets do not resolve shows an em dash and runs no query. `narrow` facets apply only when the row resolves them, so the facets drive the hierarchy: a lane (a bin carrying `lane`) looks ahead to its own service level only, a bin without lanes to its whole destination, and a grouped tub reads the union of its lanes.
+
+A schema declares up to 4 sets; a query names up to 12 roles.
+
+### Related columns
+
+A column with `related` aggregates its set for each row:
+
+```jsonc
+{ "label": "Holds", "related": "contents", "aggregate": "count",
+  "splitBy": "reciprocal.metadata.serviceLevel", "labels": { "standard": "Standard", "express": "Express" } },
+{ "label": "Coming", "related": "coming", "aggregate": "count", "splitBy": "role" }
+```
+
+The cell reads `3 · Standard 2 · Express 1`: the count, then each split value as a chip. `splitBy` takes:
+
+| Set | `splitBy` |
+|-----|-----------|
+| `items` | `payload.<path>` or `reciprocal.metadata.<key>` |
+| `query` | `role` (chips in sequence order, labeled by role title) or `metadata.<key>` |
+
+`labels` maps split values to display text. A `role` chip opens that role's list filtered to the row's facets.
+
+### Row detail
+
+`x-lt-row-detail` lists sections a row expands into. Each section loads when the row opens, and lists its set's rows with its own columns:
+
+```jsonc
+"x-lt-row-detail": [
+  { "related": "contents", "label": "Holds", "columns": [
+      { "label": "Order",   "value": "{{item.itemKey}}" },
+      { "label": "Service", "value": "{{metadata.serviceLevel}}" },
+      { "label": "Placed",  "value": "{{item.at}}", "format": "date" } ] },
+  { "related": "coming", "label": "Coming", "columns": [
+      { "label": "Order", "value": "{{metadata.orderId}}" },
+      { "label": "At",    "value": "{{escalation.role}}", "format": "role" },
+      { "label": "Since", "value": "{{escalation.created_at}}", "format": "age" } ] }
+]
+```
+
+Item sections read `{{item.itemKey}}`, `{{item.payload.*}}`, `{{item.actor}}` and `{{item.at}}` beside the reciprocal row's domains; query sections read each related row's own domains. `format: "role"` renders a role name as its title. A sub-row opens its own row: an item's reciprocal row, or the related row. A section shows up to its `limit` rows (default 25, at most 100) with the total. The expansion folds with the table at narrow widths and inside a portal panel.
+
+### Grouped rows
+
+On a `facet-table`, `x-lt-group-by: "metadata.<key>"` reads every row sharing that facet as one line, expanding to its members. The list pages by groups, so a page holds whole groups and the total counts groups; a row without the facet is a group of one. Plain columns fold across a group with `group: "first" | "min" | "max" | "sum" | "count" | "distinct"` (default `first`); `min` and `max` compare numbers as numbers and instants as text, and `distinct` lists each value once ("standard, express"). Related columns merge across the group: counts and splits add. A container split finer (one bin per service level in the same tub) keeps reading as one line per tub.
+
+Containment reads by indentation and band: an open line takes a light band; its members are rows of the same table, stepped in under it on a stronger band; a row's detail sections step in past their row on that row's band. The facets carry the hierarchy, so nothing repeats beneath the line that states it: a member leaves blank every value it shares with its group (the group line already shows it), and a detail section drops a column whose every row restates a facet the opened row carries (a lane's look-ahead needs no Service column). A section's first column always stays.
+
+### Scope and cost
+
+Related sets read under the viewer's own read scope, as every list does:
+
+- An item total comes from the host row, so it shows whenever the row does. A split counts only reciprocal rows the viewer reads; when none are readable the cell shows the total with *split restricted*.
+- A query set counts only roles the viewer reads in full. The roles it cannot count are named in the cell's tooltip and in each expansion (*partial*). Granting `read` on those roles is the dial that widens the view.
+- A viewer who cannot read the host role gets a 404.
+
+The server reads the declaration from the role's stored list schema at the version the page rendered, never from the request. `POST /api/escalations/related` aggregates one page of rows in one statement per declared (set, split) pair, whatever the page size or item count; a query set's facet match is served by the metadata GIN index. `POST /api/escalations/related/rows` reads one row's set for its expansion. The list refreshes the sets live: the row's own role events, and the related roles' events, refresh the counts on the list tier.
+
+A role's list schema is validated wherever it is written (the role API, the MCP tool, the startup apply): a column naming an undeclared set, an unknown split path, or a malformed query is refused with the path that failed. Keys outside this vocabulary stay free-form.
+
+The reference: `examples/workflows/consolidation/` (roles seeded by `examples/seed-consolidation.ts`). Orders walk two stations and are staged; containers per destination read what they hold by service level and what is coming by station. `npm run consolidation:sim` drives a floor over HTTP; `KEEP=1` leaves it mid-flight.

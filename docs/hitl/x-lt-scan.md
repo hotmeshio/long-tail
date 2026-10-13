@@ -35,8 +35,11 @@ A form field that takes a scan. While a claimed form is open and editable, a sca
 | `expect` | Context paths (`metadata.*`, `envelope.*`, `lookup.*`, …) whose values the field accepts. A path that holds a list contributes every entry. |
 | `expect-error` | The message for a scan outside `expect`; `{{expected}}` lists what the field accepts. Default: `Expected {{expected}}`. |
 | `multiplicity` | Array fields: `"count"` admits a value as many times as `expect` lists it (a part expected twice takes two scans); otherwise each expected value is admitted once. |
+| `prompt` | Array fields: the instruction shown while the field is empty. Default: the field's `description`. |
 
 A string field is replaced by a scan. An array field appends, up to `maxItems`. Manufacturer barcodes compare as GTINs, so a UPC-A matches its 14-digit form.
+
+An array scan field reads as a checklist: its prompt while empty, `n of N` beside the label, and a remove control on each scanned value while the form is editable. `N` is what `expect` admits (each listing under `multiplicity: "count"`, each distinct value otherwise), or `maxItems`, so the count and the admission gate agree. A removed value is admitted again on the next scan.
 
 ## Which field takes the scan
 
@@ -44,7 +47,7 @@ The focused field, when it accepts the scan's scheme. Otherwise the first field 
 
 ## Expected values are checked on both sides
 
-A scan outside `expect` shows as an error under the form and leaves the field as it was. The same check runs in the shared validator at submit, so a typed value outside `expect` is a field error in the form and a 422 from the API.
+A scan outside `expect` shows as an error directly under the field that refused it, and leaves the field as it was; an accepted scan shows a confirmation in the same place. Either way the field scrolls into view. The same check runs in the shared validator at submit, so a typed value outside `expect` is a field error in the form and a 422 from the API.
 
 ## `x-lt-scan-submit`
 

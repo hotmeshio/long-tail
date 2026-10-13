@@ -1224,3 +1224,19 @@ interface StationMetric {
 `pending` reflects the live queue depth regardless of period. `claimed`, `resolved`, and both percentile objects use the lookback window. `priority_count` covers pending, unclaimed items whose age exceeds the role's threshold — age from the `priority_facet` metadata timestamp (`created_at` when unset) against `priority_threshold_minutes` (`sla_minutes` when unset); stations with neither threshold always return `0`. `throughput_pct` is `null` when `target_per_hour` is not set.
 
 **Auth:** Same RBAC as `getStats` — callers see only the stations for roles they hold.
+
+## getRelated / getRelatedRows
+
+Read the related sets a role's list schema declares (`x-lt-related`) for list rows, under the caller's read scope. Mirrors `POST /api/escalations/related` and `/related/rows`.
+
+```typescript
+const page = await client.escalations.getRelated({ role: 'consolidate', ids: rows.map((r) => r.id) });
+// page.data.sets.contents.aggregates['reciprocal.metadata.serviceLevel'][rowId]
+//   → { count: 3, splits: { standard: 2, express: 1 } }
+
+const orders = await client.escalations.getRelatedRows({ role: 'consolidate', id: rowId, set: 'contents' });
+// orders.data.rows → [{ item: { itemKey, at, reciprocalId }, escalation }]
+```
+
+`list` and `listAvailable` take `groupBy` (a metadata key) to page by groups of rows sharing it: the response adds `groups: [{ key, ids }]` and `total` counts groups.
+
