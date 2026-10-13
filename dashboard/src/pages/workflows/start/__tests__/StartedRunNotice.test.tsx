@@ -83,6 +83,14 @@ describe('InvokeFooter — following a started run', () => {
     expect(await screen.findByTestId('started-run-result')).toHaveTextContent('printer-09');
   });
 
+  it('a failed event without data reads the run\'s error through the API', async () => {
+    apiFetch.mockResolvedValue({ workflowId: 'wf-1', state: 'failed', error: 'printer offline', result: null });
+    renderStarted();
+    await act(async () => { handler!(event('system.workflow.wf-1.failed')); });
+    expect(apiFetch).toHaveBeenCalledWith('/workflows/wf-1/result');
+    expect(await screen.findByTestId('started-run-result')).toHaveTextContent('printer offline');
+  });
+
   it('a failed event reads as failure', () => {
     renderStarted();
     act(() => handler!(event('system.workflow.wf-1.failed', { error: 'boom' })));

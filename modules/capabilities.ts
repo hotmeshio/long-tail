@@ -1,5 +1,5 @@
 import { isSuperAdmin } from '../services/user';
-import { getTaskByWorkflowId } from '../services/task/crud';
+import { getWorkflowStartIdentity } from '../services/export';
 import { isUuid } from '../lib/uuid';
 import type { AuthPayload, CapabilityAccess, CapabilitySet, LTGrantRole } from '../types';
 
@@ -44,15 +44,18 @@ export async function mayBuild(principal: CapabilityPrincipal | undefined): Prom
   return hasBuilderRole(principal.userId);
 }
 
-/** Builder access, or the person a workflow run was started by or runs as. */
+/**
+ * Builder access, or the person a workflow run was started by or runs as,
+ * read from the run's own start envelope.
+ */
 export async function mayReadWorkflowRun(
   principal: CapabilityPrincipal | undefined,
   workflowId: string,
 ): Promise<boolean> {
   if (!principal?.userId) return false;
   if (await mayBuild(principal)) return true;
-  const task = await getTaskByWorkflowId(workflowId);
-  return !!task && (task.initiated_by === principal.userId || task.executing_as === principal.userId);
+  const started = await getWorkflowStartIdentity(workflowId);
+  return !!started && (started.userId === principal.userId || started.initiatedBy === principal.userId);
 }
 
 /** Anyone who may administer, plus holders of the engineer role. */

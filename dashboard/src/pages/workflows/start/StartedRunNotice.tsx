@@ -41,10 +41,10 @@ export function useRunOutcome(workflowId: string): { outcome: RunOutcome; payloa
       setOutcome(failed ? RUN_OUTCOMES.FAILED : RUN_OUTCOMES.COMPLETED);
       setPayload(event.data);
       // Events reach non-builders without data; the run's own person reads
-      // its result through the API instead.
-      if (!failed && event.data === undefined) {
-        apiFetch<{ result?: { data?: Record<string, unknown> } }>(`/workflows/${encodeURIComponent(workflowId)}/result`)
-          .then((res) => setPayload(res.result?.data))
+      // its result, or its error, through the API instead.
+      if (event.data === undefined) {
+        apiFetch<{ result?: { data?: Record<string, unknown> } | null; error?: string }>(`/workflows/${encodeURIComponent(workflowId)}/result`)
+          .then((res) => setPayload(failed ? (res.error ? { error: res.error } : undefined) : res.result?.data))
           .catch(() => { /* the outcome stands without its payload */ });
       }
     },

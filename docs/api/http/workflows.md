@@ -336,7 +336,7 @@ GET /api/workflows/:workflowId/result
 
 Returns the result if the workflow is complete, or `202` if it's still running. Never blocks.
 
-**Auth:** Requires builder access, or being the person who started the run or the account it runs as (`lt_tasks.initiated_by` / `executing_as`). Others receive `403`.
+**Auth:** Requires builder access, or being the person who started the run or the account it runs as (read from the run's start envelope: `lt.userId`, or `lt.initiatedBy` when it runs under `execute_as`). Others receive `403`.
 
 **Response 200** (complete):
 
