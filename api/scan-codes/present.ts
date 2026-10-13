@@ -1,5 +1,7 @@
+import * as scanCodeService from '../../services/scan-code';
 import {
   SCAN_OUTCOMES,
+  type LTEscalationRecord,
   type ScanExecuteResponse,
   type ScanPresentedChoice,
   type ScanStep,
@@ -8,7 +10,14 @@ import type { LTApiResult } from '../../types/sdk';
 import { actingIdentitySatisfied } from './identity';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
-import type { StepContext } from './context';
+import { templateContext, type StepContext } from './context';
+
+/** The step's facts rendered against the presented row; unreadable tokens render empty. */
+function renderFacts(step: ScanStep, ctx: StepContext, row: LTEscalationRecord): ScanExecuteResponse['facts'] {
+  if (!step.facts) return undefined;
+  const tpl = { ...templateContext(ctx), item: row.metadata ?? {} };
+  return step.facts.map((fact) => ({ label: fact.label, value: scanCodeService.renderScanCopy(fact.value, tpl) }));
+}
 
 // ── The info-choice outcome — locate → present reality + labeled choices ───
 //
@@ -68,6 +77,7 @@ export async function presentStep(
       verb: step.verb,
       escalation,
       choices,
+      ...(step.facts ? { facts: renderFacts(step, ctx, escalation) } : {}),
       notPrimed: ctx.rule.notPrimed,
       ...(autoSelect ? { autoSelect: true } : {}),
     },

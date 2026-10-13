@@ -233,6 +233,7 @@ export function ScanStationPage() {
           subject={subject}
           primedName={identity?.displayName ?? null}
           progress={progress}
+          progressLabel={executedBench?.verb === SCAN_VERBS.ACCUMULATE ? 'added' : 'checked off'}
           note={subject && executedBench ? executedBench.done?.markdown ?? null : null}
           onRelease={dropSubject}
         />

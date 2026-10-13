@@ -166,21 +166,19 @@ describe('EscalationDetailPage — acting identity on the work surface', () => {
     state.listeners.clear();
   });
 
-  it('single-use: a held grant does not skip the submit challenge', async () => {
+  it("a held grant naming the claimant carries the submit; a spent one is never held", async () => {
     primedAs('badge-user-1', 'Dana Reviewer');
     renderPage();
 
     await screen.findByText('Plate check');
+    expect(screen.queryByTestId('submit-badge-warning')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    expect(await screen.findByTestId('station-write-challenge')).toBeInTheDocument();
-    expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
-
-    primeLive('badge-user-1', 'Dana Reviewer');
     await waitFor(() =>
       expect(state.resolve.mutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({ id: ESC_ID }),
       ),
     );
+    expect(screen.queryByTestId('station-write-challenge')).not.toBeInTheDocument();
   });
 
   it('at a station, a live-claimed item is workable and warns of the submit badge', async () => {

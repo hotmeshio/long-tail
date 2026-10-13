@@ -79,6 +79,12 @@ describe('fillStep', () => {
     });
   });
 
+  it('on a gtin scheme the expected codes read as the package prints them', async () => {
+    const gtin = { ...ctx(orderRow([`${SHOE}#1`, OTHER]), '00099999999999'), scheme: { version: 16, target_facet: 'upc', encoding: 'gtin' } };
+    const result = await fillStep(step, gtin);
+    expect(result?.data?.refusal?.expected).toEqual(['0012345678905', '0036000291452']);
+  });
+
   it('a slot another bench just filled moves to the next', async () => {
     fill
       .mockResolvedValueOnce({ status: 409, error: 'Batch item already submitted', data: { outcome: 'duplicate-item' } })

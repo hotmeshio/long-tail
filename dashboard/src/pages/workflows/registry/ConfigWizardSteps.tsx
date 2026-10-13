@@ -196,13 +196,13 @@ export function InvocationStep({ form, set }: StepProps) {
             <textarea
               value={form.input_lookups}
               onChange={(e) => set('input_lookups', e.target.value)}
-              placeholder={'[\n  { "domain": "fleet", "key": "serial-numbers", "version": 1, "as": "serials" }\n]'}
+              placeholder={'[\n  { "domain": "fleet", "key": "serial-numbers", "as": "serials" }\n]'}
               className={jsonCls}
               rows={5}
               spellCheck={false}
             />
             <p className={hintCls}>
-              Versioned knowledge refs the input form reads as <code className="font-mono">lookup.&lt;as&gt;</code>.
+              Knowledge refs the input form reads as <code className="font-mono">lookup.&lt;as&gt;</code>. Without a <code className="font-mono">version</code> a ref reads the newest edition; add one to pin an edition.
             </p>
             {form.input_lookups.trim() && !jsonValid(form.input_lookups) && (
               <p className="text-2xs text-status-error mt-1">Invalid JSON</p>

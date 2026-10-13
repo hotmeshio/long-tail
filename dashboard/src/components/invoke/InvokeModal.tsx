@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { lookupLabel } from '../../lib/lookup-label';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from '../common/modal/Modal';
 import { WorkflowIcon } from '../common/display/WorkflowIcon';
@@ -42,7 +43,7 @@ function InvokeModalBody({ workflow, prefill, onClose }: { workflow: InvocableWo
       {missingLookups.length > 0 && (
         <p className="flex items-center gap-1.5 text-2xs text-status-warning mb-4" data-testid="lookup-missing">
           <AlertTriangle className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-          {missingLookups.map((l) => `${l.domain}/${l.key} v${l.version}`).join(', ')} {missingLookups.length === 1 ? 'is' : 'are'} not available; the fields that read {missingLookups.length === 1 ? 'it' : 'them'} fall back to plain inputs.
+          {missingLookups.map(lookupLabel).join(', ')} {missingLookups.length === 1 ? 'is' : 'are'} not available; the fields that read {missingLookups.length === 1 ? 'it' : 'them'} fall back to plain inputs.
         </p>
       )}
       {workflow.input_schema ? (

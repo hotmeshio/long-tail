@@ -150,3 +150,18 @@ describe('resolveBatchItemByMetadata (service)', () => {
     expect(mockPublish.mock.calls[0][0].type).toBe('escalation.resolved');
   });
 });
+
+describe('batch fill actor (service)', () => {
+  const accepted = { ok: true, outcome: 'accepted', remaining: 1, entry: makeEntry() };
+
+  it('forwards the actor on every selector form', async () => {
+    mockClient.resolveBatchItem.mockResolvedValue(accepted);
+    mockClient.resolveBatchItemByMetadata.mockResolvedValue(accepted);
+    await resolveBatchItem(ESC_ID, 'cut', { ok: true }, undefined, undefined, { id: 'u-1' }, 'u-1');
+    await resolveBatchItemBySignalKey('sig-1', 'cut', { ok: true }, undefined, { id: 'u-2' }, 'u-2');
+    await resolveBatchItemByMetadata('orderId', 'o-1', 'cut', { ok: true }, undefined, undefined, { id: 'u-3' }, 'u-3');
+    expect(mockClient.resolveBatchItem.mock.calls[0][0]).toMatchObject({ id: ESC_ID, actor: 'u-1' });
+    expect(mockClient.resolveBatchItem.mock.calls[1][0]).toMatchObject({ signalKey: 'sig-1', actor: 'u-2' });
+    expect(mockClient.resolveBatchItemByMetadata.mock.calls[0][0]).toMatchObject({ key: 'orderId', actor: 'u-3' });
+  });
+});

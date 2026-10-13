@@ -505,9 +505,15 @@ export function itemsView(escalation: LTEscalationRecord): EscalationItemsView |
   if (isBatch(escalation)) {
     const store = (envelope[ESCALATION_BATCH_KEYS.ITEMS] ?? {}) as Record<string, any>;
     const filledAt = (envelope[ESCALATION_BATCH_KEYS.FILLED_AT] ?? {}) as Record<string, string>;
+    const filledBy = (envelope[ESCALATION_BATCH_KEYS.FILLED_BY] ?? {}) as Record<string, string>;
     const keys = (metadata[ESCALATION_BATCH_KEYS.KEYS] ?? []) as string[];
     const items: AccumulatedItem[] = Object.entries(store)
-      .map(([itemKey, payload]) => ({ itemKey, payload: payload as Record<string, unknown>, at: filledAt[itemKey] ?? '' }))
+      .map(([itemKey, payload]) => ({
+        itemKey,
+        payload: payload as Record<string, unknown>,
+        at: filledAt[itemKey] ?? '',
+        ...(typeof filledBy[itemKey] === 'string' ? { actor: filledBy[itemKey] } : {}),
+      }))
       .sort((a, b) => a.at.localeCompare(b.at) || a.itemKey.localeCompare(b.itemKey));
     return {
       escalationId: escalation.id,

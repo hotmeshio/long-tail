@@ -19,7 +19,8 @@ import {
 } from './context';
 import { spendGrant } from './grant';
 import { locateForStep } from './locate';
-import { accumulateFromSubject, accumulateIntoSubject } from './verbs-subject';
+import { accumulateFromSubject } from './verbs-subject';
+import { accumulateIntoSubject } from './verb-into-subject';
 
 /**
  * Adds the scanned item to an accumulator. Two modes, one atomic write:
@@ -91,6 +92,9 @@ export async function accumulateStep(
       payload: rendered.payload,
       metadata: rendered.metadata,
       restrictRoles: step.query?.roles,
+      ...(step.query?.types || step.query?.subtypes
+        ? { container: { types: step.query.types, subtypes: step.query.subtypes } }
+        : {}),
     };
   }
 

@@ -46,27 +46,32 @@ export function useInvocableWorkflows() {
 export interface WorkflowLookup {
   domain: string;
   key: string;
-  version: number;
+  /** The edition served; null when a current ref found none. */
+  version: number | null;
+  /** The ref follows the newest edition. */
+  current?: true;
   as?: string;
   data: Record<string, unknown> | null;
   missing?: boolean;
 }
 
-/**
- * The versioned knowledge lookups pinned on a workflow config, resolved
- * server-side. Editions are immutable, so one fetch serves the session.
- */
 /** The lookup form-context domain: resolved editions keyed as the form reads them, missing refs dropped. */
 export function foldWorkflowLookups(lookups: WorkflowLookup[]): Record<string, unknown> {
   return Object.fromEntries(lookups.filter((l) => !l.missing).map((l) => [l.as ?? l.key, l.data]));
 }
 
+/**
+ * The knowledge lookups on a workflow config, resolved server-side. Read
+ * again each time a form mounts so a ref that follows the newest edition
+ * shows it; never on focus or on a timer.
+ */
 export function useWorkflowLookups(type: string, enabled: boolean) {
   return useQuery<{ lookups: WorkflowLookup[] }>({
     queryKey: ['workflows', type, 'input-lookups'],
     queryFn: () => apiFetch(`/workflows/${encodeURIComponent(type)}/input-lookups`),
     enabled: !!type && enabled,
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
   });
 }
 

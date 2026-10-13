@@ -71,6 +71,8 @@ export interface ScanStep {
     status?: 'pending' | 'resolved' | 'cancelled';
     availability?: 'available' | 'claimed' | 'mine' | 'any';
     facets?: Record<string, unknown>;
+    types?: string[];
+    subtypes?: string[];
   };
   cardinality?: 'first' | 'many';
   verb: ScanVerb;
@@ -78,6 +80,8 @@ export interface ScanStep {
   params?: ScanStepParams;
   /** PRESENT only: the labeled choice set rendered under the located reality. */
   choices?: ScanChoice[];
+  /** PRESENT only: labeled templates the station states instead of the row's metadata. */
+  facts?: { label: string; value: string }[];
   /** PRESENT with one choice: the scan executes it directly instead of presenting. */
   autoSelectSingle?: boolean;
   /** The step executes only under a real acting identity (badge or a write-capable login). */
@@ -116,6 +120,8 @@ export interface ScanStepParams {
     from?: 'subject';
     /** The held subject's row collects the scanned code. */
     into?: 'subject';
+    /** Into-subject: the scanned code's own pending row, written as the reciprocal. */
+    item?: { roles?: string[]; types?: string[]; subtypes?: string[]; facets?: Record<string, unknown> };
   };
   /** Hold verb options. */
   hold?: {
@@ -209,6 +215,8 @@ export interface ScanExecuteResponse {
   notPrimed?: ScanRuleFallback;
   /** The labeled choice set (CHOICES). */
   choices?: ScanPresentedChoice[];
+  /** CHOICES: the step's curated facts, rendered; absent when the step declares none. */
+  facts?: { label: string; value: string }[];
   /** CHOICES only: the server would have executed the single choice, but identity stopped it. */
   autoSelect?: boolean;
   /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */

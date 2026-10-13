@@ -35,7 +35,7 @@ export interface CascadeResolverV1 {
 
 export const CASCADE_FORM_SCHEMA = {
   title: 'Catalog Pick',
-  description: 'Pick a material and destination. Every option list comes from a version-pinned knowledge lookup.',
+  description: 'Pick a material and destination. Every option list comes from a versioned knowledge lookup.',
   'x-lt-order': [
     'material',
     'country',
@@ -46,10 +46,10 @@ export const CASCADE_FORM_SCHEMA = {
   'x-lt-help': [
     '### Catalog pick guide',
     '',
-    'Every dropdown on this form offers a **version-pinned lookup** — the exact',
-    'edition of the catalog this order was created against.',
+    'Every dropdown on this form offers a **versioned lookup**: a pinned edition',
+    'of the catalog, or the newest one when the order follows it.',
     '',
-    '**Material** options come from the pinned `catalog/materials` edition.',
+    '**Material** options come from the `catalog/materials` edition this order reads.',
     '',
     '**Region** follows your **Country** answer: it stays disabled until you',
     'choose a country, then offers only that country\'s regions.',

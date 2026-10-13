@@ -213,23 +213,27 @@ export function useEscalation(id: string) {
 export interface EscalationLookup {
   domain: string;
   key: string;
-  version: number;
+  /** The edition served; null when a current ref found none. */
+  version: number | null;
+  /** The ref follows the newest edition. */
+  current?: true;
   as?: string;
   data: Record<string, unknown> | null;
   missing?: boolean;
 }
 
 /**
- * The escalation's versioned knowledge lookups, resolved server-side against
- * the refs pinned on the row. Version-pinned editions are immutable, so the
- * result never goes stale — one fetch per escalation, cached for the session.
+ * The escalation's knowledge lookups, resolved server-side against the refs
+ * on the row. Read again each time the detail page mounts so a ref that
+ * follows the newest edition shows it; never on focus or on a timer.
  */
 export function useEscalationLookups(id: string, enabled: boolean) {
   return useQuery<{ lookups: EscalationLookup[] }>({
     queryKey: ['escalations', id, 'lookups'],
     queryFn: () => apiFetch(`/escalations/${id}/lookups`),
     enabled: !!id && enabled,
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
   });
 }
 

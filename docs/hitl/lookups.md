@@ -1,45 +1,52 @@
 # Versioned Knowledge Lookups
 
-An escalation can pin **versioned knowledge lookups** — enumerated lists (select options, checklist items, cascade maps) that live once in the knowledge store and are referenced by thousands of rows. The refs ride the escalation; the content does not. Forms address the resolved content through the `lookup.*` context domain, so the full x-lt vocabulary works against it: `x-lt-options`, `x-lt-source`, `x-lt-showIf`, `x-lt-help`.
+An escalation can reference **versioned knowledge lookups** — enumerated lists (select options, checklist items, cascade maps) that live once in the knowledge store and are referenced by thousands of rows. The refs ride the escalation; the content does not. Forms address the resolved content through the `lookup.*` context domain, so the full x-lt vocabulary works against it: `x-lt-options`, `x-lt-source`, `x-lt-showIf`, `x-lt-help`.
 
 ---
 
 ## The Ref
 
 ```json
-{ "domain": "catalog", "key": "materials", "version": 2, "as": "materials" }
+{ "domain": "catalog", "key": "materials", "as": "materials" }
+{ "domain": "catalog", "key": "materials", "version": 2 }
 ```
 
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `domain` | yes | Knowledge domain |
 | `key` | yes | Entry key within the domain |
-| `version` | yes | The immutable edition this escalation reads |
+| `version` | no | An edition to pin. Absent or `"current"`, the ref follows the newest edition |
 | `as` | no | The ref's form-context address, when the key alone is ambiguous |
 
-`version` is required by design. A ref names an **immutable edition**, never a moving target: every escalation created against edition 2 renders edition 2 forever, however the entry evolves afterward. Refs live under the reserved `envelope.lookups` key — the unindexed, render-only bag beside `formDefaults`. They ride the engine's atomic write but never touch the GIN-indexed metadata surface: refs are form plumbing, not facets.
+**Current refs** (no `version`, or `"current"`) read the entry's newest edition. A pending row reads the edition in force when its form renders, so a row that stays open for days shows today's list. A resolved or cancelled row reads the edition that was current when it closed, so its history shows the list its work was done against. Form schemas stay pinned (`schemaVersion`); the lists they read follow the knowledge entry.
+
+**Pinned refs** (`version: N`) name an immutable edition: every escalation created against edition 2 renders edition 2 forever, however the entry evolves afterward. Pin when the form must read one exact edition.
+
+A value picked from a current list is validated against the edition in force at submit, so an option removed while the form was open is refused with the canonical 422 and the person picks again.
+
+Refs live under the reserved `envelope.lookups` key — the unindexed, render-only bag beside `formDefaults`. They ride the engine's atomic write but never touch the GIN-indexed metadata surface: refs are form plumbing, not facets.
 
 ## Creating an Escalation with Lookups
 
-Pass `lookups` to `conditional` — the same compile-time-literal discipline as `schemaVersion`:
+Pass `lookups` to `conditional`:
 
 ```typescript
 const decision = await conditional<CascadeResolverV1>(signalId, {
   role: 'catalog-picker',
   description: 'Pick a material for this order',
   lookups: [
-    { domain: 'catalog', key: 'materials', version: 2 },
-    { domain: 'catalog', key: 'geo', version: 1 },
+    { domain: 'catalog', key: 'materials' },          // the newest edition
+    { domain: 'catalog', key: 'geo', version: 1 },    // pinned
   ],
   schemaVersion: 1,
 });
 ```
 
-The refs fold into `envelope.lookups` as a pure transform — a pinned wait costs exactly what an unpinned one does. A malformed ref (missing field, non-integer version) throws before the row is written; over the HTTP create surface the same validation answers with a 400.
+The refs fold into `envelope.lookups` as a pure transform — a wait with refs costs exactly what one without does. A malformed ref (missing field, a version that is not a positive integer or `"current"`) throws before the row is written; over the HTTP create surface the same validation answers with a 400.
 
 ## Pinning on a Workflow Config
 
-An invoke form pins editions the same way. Declare `inputLookups` beside `inputSchema` on the worker config and the form reads them under `lookup.<as ?? key>`:
+An invoke form references editions the same way. Declare `inputLookups` beside `inputSchema` on the worker config and the form reads them under `lookup.<as ?? key>`:
 
 ```typescript
 const fleetToolsConfig: LTWorkerConfig = {
@@ -54,28 +61,30 @@ const fleetToolsConfig: LTWorkerConfig = {
 "serialNumber": { "type": "string", "title": "Serial", "x-lt-options": "lookup.serials.items" }
 ```
 
-The Invoke Tool page fetches `GET /api/workflows/:type/input-lookups` once per workflow; the grant is the invoke predicate, so whoever may start the workflow reads exactly the pinned editions. The invoke API resolves the same refs into the gate, so a value outside the edition is refused with the canonical 422. The registry detail page edits the refs under **Lookups** in its Invocation column; the preview renders against the resolved editions.
+The Invoke Tool page fetches `GET /api/workflows/:type/input-lookups` each time the form opens; the grant is the invoke predicate, so whoever may start the workflow reads exactly the entries the config names. The invoke API resolves the same refs into the gate, so a value outside the edition is refused with the canonical 422. The registry detail page edits the refs under **Lookups** in its Invocation column; the preview renders against the resolved editions.
 
-The refs are checked twice on save. Shape first: a missing `domain` or `key`, a `version` that is not a positive integer, or an empty `as` answers `400` with the field named. Existence second: a ref whose edition does not exist answers `400` naming the editions that do (`Lookup ref fleet/serial-numbers v3 names no edition (editions: v1, v2)`), from `PUT /api/workflows/:type/config` and from the MCP `upsert_workflow_config` tool alike. On the worker boot path a malformed ref fails the boot; a ref whose edition is not yet written logs a warning, since seeds commonly run after registration. At run time the resolver reads each edition once and holds it in memory (editions are immutable), a missing edition answers `missing: true` for that ref without failing the batch, the Invoke Tool page shows which pinned editions are unavailable, and the fields that read them follow the `x-lt-options` rules: a plain path falls back to the typed input, an interpolated path stays a disabled select and fails closed.
+The refs are checked twice on save. Shape first: a missing `domain` or `key`, a `version` that is not a positive integer or `"current"`, or an empty `as` answers `400` with the field named. Existence second: a ref with no edition behind it answers `400` naming the editions that do (`Lookup ref fleet/serial-numbers v3 names no edition (editions: v1, v2)`; a current ref to an entry with no editions says `current`), from `PUT /api/workflows/:type/config` and from the MCP `upsert_workflow_config` tool alike. On the worker boot path a malformed ref fails the boot; a ref whose edition is not yet written logs a warning, since seeds commonly run after registration. At run time the resolver holds each edition in memory once read (editions are immutable; a current ref first looks up which edition is newest), a missing edition answers `missing: true` for that ref without failing the batch, the Invoke Tool page shows which editions are unavailable, and the fields that read them follow the `x-lt-options` rules: a plain path falls back to the typed input, an interpolated path stays a disabled select and fails closed.
 
 ## Versioning
 
 Every knowledge entry carries a `current_version`, and every write that changes its data mints an immutable snapshot automatically — no publish step:
 
 1. **Add items** — write the entry (`storeEntry`, `set_knowledge_field`, the dashboard editor). The data change bumps `current_version` and snapshots the new edition. Writes that leave the data unchanged mint nothing.
-2. **Repin** — update the workflow's `lookups` literal to the new version, evolving the resolver payload type alongside when the new items change what the form can answer.
-3. **Rows in flight keep their edition** — an escalation pinned to v1 renders v1's list even after v5 exists.
+2. **Current refs follow** — every pending row with a current ref shows the new edition on its next render. Nothing to repin.
+3. **Pinned rows keep their edition** — an escalation pinned to v1 renders v1's list even after v5 exists. Repin the literal (and evolve the resolver payload type) when a pinned form should move.
 
 Inspect the lineage with `GET /api/knowledge/entry/versions?domain=catalog&key=materials`, `ltc kb versions catalog materials`, or the `list_knowledge_versions` MCP tool. Fetch a specific edition with `?version=N` on the entry endpoint.
 
 ## The Grant
 
-The refs on the row ARE the grant. Any user who may read the escalation may fetch exactly the pinned editions it names:
+The refs on the row ARE the grant. Any user who may read the escalation may fetch exactly the entries it names, at the editions those refs resolve to:
 
 ```
 GET /api/escalations/:id/lookups
-→ { "lookups": [{ "domain": "catalog", "key": "materials", "version": 2, "data": { "items": [...] } }] }
+→ { "lookups": [{ "domain": "catalog", "key": "materials", "version": 4, "current": true, "data": { "items": [...] } }] }
 ```
+
+`version` is the edition served; `current: true` marks a ref that follows the newest edition.
 
 The general knowledge API (`/api/knowledge/*`) is a builder surface — superadmin or engineer. A member never queries the knowledge store directly; the escalation-scoped endpoint serves them precisely the editions their work item carries, and nothing else. A ref whose snapshot does not exist answers with `missing: true` for that ref — the batch never fails.
 
@@ -113,7 +122,7 @@ Option entries are scalars or `{ value, label }` objects (`{ id, label }` accept
 
 The select renders the labels, the submitted answer is the value, and mixed arrays resolve each entry independently (a scalar is both).
 
-Membership is enforced on both sides of the wire: the dashboard constrains the choices, and an `enforce_schema` role's server gate re-resolves the same pinned editions and rejects an out-of-edition value with the canonical 422.
+Membership is enforced on both sides of the wire: the dashboard constrains the choices, and an `enforce_schema` role's server gate re-resolves the same refs (a current ref at the edition in force at submit) and rejects an out-of-edition value with the canonical 422.
 
 ## Cascading Selects
 
@@ -162,9 +171,9 @@ A lookup-sourced checklist can declare `"x-lt-default-checked": true` to start e
 ## Efficiency
 
 - **Refs, not content, ride the rows.** Thousands of escalations sharing one list each store a three-field ref; the list lives once per edition.
-- **One fetch per page.** The resolve UI batch-fetches all refs in a single `GET /:id/lookups` call at load. Pinned editions are immutable, so the response caches for the whole session.
+- **One fetch per page.** The resolve UI batch-fetches all refs in a single `GET /:id/lookups` call each time the page opens (never on focus or a timer), so a current ref shows the newest edition on the next open.
 - **Zero network during execution.** Cascade levels resolve locally from the already-fetched entry data — every keystroke re-resolves in memory.
-- **Server-side, snapshots cache indefinitely.** Enforcement reads come from an in-process LRU keyed by `(domain, key, version)`; the first row referencing an edition pays the read, every later row hits memory.
+- **Server-side, snapshots cache indefinitely.** Enforcement reads come from an in-process LRU keyed by `(domain, key, version)`; the first row referencing an edition pays the read, every later row hits memory. A current ref adds one indexed read (the newest edition by primary key) per resolution.
 
 ## Reference Example
 

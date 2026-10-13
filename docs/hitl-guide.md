@@ -70,7 +70,7 @@ When you author a HITL-backed workflow, the platform handles:
 - **AI triage** — optional auto-resolution for common patterns
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Schema enforcement** — roles with `enforce_schema` validate every resolver payload server-side (dashboard, API, MCP, CLI alike) with the same pass the form runs, rejecting violations as a structured 422 (see [schema-enforcement.md](schema-enforcement.md))
-- **Versioned lookups** — escalations pin immutable knowledge editions for their option lists; the refs grant readers exactly those editions, and cascading selects resolve locally from one batch fetch (see [lookups.md](hitl/lookups.md))
+- **Versioned lookups** — escalations reference knowledge entries for their option lists, following the newest edition or pinned to one; the refs grant readers exactly those entries, and cascading selects resolve locally from one batch fetch (see [lookups.md](hitl/lookups.md))
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
 - **Bulk operations** — bulk claim, assign, triage, and cancel for queue management
 - **Cancellation** — cancel pending escalations from the API or dashboard

@@ -81,3 +81,30 @@ describe('presentStep — auto-select', () => {
     expect(await presentStep(single(), ctx)).toBeNull();
   });
 });
+
+describe('presentStep — curated facts', () => {
+  const twoChoices = (facts?: ScanStep['facts']) => single({
+    autoSelectSingle: false, facts,
+    choices: [{ label: 'Start', verb: 'claim' }, { label: 'View', verb: 'show-detail' }],
+  });
+
+  it('renders each fact against the presented row and the scan, in order', async () => {
+    satisfied.mockResolvedValue(true);
+    const result = await presentStep(twoChoices([
+      { label: 'Serial', value: '{item.serialNumber}' },
+      { label: 'Scanned', value: '{scan.target}' },
+    ]), ctx);
+    expect(result?.data?.facts).toEqual([{ label: 'Serial', value: 'SER-9' }, { label: 'Scanned', value: 'SER-9' }]);
+  });
+
+  it('a fact whose facet the row lacks renders empty, never the raw token', async () => {
+    satisfied.mockResolvedValue(true);
+    const result = await presentStep(twoChoices([{ label: 'Table', value: '{item.packingTable}' }]), ctx);
+    expect(result?.data?.facts).toEqual([{ label: 'Table', value: '' }]);
+  });
+
+  it('a step without facts answers without them, so the station lists metadata as before', async () => {
+    satisfied.mockResolvedValue(true);
+    expect(await presentStep(twoChoices(), ctx).then((r) => r?.data && 'facts' in r.data)).toBe(false);
+  });
+});

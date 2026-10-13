@@ -125,7 +125,7 @@ describe('resolveBatchItemBySignalKey (api)', () => {
     expect((result.data as any).remaining).toBe(1);
     expect(mockBatchBySignalKey).toHaveBeenCalledWith(
       SIGNAL_KEY, 'cut', { ok: true },
-      { unit: 'u1-L', resolved_by: 'user-uuid' }, { id: 'user-uuid' },
+      { unit: 'u1-L', resolved_by: 'user-uuid' }, { id: 'user-uuid' }, 'user-uuid',
     );
   });
 

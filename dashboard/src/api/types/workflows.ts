@@ -2,7 +2,8 @@
 export interface WorkflowLookupRef {
   domain: string;
   key: string;
-  version: number;
+  /** An edition to pin; absent or 'current' follows the newest. */
+  version?: number | 'current';
   as?: string;
 }
 

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import * as escalationService from '../escalation';
 import { resolveLookupRefs } from '../knowledge';
-import { readLookupRefs } from '../../api/escalations/lookups';
+import { lookupAsOf, readLookupRefs } from '../../api/escalations/lookups';
 
 // ── Schemas (extracted to break TS2589 deep-instantiation in registerTool generics) ──
 
@@ -165,7 +165,7 @@ export function registerHumanQueueTools(server: McpServer): void {
         };
       }
       const refs = readLookupRefs(escalation.envelope);
-      const lookups = refs.length > 0 ? await resolveLookupRefs(refs) : [];
+      const lookups = refs.length > 0 ? await resolveLookupRefs(refs, lookupAsOf(escalation)) : [];
       return {
         content: [{
           type: 'text' as const,

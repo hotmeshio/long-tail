@@ -149,13 +149,21 @@ describe('conditional', () => {
     });
   });
 
-  it('rejects a lookup ref without a version before the engine write', async () => {
+  it('folds a ref with no version through: it follows the newest edition', async () => {
+    mockCondition.mockResolvedValue({ approved: true });
+    await conditional('sig-cur', { role: 'catalog-picker', lookups: [{ domain: 'catalog', key: 'materials' }] });
+    expect(mockCondition).toHaveBeenCalledWith('sig-cur', expect.objectContaining({
+      envelope: { lookups: [{ domain: 'catalog', key: 'materials' }] },
+    }));
+  });
+
+  it('rejects a lookup ref with a malformed version before the engine write', async () => {
     await expect(
       conditional('sig-bad', {
         role: 'catalog-picker',
-        lookups: [{ domain: 'catalog', key: 'materials' } as any],
+        lookups: [{ domain: 'catalog', key: 'materials', version: 0 }],
       }),
-    ).rejects.toThrow(/positive integer version/);
+    ).rejects.toThrow(/positive integer, 'current', or absent/);
     expect(mockCondition).not.toHaveBeenCalled();
   });
 

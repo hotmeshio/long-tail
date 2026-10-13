@@ -183,7 +183,7 @@ describe('resolveBatchItem (api) — claim semantics and provenance', () => {
   it('is claim-agnostic by default — no assertClaim forwarded', async () => {
     await resolveBatchItem({ id: 'esc-batch', itemKey: 'cut', resolverPayload: { ok: true } }, AUTH);
     expect(mockBatchItem).toHaveBeenCalledWith(
-      'esc-batch', 'cut', { ok: true }, { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' },
+      'esc-batch', 'cut', { ok: true }, { resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' }, 'user-uuid',
     );
   });
 
@@ -192,7 +192,7 @@ describe('resolveBatchItem (api) — claim semantics and provenance', () => {
       { id: 'esc-batch', itemKey: 'cut', resolverPayload: { ok: true }, assertClaim: true }, AUTH,
     );
     expect(mockBatchItem).toHaveBeenCalledWith(
-      'esc-batch', 'cut', { ok: true }, { resolved_by: 'user-uuid' }, 'user-uuid', { id: 'user-uuid' },
+      'esc-batch', 'cut', { ok: true }, { resolved_by: 'user-uuid' }, 'user-uuid', { id: 'user-uuid' }, 'user-uuid',
     );
   });
 
@@ -202,7 +202,7 @@ describe('resolveBatchItem (api) — claim semantics and provenance', () => {
     );
     expect(mockBatchItem).toHaveBeenCalledWith(
       'esc-batch', 'cut', { ok: true },
-      { station: 'st-1', resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' },
+      { station: 'st-1', resolved_by: 'user-uuid' }, undefined, { id: 'user-uuid' }, 'user-uuid',
     );
   });
 });

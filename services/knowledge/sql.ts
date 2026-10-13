@@ -10,3 +10,12 @@ export const LIST_KNOWLEDGE_VERSIONS = `
   JOIN lt_knowledge k ON k.domain = v.domain AND k.key = v.key
   WHERE v.domain = $1 AND v.key = $2
   ORDER BY v.version DESC`;
+
+/** The newest edition, or the newest created at or before $3 when it is set. */
+export const GET_LATEST_KNOWLEDGE_VERSION = `
+  SELECT version, data, tags
+  FROM lt_knowledge_versions
+  WHERE domain = $1 AND key = $2
+    AND ($3::timestamptz IS NULL OR created_at <= $3)
+  ORDER BY version DESC
+  LIMIT 1`;

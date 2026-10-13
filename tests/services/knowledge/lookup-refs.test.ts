@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // A pinned edition either exists or the message names what does.
 const mockSnapshot = vi.fn();
 const mockQuery = vi.fn();
-vi.mock('../../../services/knowledge/lookup-cache', () => ({ getKnowledgeSnapshot: (...a: unknown[]) => mockSnapshot(...a) }));
+vi.mock('../../../services/knowledge/lookup-cache', () => ({ resolveRefEdition: (...a: unknown[]) => mockSnapshot(...a) }));
 vi.mock('../../../lib/db', () => ({ getPool: () => ({ query: (...a: unknown[]) => mockQuery(...a) }) }));
 
 import { describeMissingLookupRefs } from '../../../services/knowledge/lookup-refs';
@@ -12,7 +12,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('describeMissingLookupRefs', () => {
   it('is silent when every pinned edition exists', async () => {
-    mockSnapshot.mockResolvedValue({ data: {}, tags: [] });
+    mockSnapshot.mockResolvedValue({ version: 1, snapshot: { data: {}, tags: [] } });
     expect(await describeMissingLookupRefs([{ domain: 'fleet', key: 'serial-numbers', version: 1 }])).toEqual([]);
     expect(mockQuery).not.toHaveBeenCalled();
   });
@@ -29,5 +29,12 @@ describe('describeMissingLookupRefs', () => {
     mockQuery.mockResolvedValue({ rows: [] });
     expect(await describeMissingLookupRefs([{ domain: 'fleet', key: 'serial-number', version: 1, as: 'serials' }]))
       .toEqual(['Lookup ref fleet/serial-number v1 names no edition (no knowledge entry fleet/serial-number)']);
+  });
+
+  it('a current ref to an entry with no editions says so', async () => {
+    mockSnapshot.mockResolvedValue(null);
+    mockQuery.mockResolvedValue({ rows: [] });
+    expect(await describeMissingLookupRefs([{ domain: 'fleet', key: 'tables' }]))
+      .toEqual(['Lookup ref fleet/tables current names no edition (no knowledge entry fleet/tables)']);
   });
 });

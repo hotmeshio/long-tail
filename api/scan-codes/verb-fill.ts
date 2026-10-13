@@ -3,6 +3,7 @@ import * as escalationService from '../../services/escalation';
 import { resolveBatchItem } from '../escalations/resolve-batch';
 import { ESCALATION_BATCH_KEYS } from '../../types/escalation';
 import {
+  SCAN_ENCODINGS,
   SCAN_FILL_SEPARATOR_DEFAULT,
   SCAN_OUTCOMES,
   type LTEscalationRecord,
@@ -86,8 +87,11 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
     const markdown = declared.length
       ? `All ${declared.length} of these are already checked off.`
       : scanCodeService.renderScanCopy(step.refuse?.markdown ?? STOCK_UNEXPECTED, tpl);
+    const expected = ctx.scheme.encoding === SCAN_ENCODINGS.GTIN
+      ? tpl.fill.pending.map((code) => scanCodeService.displayGtin(code))
+      : tpl.fill.pending;
     return refused(markdown, {
-      refusal: { markdown, expected: tpl.fill.pending },
+      refusal: { markdown, expected },
       progress: progress(batch, 0),
     });
   }

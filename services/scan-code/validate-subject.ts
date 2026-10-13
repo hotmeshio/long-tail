@@ -4,6 +4,7 @@ import {
   SCAN_HOLD_TTL_MIN_SECONDS,
   SCAN_VERBS,
   type ScanStep,
+  type ScanStepParams,
 } from '../../types';
 import { FACET_KEY } from '../escalation/facet-sql';
 
@@ -73,6 +74,7 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
   if ((accumulate?.from || accumulate?.into) && accumulate.containerFacet) {
     throw new Error(`${at}: params.accumulate.containerFacet is item mode; drop it for from/into 'subject'`);
   }
+  if (accumulate?.item !== undefined) assertValidItemSelector(accumulate, at);
   if (accumulate?.from && !step.params?.itemKey) {
     throw new Error(`${at}: from-subject accumulate requires params.itemKey (e.g. '{subject.<facet>}')`);
   }
@@ -107,8 +109,8 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
       if (typeof step.refuse.missing !== 'string' || !step.refuse.missing) {
         throw new Error(`${at}: refuse.missing must be markdown`);
       }
-      if (accumulate?.from !== 'subject') {
-        throw new Error(`${at}: refuse.missing applies only to a from-subject accumulate`);
+      if (accumulate?.from !== 'subject' && !(accumulate?.into === 'subject' && accumulate.item)) {
+        throw new Error(`${at}: refuse.missing applies only to a from-subject accumulate, or an into-subject accumulate with item`);
       }
     }
   }
@@ -118,6 +120,29 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
 
   if (step.verb === SCAN_VERBS.FILL) assertValidFill(step, at);
   else if (step.params?.fill !== undefined) throw new Error(`${at}: params.fill applies only to fill steps`);
+}
+
+function assertValidItemSelector(accumulate: NonNullable<ScanStepParams['accumulate']>, at: string): void {
+  const item = accumulate.item;
+  if (accumulate.into !== 'subject') {
+    throw new Error(`${at}: params.accumulate.item applies only to an into-subject accumulate`);
+  }
+  if (!isPlainObject(item)) throw new Error(`${at}: params.accumulate.item must be an object`);
+  if (item!.roles !== undefined && !isStringList(item!.roles)) {
+    throw new Error(`${at}: params.accumulate.item.roles must be a non-empty array of roles`);
+  }
+  if (item!.types !== undefined && !isStringList(item!.types)) {
+    throw new Error(`${at}: params.accumulate.item.types must be a non-empty array of strings`);
+  }
+  if (item!.subtypes !== undefined && !isStringList(item!.subtypes)) {
+    throw new Error(`${at}: params.accumulate.item.subtypes must be a non-empty array of strings`);
+  }
+  if (item!.facets !== undefined) {
+    if (!isPlainObject(item!.facets)) throw new Error(`${at}: params.accumulate.item.facets must be an object`);
+    for (const key of Object.keys(item!.facets!)) {
+      if (!FACET_KEY.test(key)) throw new Error(`${at}: params.accumulate.item.facets key "${key}" must be a facet key`);
+    }
+  }
 }
 
 function assertValidHold(step: ScanStep, at: string): void {

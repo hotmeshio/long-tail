@@ -73,6 +73,15 @@ describe('InfoChoiceScreen', () => {
     expect(screen.queryByText(/never shown/)).not.toBeInTheDocument();
   });
 
+  it("states the step's curated facts in order instead of the row's metadata", () => {
+    const response = { ...choicesResponse(), facts: [{ label: 'Bin', value: 'SF-A-2' }, { label: 'Table', value: '' }] };
+    renderScreen({ response });
+    expect(screen.getByText('Bin')).toBeInTheDocument();
+    expect(screen.getByText('SF-A-2')).toBeInTheDocument();
+    expect(screen.getByText('Table').nextSibling).toHaveTextContent('—');
+    expect(screen.queryByText('SN-88')).not.toBeInTheDocument();
+  });
+
   it('states the reality: description, queue, claim state, age, metadata', () => {
     renderScreen();
     expect(screen.getByText('Order 4412 — left insole')).toBeInTheDocument();

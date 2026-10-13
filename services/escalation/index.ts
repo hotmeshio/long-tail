@@ -1,5 +1,6 @@
 export * from './types';
 export * from './crud';
+export { claimAssertedByMetadata } from './claim-asserted';
 export * from './batch';
 export * from './accumulate';
 export * from './bulk';

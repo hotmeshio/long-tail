@@ -13,7 +13,7 @@ vi.mock('../../api/escalations/helpers', () => ({
   assertReadAccess: vi.fn(),
 }));
 
-import { getEscalationLookups } from '../../api/escalations/lookups';
+import { getEscalationLookups, lookupAsOf } from '../../api/escalations/lookups';
 import * as escalationService from '../../services/escalation';
 import * as knowledgeService from '../../services/knowledge';
 import { assertReadAccess } from '../../api/escalations/helpers';
@@ -74,6 +74,16 @@ describe('getEscalationLookups', () => {
   });
 });
 
+describe('lookupAsOf', () => {
+  it('a pending row reads now; a closed row reads as of its close', () => {
+    expect(lookupAsOf({ status: 'pending', resolved_at: null, updated_at: new Date() } as any)).toBeNull();
+    expect(lookupAsOf({ status: 'resolved', resolved_at: new Date('2026-10-01T00:00:00Z'), updated_at: new Date() } as any))
+      .toBe('2026-10-01T00:00:00.000Z');
+    expect(lookupAsOf({ status: 'cancelled', resolved_at: null, updated_at: new Date('2026-10-02T00:00:00Z') } as any))
+      .toBe('2026-10-02T00:00:00.000Z');
+  });
+});
+
 describe('assertLookupRefs (creation-path contract)', () => {
   it('accepts well-formed refs', () => {
     expect(() => assertLookupRefs([
@@ -82,10 +92,14 @@ describe('assertLookupRefs (creation-path contract)', () => {
     ])).not.toThrow();
   });
 
-  it('rejects a missing/zero/float version — refs pin immutable editions', () => {
-    expect(() => assertLookupRefs([{ domain: 'c', key: 'k' }])).toThrow(/positive integer version/);
-    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 0 }])).toThrow(/positive integer version/);
-    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 1.5 }])).toThrow(/positive integer version/);
+  it("accepts a ref that follows the newest edition: no version, or 'current'", () => {
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k' }, { domain: 'c', key: 'j', version: 'current' }])).not.toThrow();
+  });
+
+  it('rejects a zero, float, or unknown version', () => {
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 0 }])).toThrow(/positive integer, 'current', or absent/);
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 1.5 }])).toThrow(/positive integer/);
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 'latest' }])).toThrow(/positive integer/);
   });
 
   it('rejects missing identity, empty alias, and non-array shapes', () => {

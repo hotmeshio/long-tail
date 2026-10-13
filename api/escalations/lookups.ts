@@ -2,6 +2,7 @@ import * as escalationService from '../../services/escalation';
 import { resolveLookupRefs, type ResolvedLookup } from '../../services/knowledge';
 import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../types/escalation';
 import { assertReadAccess } from './helpers';
+import type { LTEscalationRecord } from '../../types';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Lookups ────────────────────────────────────────────────────────────────
@@ -21,13 +22,24 @@ export function readLookupRefs(envelope: string | null | undefined): EscalationL
 }
 
 /**
+ * When a current ref is read: now for a pending row, the moment it closed
+ * otherwise, so a closed row shows the edition its work was done against.
+ */
+export function lookupAsOf(escalation: Pick<LTEscalationRecord, 'status' | 'resolved_at' | 'updated_at'>): string | null {
+  if (escalation.status === 'pending') return null;
+  const closed = escalation.resolved_at ?? escalation.updated_at;
+  return closed ? new Date(closed).toISOString() : null;
+}
+
+/**
  * Resolve an escalation's versioned knowledge lookups.
  *
  * The refs on `envelope.lookups` ARE the grant: any user who may read the
  * escalation may read exactly the pinned editions it names — nothing else in
  * the knowledge store. Snapshots are immutable, so responses are served from
- * an in-process cache after the first read; a ref whose snapshot does not
- * exist answers with `missing: true` rather than failing the batch.
+ * an in-process cache after the first read; a current ref reads the newest
+ * edition (as of the close, for a closed row). A ref with no edition answers
+ * with `missing: true` rather than failing the batch.
  *
  * @param input.id — escalation UUID
  * @param auth — authenticated user context (must hold the escalation's role)
@@ -51,7 +63,7 @@ export async function getEscalationLookups(
       return { status: 200, data: { lookups: [] as ResolvedLookup[] } };
     }
 
-    const lookups = await resolveLookupRefs(refs);
+    const lookups = await resolveLookupRefs(refs, lookupAsOf(escalation));
     return { status: 200, data: { lookups } };
   } catch (err: any) {
     return { status: 500, error: err.message };

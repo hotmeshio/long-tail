@@ -56,4 +56,26 @@ describe('scan-code MCP tools', () => {
     expect(parsed.success).toBe(true);
     expect(executeScanCodeSchema.safeParse({ code: 'x', stationRole: 'r' }).success).toBe(true);
   });
+
+  it('the rule schema keeps the into-subject item selector and query types/subtypes', () => {
+    const parsed = upsertScanRuleSchema.parse({
+      scheme_version: 11, category: '0', name: 'Pack',
+      steps: [
+        { query: { roles: ['bin'], subtypes: ['packing'] }, verb: 'hold' },
+        { query: {}, verb: 'accumulate', subject: { schemes: [14] }, refuse: { markdown: 'x', missing: 'y' },
+          params: { itemKey: '{scan.target}', accumulate: { into: 'subject', item: { roles: ['ship'], facets: { shape: 'consolidated' } } } } },
+      ],
+    });
+    expect(parsed.steps[0].query.subtypes).toEqual(['packing']);
+    expect(parsed.steps[1].params?.accumulate?.item).toEqual({ roles: ['ship'], facets: { shape: 'consolidated' } });
+  });
+
+  it('the rule schema keeps present facts', () => {
+    const parsed = upsertScanRuleSchema.parse({
+      scheme_version: 14, category: '1', name: 'Pack It',
+      steps: [{ query: {}, verb: 'present', choices: [{ label: 'View', verb: 'show-detail' }],
+        facts: [{ label: 'Bin', value: '{item.binCode}' }] }],
+    });
+    expect(parsed.steps[0].facts).toEqual([{ label: 'Bin', value: '{item.binCode}' }]);
+  });
 });

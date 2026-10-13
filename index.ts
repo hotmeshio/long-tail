@@ -26,6 +26,7 @@ export {
   assertValidIdentityRule as assertValidScanIdentityRule,
   isValidGtin,
   normalizeGtin,
+  displayGtin,
   type ScanSchemeInput,
   type ScanRuleInput,
 } from './services/scan-code';

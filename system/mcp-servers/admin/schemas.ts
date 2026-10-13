@@ -174,10 +174,11 @@ export const upsertWorkflowConfigSchema = z.object({
   input_lookups: z.array(z.object({
     domain: z.string(),
     key: z.string(),
-    version: z.number().int().min(1),
+    version: z.union([z.number().int().min(1), z.literal('current')]).optional()
+      .describe("An edition to pin, or 'current' (or absent) to follow the newest"),
     as: z.string().optional(),
   })).nullable().optional().default(null)
-    .describe('Versioned knowledge refs the invoke form reads as lookup.<as ?? key>'),
+    .describe('Knowledge refs the invoke form reads as lookup.<as ?? key>'),
   icon: z.string().nullable().optional().default(null)
     .describe('Curated icon name (WORKFLOW_ICONS); unknown names are refused'),
   read_safe: z.boolean().optional().default(false)
@@ -961,6 +962,12 @@ const scanStepParamsSchema = z.object({
     reciprocal: z.boolean().optional(),
     from: z.literal('subject').optional().describe('The held subject joins the scanned container (its row is the reciprocal)'),
     into: z.literal('subject').optional().describe("The held subject's row collects the scanned code"),
+    item: z.object({
+      roles: z.array(z.string()).optional(),
+      types: z.array(z.string()).optional(),
+      subtypes: z.array(z.string()).optional(),
+      facets: z.record(z.any()).optional(),
+    }).optional().describe("Into-subject: the scanned code's own pending row, written as the reciprocal in the same statement"),
   }).optional(),
   hold: z.object({
     ttlSeconds: z.number().int().min(5).max(600).optional().describe('Seconds the station holds the subject (default 45)'),
@@ -1013,6 +1020,8 @@ export const upsertScanRuleSchema = z.object({
       status: z.enum(['pending', 'resolved', 'cancelled']).optional(),
       availability: z.enum(['available', 'claimed', 'mine', 'any']).optional(),
       facets: z.record(z.any()).optional().describe('Extra metadata guards'),
+      types: z.array(z.string()).optional().describe('Escalation types the located row must have (locate-then-act-by-id steps)'),
+      subtypes: z.array(z.string()).optional().describe("Escalation subtypes the located row must have, e.g. ['packing']"),
     }),
     cardinality: z.enum(['first', 'many']).optional(),
     verb: z.enum(['show-detail', 'show-list', 'claim', 'claim-show-detail', 'release', 'resolve', 'escalate', 'cancel', 'accumulate', 'present', 'hold', 'fill']),
@@ -1020,6 +1029,10 @@ export const upsertScanRuleSchema = z.object({
     params: scanStepParamsSchema.optional(),
     requireActingIdentity: z.boolean().optional().describe('The step executes only under a real acting identity — a badge grant, or a login whose own write scope covers the step'),
     choices: z.array(scanChoiceSchema).optional().describe("present verb only: the labeled choice set rendered under the located reality"),
+    facts: z.array(z.object({
+      label: z.string(),
+      value: z.string().describe("Template, e.g. '{item.binCode}'"),
+    })).optional().describe('present verb only: the facts the station states about the located row, in order'),
     autoSelectSingle: z.boolean().optional().describe('present verb with exactly one confirm-less choice: the scan executes it directly — one scan, one action; an unsatisfied identity requirement still presents the badge stop-over'),
     subject: z.object({
       schemes: z.array(z.number().int().min(10).max(99)),
@@ -1034,7 +1047,7 @@ export const upsertScanRuleSchema = z.object({
     refuse: z.object({
       markdown: z.string().describe('What the station says on a failed match (template; may read {container.*})'),
       conflict: z.string().optional().describe('What the station says when the write loses a race'),
-      missing: z.string().optional().describe('From-subject accumulate: what the station says when the pairing holds but no open container carries the scanned code (else the next step runs)'),
+      missing: z.string().optional().describe("Subject accumulate: what the station says when the pairing holds but the row the scan names is not found (from-subject: no open container; into-subject with item: no waiting item row). Else the next step runs"),
     }).optional(),
     done: z.object({
       markdown: z.string().describe("What the station says once the write lands, e.g. 'Place it in **{container.containerCode}**.' (template)"),

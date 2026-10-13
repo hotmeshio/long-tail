@@ -17,10 +17,11 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 
 /**
  * HotMesh's escalation config plus long-tail sugar. `schemaVersion` pins the
- * role form version (lt_role_schemas) the resolve UI renders; `lookups` pins
- * versioned knowledge editions the form may read (the `lookup.*` context
- * domain — see docs/hitl/lookups.md). Both are compile-time LITERALS the
- * workflow author sets, folded before the config reaches the engine:
+ * role form version (lt_role_schemas) the resolve UI renders; `lookups` names
+ * the knowledge entries the form may read (the `lookup.*` context domain, see
+ * docs/hitl/lookups.md), each pinned to an edition or following the current
+ * one. Both are LITERALS the workflow author sets, folded before the config
+ * reaches the engine:
  * schemaVersion into the GIN-indexed metadata (a queryable facet), lookups
  * into the unindexed envelope (form plumbing, never a facet). Folding is a
  * pure transform — no query, no activity — so a pinned `conditional` costs
@@ -98,17 +99,19 @@ function toEngineConfig(
  * });
  * ```
  *
- * **Pin versioned knowledge lookups — option lists the form reads.** Each ref
- * names an immutable knowledge edition; the resolve UI fetches them once and
- * the form addresses the content as the `lookup.*` context domain
- * (`x-lt-options: "lookup.materials.items"`). Evolve the list by writing the
- * entry (a new version mints automatically) and repinning the literal here.
+ * **Knowledge lookups — option lists the form reads.** Each ref names a
+ * knowledge entry; the resolve UI fetches it and the form addresses the
+ * content as the `lookup.*` context domain (`x-lt-options:
+ * "lookup.materials.items"`). Leave `version` out (or set `'current'`) and
+ * the form reads the newest edition, so a long-open row sees today's list
+ * and a closed row the list current when it closed. Pin a `version` when the
+ * form must read one exact edition.
  *
  * ```typescript
  * const decision = await conditional<PickerResolverV1>(signalId, {
  *   role: 'catalog-picker',
  *   description: instructions,
- *   lookups: [{ domain: 'catalog', key: 'materials', version: 2 }],
+ *   lookups: [{ domain: 'catalog', key: 'materials' }],
  * });
  * ```
  *
@@ -160,7 +163,10 @@ function toEngineConfig(
  * items persist on the terminal row for audit. Add `partialOnTimeout: true`
  * (hotmesh 0.29.0+) and the timer instead resumes with the items filled so
  * far plus `$trigger: 'timeout'`. A plain resolve on a batch row remains an
- * admin override that resolves the whole row with its payload.
+ * admin override that resolves the whole row with its payload. Entries
+ * already satisfied go in `filled` (hotmesh 0.31.0+), keyed by item key
+ * with `payload`, `at` from the source of record, and an optional `actor`;
+ * the row starts with that progress and delivers them with the collection.
  *
  * **Open accumulation — items arrive over time (hotmesh 0.29.0+).** Declare
  * `accumulate` and the escalation holds items added via `accumulateItem`
