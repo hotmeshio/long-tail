@@ -64,11 +64,22 @@ export async function executeScanChoice(
       grant = peeked.grant;
     }
 
-    // 3. The row anchors the target: the scheme's facet on the escalation the
-    // screen presented. A missing binding is loud misconfiguration.
-    // A row the actor may not read answers exactly as a missing one does.
+    // 3. With no live grant, a choice that needs a badge parks for the next
+    // badge scan before any row is read, whatever the station may read.
+    if (!grant && choice.requireActingIdentity
+      && !(await actingIdentitySatisfied(step, { stationAuth: auth, acting: false } as StepContext))) {
+      return stampPointer(notPrimed({ rule } as StepContext), rule, input);
+    }
+
+    // 4. The row anchors the target: the scheme's facet on the escalation the
+    // screen presented. A missing binding is loud misconfiguration. A row the
+    // actor may not read answers as one that left the presented state, and
+    // discloses nothing of the row.
     const loaded = await escalationService.getEscalation(input.escalationId);
-    const row = loaded && !(await assertReadAccess(effectiveAuth.userId, loaded)) ? loaded : null;
+    if (loaded && (await assertReadAccess(effectiveAuth.userId, loaded))) {
+      return stampPointer(conflict('the item is no longer in the presented state'), rule, input);
+    }
+    const row = loaded;
     const target = row?.metadata?.[scheme.target_facet];
     if (!row || typeof target !== 'string' || !target) {
       return {
@@ -88,12 +99,12 @@ export async function executeScanChoice(
       grant,
     };
 
-    // 4. The identity gate, per the choice.
+    // 5. The identity gate, per the choice.
     if (choice.requireActingIdentity && !(await actingIdentitySatisfied(step, ctx))) {
       return decorate(notPrimed(ctx), ctx, input);
     }
 
-    // 5. The row must still match the step's query — the reality the screen
+    // 6. The row must still match the step's query — the reality the screen
     // showed. A row that moved on (resolved, claimed away, re-routed) is the
     // same double-actor race a second scan loses.
     const located = await locateForStep(step, ctx, 2);
@@ -102,17 +113,33 @@ export async function executeScanChoice(
       return decorate(conflict('the item is no longer in the presented state'), ctx, input);
     }
 
-    // 6. Dispatch through the same atomic executors a direct scan uses.
+    // 7. Dispatch through the same atomic executors a direct scan uses.
     const synthesized: ScanStep = { query: step.query, verb: choice.verb, params: choice.params };
     const result = decorate(await dispatchChoiceVerb(synthesized, ctx, presented), ctx, input);
 
-    // 7. Settle the badge: refund a spend whose act did not land
+    // 8. Settle the badge: refund a spend whose act did not land
     const acting = await settleGrant(ctx, result);
     if (acting && result.data) result.data = { ...result.data, acting };
     return result;
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+/** Stamp the rule and pointer onto an outcome decided before the row was read. */
+function stampPointer(
+  result: LTApiResult<ScanExecuteResponse>,
+  rule: { scheme_version: number; category: string; name: string },
+  input: ScanChoiceExecuteRequest,
+): LTApiResult<ScanExecuteResponse> {
+  if (result.data && typeof result.data === 'object' && 'outcome' in result.data) {
+    result.data = {
+      ...result.data,
+      rule: { schemeVersion: rule.scheme_version, category: rule.category, name: rule.name },
+      stepIndex: input.stepIndex,
+    };
+  }
+  return result;
 }
 
 /** Stamp the rule + pointer identity onto the outcome, mirroring execute. */

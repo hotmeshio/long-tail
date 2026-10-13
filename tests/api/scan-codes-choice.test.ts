@@ -91,13 +91,26 @@ describe('executeScanChoice — the pointer is never authority', () => {
     expect(result.data?.outcome).toBe(SCAN_OUTCOMES.UNCONFIGURED);
   });
 
-  it('a row the actor may not read is UNCONFIGURED, exactly as a missing row, and reveals no target', async () => {
+  it('a row the actor may not read is CONFLICT, as a row that left the presented state, and reveals no target', async () => {
     vi.mocked(assertReadAccess).mockResolvedValueOnce({ status: 403, error: 'Not authorized to view this escalation' });
     const result = await executeScanChoice(pointer, auth);
-    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.UNCONFIGURED);
+    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.CONFLICT);
     expect((result.data as any)?.parsed).toBeUndefined();
     expect(locate).not.toHaveBeenCalled();
     expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('with no grant, a badge-required choice parks for the next badge scan before any row is read', async () => {
+    // The 60s grant expired between render and tap; the station reads only its own roles.
+    satisfied.mockResolvedValue(false);
+    vi.mocked(assertReadAccess).mockResolvedValue({ status: 403, error: 'Not authorized to view this escalation' });
+    const result = await executeScanChoice(pointer, auth);
+    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.NOT_PRIMED);
+    expect(result.data?.notPrimed).toEqual({ markdown: 'badge' });
+    expect((result.data as any)?.parsed).toBeUndefined();
+    expect(esc.getEscalation).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    vi.mocked(assertReadAccess).mockResolvedValue(null);
   });
 
   it('a row that moved out of the presented state is CONFLICT', async () => {
