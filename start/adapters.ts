@@ -16,6 +16,7 @@ import { McpEscalationStrategy } from '../services/escalation-strategy/mcp';
 import { configureFeatureFlags } from '../modules/features';
 import { configureSearch } from '../modules/search';
 import { configureBranding } from '../modules/branding';
+import { configureDisplay } from '../modules/display';
 
 import { createSocketIOAuthenticator } from './socket-auth';
 import type { LTStartConfig } from '../types/startup';
@@ -29,6 +30,7 @@ export function registerAdapters(startConfig: LTStartConfig): void {
   configureFeatureFlags(startConfig.features);
   configureSearch(startConfig.search);
   configureBranding(startConfig.branding);
+  configureDisplay(startConfig.display);
 
   // Logging (register first so subsequent log calls use it)
   if (startConfig.logging?.adapter) {

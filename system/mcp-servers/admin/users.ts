@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import * as userService from '../../../services/user';
 import * as roleService from '../../../services/role';
+import { listSchemaRelationsError } from '../../../shared/list-schema';
 import { patchUserProperties as patchUserPropertiesApi } from '../../../api/users';
 import {
   listUsersSchema,
@@ -261,6 +262,13 @@ export function registerUserTools(server: McpServer): void {
       inputSchema: updateRoleSchema,
     },
     async (args: z.infer<typeof updateRoleSchema>) => {
+      const listSchemaError = args.list_schema != null ? listSchemaRelationsError(args.list_schema) : null;
+      if (listSchemaError) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `list_schema: ${listSchemaError}` }) }],
+          isError: true,
+        };
+      }
       const updated = await roleService.updateRoleMetadata(args.role, {
         title: args.title,
         description: args.description,

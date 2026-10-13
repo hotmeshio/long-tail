@@ -1,5 +1,5 @@
 import type { ScanPresentedChoice } from '../scan-choice';
-import type { ScanOutcome, ScanVerb } from './constants';
+import type { ScanFactFormat, ScanOutcome, ScanVerb } from './constants';
 import type { ScanRuleFallback, ScanStepParams, ScanStepQuery } from './rule';
 
 export interface ParsedScanCode {
@@ -80,8 +80,8 @@ export interface ScanExecuteResponse {
   notPrimed?: ScanRuleFallback;
   /** The labeled choice set (CHOICES). */
   choices?: ScanPresentedChoice[];
-  /** CHOICES: the step's curated facts, rendered; absent when the step declares none. */
-  facts?: { label: string; value: string }[];
+  /** CHOICES: the step's curated facts, rendered; absent when the step declares none. A `format` fact carries its raw value. */
+  facts?: { label: string; value: string; format?: ScanFactFormat }[];
   /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */
   container?: { facet: string; value: string };
   /** CHOICES: the step would auto-execute its single choice — only identity stopped it. */

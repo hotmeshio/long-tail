@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from './useAuth';
+import { useViewerIdentity } from './useViewerIdentity';
 import { useEventSubscriptions } from './useEventContext';
 import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
 
@@ -19,7 +19,8 @@ function currentEscalationId(pathname: string): string | undefined {
  * spawns a follow-on that is BORN ASSIGNED to them, land them on it. The engine
  * states the hand-off definitively — a `claimed` event carrying
  * `assignedAtCreation === true` (a directed, system-issued assignment, not an
- * interactive claim), `data.assigned_to === viewer`, and `data.parent_id` equal
+ * interactive claim), `data.assigned_to` naming the viewer (the badged person
+ * on a shared station, or the signed-in account), and `data.parent_id` equal
  * to the escalation on screen. All three must hold, so an unrelated assignment
  * or a claim the viewer made themselves can never redirect them. Navigation is
  * scoped to being on the parent's page, so nothing yanks a viewer working
@@ -27,7 +28,7 @@ function currentEscalationId(pathname: string): string | undefined {
  * the brief gap; this hook is what ends it.
  */
 export function useFollowMyClaims(): void {
-  const { user } = useAuth();
+  const { isViewer } = useViewerIdentity();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,8 +36,8 @@ export function useFollowMyClaims(): void {
   // across route changes instead of resubscribing on every navigation.
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
-  const userIdRef = useRef(user?.userId);
-  userIdRef.current = user?.userId;
+  const isViewerRef = useRef(isViewer);
+  isViewerRef.current = isViewer;
 
   const handler = useCallback((event: any) => {
     // Only a directed, born-assigned hand-off pulls the viewer — never an
@@ -45,7 +46,7 @@ export function useFollowMyClaims(): void {
     const childId: string | undefined = event?.escalationId ?? event?.data?.id;
     const assignedTo: string | undefined = event?.data?.assigned_to;
     const parentId: string | undefined = event?.data?.parent_id;
-    if (!childId || assignedTo !== userIdRef.current) return;
+    if (!childId || !isViewerRef.current(assignedTo)) return;
     // The child must descend from the escalation on screen — the hand-off from
     // what the viewer just did, not some other assignment that happened to land.
     if (!parentId || parentId !== currentEscalationId(pathRef.current)) return;

@@ -10,6 +10,9 @@ import type { FieldControlProps } from './field-control-props';
 import { SelectField } from './SelectField';
 import { MultiSelectField } from './MultiSelectField';
 import { JsonField } from './JsonField';
+import { ListField } from './ListField';
+import { readScanSink } from '../../../lib/x-lt-scan';
+import { useFieldNotice, FieldNoticeLine } from './field-notice';
 
 const FORMAT_INPUT_TYPES: Record<string, string> = {
   date: 'date',
@@ -41,6 +44,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   submitAttempted?: boolean;
 }) {
   const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
+  const notice = useFieldNotice(fieldKey);
   const label = deriveFieldLabel(fieldKey, fieldSchema);
   const widgetName = fieldSchema?.['x-lt-widget'] as string | undefined;
   const kind = declaredKind(fieldSchema, value);
@@ -174,19 +178,24 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
       return renderText(typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value));
 
     case 'array':
-      // Without an option list or the json widget a list is display only.
-      if (!Array.isArray(value)) return renderText(value === null || value === undefined ? '' : String(value));
+      // Without an option list or the json widget a list displays; a scan list is a checklist.
+      if (!Array.isArray(value) && !(value == null && readScanSink(fieldSchema))) {
+        return renderText(value === null || value === undefined ? '' : String(value));
+      }
       return (
-        <div>
-          <FieldLabel isRequired={isRequired}>{label}</FieldLabel>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {value.map((item, i) => (
-              <span key={i} className="px-2 py-0.5 text-2xs font-mono bg-surface-sunken rounded text-text-secondary">
-                {String(item)}
-              </span>
-            ))}
-          </div>
-        </div>
+        <ListField
+          fieldKey={fieldKey}
+          label={label}
+          values={Array.isArray(value) ? value : []}
+          fieldSchema={fieldSchema}
+          helperText={helperText}
+          isRequired={isRequired}
+          error={error}
+          ids={ids}
+          notice={notice}
+          context={escalationContext as Record<string, unknown> | undefined}
+          onChange={onChange}
+        />
       );
 
     case 'object': {
@@ -307,6 +316,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
           {...ariaProps}
         />
         <FieldError error={error} id={ids.error} />
+        <FieldNoticeLine notice={notice} />
       </div>
     );
   }

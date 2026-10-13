@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useActingIdentity } from '../../hooks/useActingIdentity';
+import { useViewerIdentity } from '../../hooks/useViewerIdentity';
 import { SCAN_CHOICES_STATE, useScanInput } from '../../hooks/useScanInput';
 import {
   executeScanChoice,
@@ -74,6 +75,7 @@ export function ScanStationPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { identity, clear, settle } = useActingIdentity();
+  const { viewerId } = useViewerIdentity();
   const { lastResult, subject, dropSubject, adoptResponse, pendingScan, dropPendingScan } = useScanInput();
   const [screen, setScreen] = useState<ScanExecuteResponse | null>(null);
   const [pendingBadge, setPendingBadge] = useState<PendingBadge | null>(null);
@@ -244,7 +246,7 @@ export function ScanStationPage() {
           key={String(screen!.escalation!.id)}
           response={screen!}
           hasActingIdentity={!!identity}
-          selfId={identity?.actorId ?? user?.userId ?? null}
+          selfId={viewerId ?? null}
           busy={busy}
           onExecute={executeChoice}
           onWithheldSelect={holdForBadge}

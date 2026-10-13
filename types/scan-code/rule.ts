@@ -4,6 +4,7 @@ import type {
   ScanAvailability,
   ScanCardinality,
   ScanEncoding,
+  ScanFactFormat,
   ScanGrantScope,
   ScanSchemeKind,
   ScanVerb,
@@ -175,6 +176,11 @@ export interface ScanFact {
   label: string;
   /** Template rendered against the located row (`{item.<facet>}`) and the scan tokens. */
   value: string;
+  /**
+   * Render the value as a list column does (`date`, `age`, `ago`); the value
+   * must then be a single token, so the station receives the raw value.
+   */
+  format?: ScanFactFormat;
 }
 
 export interface ScanStep {

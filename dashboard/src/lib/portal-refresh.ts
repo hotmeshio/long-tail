@@ -17,8 +17,8 @@ export interface PortalRefreshPlan {
 /**
  * How a portal stays fresh. Every list query key carries its params object,
  * and the query client matches object segments partially, so an event on
- * one queue refreshes only that queue's panels and tiles: `['escalations',
- * { role }]` and `['escalations', 'available', { role }]`. A URL that names
+ * one queue refreshes only that queue's panels and tiles (pinned by `role`
+ * or by a lone `roles` entry) and the queue's related sets. A URL that names
  * several roles or none widens the plan to the whole escalation family.
  */
 export function portalRefreshPlan(urls: Array<Pick<RolePin, 'url'>>, resolveUrl: (url: string) => string): PortalRefreshPlan {
@@ -40,7 +40,16 @@ export function portalRefreshPlan(urls: Array<Pick<RolePin, 'url'>>, resolveUrl:
     keysFor(eventType) {
       const token = eventType.startsWith(ESCALATION_TYPE_PREFIX) ? eventType.slice(ESCALATION_TYPE_PREFIX.length).split('.')[0] : '';
       const role = byToken.get(token);
-      return role ? [['escalations', { role }], ['escalations', 'available', { role }]] : WIDE_KEYS;
+      return role
+        ? [
+            ['escalations', { role }],
+            ['escalations', 'available', { role }],
+            ['escalations', { roles: [role] }],
+            ['escalations', 'available', { roles: [role] }],
+            ['escalations', 'related', role],
+            ['escalations', 'related-rows', role],
+          ]
+        : WIDE_KEYS;
     },
   };
 }

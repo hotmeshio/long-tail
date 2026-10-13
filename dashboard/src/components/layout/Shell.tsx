@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
 import { usePersona } from '../../hooks/usePersona';
 import { useFollowMyClaims } from '../../hooks/useFollowMyClaims';
+import { setDisplayTimeZone } from '../../lib/display-zone';
 import { useKioskMode, isKioskAllowedPath } from '../../hooks/useKioskMode';
 import { isPortalPath } from '../../lib/portal-path';
 import { useSettings } from '../../api/settings';
@@ -45,6 +46,9 @@ function ShellLayout() {
   // Claim hand-off: anything claimed in the viewer's name pulls them to it.
   useFollowMyClaims();
   const { data: settings } = useSettings();
+  // Dates render in the deployment's display zone once settings arrive; set
+  // during render so every child formats with it in the same pass.
+  setDisplayTimeZone(settings?.display?.timeZone);
   const aiOverride = getAiOverride();
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
   const { collapsed, toggle } = useSidebar();

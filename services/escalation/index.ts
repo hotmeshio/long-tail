@@ -22,3 +22,13 @@ export {
   resetAnalyticsCaches,
 } from './aggregates';
 export { AnalyticsInputError } from './aggregate-validate';
+export { searchEscalationsGrouped } from './grouped-list';
+export type { EscalationGroup } from './grouped-list';
+export {
+  aggregateRelatedItems,
+  listRelatedItems,
+  aggregateRelatedQuery,
+  listRelatedQueryRows,
+  readRelatedHosts,
+} from './related';
+export type { RelatedQueryHost } from './related';

@@ -36,4 +36,11 @@ describe('present facts', () => {
     expect(check(present([{ label: 'Held', value: '{subject.binCode}' }]))).toThrow(/subject gate/);
     expect(check(present([{ label: 'Box', value: '{container.binCode}' }]))).toThrow(/refusal or done copy/);
   });
+
+  it('a format renders a single token as a list column does', () => {
+    expect(check(present([{ label: 'Ship by', value: '{item.releaseAt}', format: 'date' }]))).not.toThrow();
+    expect(check(present([{ label: 'Waiting', value: ' {item.since} ', format: 'age' }]))).not.toThrow();
+    expect(check(present([{ label: 'Ship by', value: '{item.releaseAt}', format: 'when' }]))).toThrow(/date, age, ago/);
+    expect(check(present([{ label: 'Ship by', value: 'by {item.releaseAt}', format: 'date' }]))).toThrow(/single token/);
+  });
 });

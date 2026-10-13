@@ -30,7 +30,7 @@ export function OperatorDashboard() {
   // The personal inbox moves on claims arriving and work leaving — claimed
   // and resolved. A role filter narrows the subscription to that queue's
   // subject token; nothing else in the escalation space reaches this page.
-  useEscalationListEvents({ role: filters.role || null, verbs: ['claimed', 'resolved'] });
+  useEscalationListEvents({ role: filters.role || null, verbs: ['claimed', 'resolved', 'updated'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
   const debouncedSearch = useDebouncedValue(filters.search);
   const release = useReleaseEscalation();
@@ -215,6 +215,7 @@ export function OperatorDashboard() {
         <EscalationListView
           role={singleRole!}
           listSchema={listSchema!}
+          listSchemaVersion={listSchemaQuery.data?.version ?? null}
           activeEscalations={activeClaims}
           onRowClick={openDetail}
           forceViewAction

@@ -5,6 +5,8 @@ import type { LTEscalationRecord } from './types';
 interface EscalationListResponse {
   escalations: LTEscalationRecord[];
   total: number;
+  /** Grouped reads: the page's groups, in order; `total` counts groups. */
+  groups?: { key: string | null; ids: string[] }[];
 }
 
 export interface FacetRange { facet: string; op: '<' | '<=' | '>' | '>=' | '='; value: number }
@@ -27,6 +29,8 @@ export interface FacetFilters {
    * pass 'envelope' only when the surface's schema interpolates them.
    */
   include?: 'envelope';
+  /** Page by groups of this metadata key (whole groups per page). */
+  groupBy?: string;
 }
 
 export interface EscalationFilters extends FacetFilters {
@@ -58,6 +62,7 @@ function appendFacetParams(params: URLSearchParams, f: FacetFilters): void {
   if (f.available !== undefined) params.set('available', String(f.available));
   if (f.jeopardy === true) params.set('jeopardy', '1');
   if (f.include) params.set('include', f.include);
+  if (f.groupBy) params.set('groupBy', f.groupBy);
 }
 
 export interface EscalationStats {

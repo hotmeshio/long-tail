@@ -96,6 +96,11 @@ interface DataTableProps<T> {
    * reads as a tight list of identities rather than a squeeze of every column.
    */
   density?: 'default' | 'dense' | 'compact';
+  /**
+   * Content shown beneath a row, spanning the full width: a table row under
+   * the row in table mode, the card's foot in card mode. Null renders nothing.
+   */
+  renderExpansion?: (row: T) => ReactNode | null;
 }
 
 /** The @table threshold in rem — below this the table folds into cards. */
@@ -173,6 +178,7 @@ export function DataTable<T>({
   forceCardMode,
   fold = 'auto',
   density = 'default',
+  renderExpansion,
 }: DataTableProps<T>) {
   const [wrapRef, width] = useContainerWidth<HTMLDivElement>();
   const cardMode = forceCardMode
@@ -249,6 +255,7 @@ export function DataTable<T>({
                     ))}
                   </dl>
                 )}
+                {renderExpansion?.(row)}
               </div>
             );
           })}
@@ -289,9 +296,10 @@ export function DataTable<T>({
         <tbody>
           {data.map((row, index) => {
             const isActive = activeRowKey != null && keyFn(row) === activeRowKey;
+            const expansion = renderExpansion?.(row) ?? null;
             return (
+            <Fragment key={keyFn(row)}>
             <tr
-              key={keyFn(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={`group/row border-b last:border-b-0 transition-colors duration-100 ${
                 onRowClick ? 'cursor-pointer row-hover' : ''
@@ -306,6 +314,12 @@ export function DataTable<T>({
                 </td>
               ))}
             </tr>
+            {expansion != null && (
+              <tr className="border-b last:border-b-0 bg-surface-sunken/30" data-testid="row-expansion">
+                <td colSpan={columns.length} className="p-0">{expansion}</td>
+              </tr>
+            )}
+            </Fragment>
             );
           })}
         </tbody>

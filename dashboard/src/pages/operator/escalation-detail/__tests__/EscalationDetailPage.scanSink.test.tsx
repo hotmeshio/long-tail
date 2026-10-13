@@ -210,8 +210,15 @@ describe('EscalationDetailPage — a scan into the open form', () => {
     await screen.findByText('Bin');
     await waitFor(() => expect(state.interceptor).not.toBeNull());
 
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
     act(() => { state.interceptor!('14:0:SF-B-9'); });
-    expect(await screen.findByText('This bag goes in SF-A-2.')).toBeInTheDocument();
+    const refusal = await screen.findByText('This bag goes in SF-A-2.');
+    // The refusal sits under the field that refused it, and the field scrolls into view.
+    expect(refusal).toHaveAttribute('data-testid', 'field-scan-notice');
+    expect(refusal.closest('[data-field-key]') ?? refusal.parentElement?.querySelector('[data-field-key="binCode"]')).toBeTruthy();
+    expect(screen.getAllByText('This bag goes in SF-A-2.')).toHaveLength(1);
+    expect(scrolled).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
     expect(screen.queryByTestId('station-write-challenge')).toBeNull();
     expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
   });

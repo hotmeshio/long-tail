@@ -154,3 +154,11 @@ export function itemLabel(
   if (tokens > 0 && resolved === 0) return null;
   return label || null;
 }
+
+/** A template over `{{item.*}}` and the escalation domains; missing tokens read as an em dash. */
+export function interpolateItemTemplate(template: string, item: EscalationItem | undefined, ctx: HelpTokenContext = {}): string {
+  return template.replace(TOKEN, (_match, rawPath: string) => {
+    if (!item && rawPath.split('.')[0] === ITEM_DOMAIN) return MISSING;
+    return tokenValue(rawPath, item ?? ({} as EscalationItem), ctx) ?? MISSING;
+  });
+}
