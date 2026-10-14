@@ -1453,6 +1453,7 @@ Body: `{ role, ids, version? }`, with up to 100 ids (one page). One statement ru
   "sets": {
     "contents": {
       "source": "items",
+      "roles": ["order-stage"],
       "aggregates": {
         "reciprocal.metadata.serviceLevel": {
           "6f1c…": { "count": 3, "splits": { "standard": 2, "express": 1 } }
@@ -1470,7 +1471,7 @@ Body: `{ role, ids, version? }`, with up to 100 ids (one page). One statement ru
 }
 ```
 
-`aggregates` is keyed by `splitBy` (`""` when a column is unsplit), then row id. `hidden` counts items whose reciprocal row the caller cannot read; `unresolved` marks a row whose facet templates did not resolve; `restricted` names query roles outside the caller's full read scope (not counted). 400 for a bad body or a segment naming no sequence; 422 when the stored declaration no longer validates.
+`aggregates` is keyed by `splitBy` (`""` when a column is unsplit), then row id. `hidden` counts items whose reciprocal row the caller cannot read; `unresolved` marks a row whose facet templates did not resolve; `restricted` names query roles outside the caller's full read scope (not counted). `roles` names the roles whose rows a set reads, so a list can follow their events: a query set's resolved roles in order, or, for an item set split by `reciprocal.metadata.<key>`, the roles of the readable reciprocal rows. 400 for a bad body or a segment naming no sequence; 422 when the stored declaration no longer validates.
 
 ```
 POST /api/escalations/related/rows

@@ -66,29 +66,32 @@ describe('related set SQL against real rows', () => {
   }, 10_000);
 
   it('counts items and splits them by the reciprocal row facet', async () => {
-    const agg = await escalationService.aggregateRelatedItems({
+    const { aggregates: agg, roles } = await escalationService.aggregateRelatedItems({
       hostIds: [binA, binB], scope: GLOBAL, splitBy: 'reciprocal.metadata.serviceLevel',
     });
     expect(agg[binA]).toEqual({ count: 3, splits: { standard: 2, express: 1 } });
     expect(agg[binB]).toEqual({ count: 0, splits: {} });
+    expect(roles).toEqual([STAGE]);
   });
 
   it('splits by item payload, including batch entries', async () => {
-    const agg = await escalationService.aggregateRelatedItems({
+    const { aggregates: agg, roles } = await escalationService.aggregateRelatedItems({
       hostIds: [binA, batch], scope: GLOBAL, splitBy: 'payload.tool',
     });
+    expect(roles).toEqual([]);
     expect(agg[batch]).toEqual({ count: 1, splits: { saw: 1 } });
     expect(agg[binA]).toEqual({ count: 3, splits: { '': 3 } });
   });
 
   it('reports reciprocal rows outside the scope as hidden', async () => {
     const scope = { visibleRoles: [BIN], selfRoles: [], meUserId: VIEWER };
-    const agg = await escalationService.aggregateRelatedItems({
+    const { aggregates: agg, roles } = await escalationService.aggregateRelatedItems({
       hostIds: [binA], scope, splitBy: 'reciprocal.metadata.serviceLevel',
     });
     expect(agg[binA]).toEqual({ count: 3, splits: {}, hidden: 3 });
+    expect(roles).toEqual([]);
     const unsplit = await escalationService.aggregateRelatedItems({ hostIds: [binA], scope });
-    expect(unsplit[binA]).toEqual({ count: 3 });
+    expect(unsplit.aggregates[binA]).toEqual({ count: 3 });
   });
 
   it('lists items in fill order with their reciprocal rows', async () => {

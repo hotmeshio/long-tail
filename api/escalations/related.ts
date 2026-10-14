@@ -103,11 +103,15 @@ export async function getRelatedAggregates(
       const decl = relations.sets[name];
       const result: RelatedSetResult = { source: decl.source, aggregates: {} };
       if (decl.source === RELATED_SOURCES.ITEMS) {
+        const roles = new Set<string>();
         for (const splitBy of splitsFor(relations, name)) {
-          result.aggregates[splitBy] = await escalationService.aggregateRelatedItems({
+          const read = await escalationService.aggregateRelatedItems({
             hostIds, scope, splitBy: splitBy || undefined,
           });
+          result.aggregates[splitBy] = read.aggregates;
+          read.roles.forEach((r) => roles.add(r));
         }
+        if (roles.size) result.roles = [...roles].sort();
       } else {
         const resolved = await resolveQueryRoles(decl.query!, readScope);
         if (typeof resolved === 'string') return { status: 400, error: `x-lt-related.${name}: ${resolved}` };

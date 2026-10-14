@@ -74,14 +74,15 @@ function itemEntriesCte(params: unknown[], scope: ReadScopeInput, hostIds: strin
 /**
  * Count each host's items, optionally split by `payload.<path>` or
  * `reciprocal.metadata.<key>`. A reciprocal split counts only reciprocal rows
- * the caller can read; the rest are reported as `hidden`.
+ * the caller can read; the rest are reported as `hidden`. `roles` names the
+ * roles of the readable reciprocal rows, so a list can follow their changes.
  */
 export async function aggregateRelatedItems(opts: {
   hostIds: string[];
   scope: ReadScopeInput;
   splitBy?: string;
-}): Promise<Aggregates> {
-  if (!opts.hostIds.length) return {};
+}): Promise<{ aggregates: Aggregates; roles: string[] }> {
+  if (!opts.hostIds.length) return { aggregates: {}, roles: [] };
   await ensureEscalationCompatView();
   const params: unknown[] = [];
   const cte = itemEntriesCte(params, opts.scope, opts.hostIds);
@@ -89,6 +90,7 @@ export async function aggregateRelatedItems(opts: {
   let splitExpr = 'NULL::text';
   let join = '';
   let hiddenExpr = 'false';
+  let rolesExpr = 'NULL::text[]';
   if (splitBy.startsWith(SPLIT_PATHS.PAYLOAD)) {
     const pi = params.push(splitBy.slice(SPLIT_PATHS.PAYLOAD.length).split('.'));
     splitExpr = `(CASE WHEN en.acc THEN en.entry->'payload' ELSE en.entry END) #>> $${pi}::text[]`;
@@ -98,15 +100,18 @@ export async function aggregateRelatedItems(opts: {
     join = `LEFT JOIN public.lt_escalations r ON r.id = en.rid${rScope ? ` AND ${rScope}` : ''}`;
     splitExpr = `r.metadata->>$${ki}`;
     hiddenExpr = '(en.rid IS NOT NULL AND r.id IS NULL)';
+    rolesExpr = 'array_agg(DISTINCT r.role) FILTER (WHERE r.id IS NOT NULL)';
   }
   const { rows } = await getPool().query(
     `WITH ${cte}
-     SELECT en.host_id::text AS host_id, ${splitExpr} AS split, ${hiddenExpr} AS hidden, count(*)::int AS n
+     SELECT en.host_id::text AS host_id, ${splitExpr} AS split, ${hiddenExpr} AS hidden, count(*)::int AS n,
+       ${rolesExpr} AS roles
      FROM entries en ${join}
      GROUP BY 1, 2, 3`,
     params,
   );
-  return foldAggregateRows(rows, opts.hostIds, !!splitBy);
+  const roles = new Set<string>(rows.flatMap((row) => row.roles ?? []));
+  return { aggregates: foldAggregateRows(rows, opts.hostIds, !!splitBy), roles: [...roles].sort() };
 }
 
 /** One host's items in fill order, each with its reciprocal row when readable. */

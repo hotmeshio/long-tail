@@ -50,7 +50,7 @@ beforeEach(() => {
     data: {
       version: 4,
       sets: {
-        contents: { source: 'items', aggregates: { 'reciprocal.metadata.serviceLevel': {
+        contents: { source: 'items', roles: ['stage'], aggregates: { 'reciprocal.metadata.serviceLevel': {
           a: { count: 3, splits: { standard: 2, express: 1 } },
           b: { count: 2, splits: {}, hidden: 2 },
         } } },
@@ -74,7 +74,7 @@ describe('facet-table related columns', () => {
   it('reads the page once at the rendered version and subscribes to the related roles', () => {
     renderTable();
     expect(useRelatedAggregates).toHaveBeenCalledWith('consolidate', ['a', 'b'], 4);
-    expect(useRelatedSetEvents).toHaveBeenLastCalledWith(['prep', 'check']);
+    expect(useRelatedSetEvents).toHaveBeenLastCalledWith(['stage', 'prep', 'check']);
   });
 
   it('shows the count and labeled splits, role splits in sequence order', () => {
@@ -175,7 +175,7 @@ describe('facet-table groups', () => {
     useRelatedAggregates.mockReturnValue({
       isLoading: false,
       data: { version: 4, sets: {
-        contents: { source: 'items', aggregates: { 'reciprocal.metadata.serviceLevel': {} } },
+        contents: { source: 'items', roles: ['stage'], aggregates: { 'reciprocal.metadata.serviceLevel': {} } },
         coming: { source: 'query', roles: ['prep'], roleLabels: { prep: 'Prep' }, restricted: [],
           aggregates: { role: { a: { count: 5, splits: { prep: 5 } }, a2: { count: 5, splits: { prep: 5 } } } } },
       } },

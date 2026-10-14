@@ -3,6 +3,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getRelatedAggregates, getRelatedRows } from '../../api/escalations/related';
 import { listEscalations } from '../../api/escalations/list';
 import { removeItem } from '../../api/escalations/accumulate';
+import { claimEscalation } from '../../api/escalations/claim';
+import { escalations } from '../../services/escalation/client';
 import { CONSOLIDATION_ROLES as R, SERVICE_LEVELS } from '../../examples/workflows/consolidation';
 import { ConsolidationFloor } from '../helpers/consolidation-floor';
 import type { LTEscalationRecord } from '../../types';
@@ -57,6 +59,16 @@ describe('consolidation: the container list reads the floor', () => {
     expect(sets.coming.aggregates.role[tubStandard.id]).toEqual({ count: 2, splits: { [R.PREP]: 1, [R.CHECK]: 1 } });
   }, 30_000);
 
+  it('a claimed upstream row still counts as coming', async () => {
+    const prep = await floor.waitFor(`${R.PREP}-${orders[3]}`);
+    const claim = await claimEscalation({ id: prep.id }, floor.auth);
+    expect(claim.status).toBe(200);
+    const sets = await read([southBin.id]);
+    expect(sets.coming.aggregates.role[southBin.id]).toEqual({ count: 1, splits: { [R.PREP]: 1 } });
+    const rows = await getRelatedRows({ role: R.BIN, id: southBin.id, set: 'coming' }, floor.auth);
+    expect(rows.data.rows[0].escalation).toMatchObject({ id: prep.id, assigned_to: floor.operatorId });
+  }, 30_000);
+
   it('placed orders leave coming and are held, split by service level', async () => {
     await floor.advance(orders[0], R.CHECK, R.STAGE);
     await floor.walk(orders[1]);
@@ -92,6 +104,14 @@ describe('consolidation: the container list reads the floor', () => {
     expect(result.status).toBe(200);
     const sets = await read([tubStandard.id]);
     expect(sets.contents.aggregates[HOLDS][tubStandard.id]).toEqual({ count: 1, splits: { standard: 1 } });
+  }, 30_000);
+
+  it('a held order whose own row changes moves the split, and the set names that row role to follow', async () => {
+    const member = await floor.waitFor(`stage-${orders[0]}`, 'resolved');
+    await (await escalations()).update({ id: member.id, metadata: { serviceLevel: SERVICE_LEVELS.EXPRESS } });
+    const sets = await read([tubStandard.id]);
+    expect(sets.contents.aggregates[HOLDS][tubStandard.id]).toEqual({ count: 1, splits: { express: 1 } });
+    expect(sets.contents.roles).toEqual([R.STAGE]);
   }, 30_000);
 
   it('the tub reads as one group of its lanes, a page never splitting a group', async () => {

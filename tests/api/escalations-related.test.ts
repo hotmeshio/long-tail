@@ -48,7 +48,7 @@ beforeEach(() => {
     { id: H1, role: 'bin', metadata: { destination: 'north' } },
     { id: H2, role: 'bin', metadata: {} },
   ] as any);
-  vi.mocked(escalationService.aggregateRelatedItems).mockResolvedValue({ [H1]: { count: 2 } } as any);
+  vi.mocked(escalationService.aggregateRelatedItems).mockResolvedValue({ aggregates: { [H1]: { count: 2 } }, roles: ['stage'] });
   vi.mocked(escalationService.aggregateRelatedQuery).mockResolvedValue({ [H1]: { count: 1, splits: { prep: 1 } } } as any);
 });
 
@@ -66,6 +66,7 @@ describe('getRelatedAggregates', () => {
     const coming = result.data.sets.coming;
     expect(coming).toMatchObject({ roles: ['prep', 'check'], roleLabels: { prep: 'Prep', check: 'check' }, restricted: ['check'] });
     expect(coming.aggregates.role[H2]).toEqual({ count: 0, unresolved: true });
+    expect(result.data.sets.contents).toMatchObject({ source: 'items', roles: ['stage'], aggregates: { '': { [H1]: { count: 2 } } } });
     expect(result.data.version).toBe(3);
   });
 

@@ -130,7 +130,11 @@ export interface RelatedHostAggregate {
 
 export interface RelatedSetResult {
   source: RelatedSource;
-  /** Query sets: the resolved roles, in order. */
+  /**
+   * The roles whose rows the set reads, which a list follows for live
+   * changes: a query set's resolved roles in order, or the roles of an item
+   * set's readable reciprocal rows when a column splits by them.
+   */
   roles?: string[];
   /** Query sets: role titles, keyed by role. */
   roleLabels?: Record<string, string>;
