@@ -3,6 +3,7 @@ import { Modal } from '../../common/modal/Modal';
 import { useScanInput } from '../../../hooks/useScanInput';
 import { formatTimeAgo } from '../../../lib/format';
 import { stationFactEntries } from '../../../lib/metadata-display';
+import { FormattedValue } from '../../common/display/FormattedValue';
 import { isChoiceEnabled, matchChoiceByCode } from './choice-code';
 import type { ScanExecuteResponse, ScanPresentedChoice } from '../../../api/scan-codes';
 
@@ -15,11 +16,13 @@ function formatFactValue(value: unknown): string {
   return String(value);
 }
 
-function FactRow({ label, value }: { label: string; value: string }) {
+function FactRow({ label, value, format }: { label: string; value: string; format?: string }) {
   return (
     <div className="flex items-baseline gap-4 py-2">
       <span className="w-32 shrink-0 text-2xs uppercase tracking-wide text-text-quaternary">{label}</span>
-      <span className="text-sm text-text-primary break-words">{value}</span>
+      <span className="text-sm text-text-primary break-words" data-testid="station-fact-value">
+        {format ? <FormattedValue raw={value} format={format} /> : value}
+      </span>
     </div>
   );
 }
@@ -84,8 +87,8 @@ export function InfoChoiceScreen({
   const claimClass = assignedTo === selfId ? 'text-accent' : 'text-text-secondary';
   const typeLine = [escalation.type, escalation.subtype].filter(Boolean).join(' · ');
   // The step's curated facts when it declares them, else the row's metadata.
-  const metaEntries: [string, unknown][] = response.facts
-    ? response.facts.map((f) => [f.label, f.value])
+  const metaEntries: [string, unknown, string?][] = response.facts
+    ? response.facts.map((f) => [f.label, f.value, f.format])
     : stationFactEntries(metadata);
 
   return (
@@ -112,8 +115,8 @@ export function InfoChoiceScreen({
         </div>
         {metaEntries.length > 0 && (
           <div className="divide-y divide-surface-border border-t border-surface-border">
-            {metaEntries.map(([key, value], i) => (
-              <FactRow key={`${i}-${key}`} label={key} value={formatFactValue(value)} />
+            {metaEntries.map(([key, value, format], i) => (
+              <FactRow key={`${i}-${key}`} label={key} value={formatFactValue(value)} format={format} />
             ))}
           </div>
         )}

@@ -16,7 +16,9 @@
  * Root `x-lt-scan-submit: true` submits once every required scan field is
  * filled and the form validates. A string field is replaced by a scan; an
  * array field appends, and with `multiplicity: "count"` a value expected n
- * times takes n scans.
+ * times takes n scans. `prompt` is the empty array field's instruction (the
+ * field description when absent); the field reads `n of N` against the same
+ * expected list that admits each scan, or `maxItems`.
  */
 import { resolveCtxPath } from './ctx-path';
 
@@ -35,6 +37,8 @@ export interface ScanSink {
   expectError: string;
   /** Array fields: 'count' takes a value as many times as it is expected. */
   multiplicity: 'count' | 'once';
+  /** Array fields: the instruction shown while the field is empty. */
+  prompt?: string;
 }
 
 /** The parts of a parsed scan a sink reads. */
@@ -60,6 +64,7 @@ export function readScanSink(fieldSchema: Schema | undefined): ScanSink | null {
     ...(expect?.length ? { expect } : {}),
     expectError: typeof cfg['expect-error'] === 'string' ? cfg['expect-error'] : DEFAULT_EXPECT_ERROR,
     multiplicity: cfg.multiplicity === 'count' ? 'count' : 'once',
+    ...(typeof cfg.prompt === 'string' && cfg.prompt.trim() ? { prompt: cfg.prompt } : {}),
   };
 }
 
@@ -112,6 +117,24 @@ export function scanSinkError(
     budget.splice(at, 1);
   }
   return undefined;
+}
+
+/**
+ * How many scans complete an array field: the scans its expected list admits
+ * (each listing under 'count', each distinct value otherwise), else
+ * `maxItems`, else null. The checklist and the admission gate share it.
+ */
+export function scanTargetCount(
+  fieldSchema: Schema | undefined,
+  ctx: Record<string, unknown> | undefined,
+): number | null {
+  const sink = readScanSink(fieldSchema);
+  if (sink) {
+    const expected = resolveScanExpected(sink, ctx);
+    if (expected !== null) return sink.multiplicity === 'count' ? expected.length : new Set(expected).size;
+  }
+  const max = fieldSchema?.maxItems;
+  return typeof max === 'number' ? max : null;
 }
 
 /** What a scan does to a field: the next value, or the error to show (nothing written). */

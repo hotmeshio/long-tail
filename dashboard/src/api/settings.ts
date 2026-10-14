@@ -50,6 +50,8 @@ export interface AppSettings {
     /** Deployment-registered themes (metadata only; CSS arrives via /api/settings/custom.css). */
     themes?: Array<{ id: string; label: string; swatch: string; dark?: boolean }>;
   };
+  /** Deployment display: an IANA time zone every dashboard date renders in (null = the browser's). */
+  display?: { timeZone: string | null };
   environment?: {
     longTailVersion: string;
     hotmeshVersion: string;

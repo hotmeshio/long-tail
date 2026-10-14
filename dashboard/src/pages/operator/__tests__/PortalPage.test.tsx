@@ -97,6 +97,10 @@ describe('PortalPage', () => {
     expect(state.invalidate).toHaveBeenLastCalledWith([
       ['escalations', { role: 'harvest' }],
       ['escalations', 'available', { role: 'harvest' }],
+      ['escalations', { roles: ['harvest'] }],
+      ['escalations', 'available', { roles: ['harvest'] }],
+      ['escalations', 'related', 'harvest'],
+      ['escalations', 'related-rows', 'harvest'],
     ]);
   });
 

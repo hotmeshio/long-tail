@@ -433,6 +433,13 @@ export interface LTStartConfig {
   search?: { enabled?: boolean; facets?: string[] };
 
   /**
+   * Dashboard display. `timeZone` (an IANA name, e.g. "America/Chicago")
+   * renders every dashboard date in that zone, so a floor reads its own time
+   * on every screen. Unset, dates render in the viewer's browser zone.
+   */
+  display?: { timeZone?: string };
+
+  /**
    * White-label branding. The `appName` replaces "LongTail" in the dashboard
    * header. Defaults to "LongTail" when omitted.
    *

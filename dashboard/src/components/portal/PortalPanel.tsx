@@ -142,7 +142,9 @@ export function PortalPanel({ pin, url, from }: {
           <EscalationListView
             role={list.singleRole!}
             listSchema={list.listSchema!}
+            listSchemaVersion={list.listSchemaVersion}
             activeEscalations={list.escalations}
+            groups={list.groups}
             onRowClick={openRow}
             onOpenGroup={(target) => navigate(target)}
           />

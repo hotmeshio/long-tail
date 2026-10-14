@@ -82,6 +82,8 @@ A portal page fills the content area with one grid row per declared row, each di
 
 **Fitting a screen.** A panel on a wall screen is read, not scrolled, so a pin can ask the table to spend its width tightly: `?view=table&layout=compact` keeps the table a table however narrow the panel, tightens every cell, and holds the non-identity columns (assignee, role, priority) back until the panel is wide enough, so a narrow cell reads as a tight list of item and age and twenty rows fit where the folded layout showed four. `layout=cards` asks for the folded console-card layout on purpose. Without `layout`, the table folds on its own below the card threshold. The hint rides the URL like `view`, so it works on the full list page too, and it is the seam for a compact timeline later: a series of tight offset lines that fit the whole story in the panel.
 
+A rich panel carries the role's whole list schema, so related columns, row expansion, and grouped rows (see [Related sets](x-lt-list-schema.md#related-sets)) read on a wall screen as they do on the list page.
+
 A portal page shows without the left nav, as kiosk does: it is a screen read from across a room, and the panels are the page. The header stays, so the user menu still switches portals. Any signed-in user may open a portal. Panels read through the same role-scoped endpoints as the list page, so RBAC is unchanged: each viewer sees exactly what their read scope returns, and a queue outside it renders empty. Link variables resolve per device at render time, exactly as pins in the nav do. One event subscription per queue named by the cells keeps every panel current, on the LIST refresh tier.
 
 ## Choosing a portal

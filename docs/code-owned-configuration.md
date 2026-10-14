@@ -157,3 +157,15 @@ dedicated advisory lock, separate from the migration lock. Single-statement
 applies are also individually race-safe: every upsert carries an
 `IS DISTINCT FROM` guard, so an identical declaration arriving from two
 containers writes once and no-ops once.
+
+## Display time zone
+
+`display.timeZone` (an IANA name) renders every dashboard date in that zone, so a floor reads its own time on every screen: list columns, station facts, and detail pages alike. Unset, dates render in the viewer's browser zone. An unknown zone fails the boot.
+
+```typescript
+await start({
+  // …
+  display: { timeZone: 'America/Chicago' },
+});
+```
+

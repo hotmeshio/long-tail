@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { format as fnsFormat } from 'date-fns';
 import { formatTimeAgo } from '../../../lib/format';
+import { formatDisplayDateTime, getDisplayTimeZone } from '../../../lib/display-zone';
 import { DateTooltip } from './DateTooltip';
 
 type DateFormat = 'relative' | 'datetime' | 'time';
@@ -15,8 +15,8 @@ function formatDisplay(date: string, fmt: DateFormat): string {
   const d = new Date(date);
   switch (fmt) {
     case 'relative': return formatTimeAgo(date);
-    case 'datetime': return fnsFormat(d, 'MMM d, yyyy h:mm a');
-    case 'time': return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    case 'datetime': return formatDisplayDateTime(d);
+    case 'time': return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: getDisplayTimeZone() ?? undefined });
   }
 }
 
@@ -25,7 +25,7 @@ function buildOptions(date: string) {
   return [
     { label: 'ms', value: String(d.getTime()) },
     { label: 'utc', value: d.toISOString() },
-    { label: 'local', value: fnsFormat(d, 'MMM d, yyyy h:mm:ss a') },
+    { label: 'local', value: formatDisplayDateTime(d, true) },
   ];
 }
 

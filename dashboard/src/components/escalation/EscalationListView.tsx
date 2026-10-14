@@ -1,31 +1,30 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { interpolateHelp, type HelpTokenContext } from '../../lib/x-lt-help';
-import { DataTable, type Column as TableColumn } from '../common/data/DataTable';
-import { Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { interpolateHelp } from '../../lib/x-lt-help';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
-import { STATUS_DOT_STYLES } from '../common/display/StatusBadge';
 import { DateValue } from '../common/display/DateValue';
-import { UserName } from '../common/display/UserName';
+import { FormattedValue as FieldValue, EM_DASH, isAgeFormat } from '../common/display/FormattedValue';
 import { StickyPagination } from '../common/data/StickyPagination';
-import { useEscalations, useClaimEscalation } from '../../api/escalations';
+import { useEscalations } from '../../api/escalations';
 import { schemaNeedsEnvelope } from '../../lib/schema-needs-envelope';
-import { isEffectivelyClaimed } from '../../lib/escalation';
-import { formatAgoCompact } from '../../lib/format';
-import { identifierToTitle } from '../../lib/identifier-label';
 import { getDeep } from '../../lib/x-lt-bind';
 import { typeColor } from '../../lib/type-color';
 import { RefineDialog, type RefinePair } from './RefineDialog';
+import {
+  escalationDotClass,
+  rowContext,
+  RowActionButton,
+  RefineTrigger,
+  METADATA_TOKEN,
+  type ColumnDef,
+  type RowActionDef,
+} from './list-view/row-parts';
+import { FacetTable, type EscalationGroup } from './list-view/FacetTable';
 import type { LTEscalationRecord } from '../../api/types';
 
-/** Dot colour matches the standard table view: blue = pending unclaimed,
- * orange = under a live claim; other statuses follow the shared map. */
-function escalationDotClass(e: LTEscalationRecord): string {
-  if (e.status === 'pending') {
-    return isEffectivelyClaimed(e) ? 'bg-status-claimed-graphic' : 'bg-status-active';
-  }
-  return STATUS_DOT_STYLES[e.status] ?? 'bg-status-active';
-}
+export { rowContext, rowRefinePairs } from './list-view/row-parts';
+export type { ColumnDef, RowActionDef } from './list-view/row-parts';
+export { FIELD_FORMATS } from '../common/display/FormattedValue';
 
 /**
  * EscalationListView — the role-authored rich view of an escalation list, driven
@@ -54,24 +53,6 @@ interface HistoryDef {
   status?: string;
 }
 
-export interface ColumnDef {
-  label: string;
-  value: string;
-  /** "age" renders an ISO timestamp as a compact age with an absolute tooltip. */
-  format?: string;
-  /**
-   * Card-fold behavior when the table folds at narrow widths (same contract
-   * as the engineer table): 1 = identity — always visible, forms the card's
-   * title line; 2 = folds into the card body as a label/value pair; 3 =
-   * dropped in card mode. Undeclared, the first column is the identity and
-   * the rest fold.
-   */
-  priority?: 1 | 2 | 3;
-  /** CSS column width ("40%", "12rem"). Unset columns share the remainder;
-   *  when no column declares one, the first column holds a fixed 200px so
-   *  the identity stays legible and every other value keeps its room. */
-  width?: string;
-}
 
 interface BoardCardDef {
   title?: string;
@@ -80,31 +61,8 @@ interface BoardCardDef {
   fields?: { label: string; value: string; format?: string }[];
 }
 
-/**
- * The per-row action button — the queue-working gesture, always available on
- * every layout. Template-driven: the schema author sets the action, its text,
- * and (for claim) the hold time.
- */
-export interface RowActionDef {
-  /** "claim" fires a one-click claim then opens the detail page already
-   *  claimed; "view" just opens it. Default "claim". */
-  action?: 'claim' | 'view';
-  /** Button text. Defaults "Claim" / "View" by action. */
-  label?: string;
-  /** Claim hold time in minutes. Default 30 (the platform claim default). */
-  durationMinutes?: number;
-  /**
-   * Launch the detail page's claim-and-submit flow instead of a plain claim:
-   * the row is claimed, the form's seeded defaults are resolved, and — when the
-   * form declares `x-lt-transition` — the wait screen bridges to the born-assigned
-   * follow-on. One list gesture ("Start Harvesting") starts the work and lands
-   * the person on the next step. The behavior lives on the detail page (form
-   * defaults, validation, transition); the list only points there with intent.
-   */
-  submitOnClaim?: boolean;
-}
 
-interface ListSchema {
+export interface ListSchema {
   'x-lt-layout'?: string;
   'x-lt-help'?: string;
   'x-lt-active'?: CardDef;
@@ -116,6 +74,9 @@ interface ListSchema {
   'x-lt-card'?: BoardCardDef;
   /** The per-row action button (claim | view, label, claim duration). */
   'x-lt-row-action'?: RowActionDef;
+  /** facet-table: related sets, row detail sections (see shared/list-schema). */
+  'x-lt-related'?: Record<string, unknown>;
+  'x-lt-row-detail'?: unknown[];
 }
 
 /**
@@ -134,153 +95,12 @@ function useAgeTick(enabled: boolean): void {
 
 function schemaUsesAge(schema: ListSchema): boolean {
   return [...(schema['x-lt-columns'] ?? []), ...(schema['x-lt-card']?.fields ?? [])]
-    .some((f) => f.format === 'age');
+    .some((f) => isAgeFormat(f.format));
 }
 
-/** Build the token context for one escalation row (payloads are JSON strings). */
-export function rowContext(e: LTEscalationRecord): HelpTokenContext {
-  const parse = (s: string | null | undefined): Record<string, unknown> | null => {
-    if (!s) return null;
-    try {
-      const v = JSON.parse(s);
-      return v && typeof v === 'object' ? v : null;
-    } catch {
-      return null;
-    }
-  };
-  return {
-    escalation: e as unknown as Record<string, unknown>,
-    metadata: e.metadata ?? null,
-    envelope: parse(e.envelope),
-    payload: parse(e.escalation_payload),
-    resolver: parse(e.resolver_payload),
-  };
-}
 
-const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
-const EM_DASH = '—';
 
-/** Column value formats an author may name. `ago` is the spoken form of `age`. */
-export const FIELD_FORMATS = {
-  AGE: 'age',
-  AGO: 'ago',
-  DATE: 'date',
-  USER: 'user',
-} as const;
 
-/**
- * Render an interpolated field value with a little care: `format: "age"` (or
- * `"ago"`) turns a timestamp into a compact age ("12m", "3h") with the
- * absolute time as its tooltip; `format: "date"` renders the full date the
- * dashboard uses everywhere, hoverable, and so does any ISO datetime with no
- * format; `format: "user"` resolves a user-id token to a display name; an
- * empty value a quiet em dash; anything else plain text. Authors bind
- * tokens; we make the common shapes look right.
- */
-function FieldValue({ raw, format }: { raw: string; format?: string }) {
-  if (!raw || raw === EM_DASH) return <span className="text-text-quaternary">{EM_DASH}</span>;
-  if (format === FIELD_FORMATS.USER) return <UserName userId={raw} className="block truncate" />;
-  const isDate = ISO_DATETIME.test(raw) || !Number.isNaN(new Date(raw).getTime()) && (format === FIELD_FORMATS.AGE || format === FIELD_FORMATS.AGO || format === FIELD_FORMATS.DATE);
-  if ((format === FIELD_FORMATS.AGE || format === FIELD_FORMATS.AGO) && isDate) {
-    return <span title={new Date(raw).toLocaleString()} className="tabular-nums whitespace-nowrap">{formatAgoCompact(raw)}</span>;
-  }
-  if (isDate && (format === FIELD_FORMATS.DATE || ISO_DATETIME.test(raw))) {
-    return <DateValue date={raw} format="datetime" className="text-text-primary whitespace-nowrap" />;
-  }
-  return <>{raw}</>;
-}
-
-/** The identity column's width when no column declares one: room for a label, no more. */
-const IDENTITY_COLUMN_WIDTH = '200px';
-
-/** The action column sizes to its label so the button never wraps or truncates. */
-function actionColumnWidth(label: string): string {
-  return `${Math.max(6, Math.round(label.length * 0.55 + 3.5))}rem`;
-}
-
-const DEFAULT_CLAIM_MINUTES = 30;
-
-/** Claim targets pending rows without a live claim window. */
-function isClaimable(row: LTEscalationRecord): boolean {
-  return row.status === 'pending' && !isEffectivelyClaimed(row);
-}
-
-/**
- * The x-lt-row-action button. `claim` is one click: claim for the template's
- * duration, then open the detail page already claimed — the fast path for
- * working a queue. `view` opens the detail page. Persistent (light accent at
- * rest, saturating on hover); a rejected claim surfaces its message inline.
- */
-function RowActionButton({ row, def, onView, prominent, forceView }: {
-  row: LTEscalationRecord;
-  def?: RowActionDef;
-  onView?: () => void;
-  /** Hero treatment for the active-card CTA; default is the compact row button. */
-  prominent?: boolean;
-  /** Render claim templates as view actions (see EscalationListView). */
-  forceView?: boolean;
-}) {
-  const authored = def?.action ?? 'claim';
-  const action = forceView ? 'view' : authored;
-  // The authored label describes the authored gesture. When view is forced
-  // over a claim template, claim wording would mislead — use the view default.
-  const label = authored === action && def?.label
-    ? def.label
-    : action === 'claim' ? 'Claim' : 'View';
-  const claim = useClaimEscalation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [error, setError] = useState('');
-
-  // A spent gesture stays visible — the disabled button keeps every row's
-  // layout uniform instead of leaving a hole on resolved/held rows.
-  const spent = action === 'claim' && !isClaimable(row);
-
-  const fire = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (action === 'view') {
-      onView?.();
-      return;
-    }
-    // Launch the detail page's claim → submit → transition flow. The detail
-    // page owns the heavy lifting (seed defaults, validate, resolve, hand-off);
-    // the list points there with the intent and the authored claim duration.
-    if (def?.submitOnClaim) {
-      navigate(`/escalations/detail/${row.id}`, {
-        state: { autoStart: true, durationMinutes: def?.durationMinutes, from: location.pathname },
-      });
-      return;
-    }
-    setError('');
-    claim.mutate(
-      { id: row.id, durationMinutes: def?.durationMinutes ?? DEFAULT_CLAIM_MINUTES },
-      {
-        onSuccess: () => onView?.(),
-        onError: (err) => setError((err as Error).message),
-      },
-    );
-  };
-
-  const classes = prominent
-    ? 'btn-primary text-xs shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent'
-    : 'px-2 py-0.5 rounded text-2xs font-medium text-accent/70 border border-accent/30 enabled:hover:text-accent enabled:hover:border-accent/60 enabled:hover:bg-accent/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap';
-
-  return (
-    <span className="inline-flex flex-col items-end gap-0.5">
-      <button
-        type="button"
-        onClick={fire}
-        disabled={claim.isPending || spent}
-        title={spent ? (row.status === 'pending' ? 'claimed' : row.status) : undefined}
-        className={classes}
-        data-testid="row-action-button"
-      >
-        {claim.isPending ? 'Claiming…' : label}
-      </button>
-      {error && <span className="text-2xs text-status-error" data-testid="row-action-error">{error}</span>}
-    </span>
-  );
-}
 
 function ActiveCard({ esc, card, rowAction, onOpen, forceView }: {
   esc: LTEscalationRecord;
@@ -407,156 +227,7 @@ function HistoryColumn({ role, def, onRowClick }: {
   );
 }
 
-/** A metadata value the faceted query can match on: a scalar with something in it. */
-function isFacetValue(raw: unknown): raw is string | number | boolean {
-  return (typeof raw === 'string' && raw !== '') || typeof raw === 'number' || typeof raw === 'boolean';
-}
 
-/**
- * The refinable facts one row offers: every metadata facet the row carries.
- * Columns the author bound to a metadata value lead, under their authored
- * labels; every other scalar facet follows under a label derived from its
- * key, so the dialog reaches the whole record, not only what the columns
- * show. Feeds the row's RefineDialog.
- */
-export function rowRefinePairs(row: LTEscalationRecord, columnDefs: ColumnDef[]): RefinePair[] {
-  const pairs: RefinePair[] = [];
-  const seen = new Set<string>();
-  const metadata = row.metadata ?? {};
-  for (const col of columnDefs) {
-    const bound = col.value.match(METADATA_TOKEN)?.[1];
-    if (!bound || seen.has(bound)) continue;
-    const raw = metadata[bound];
-    if (!isFacetValue(raw)) continue;
-    seen.add(bound);
-    pairs.push({ key: bound, label: col.label, value: raw, bound: true });
-  }
-  for (const [key, raw] of Object.entries(metadata)) {
-    if (seen.has(key) || !isFacetValue(raw)) continue;
-    seen.add(key);
-    pairs.push({ key, label: identifierToTitle(key), value: raw });
-  }
-  return pairs;
-}
-
-/** The always-tappable row/card refine trigger — one magnifier, dialog behind it. */
-function RefineTrigger({ onOpen, className = '' }: { onOpen: () => void; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onOpen(); }}
-      className={`p-1.5 rounded text-text-quaternary/70 hover:text-accent hover:bg-surface-hover transition-colors ${className}`}
-      title="Refine — filter or search by this row's values"
-      aria-label="Refine — filter or search by this row's values"
-      data-testid="row-refine"
-    >
-      <Search className="w-3.5 h-3.5" strokeWidth={1.5} />
-    </button>
-  );
-}
-
-/** Multi-row pending queue as a facet table. Columns defined by x-lt-columns. */
-function FacetTable({ schema, rows, role, onRowClick, onAddFacet, forceView }: {
-  schema: ListSchema;
-  rows: LTEscalationRecord[];
-  role: string;
-  onRowClick?: (row: LTEscalationRecord) => void;
-  /** RefineDialog "Add to filters" — merge into the live filter set. */
-  onAddFacet?: (key: string, value: unknown) => void;
-  forceView?: boolean;
-}) {
-  const navigate = useNavigate();
-  const columnDefs = schema['x-lt-columns'] ?? [];
-  const rowAction = schema['x-lt-row-action'];
-  const [refineRow, setRefineRow] = useState<LTEscalationRecord | null>(null);
-
-  // The authored columns render through the SAME table the engineer views
-  // use, at its dense setting: small type, tight side padding, sticky header,
-  // and the card fold at narrow widths — a table never scrolls horizontally,
-  // it folds. Authors steer the fold with `priority` on each column (1 title
-  // line, 2 folds, 3 dropped); undeclared, the first column is the identity
-  // and holds 200px so every other value keeps its room.
-  //
-  // Cells carry DATA only — the full column width belongs to the value, with
-  // the full text on hover. Refining lives on the row: one magnifier opens
-  // the RefineDialog over every metadata-bound value the row carries.
-  const actionLabel = rowAction?.label ?? (forceView ? 'View' : 'Claim');
-  const columns: TableColumn<LTEscalationRecord>[] = [
-    {
-      key: '_status',
-      label: '',
-      priority: 1,
-      className: 'w-8',
-      render: (row) => (
-        <span
-          className={`w-2.5 h-2.5 inline-block rounded-full dot-ring ${escalationDotClass(row)}`}
-          title={row.status}
-        />
-      ),
-    },
-    ...columnDefs.map((col, i): TableColumn<LTEscalationRecord> => ({
-      key: `col-${i}`,
-      label: col.label,
-      priority: col.priority ?? (i === 0 ? 1 : 2),
-      width: col.width ?? (i === 0 && !columnDefs.some((c) => c.width) ? IDENTITY_COLUMN_WIDTH : undefined),
-      render: (row) => {
-        const ctx = rowContext(row);
-        const text = interpolateHelp(col.value, ctx);
-        return (
-          <span className="block truncate" title={text && text !== EM_DASH ? text : undefined}>
-            <FieldValue raw={text} format={col.format} />
-          </span>
-        );
-      },
-    })),
-    {
-      key: '_refine',
-      label: '',
-      priority: 1,
-      className: 'w-8 px-1',
-      render: (row) =>
-        rowRefinePairs(row, columnDefs).length > 0
-          ? <RefineTrigger onOpen={() => setRefineRow(row)} />
-          : null,
-    },
-    {
-      // The action column sizes to hold its button — a fixed table won't grow a
-      // cell to fit content, so the width is set for the authored label (e.g.
-      // "Start Onboarding") and the button never wraps or truncates. The
-      // description column absorbs the remaining width and truncates instead.
-      key: '_action',
-      label: '',
-      priority: 1,
-      width: actionColumnWidth(actionLabel),
-      className: 'text-right whitespace-nowrap',
-      render: (row) => (
-        <RowActionButton row={row} def={rowAction} onView={() => onRowClick?.(row)} forceView={forceView} />
-      ),
-    },
-  ];
-
-  return (
-    <>
-      <DataTable
-        columns={columns}
-        data={rows}
-        layout="fixed"
-        density="dense"
-        keyFn={(row) => row.id}
-        onRowClick={onRowClick}
-        emptyMessage="No pending items."
-      />
-      <RefineDialog
-        open={!!refineRow}
-        onClose={() => setRefineRow(null)}
-        role={role}
-        pairs={refineRow ? rowRefinePairs(refineRow, columnDefs) : []}
-        onNavigate={navigate}
-        onAddFacet={onAddFacet}
-      />
-    </>
-  );
-}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -607,8 +278,6 @@ export function groupBoardRows(rows: LTEscalationRecord[], groupBy: string): Boa
   return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
-/** A field value token that is a pure metadata binding — facet-linkable. */
-const METADATA_TOKEN = /^\{\{\s*metadata\.([a-zA-Z0-9_]+)\s*\}\}$/;
 
 function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet, forceView }: {
   schema: ListSchema;
@@ -738,10 +407,14 @@ function FacetBoard({ schema, rows, role, onOpenDetail, onOpenGroup, onAddFacet,
   );
 }
 
-export function EscalationListView({ role, listSchema, activeEscalations, onRowClick, onOpenGroup, onAddFacet, forceViewAction, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
+export function EscalationListView({ role, listSchema, listSchemaVersion, activeEscalations, groups, onRowClick, onOpenGroup, onAddFacet, forceViewAction, total, page, totalPages, pageSize, onPageChange, onPageSizeChange }: {
   role: string;
   listSchema: ListSchema;
+  /** The list schema version rendered; related sets read the same version. */
+  listSchemaVersion?: number | null;
   activeEscalations: LTEscalationRecord[];
+  /** facet-table grouped reads: the page's groups, in order. */
+  groups?: EscalationGroup[] | null;
   onRowClick?: (row: LTEscalationRecord) => void;
   /** facet-board history affordances — receive a filtered deep link. */
   onOpenGroup?: (url: string) => void;
@@ -791,7 +464,7 @@ export function EscalationListView({ role, listSchema, activeEscalations, onRowC
     const resolvedTotal = total ?? activeEscalations.length;
     return (
       <div>
-        <FacetTable schema={listSchema} rows={activeEscalations} role={role} onRowClick={onRowClick} onAddFacet={onAddFacet} forceView={forceViewAction} />
+        <FacetTable schema={listSchema as Record<string, unknown>} rows={activeEscalations} groups={groups} role={role} version={listSchemaVersion} onRowClick={onRowClick} onAddFacet={onAddFacet} forceView={forceViewAction} />
         {page !== undefined && totalPages !== undefined && onPageChange && (
           <StickyPagination
             page={page}

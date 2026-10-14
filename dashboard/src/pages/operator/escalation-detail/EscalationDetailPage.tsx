@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAccess } from '../../../hooks/useAccess';
 import { useActingIdentity } from '../../../hooks/useActingIdentity';
+import { useViewerIdentity } from '../../../hooks/useViewerIdentity';
+import { FieldNoticeProvider } from '../../../components/escalation/resolver-form/field-notice';
 import { useScanEnabled } from '../../../hooks/useScanInput';
 import {
   useEscalation,
@@ -108,7 +110,7 @@ function EscalationDetailView({ id }: { id: string }) {
   // The badge grant outranks the session: whoever badged in owns the claim
   // comparisons here, and the mutations they fire ride the acting header so
   // the server attributes them to the same person.
-  const effectiveActorId = acting?.actorId ?? user?.userId;
+  const { viewerId: effectiveActorId, isViewer } = useViewerIdentity();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -298,8 +300,8 @@ function EscalationDetailView({ id }: { id: string }) {
           status: 'pending',
           limit: '1',
         });
-        const res = await apiFetch<{ escalations: Array<{ id: string; parent_id?: string }> }>(`/escalations?${params}`);
-        const child = res?.escalations?.[0];
+        const res = await apiFetch<{ escalations: Array<{ id: string; parent_id?: string; assigned_to?: string | null }> }>(`/escalations?${params}`);
+        const child = res?.escalations?.find((c) => isViewer(c.assigned_to));
         // Guard the correlation on the row itself, so a query path that does not
         // filter by parent_id (self-scope search) can never land a wrong child.
         if (child?.id && child.parent_id === id) {
@@ -322,7 +324,7 @@ function EscalationDetailView({ id }: { id: string }) {
       }
     }, waiting.maxWaitSeconds * 1000);
     return () => window.clearTimeout(timer);
-  }, [waiting, id, effectiveActorId, navigate, queryClient]);
+  }, [waiting, id, effectiveActorId, isViewer, navigate, queryClient]);
 
   // Fire the list-driven auto-start once. The escalation must be loaded, still
   // claimable (pending, no live claim), and — when it carries a form — seeded so
@@ -379,6 +381,21 @@ function EscalationDetailView({ id }: { id: string }) {
     context: esc ? buildShowIfContext(esc, lookupCtx) : undefined,
     onScanSubmit: (next) => scanSubmitRef.current(next),
   });
+  // A scan's message renders at the field that took or refused it, and the
+  // field scrolls into view; a field the form does not render keeps the line
+  // above the form.
+  const [noticeAtField, setNoticeAtField] = useState(false);
+  const fieldNotice = useMemo(
+    () => scanNotice && { ...scanNotice, message: `Scanned into ${fieldTitle(effectiveSchema, scanNotice.field)}` },
+    [scanNotice, effectiveSchema],
+  );
+  useLayoutEffect(() => {
+    if (!scanNotice) return;
+    const key = scanNotice.field.replace(/["\\]/g, (c) => `\\${c}`);
+    const el = document.querySelector<HTMLElement>(`[data-field-key="${key}"]`);
+    setNoticeAtField(!!el);
+    el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [scanNotice]);
 
   if (isLoading) {
     return (
@@ -743,7 +760,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 isRetrying={claim.isPending || resolve.isPending}
               />
 
-              {scanNotice && editable && (
+              {scanNotice && editable && !noticeAtField && (
                 <p
                   role="status"
                   key={scanNotice.at}
@@ -753,6 +770,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 </p>
               )}
 
+              <FieldNoticeProvider value={editable && fieldNotice ? fieldNotice : null}>
               <EscalationFormSection
                 esc={esc}
                 resolverPayload={resolverPayload}
@@ -782,6 +800,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 onDisabledClick={() => setClaimNudge((n) => n + 1)}
                 disabledHint={lockedFormHint}
               />
+              </FieldNoticeProvider>
 
               <div className="h-10" />
             </div>

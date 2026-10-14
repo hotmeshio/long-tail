@@ -9,7 +9,9 @@ import { NATS_SUBJECT_PREFIX } from '../nats/config';
 
 export type EscalationVerb =
   | 'created' | 'claimed' | 'released' | 'resolved'
-  | 'cancelled' | 'reassigned' | 'expired';
+  | 'cancelled' | 'reassigned' | 'expired'
+  /** In-place progress on a pending row: an item added or removed, an interim batch fill. */
+  | 'updated';
 
 /**
  * Mirror of the server's subject-token sanitizer: role values embed in

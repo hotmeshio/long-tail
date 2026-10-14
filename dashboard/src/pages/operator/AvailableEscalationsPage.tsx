@@ -63,7 +63,7 @@ export function AvailableEscalationsPage() {
   // The queue moves on arrivals and departures-into-work — created and
   // claimed. A role filter narrows the subscription to that queue's subject
   // token. Manual refresh covers the long tail of other lifecycle moments.
-  useEscalationListEvents({ role: filters.role || null, verbs: ['created', 'claimed'] });
+  useEscalationListEvents({ role: filters.role || null, verbs: ['created', 'claimed', 'updated'] });
   // Debounce so server-side search fires once the user pauses, not per keystroke.
   const debouncedSearch = useDebouncedValue(filters.search);
   const claimDurations = useClaimDurations();
@@ -244,7 +244,7 @@ export function AvailableEscalationsPage() {
   // Timeline mode fetches 100 per page so the spine has enough story to tell.
   const timelinePageSize = 100;
   const {
-    escalations, total, listSchema, singleRole, hasRichView,
+    escalations, total, groups, listSchema, listSchemaVersion, singleRole, hasRichView,
     isLoading, isFetching, error: queryError, refetch,
   } = useEscalationListQuery(listParams, {
     limit: showTimeline ? timelinePageSize : pagination.pageSize,
@@ -589,7 +589,9 @@ export function AvailableEscalationsPage() {
         <EscalationListView
           role={singleRole!}
           listSchema={listSchema!}
+          listSchemaVersion={listSchemaVersion}
           activeEscalations={escalations}
+          groups={groups}
           onRowClick={(row) => navigate(`/escalations/detail/${row.id}`, { state: { from: '/escalations/available' } })}
           onOpenGroup={(url) => navigate(url)}
           onAddFacet={(key, value) => setFacetFilters({

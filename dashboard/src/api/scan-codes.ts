@@ -81,7 +81,7 @@ export interface ScanStep {
   /** PRESENT only: the labeled choice set rendered under the located reality. */
   choices?: ScanChoice[];
   /** PRESENT only: labeled templates the station states instead of the row's metadata. */
-  facts?: { label: string; value: string }[];
+  facts?: { label: string; value: string; format?: 'date' | 'age' | 'ago' }[];
   /** PRESENT with one choice: the scan executes it directly instead of presenting. */
   autoSelectSingle?: boolean;
   /** The step executes only under a real acting identity (badge or a write-capable login). */
@@ -216,7 +216,7 @@ export interface ScanExecuteResponse {
   /** The labeled choice set (CHOICES). */
   choices?: ScanPresentedChoice[];
   /** CHOICES: the step's curated facts, rendered; absent when the step declares none. */
-  facts?: { label: string; value: string }[];
+  facts?: { label: string; value: string; format?: 'date' | 'age' | 'ago' }[];
   /** CHOICES only: the server would have executed the single choice, but identity stopped it. */
   autoSelect?: boolean;
   /** NO_OPEN_CONTAINER: the facet the located item names and no pending container carries. */

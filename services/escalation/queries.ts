@@ -6,6 +6,7 @@ import type { LTEscalationRecord, LTEscalationStatus } from '../../types';
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
 import { buildFacetWhere, buildFacetOrder } from './facet-sql';
+import { buildReadScopeClause } from './read-scope-sql';
 import type { EscalationStats, StationMetric } from './types';
 import { SORTABLE_COLUMNS, VALID_PERIODS } from './types';
 import { searchEscalationsQuery, COUNT_SEARCH_ESCALATIONS, STATION_LIVE_COUNTS_SQL, STATION_PERIOD_METRICS_SQL } from './sql';
@@ -108,18 +109,8 @@ async function searchEscalations(params: {
   };
 }
 
-/**
- * Scoped faceted search — the HUMAN operations query. Composes the read-scope
- * predicate (global → none; else `role ∈ allRoles OR (role ∈ selfRoles AND
- * assigned_to = me)`) with the full FacetQuery language (`buildFacetWhere`:
- * facets `@>`, block, numeric range, exists, status, available) plus the extra
- * top-level filters (type/subtype/priority/assigned_to) and an exact correlation-id
- * match (id/workflow_id/origin_id), then orders
- * by `buildFacetOrder` (columns + `metadata.<key>`). Every value is bound; the
- * COUNT shares the WHERE so totals stay correct across pages — no client-side
- * filtering. Reads go through the `public.lt_escalations` view.
- */
-export async function searchEscalationsFaceted(opts: {
+/** The scoped faceted search input, shared by the row and grouped reads. */
+export type ScopedFacetSearch = {
   global?: boolean;
   visibleRoles?: string[]; // read_all roles
   selfRoles?: string[];    // read_self roles
@@ -132,23 +123,15 @@ export async function searchEscalationsFaceted(opts: {
   search?: string;
   limit: number;
   offset: number;
-}): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
-  await ensureEscalationCompatView();
-  const pool = getPool();
-  const params: unknown[] = [];
+};
+
+/** The WHERE clause of a scoped faceted search, pushing bound params. */
+export function buildScopedSearchWhere(opts: Omit<ScopedFacetSearch, 'limit' | 'offset'>, params: unknown[]): string {
   const clauses: string[] = [];
 
   // 1. Read-scope predicate (skip entirely for global access).
-  if (!opts.global) {
-    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
-    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
-    const mi = params.push(opts.meUserId || null);
-    clauses.push(
-      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
-        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
-        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
-    );
-  }
+  const scopeClause = buildReadScopeClause(opts, params);
+  if (scopeClause) clauses.push(scopeClause);
 
   // 2. Faceted predicate (role/roles/status/available/facets/block/range/exists).
   const facetClause = buildFacetWhere(opts.facet, params);
@@ -170,7 +153,25 @@ export async function searchEscalationsFaceted(opts: {
     clauses.push(`(origin_id = $${i} OR workflow_id = $${i} OR ($${u}::uuid IS NOT NULL AND id = $${u}::uuid))`);
   }
 
-  const where = clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
+  return clauses.length ? `WHERE ${clauses.join('\n  AND ')}` : '';
+}
+
+/**
+ * Scoped faceted search — the HUMAN operations query. Composes the read-scope
+ * predicate (global → none; else `role ∈ allRoles OR (role ∈ selfRoles AND
+ * assigned_to = me)`) with the full FacetQuery language (`buildFacetWhere`:
+ * facets `@>`, block, numeric range, exists, status, available) plus the extra
+ * top-level filters (type/subtype/priority/assigned_to) and an exact correlation-id
+ * match (id/workflow_id/origin_id), then orders
+ * by `buildFacetOrder` (columns + `metadata.<key>`). Every value is bound; the
+ * COUNT shares the WHERE so totals stay correct across pages — no client-side
+ * filtering. Reads go through the `public.lt_escalations` view.
+ */
+export async function searchEscalationsFaceted(opts: ScopedFacetSearch): Promise<{ escalations: LTEscalationRecord[]; total: number }> {
+  await ensureEscalationCompatView();
+  const pool = getPool();
+  const params: unknown[] = [];
+  const where = buildScopedSearchWhere(opts, params);
   const orderBy = buildFacetOrder(opts.facet.orderBy);
   const countParams = [...params];
   const li = params.push(opts.limit);
@@ -236,16 +237,8 @@ export async function listFacetKeys(opts: {
   const params: unknown[] = [];
   const clauses: string[] = ["jsonb_typeof(metadata) = 'object'"];
 
-  if (!opts.global) {
-    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
-    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
-    const mi = params.push(opts.meUserId || null);
-    clauses.push(
-      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
-        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
-        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
-    );
-  }
+  const scopeClause = buildReadScopeClause(opts, params);
+  if (scopeClause) clauses.push(scopeClause);
 
   const { rows } = await pool.query(
     `SELECT DISTINCT jsonb_object_keys(metadata) AS key
@@ -309,16 +302,8 @@ export async function listFacetValues(
   const params: unknown[] = [key];
   const clauses: string[] = ["jsonb_typeof(metadata) = 'object'", 'metadata ? $1'];
 
-  if (!opts.global) {
-    const ai = params.push(opts.visibleRoles?.length ? opts.visibleRoles : null);
-    const si = params.push(opts.selfRoles?.length ? opts.selfRoles : null);
-    const mi = params.push(opts.meUserId || null);
-    clauses.push(
-      `(($${ai}::text[] IS NULL AND $${si}::text[] IS NULL)
-        OR ($${ai}::text[] IS NOT NULL AND role = ANY($${ai}))
-        OR ($${si}::text[] IS NOT NULL AND role = ANY($${si}) AND assigned_to = $${mi}))`,
-    );
-  }
+  const scopeClause = buildReadScopeClause(opts, params);
+  if (scopeClause) clauses.push(scopeClause);
 
   const { rows } = await pool.query(
     `SELECT DISTINCT metadata->>$1 AS value

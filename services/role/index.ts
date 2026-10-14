@@ -1,3 +1,4 @@
+import { listSchemaRelationsError } from '../../shared/list-schema';
 import { getPool } from '../../lib/db';
 import { hasGlobalEscalationAccess, hasRole } from '../user';
 import {
@@ -168,6 +169,10 @@ export async function updateRoleMetadata(
   role: string,
   input: UpdateRoleInput,
 ): Promise<RoleDetail | null> {
+  if (input.list_schema != null) {
+    const listSchemaError = listSchemaRelationsError(input.list_schema);
+    if (listSchemaError) throw new Error(`list_schema: ${listSchemaError}`);
+  }
   const pool = getPool();
   const provided = (key: keyof UpdateRoleInput) => input[key] !== undefined;
   const upstreams = [...new Set(input.upstream_roles ?? [])].sort();

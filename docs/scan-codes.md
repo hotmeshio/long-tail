@@ -246,9 +246,15 @@ fill renders as a dash.
 "facts": [
   { "label": "Bin", "value": "{item.binCode}" },
   { "label": "Clinic", "value": "{item.facilityName}" },
-  { "label": "Bags", "value": "{item.memberCount}" }
+  { "label": "Bags", "value": "{item.memberCount}" },
+  { "label": "Ship by", "value": "{item.releaseAt}", "format": "date" }
 ]
 ```
+
+A fact with `format` (`date`, `age`, `ago`) reads one token: the station
+receives the raw value and renders it with the list's formatter, so an ISO
+instant in metadata reads the same on the station as in a list column (and
+in the deployment's display time zone, when one is set).
 
 Without `facts`, the station lists the row's metadata, leaving out the
 bookkeeping a bench never acts on: scan provenance (`scannedAt`,

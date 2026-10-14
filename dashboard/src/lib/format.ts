@@ -1,4 +1,5 @@
-import { formatDistanceToNowStrict, format } from 'date-fns';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { formatDisplayDateTime } from './display-zone';
 
 /** Locale-formatted integer with commas: 1234567 → "1,234,567" */
 export function formatCount(n: number): string {
@@ -63,7 +64,7 @@ export function formatDuration(ms: number | null | undefined): string {
  */
 export function formatDateTime(iso: string | null): string {
   if (!iso) return '--';
-  return format(new Date(iso), 'MMM d, yyyy h:mm a');
+  return formatDisplayDateTime(iso);
 }
 
 /**

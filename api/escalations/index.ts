@@ -15,3 +15,4 @@ export { findByMetadata, claimByMetadata, resolveByMetadata } from './metadata';
 export { cancelSingleEscalation, bulkCancel } from './cancel';
 export { searchByFacets, claimGroups, claimByFacets } from './facets';
 export { aggregateByFacets, timelineByFacet } from './analytics';
+export { getRelatedAggregates, getRelatedRows } from './related';

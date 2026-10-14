@@ -16,7 +16,11 @@ import { templateContext, type StepContext } from './context';
 function renderFacts(step: ScanStep, ctx: StepContext, row: LTEscalationRecord): ScanExecuteResponse['facts'] {
   if (!step.facts) return undefined;
   const tpl = { ...templateContext(ctx), item: row.metadata ?? {} };
-  return step.facts.map((fact) => ({ label: fact.label, value: scanCodeService.renderScanCopy(fact.value, tpl) }));
+  return step.facts.map((fact) => ({
+    label: fact.label,
+    value: scanCodeService.renderScanCopy(fact.value.trim(), tpl),
+    ...(fact.format ? { format: fact.format } : {}),
+  }));
 }
 
 // ── The info-choice outcome — locate → present reality + labeled choices ───
