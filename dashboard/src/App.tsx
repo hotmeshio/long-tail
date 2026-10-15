@@ -6,6 +6,7 @@ import { EventTransportProvider } from './hooks/useEventTransport';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
+import { OAuthConsentPage } from './pages/OAuthConsentPage';
 import { RequireRole } from './components/layout/RequireRole';
 import { RequireInvocable } from './components/layout/RequireInvocable';
 import { RequireAI } from './components/layout/RequireAI';
@@ -160,6 +161,9 @@ const StreamMessagesPage = lazy(() =>
 const CredentialsPage = lazy(() =>
   import('./pages/settings/CredentialsPage').then((m) => ({ default: m.CredentialsPage })),
 );
+const ConnectedAppsPage = lazy(() =>
+  import('./pages/settings/ConnectedAppsPage').then((m) => ({ default: m.ConnectedAppsPage })),
+);
 const FilesPage = lazy(() =>
   import('./pages/files').then((m) => ({ default: m.FilesPage })),
 );
@@ -261,6 +265,7 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/connect/anthropic', element: <ConnectAnthropicPage /> },
   { path: '/connect/:provider', element: <ConnectAnthropicPage /> },
+  { path: '/oauth/consent', element: <OAuthConsentPage /> },
   {
     path: '/',
     element: <Shell />,
@@ -274,6 +279,7 @@ const router = createBrowserRouter([
 
       // Credentials (all authenticated users) — legacy path redirects
       { path: 'credentials', element: <Lazy><CredentialsPage /></Lazy> },
+      { path: 'connected-apps', element: <Lazy><ConnectedAppsPage /></Lazy> },
       { path: 'connections', element: <Navigate to="/credentials" replace /> },
 
       // Escalation section (all authenticated users)
@@ -290,15 +296,19 @@ const router = createBrowserRouter([
       // Capabilities (all authenticated users)
       { path: 'capabilities', element: <Lazy><CapabilitiesPage /></Lazy> },
 
-      // Agents section (all authenticated users)
-      { path: 'agents', element: <Lazy><AgentsPage /></Lazy> },
-      { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
-      { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
-      { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
-
-      // Topics section (all authenticated users)
-      { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
-      { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
+      // Agents and topics (builder: superadmin or engineer), matching the
+      // sidebar and the server's write gates
+      {
+        element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
+        children: [
+          { path: 'agents', element: <Lazy><AgentsPage /></Lazy> },
+          { path: 'agents/new', element: <Lazy><AgentConfigPage /></Lazy> },
+          { path: 'agents/:id', element: <Lazy><AgentDetailPage /></Lazy> },
+          { path: 'agents/:id/edit', element: <Lazy><AgentConfigPage /></Lazy> },
+          { path: 'topics', element: <Lazy><TopicsPage /></Lazy> },
+          { path: 'topics/:topic', element: <Lazy><TopicDetailPage /></Lazy> },
+        ],
+      },
 
       // Invoke: open to anyone the server lists an invokable workflow for
       {

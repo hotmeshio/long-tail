@@ -1,12 +1,11 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { createNetworkTransport } from './network-transport';
 import * as mcpDbService from '../db';
-import type { LTMcpServerRecord, LTMcpToolManifest } from '../../../types';
+import type { LTMcpServerRecord, LTMcpToolManifest, LTToolManifestEntry } from '../../../types';
 
 /** In-memory map of server ID/name to active MCP client */
 const clients = new Map<string, Client>();
@@ -17,6 +16,9 @@ const clients = new Map<string, Client>();
  * rather than external stdio/SSE connections.
  */
 const builtinFactories = new Map<string, () => Promise<any>>();
+
+/** Tool manifests declared with a built-in factory (Long Tail's or the host's), keyed by server name. */
+const builtinManifests = new Map<string, LTToolManifestEntry[]>();
 
 /**
  * Cached built-in McpServer instances -- keyed by canonical server name.
@@ -47,8 +49,16 @@ export function getBuiltinServers(): Map<string, any> {
 export function registerBuiltinServer(
   name: string,
   factory: () => Promise<any>,
+  toolManifest?: LTToolManifestEntry[],
 ): void {
   builtinFactories.set(name, factory);
+  if (toolManifest) builtinManifests.set(name, toolManifest);
+  else builtinManifests.delete(name);
+}
+
+/** The tool manifest a built-in server was registered with, if any. */
+export function getBuiltinToolManifest(name: string): LTToolManifestEntry[] | undefined {
+  return builtinManifests.get(name);
 }
 
 /**
@@ -108,10 +118,8 @@ export async function connectToServer(server: LTMcpServerRecord): Promise<Client
       args: server.transport_config.args || [],
       env: server.transport_config.env,
     });
-  } else if (ttype === 'streamable-http') {
-    transport = new StreamableHTTPClientTransport(new URL(server.transport_config.url!));
   } else {
-    transport = new SSEClientTransport(new URL(server.transport_config.url!));
+    transport = createNetworkTransport(ttype === 'streamable-http' ? 'streamable-http' : 'sse', server.transport_config);
   }
 
   await client.connect(transport);
@@ -152,6 +160,33 @@ export async function disconnectFromServer(serverId: string): Promise<void> {
  * Alias lookups (e.g. 'translation' matching 'long-tail-translation') reuse
  * the same client instance to avoid double-connecting the singleton server.
  */
+/**
+ * The built-in server a server id or name resolves to, by the same rules
+ * resolveClient follows: an exact or fuzzy factory name, else a registered
+ * server whose name matches a factory. Null for an external server.
+ */
+export async function resolveBuiltinServerName(serverId: string): Promise<string | null> {
+  if (builtinFactories.has(serverId)) return serverId;
+  const norm = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const normId = norm(serverId);
+  for (const [name] of builtinFactories) {
+    const normName = norm(name);
+    if (normName.includes(normId) || normId.includes(normName)) return name;
+  }
+  try {
+    const dbServer =
+      (await mcpDbService.getMcpServer(serverId)) ||
+      (await mcpDbService.getMcpServerByName(serverId));
+    if (!dbServer) return null;
+    for (const [name] of builtinFactories) {
+      if (dbServer.name === name || name.includes(dbServer.name) || dbServer.name.includes(name)) return name;
+    }
+  } catch {
+    // DB lookup failed: treated as external
+  }
+  return null;
+}
+
 export async function resolveClient(serverId: string): Promise<Client | null> {
   // 1. Direct lookup (by UUID or name)
   if (clients.has(serverId)) return clients.get(serverId)!;

@@ -125,3 +125,20 @@ export const STOP_WORDS = new Set([
 
 /** YAML dump line width. */
 export const YAML_LINE_WIDTH = envInt('LT_YAML_LINE_WIDTH', 120);
+
+// ── OAuth authorization server ───────────────────────────────────────
+
+/** Access-token lifetime. Bounds how stale a token's roles can be when no revocation event arrives. */
+export const OAUTH_ACCESS_TOKEN_TTL_SECONDS = envInt('LT_OAUTH_ACCESS_TOKEN_TTL_SECONDS', 300);
+
+/** Refresh-token lifetime. Each refresh issues a new one. */
+export const OAUTH_REFRESH_TOKEN_TTL_SECONDS = envInt('LT_OAUTH_REFRESH_TOKEN_TTL_SECONDS', 30 * 24 * 60 * 60);
+
+/** Authorization-code lifetime, from consent to the client's token request. */
+export const OAUTH_CODE_TTL_SECONDS = envInt('LT_OAUTH_CODE_TTL_SECONDS', 60);
+
+/** Client registrations allowed per address in each window. */
+export const OAUTH_REGISTRATIONS_PER_WINDOW = envInt('LT_OAUTH_REGISTRATIONS_PER_WINDOW', 20);
+
+/** Registration rate-limit window. */
+export const OAUTH_REGISTRATION_WINDOW_SECONDS = envInt('LT_OAUTH_REGISTRATION_WINDOW_SECONDS', 600);

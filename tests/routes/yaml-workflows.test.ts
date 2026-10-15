@@ -12,7 +12,7 @@ describe('YAML Workflows routes', () => {
 
     it('returns workflow list', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -24,7 +24,7 @@ describe('YAML Workflows routes', () => {
 
     it('supports status filter', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows?status=active`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -35,7 +35,7 @@ describe('YAML Workflows routes', () => {
 
     it('supports graph_topic filter', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows?graph_topic=nonexistent_topic`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -45,7 +45,7 @@ describe('YAML Workflows routes', () => {
 
     it('supports app_id filter', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows?app_id=nonexistent_app`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -55,7 +55,7 @@ describe('YAML Workflows routes', () => {
 
     it('supports search filter', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows?search=zzz_no_match_zzz`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -65,7 +65,7 @@ describe('YAML Workflows routes', () => {
 
     it('supports pagination', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows?limit=1&offset=0`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -81,7 +81,7 @@ describe('YAML Workflows routes', () => {
 
     it('returns an array of app_ids', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/app-ids`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -91,7 +91,7 @@ describe('YAML Workflows routes', () => {
 
     it('app_ids are strings and sorted', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/app-ids`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       const body = await res.json();
       for (const id of body.app_ids) {
@@ -105,7 +105,7 @@ describe('YAML Workflows routes', () => {
   describe('GET /api/yaml-workflows/:id', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -115,7 +115,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name: 'updated' }),
       });
       expect(res.status).toBe(404);
@@ -126,7 +126,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -136,7 +136,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/deploy`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -146,7 +146,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/invoke`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ data: {} }),
       });
       expect(res.status).toBe(404);
@@ -157,7 +157,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/regenerate`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -167,7 +167,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/archive`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -177,7 +177,7 @@ describe('YAML Workflows routes', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/restore`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -192,7 +192,7 @@ describe('YAML Workflows routes', () => {
     it('returns 400 when required fields missing', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name: 'test' }),
       });
       expect(res.status).toBe(400);
@@ -202,7 +202,7 @@ describe('YAML Workflows routes', () => {
   describe('GET /api/yaml-workflows/:id/yaml', () => {
     it('returns 404 for non-existent workflow', async () => {
       const res = await fetch(`${ctx.BASE}/yaml-workflows/nonexistent-id/yaml`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

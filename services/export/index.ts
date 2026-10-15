@@ -14,6 +14,7 @@ import { getPool } from '../../lib/db';
 import { sanitizeAppId, quoteSchema } from '../hotmesh-utils';
 
 import { getHandle } from './client';
+import { resolveWorkflowHandle } from '../task/resolve';
 import { postProcessExecution } from './post-process';
 import {
   readWorkflowState, workflowStateFromStatus, isTerminated, WORKFLOW_STATES, type WorkflowState,
@@ -165,6 +166,32 @@ export async function getWorkflowEnvelopes(
   }
   const output = await handle.output<unknown>().catch(() => null);
   return { workflow_id: workflowId, status: reading.state, input, output: output ?? null };
+}
+
+/**
+ * The identity a run was started with: its start envelope's `lt` block
+ * (`userId` is who it runs as; `initiatedBy` is the person who started it
+ * under `execute_as`). Read from the run's own input, so it holds for every
+ * registered or durable run. Null when the run cannot be found.
+ */
+export async function getWorkflowStartIdentity(
+  workflowId: string,
+): Promise<{ userId?: string; initiatedBy?: string } | null> {
+  let resolved;
+  try {
+    resolved = await resolveWorkflowHandle(workflowId);
+  } catch {
+    return null;
+  }
+  const handle = await getHandle(resolved.taskQueue, resolved.workflowName, workflowId);
+  const args = await handle.input<unknown[]>().catch(() => undefined);
+  const envelope = Array.isArray(args) && args.length >= 1 ? args[0] : null;
+  const lt = (envelope && typeof envelope === 'object' ? (envelope as { lt?: Record<string, unknown> }).lt : null) ?? null;
+  if (!lt) return {};
+  return {
+    ...(typeof lt.userId === 'string' ? { userId: lt.userId } : {}),
+    ...(typeof lt.initiatedBy === 'string' ? { initiatedBy: lt.initiatedBy } : {}),
+  };
 }
 
 /**

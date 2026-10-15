@@ -1,6 +1,6 @@
 # Service Accounts API
 
-Service accounts are named identities that authenticate with API keys instead of passwords. They share the same role-based access control as human users. All endpoints require admin access.
+Service accounts are named identities that authenticate with API keys instead of passwords. They share the same role-based access control as human users. All endpoints require builder access (superadmin or the `engineer` role). Role assignments follow the [scoped role assignment](roles.md#scoped-role-assignment) rules, and only a superadmin may change, delete, assign or remove roles on, or create or revoke keys for an account that holds a superadmin grant.
 
 ## List service accounts
 
@@ -107,7 +107,7 @@ Deletes the service account and all its API keys (cascade).
 
 ## Service account roles
 
-Roles work identically to user roles.
+Roles work identically to user roles, including the [scoped role assignment](roles.md#scoped-role-assignment) rules.
 
 ```
 GET    /api/bot-accounts/:id/roles
@@ -189,6 +189,12 @@ DELETE /api/bot-accounts/:id/api-keys/:keyId
 
 ```json
 { "revoked": true }
+```
+
+**Response 404:** The key does not exist or belongs to a different service account than `:id`.
+
+```json
+{ "error": "API key not found" }
 ```
 
 ## Using a service account API key

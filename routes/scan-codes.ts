@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import * as api from '../api/scan-codes';
 import { requireRoleManager } from '../modules/auth';

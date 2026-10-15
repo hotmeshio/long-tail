@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { isUuid } from '../../lib/uuid';
 import bcrypt from 'bcryptjs';
 
 import { getPool } from '../../lib/db';
@@ -8,6 +9,7 @@ import {
   UPDATE_BOT_KEY_LAST_USED,
   DELETE_BOT_KEY,
   LIST_BOT_KEYS_BY_USER,
+  GET_BOT_KEY_OWNER,
 } from './sql';
 
 const TOKEN_PREFIX = 'lt_bot_';
@@ -75,6 +77,14 @@ export async function revokeBotApiKey(id: string): Promise<boolean> {
 /**
  * List API keys for a bot account (without hashes).
  */
+/** The bot account a key belongs to, or null when there is no such key. */
+export async function getBotApiKeyOwner(keyId: string): Promise<string | null> {
+  if (!isUuid(keyId)) return null;
+  const pool = await getPool();
+  const { rows } = await pool.query(GET_BOT_KEY_OWNER, [keyId]);
+  return rows[0]?.user_id ?? null;
+}
+
 export async function listBotApiKeys(userId: string): Promise<BotApiKeyRecord[]> {
   const pool = await getPool();
   const { rows } = await pool.query(LIST_BOT_KEYS_BY_USER, [userId]);

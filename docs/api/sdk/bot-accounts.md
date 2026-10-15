@@ -237,6 +237,7 @@ const result = await lt.botAccounts.revokeKey({ keyId: 'key-id' });
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `keyId` | `string` | Yes | Unique identifier of the API key to revoke |
+| `botId` | `string` | No | When given, the key is revoked only if it belongs to this bot; otherwise `404` |
 
 **Returns:** `LTApiResult<{ revoked: true }>`
 

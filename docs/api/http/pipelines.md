@@ -114,6 +114,8 @@ Returns full execution detail for a specific run, including inflated activity ev
 POST /api/pipelines/:jobId/interrupt
 ```
 
+**Auth:** Requires builder access (superadmin or the `engineer` role).
+
 Immediately terminates a running pipeline job via `HotMesh.interrupt()`. The job is marked as interrupted and its state is expired.
 
 **Body:**

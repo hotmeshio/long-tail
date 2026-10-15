@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import { validateDelegationToken, requireScope } from '../services/auth/delegation';
 import { validateServiceToken } from '../services/auth/service-token';

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { setupRouteTest, authHeaders } from './setup';
 
 const ctx = setupRouteTest(4622);
@@ -74,22 +74,20 @@ describe('Namespace routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('allows member role to create namespace', async () => {
+    it('refuses a member: registering a namespace needs builder access', async () => {
       const name = `test-ns-member-${Date.now()}`;
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
         headers: authHeaders(ctx.memberToken),
         body: JSON.stringify({ name, description: 'Member namespace' }),
       });
-      expect(res.status).toBe(200);
-      const body = await res.json() as any;
-      expect(body.name).toBe(name);
+      expect(res.status).toBe(403);
     });
 
     it('returns 400 when name is missing', async () => {
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -101,7 +99,7 @@ describe('Namespace routes', () => {
       const name = `test-ns-${Date.now()}`;
       const res = await fetch(`${ctx.BASE}/namespaces`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ name, description: 'Test namespace' }),
       });
       expect(res.status).toBe(200);
@@ -134,6 +132,22 @@ describe('DBA routes', () => {
 });
 
 describe('Insight routes', () => {
+  const LLM_KEYS = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'] as const;
+  const saved: Partial<Record<(typeof LLM_KEYS)[number], string>> = {};
+
+  beforeAll(() => {
+    for (const key of LLM_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterAll(() => {
+    for (const key of LLM_KEYS) {
+      if (saved[key] !== undefined) process.env[key] = saved[key];
+    }
+  });
+
   describe('POST /api/insight/mcp-query', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/insight/mcp-query`, { method: 'POST' });
@@ -151,19 +165,13 @@ describe('Insight routes', () => {
       expect(body.error).toContain('prompt');
     });
 
-    it('accepts async mode and returns workflow_id or 503', async () => {
+    it('returns 503 without an LLM key', async () => {
       const res = await fetch(`${ctx.BASE}/insight/mcp-query`, {
         method: 'POST',
         headers: authHeaders(ctx.adminToken),
         body: JSON.stringify({ prompt: 'test query', wait: false }),
       });
-      // 503 if no LLM key, 200 if key present (async mode returns immediately)
-      expect([200, 503]).toContain(res.status);
-      const body = await res.json() as any;
-      if (res.status === 200) {
-        expect(body.workflow_id).toBeDefined();
-        expect(body.status).toBe('started');
-      }
+      expect(res.status).toBe(503);
     });
   });
 
@@ -190,7 +198,6 @@ describe('Insight routes', () => {
         headers: authHeaders(ctx.adminToken),
         body: JSON.stringify({ prompt: 'Count active users by role' }),
       });
-      // Without LLM key, the endpoint falls back gracefully
       expect(res.status).toBe(200);
       const body = await res.json() as any;
       expect(body).toHaveProperty('description');
@@ -208,7 +215,7 @@ describe('Insight routes', () => {
     it('returns 400 when prompt is missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -216,27 +223,13 @@ describe('Insight routes', () => {
       expect(body.error).toContain('prompt');
     });
 
-    it('accepts async mode and returns workflow_id or 503', async () => {
+    it('returns 503 without an LLM key', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
-        body: JSON.stringify({ prompt: 'screenshot a webpage and save it', wait: false }),
-      });
-      expect([200, 503]).toContain(res.status);
-      const body = await res.json() as any;
-      if (res.status === 200) {
-        expect(body.workflow_id).toBeDefined();
-        expect(body.status).toBe('started');
-      }
-    });
-
-    it('accepts tags parameter', async () => {
-      const res = await fetch(`${ctx.BASE}/insight/build-workflow`, {
-        method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test', tags: ['browser-automation'], wait: false }),
       });
-      expect([200, 503]).toContain(res.status);
+      expect(res.status).toBe(503);
     });
   });
 
@@ -249,7 +242,7 @@ describe('Insight routes', () => {
     it('returns 400 when required fields are missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test' }),
       });
       expect(res.status).toBe(400);
@@ -260,26 +253,12 @@ describe('Insight routes', () => {
     it('returns 400 when feedback is missing', async () => {
       const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ prompt: 'test', prior_yaml: 'app:\n  id: test' }),
       });
       expect(res.status).toBe(400);
       const body = await res.json() as any;
       expect(body.error).toContain('feedback');
-    });
-
-    it('accepts valid refine request or 503', async () => {
-      const res = await fetch(`${ctx.BASE}/insight/build-workflow/refine`, {
-        method: 'POST',
-        headers: authHeaders(ctx.adminToken),
-        body: JSON.stringify({
-          prompt: 'screenshot a webpage',
-          prior_yaml: 'app:\n  id: test\n  version: "1"',
-          feedback: 'screenshot_path missing .png extension',
-          wait: false,
-        }),
-      });
-      expect([200, 503]).toContain(res.status);
     });
   });
 });

@@ -4,6 +4,7 @@ import * as mcpClient from '../../../services/mcp/client';
 import * as mcpDbService from '../../../services/mcp/db';
 import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
+import { currentToolPrincipal, permittedBuiltin } from './principal-tools';
 
 /**
  * Call any tool by its qualified name — handles both YAML workflows
@@ -29,22 +30,20 @@ export async function callTool(
         return { error: `Compiled workflow "${yamlWorkflowName}" is not active` };
       }
       const toolCtx = getToolContext();
-      const scopedArgs = toolCtx?.principal.id
+      const scope = toolCtx?.principal.id
         ? {
-            ...args,
-            _scope: {
-              principal: toolCtx.principal,
-              ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
-              scopes: toolCtx.credentials.scopes,
-            },
+            principal: toolCtx.principal,
+            ...(toolCtx.initiatingPrincipal ? { initiatingPrincipal: toolCtx.initiatingPrincipal } : {}),
+            scopes: toolCtx.credentials.scopes,
           }
-        : args;
+        : undefined;
       const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
         wf.app_id,
         wf.graph_topic,
-        scopedArgs,
+        args,
         undefined,
         wf.graph_topic,
+        scope,
       );
       return { job_id, workflow: yamlWorkflowName, status: 'completed', result };
     } catch (err: any) {
@@ -67,9 +66,20 @@ export async function callTool(
     ? { userId: toolCtx.principal.id, delegationToken: toolCtx.credentials.delegationToken }
     : undefined;
 
+  // A built-in tool runs as the workflow's principal, under its manifest gate.
+  const principal = await currentToolPrincipal();
+  const dispatch = async (server: string) => {
+    if (principal) {
+      const builtin = await permittedBuiltin(principal, server, toolName);
+      if (builtin === undefined) return { error: `${toolName} is not available to this caller`, tool: qualifiedName };
+      if (builtin) return mcpClient.callBuiltinToolAs(builtin, toolName, { ...args }, { userId: principal.userId }, authContext);
+    }
+    return mcpClient.callServerTool(server, toolName, args, authContext);
+  };
+
   if (serverName) {
     try {
-      return await mcpClient.callServerTool(serverName, toolName, args, authContext);
+      return await dispatch(serverName);
     } catch (err: any) {
       return { error: err.message, tool: qualifiedName, args };
     }
@@ -81,7 +91,7 @@ export async function callTool(
     const manifest = server.tool_manifest || [];
     if (manifest.some((t: any) => t.name === toolName)) {
       try {
-        return await mcpClient.callServerTool(server.name, toolName, args, authContext);
+        return await dispatch(server.name);
       } catch (err: any) {
         return { error: err.message, tool: qualifiedName, args };
       }

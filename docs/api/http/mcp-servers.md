@@ -1,12 +1,16 @@
 # MCP Servers API
 
-Manage MCP server registrations, connections, and tool invocations. All endpoints require authentication.
+Manage MCP server registrations, connections, and tool invocations. All endpoints require authentication. Registering, testing, updating, deleting, connecting, and disconnecting servers require builder access (superadmin or the `engineer` role).
+
+A `stdio` server is a command Long Tail starts on its own host, with that host's environment and network. Builder access therefore includes running commands on the host: grant the `engineer` role with the same care as host access.
 
 ## List servers
 
 ```
 GET /api/mcp/servers
 ```
+
+`transport_config` is included only for builders.
 
 **Query parameters:**
 
@@ -53,6 +57,8 @@ GET /api/mcp/servers
 POST /api/mcp/servers
 ```
 
+**Auth:** Requires builder access (superadmin or the `engineer` role).
+
 **Request body:**
 
 | Field | Type | Required | Description |
@@ -76,14 +82,16 @@ POST /api/mcp/servers
 **Transport config for `sse`:**
 
 ```json
-{ "url": "http://localhost:3001/sse" }
+{ "url": "http://localhost:3001/sse", "headers": { "Authorization": "Bearer <token>" } }
 ```
 
 **Transport config for `streamable-http`:**
 
 ```json
-{ "url": "http://localhost:3001/mcp" }
+{ "url": "http://localhost:3001/mcp", "headers": { "Authorization": "Bearer <token>" } }
 ```
+
+`headers` is optional and is sent with every request to the server, the SSE stream included. Like the rest of `transport_config`, it is returned only to builders.
 
 **Response 201:** Created server record.
 
@@ -95,6 +103,8 @@ POST /api/mcp/servers
 GET /api/mcp/servers/:id
 ```
 
+`transport_config` is included only for builders.
+
 **Response 200:** Server record.
 
 **Response 404:** Server not found.
@@ -104,6 +114,8 @@ GET /api/mcp/servers/:id
 ```
 PUT /api/mcp/servers/:id
 ```
+
+**Auth:** Requires builder access (superadmin or the `engineer` role).
 
 **Request body:** Any fields from the registration (partial update), including `tags`, `compile_hints`, and `credential_providers`.
 
@@ -116,6 +128,8 @@ PUT /api/mcp/servers/:id
 ```
 DELETE /api/mcp/servers/:id
 ```
+
+**Auth:** Requires builder access (superadmin or the `engineer` role).
 
 **Response 200:**
 
@@ -130,6 +144,8 @@ DELETE /api/mcp/servers/:id
 ```
 POST /api/mcp/servers/test-connection
 ```
+
+**Auth:** Requires builder access (superadmin or the `engineer` role).
 
 Test connectivity to an MCP server without persisting a registration. Creates a temporary client, connects, lists tools, then disconnects.
 
@@ -167,6 +183,8 @@ On failure:
 POST /api/mcp/servers/:id/connect
 ```
 
+**Auth:** Requires builder access (superadmin or the `engineer` role).
+
 Establishes a connection to the registered MCP server and caches its tool manifest.
 
 **Response 200:**
@@ -180,6 +198,8 @@ Establishes a connection to the registered MCP server and caches its tool manife
 ```
 POST /api/mcp/servers/:id/disconnect
 ```
+
+**Auth:** Requires builder access (superadmin or the `engineer` role).
 
 **Response 200:**
 
@@ -222,15 +242,23 @@ POST /api/mcp/servers/:id/tools/:toolName/call
 
 Invoke a tool on a connected MCP server.
 
+**Auth:** The tool runs as the caller, or as the `execute_as` account when given. A built-in tool requires the capability its manifest `gate` declares, checked for the acting account; a built-in tool with no gate requires builder access. A tool on an external server (any registered network or local-process server) requires builder access, since it runs on the credential stored with that server. `execute_as` follows the act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type.
+
 **Request body:**
 
 ```json
 {
   "arguments": {
     "image_url": "https://example.com/image.png"
-  }
+  },
+  "execute_as": "optional-account-id"
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `arguments` | `object` | No | Tool arguments |
+| `execute_as` | `string` | No | Account id or `external_id` to run the tool as |
 
 **Response 200:**
 
@@ -241,6 +269,8 @@ Invoke a tool on a connected MCP server.
   }
 }
 ```
+
+**Response 403:** The caller may not act as `execute_as`, or the acting account lacks the tool's capability.
 
 **Response 422** (missing credential):
 

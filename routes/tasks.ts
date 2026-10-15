@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import * as api from '../api/tasks';
 
@@ -46,7 +46,7 @@ router.get('/', async (req, res) => {
     origin_id: req.query.origin_id as string,
     limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     offset: req.query.offset ? parseInt(req.query.offset as string, 10) : undefined,
-  });
+  }, req.auth);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -81,7 +81,7 @@ router.get('/processes', async (req, res) => {
  * Get all tasks and escalations for a process (origin_id).
  */
 router.get('/processes/:originId', async (req, res) => {
-  const result = await api.getProcess({ originId: req.params.originId });
+  const result = await api.getProcess({ originId: req.params.originId }, req.auth);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -90,7 +90,7 @@ router.get('/processes/:originId', async (req, res) => {
  * Get a single task by ID.
  */
 router.get('/:id', async (req, res) => {
-  const result = await api.getTask({ id: req.params.id });
+  const result = await api.getTask({ id: req.params.id }, req.auth);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

@@ -9,7 +9,8 @@
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
-import { canInvokeWorkflow } from './invocation-access';
+import { canInvokeWorkflow, mayActAs, SYSTEM_AUTHORITY_WORKFLOWS, type InvocationRoleGrant } from './invocation-access';
+import { isUuid } from '../lib/uuid';
 
 import { createClient } from '../workers';
 import * as configService from './config';
@@ -168,30 +169,62 @@ async function resolveTaskQueue(workflowType: string): Promise<string> {
   return worker.taskQueue;
 }
 
+/** A principal's grants by uuid or external_id, or null when no such user exists. */
+async function grantsOf(identifier: string): Promise<InvocationRoleGrant[] | null> {
+  const user = isUuid(identifier)
+    ? await userService.getUser(identifier)
+    : await userService.getUserByExternalId(identifier);
+  return user ? user.roles.map((r) => ({ role: r.role, type: r.type })) : null;
+}
+
 /**
- * Check invocation_roles when present on a workflow config.
- * Throws InvocationError if the user lacks the required role.
+ * Check a caller against the workflow's invocation rules, from the caller's
+ * live grants rather than any role claim a token carries. A workflow with no
+ * invocation roles is open, except a system-authority workflow, which needs a
+ * superadmin.
  */
 export async function checkInvocationRoles(
   workflowType: string,
   userId: string,
-  authRole?: string,
 ): Promise<void> {
   const wfConfig = await configService.getWorkflowConfig(workflowType);
-  if (!wfConfig || wfConfig.invocation_roles.length === 0) return;
+  const systemAuthority = SYSTEM_AUTHORITY_WORKFLOWS.has(workflowType);
+  if (!systemAuthority && (!wfConfig || wfConfig.invocation_roles.length === 0)) return;
 
-  // Superadmin from JWT bypasses all invocation role checks
-  if (authRole === 'superadmin') return;
-
-  const user = await userService.getUser(userId);
-  if (!user) {
+  const roles = await grantsOf(userId);
+  if (!roles) {
     throw new InvocationError('User not registered', 403);
   }
 
   // invocable is resolveTaskQueue's concern; this gate decides roles only.
-  if (!canInvokeWorkflow({ ...wfConfig, invocable: true }, user.roles, authRole)) {
+  const rules = { workflow_type: workflowType, invocation_roles: wfConfig?.invocation_roles ?? [], invocable: true };
+  if (!canInvokeWorkflow(rules, roles)) {
     throw new InvocationError('Insufficient role for invocation', 403);
   }
+}
+
+/** Refuse an execute_as override that would exceed the caller's own authority. */
+export async function assertMayActAs(userId: string, executeAs: string): Promise<void> {
+  const caller = await grantsOf(userId);
+  if (!caller) throw new InvocationError('User not registered', 403);
+  const target = await grantsOf(executeAs);
+  if (!target) throw new InvocationError(`execute_as principal "${executeAs}" not found`, 404);
+  if (!mayActAs(caller, target)) {
+    throw new InvocationError('execute_as may not exceed your own authority', 403);
+  }
+}
+
+/**
+ * Authorize an invocation that arrives from outside the process (REST, /mcp):
+ * the workflow's invocation rules, then any execute_as override.
+ */
+export async function authorizeInvocation(input: {
+  workflowType: string;
+  userId: string;
+  executeAs?: string;
+}): Promise<void> {
+  await checkInvocationRoles(input.workflowType, input.userId);
+  if (input.executeAs) await assertMayActAs(input.userId, input.executeAs);
 }
 
 /**

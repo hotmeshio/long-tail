@@ -5,6 +5,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as api from '../../../api/bot-accounts';
+import { getBotApiKeyOwner } from '../../../services/auth/bot-api-key';
+import { mayGrantRoles, mayManageAccount, type GrantDecision } from '../../../modules/capabilities';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import {
   listBotsSchema,
   getBotSchema,
@@ -14,6 +17,19 @@ import {
   createBotApiKeySchema,
   revokeBotKeySchema,
 } from './schemas';
+
+/** An MCP error for a refused decision; null when the call may go on. */
+function refusal(decision: GrantDecision) {
+  if (decision.allowed) return null;
+  return { content: [{ type: 'text' as const, text: JSON.stringify({ error: decision.error }) }], isError: true };
+}
+
+/** For a /mcp caller, the account rule on `botId`; internal calls act as lt-system. */
+async function accountRefusal(extra: ToolCallExtra | undefined, botId: string | null) {
+  const caller = externalCaller(extra);
+  if (!caller || !botId) return null;
+  return refusal(await mayManageAccount(caller.userId, botId));
+}
 
 export function registerBotAccountTools(server: McpServer): void {
 
@@ -61,7 +77,10 @@ export function registerBotAccountTools(server: McpServer): void {
         'Bot accounts can run workflows and hold API keys.',
       inputSchema: createBotSchema,
     },
-    async (args: z.infer<typeof createBotSchema>) => {
+    async (args: z.infer<typeof createBotSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? refusal(await mayGrantRoles(caller.userId, args.roles)) : null;
+      if (refused) return refused;
       const result = await api.createBot(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -78,7 +97,9 @@ export function registerBotAccountTools(server: McpServer): void {
       description: 'Update a bot account (display name, description, status).',
       inputSchema: updateBotSchema,
     },
-    async (args: z.infer<typeof updateBotSchema>) => {
+    async (args: z.infer<typeof updateBotSchema>, extra?: ToolCallExtra) => {
+      const refused = await accountRefusal(extra, args.id);
+      if (refused) return refused;
       const result = await api.updateBot(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -95,7 +116,9 @@ export function registerBotAccountTools(server: McpServer): void {
       description: 'Delete a bot account and all its API keys.',
       inputSchema: deleteBotSchema,
     },
-    async (args: z.infer<typeof deleteBotSchema>) => {
+    async (args: z.infer<typeof deleteBotSchema>, extra?: ToolCallExtra) => {
+      const refused = await accountRefusal(extra, args.id);
+      if (refused) return refused;
       const result = await api.deleteBot(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -114,7 +137,9 @@ export function registerBotAccountTools(server: McpServer): void {
         'ONCE — it cannot be retrieved again.',
       inputSchema: createBotApiKeySchema,
     },
-    async (args: z.infer<typeof createBotApiKeySchema>) => {
+    async (args: z.infer<typeof createBotApiKeySchema>, extra?: ToolCallExtra) => {
+      const refused = await accountRefusal(extra, args.id);
+      if (refused) return refused;
       const result = await api.createBotKey(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -131,7 +156,9 @@ export function registerBotAccountTools(server: McpServer): void {
       description: 'Revoke (delete) an API key for a bot account.',
       inputSchema: revokeBotKeySchema,
     },
-    async (args: z.infer<typeof revokeBotKeySchema>) => {
+    async (args: z.infer<typeof revokeBotKeySchema>, extra?: ToolCallExtra) => {
+      const refused = externalCaller(extra) ? await accountRefusal(extra, await getBotApiKeyOwner(args.key_id)) : null;
+      if (refused) return refused;
       const result = await api.revokeBotKey({ keyId: args.key_id });
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };

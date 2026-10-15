@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
 
 import * as api from '../../api/escalations';
 import { effectiveWorkAuth } from './acting';
@@ -24,7 +24,7 @@ export function registerSingleRoutes(router: Router): void {
   router.get('/by-workflow/:workflowId', async (req, res) => {
     const result = await api.getEscalationsByWorkflowId({
       workflowId: req.params.workflowId,
-    });
+    }, req.auth);
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 

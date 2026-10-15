@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { registeredToolCount } from '../../../services/mcp/registered-tools';
 
 import { registerTools } from './tools';
 
@@ -34,7 +35,7 @@ export async function createDbServer(options?: {
 
   registerTools(instance);
 
-  loggerRegistry.info(`[lt-mcp:db-server] ${name} ready (6 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:db-server] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }
 

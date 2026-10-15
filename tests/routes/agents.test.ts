@@ -18,7 +18,7 @@ describe('Agent routes', () => {
     it('POST /api/agents creates an agent', async () => {
       const res = await fetch(`${ctx.BASE}/agents`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           id: agentId,
           description: 'Test agent for integration tests',
@@ -35,7 +35,7 @@ describe('Agent routes', () => {
     it('POST /api/agents returns 400 without id', async () => {
       const res = await fetch(`${ctx.BASE}/agents`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
@@ -44,7 +44,7 @@ describe('Agent routes', () => {
     it('POST /api/agents returns 409 for duplicate id', async () => {
       const res = await fetch(`${ctx.BASE}/agents`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           id: agentId,
           description: 'Duplicate',
@@ -57,7 +57,7 @@ describe('Agent routes', () => {
 
     it('GET /api/agents lists agents', async () => {
       const res = await fetch(`${ctx.BASE}/agents`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -67,7 +67,7 @@ describe('Agent routes', () => {
 
     it('GET /api/agents?status=active filters by status', async () => {
       const res = await fetch(`${ctx.BASE}/agents?status=active`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -76,7 +76,7 @@ describe('Agent routes', () => {
 
     it('GET /api/agents/:id returns the agent with stats', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -85,7 +85,7 @@ describe('Agent routes', () => {
 
     it('GET /api/agents/:id returns 404 for missing id', async () => {
       const res = await fetch(`${ctx.BASE}/agents/nonexistent-agent-id`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -93,7 +93,7 @@ describe('Agent routes', () => {
     it('PUT /api/agents/:id updates the agent', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}`, {
         method: 'PUT',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ description: 'Updated description' }),
       });
       expect(res.status).toBe(200);
@@ -108,7 +108,7 @@ describe('Agent routes', () => {
     it('POST /api/agents/:agentId/subscriptions creates a subscription', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}/subscriptions`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({
           topic: 'app.test.>',
           reaction_type: 'durable',
@@ -124,7 +124,7 @@ describe('Agent routes', () => {
     it('POST /api/agents/:agentId/subscriptions returns 400 without topic', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}/subscriptions`, {
         method: 'POST',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
         body: JSON.stringify({ reaction_type: 'durable' }),
       });
       expect(res.status).toBe(400);
@@ -132,7 +132,7 @@ describe('Agent routes', () => {
 
     it('GET /api/agents/:agentId/subscriptions lists subscriptions', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}/subscriptions`, {
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -143,7 +143,7 @@ describe('Agent routes', () => {
     it('DELETE /api/agents/:agentId/subscriptions/:subId deletes a subscription', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}/subscriptions/${subId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
     });
@@ -153,7 +153,7 @@ describe('Agent routes', () => {
     it('DELETE /api/agents/:id deletes the agent', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(200);
     });
@@ -161,7 +161,7 @@ describe('Agent routes', () => {
     it('DELETE /api/agents/:id returns 404 after deletion', async () => {
       const res = await fetch(`${ctx.BASE}/agents/${createdId}`, {
         method: 'DELETE',
-        headers: authHeaders(ctx.adminToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

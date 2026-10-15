@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-import { Router } from 'express';
+import { Router } from '../lib/http';
 
 import * as api from '../api/settings';
 import { getCustomCss } from '../modules/branding';

@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response } from '../lib/http';
 
 import { getSSOConfig } from '../modules/sso';
 import { ssoProvision } from '../services/user/sso-provision';

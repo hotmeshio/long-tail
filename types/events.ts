@@ -48,7 +48,8 @@ export type LTSystemEventPattern =
   | `system.agent.${string}.failed`
   | `system.agent.${string}.status_changed`
   | `system.agent.${string}.triggers_changed`
-  | `system.milestone.${string}`;
+  | `system.milestone.${string}`
+  | 'system.oauth.grant.revoked';
 
 /** @deprecated Use LTSystemEventPattern for system events. Kept for backward compat. */
 export type LTEventType = LTSystemEventPattern;

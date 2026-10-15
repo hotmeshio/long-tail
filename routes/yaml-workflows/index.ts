@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../../lib/http';
 
 import cronRouter from './cron';
 import crudRouter from './crud';

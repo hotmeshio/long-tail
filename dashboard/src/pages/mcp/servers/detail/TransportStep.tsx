@@ -1,5 +1,6 @@
 import type { ServerFormState } from './server-form-types';
 import { labelCls, hintCls } from './server-form-types';
+import { SecretJsonField } from '../../../../components/common/form/SecretJsonField';
 
 interface Props {
   form: ServerFormState;
@@ -117,6 +118,13 @@ export function TransportStep({ form, set, isBuiltin }: Props) {
               ))}
             </div>
           </div>
+          <SecretJsonField
+            label="Headers (JSON)"
+            value={form.headers}
+            onChange={(v) => set('headers', v)}
+            placeholder={'{ "Authorization": "Bearer <service-account key>" }'}
+            hint="Sent with every request. Another Long Tail instance's /mcp takes a service-account key here."
+          />
         </>
       )}
 
@@ -143,16 +151,11 @@ export function TransportStep({ form, set, isBuiltin }: Props) {
               className="input text-xs w-full font-mono"
             />
           </div>
-          <div>
-            <label className={labelCls}>Environment Variables (JSON)</label>
-            <textarea
-              value={form.env_vars}
-              onChange={(e) => set('env_vars', e.target.value)}
-              className="input-json w-full"
-              rows={3}
-              spellCheck={false}
-            />
-          </div>
+          <SecretJsonField
+            label="Environment Variables (JSON)"
+            value={form.env_vars}
+            onChange={(v) => set('env_vars', v)}
+          />
         </>
       )}
 

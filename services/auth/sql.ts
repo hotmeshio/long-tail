@@ -21,6 +21,9 @@ export const UPDATE_BOT_KEY_LAST_USED = `
 export const DELETE_BOT_KEY = `
   DELETE FROM lt_bot_api_keys WHERE id = $1`;
 
+export const GET_BOT_KEY_OWNER = `
+  SELECT user_id FROM lt_bot_api_keys WHERE id = $1`;
+
 export const LIST_BOT_KEYS_BY_USER = `
   SELECT id, name, user_id, scopes, expires_at, last_used_at, created_at, updated_at
   FROM lt_bot_api_keys WHERE user_id = $1 ORDER BY created_at`;

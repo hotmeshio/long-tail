@@ -1,6 +1,6 @@
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
-import { assertReadAccess, assertQueueManageAccess } from './helpers';
+import { assertReadAccess, assertQueueManageAccess, getEscalationReadScope, scopeAdmits } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
 // ── Single-escalation routes ───────────────────────────────────────────────
@@ -38,16 +38,21 @@ export async function getEscalation(
 }
 
 /**
- * List all escalations for a given workflow ID.
+ * List the escalations for a given workflow ID. With `auth`, only the rows
+ * that caller may read; without it (in-process callers), every row.
  *
  * @param input.workflowId — HotMesh workflow ID
  * @returns `{ status: 200, data: { escalations } }`
  */
 export async function getEscalationsByWorkflowId(
   input: { workflowId: string },
+  auth?: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    const escalations = await escalationService.getEscalationsByWorkflowId(input.workflowId);
+    const all = await escalationService.getEscalationsByWorkflowId(input.workflowId);
+    if (!auth?.userId) return { status: 200, data: { escalations: all } };
+    const scope = await getEscalationReadScope(auth.userId);
+    const escalations = all.filter((e) => scopeAdmits(scope, auth.userId, e));
     return { status: 200, data: { escalations } };
   } catch (err: any) {
     return { status: 500, error: err.message };

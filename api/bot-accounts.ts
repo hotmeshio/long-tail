@@ -1,3 +1,4 @@
+import { getBotApiKeyOwner } from '../services/auth/bot-api-key';
 import * as iam from '../services/iam';
 import { isValidRoleType } from '../services/user';
 import type { LTApiResult, LTApiAuth } from '../types/sdk';
@@ -291,8 +292,13 @@ export async function createBotKey(input: {
  */
 export async function revokeBotKey(input: {
   keyId: string;
+  /** When given, the key is revoked only if it belongs to this bot. */
+  botId?: string;
 }): Promise<LTApiResult> {
   try {
+    if (input.botId !== undefined && (await getBotApiKeyOwner(input.keyId)) !== input.botId) {
+      return { status: 404, error: 'API key not found' };
+    }
     const revoked = await iam.revokeBotKey(input.keyId);
     if (!revoked) {
       return { status: 404, error: 'API key not found' };

@@ -11,6 +11,7 @@ export interface ServerFormState {
   env_vars: string;
   // network fields
   url: string;
+  headers: string;
   // shared
   auto_connect: boolean;
   tags: string[];
@@ -28,6 +29,7 @@ export const EMPTY_FORM: ServerFormState = {
   args: '',
   env_vars: '{}',
   url: '',
+  headers: '{}',
   auto_connect: false,
   tags: [],
   compile_hints: '',
@@ -52,6 +54,7 @@ export function serverToForm(s: McpServerRecord): ServerFormState {
     args: ((config as any).args ?? []).join(', '),
     env_vars: (config as any).env ? JSON.stringify((config as any).env, null, 2) : '{}',
     url: (config as any).url ?? '',
+    headers: (config as any).headers ? JSON.stringify((config as any).headers, null, 2) : '{}',
     auto_connect: s.auto_connect,
     tags: s.tags ?? [],
     compile_hints: (s as any).compile_hints ?? '',
@@ -70,7 +73,8 @@ export function formToPayload(form: ServerFormState) {
       env: form.env_vars.trim() ? JSON.parse(form.env_vars) : undefined,
     };
   } else if (form.mode === 'network') {
-    transport_config = { url: form.url.trim() };
+    const headers = form.headers.trim() ? JSON.parse(form.headers) : {};
+    transport_config = { url: form.url.trim(), ...(Object.keys(headers).length ? { headers } : {}) };
   }
   // in-process: transport_config stays empty (server manages it)
 

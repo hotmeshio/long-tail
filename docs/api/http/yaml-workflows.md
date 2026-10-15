@@ -2,6 +2,10 @@
 
 Manage YAML workflow definitions — the compiled deterministic pipelines generated from successful MCP triage executions. Each namespace (`app_id`) acts as a process server; each workflow is a tool within that server. All endpoints require authentication.
 
+**Auth:** Creating, updating, regenerating, deleting, deploying, activating, archiving, and restoring workflows, and setting or clearing a cron schedule (`PUT`/`DELETE /api/yaml-workflows/:id/cron`), require builder access (superadmin or the `engineer` role). Reads and invoke are open to any authenticated caller.
+
+An `execute_as` on invoke or on a cron schedule follows the act-as rule: a superadmin may act as anyone, and a caller holding an `admin`-type grant may act as an account that holds no superadmin grant and whose every role the caller holds at the same or higher type.
+
 ## List workflows
 
 ```
@@ -68,6 +72,8 @@ GET /api/yaml-workflows
 POST /api/yaml-workflows
 ```
 
+**Auth:** Requires builder access.
+
 Generates a YAML workflow from a completed MCP triage execution.
 
 **Request body:**
@@ -108,6 +114,8 @@ GET /api/yaml-workflows/:id
 PUT /api/yaml-workflows/:id
 ```
 
+**Auth:** Requires builder access.
+
 **Request body:** Partial update — `yaml_content`, `name`, `description`.
 
 **Response 200:** Updated workflow record.
@@ -119,6 +127,8 @@ PUT /api/yaml-workflows/:id
 ```
 DELETE /api/yaml-workflows/:id
 ```
+
+**Auth:** Requires builder access.
 
 Only allowed for `draft` or `archived` workflows.
 
@@ -138,6 +148,8 @@ Only allowed for `draft` or `archived` workflows.
 POST /api/yaml-workflows/:id/deploy
 ```
 
+**Auth:** Requires builder access.
+
 Deploys all YAML workflows sharing this workflow's `app_id` as a merged version. Bumps the version, marks all non-archived siblings as `active`, and registers HotMesh workers for the deployed workflows.
 
 **Response 200:** Updated workflow record (with new version).
@@ -149,6 +161,8 @@ Deploys all YAML workflows sharing this workflow's `app_id` as a merged version.
 ```
 POST /api/yaml-workflows/:id/activate
 ```
+
+**Auth:** Requires builder access.
 
 Activates the deployed version and registers workers for all workflows in the same `app_id`. Requires status `deployed` or `active`.
 
@@ -173,6 +187,9 @@ Invoke an active YAML workflow with parameters.
 | `data` | `object` | No | Input data matching the workflow's `input_schema` |
 | `sync` | `boolean` | No | Wait for result (default: false) |
 | `timeout` | `integer` | No | Timeout in ms for sync invocations (default: 120000) |
+| `execute_as` | `string` | No | Account id or `external_id` to run as. Must satisfy the act-as rule. |
+
+The server sets the workflow's `_scope` identity context. A `_scope` key in `data` is ignored.
 
 **Async response 200:**
 
@@ -202,6 +219,8 @@ Invoke an active YAML workflow with parameters.
 POST /api/yaml-workflows/:id/regenerate
 ```
 
+**Auth:** Requires builder access.
+
 Re-generate the YAML from the original source execution. Allowed for `draft`, `deployed`, and `active` workflows (not `archived`).
 
 **Request body:**
@@ -222,6 +241,8 @@ Re-generate the YAML from the original source execution. Allowed for `draft`, `d
 ```
 POST /api/yaml-workflows/:id/archive
 ```
+
+**Auth:** Requires builder access.
 
 Stops accepting invocations. If active, stops the engine.
 

@@ -102,6 +102,8 @@ export async function bulkClaim(
  *
  * Non-superadmin callers must verify the target user holds each
  * escalation's role (the query form requires exactly the declared role).
+ * The query form also requires the caller to manage that role's queue
+ * (write_scope all); read-only and self-scope members may not assign.
  * Publishes claim events for assigned items.
  *
  * @param input.ids — array of escalation UUIDs (ids form)
@@ -147,13 +149,16 @@ export async function bulkAssign(
       if (!query!.role || typeof query!.role !== 'string') {
         return { status: 400, error: 'query.role is required' };
       }
-      // RBAC, query form: the caller must hold the queried role (or global),
-      // and the target user must hold it — one role check instead of per-id.
+      // RBAC, query form: the caller must manage the queried role's queue
+      // (write_scope all, or global), and the target user must hold the role.
       const hasGlobal = await hasGlobalEscalationAccess(auth.userId);
       if (!hasGlobal) {
-        const callerHasRole = await userService.hasRole(auth.userId, query!.role);
-        if (!callerHasRole) {
+        const callerScope = await userService.getRoleScope(auth.userId, query!.role);
+        if (!callerScope) {
           return { status: 404, error: 'One or more escalations not found' };
+        }
+        if (callerScope.write !== 'all') {
+          return { status: 403, error: `You do not have permission to manage the "${query!.role}" queue` };
         }
         const targetHasRole = await userService.hasRole(targetUserId, query!.role);
         if (!targetHasRole) {

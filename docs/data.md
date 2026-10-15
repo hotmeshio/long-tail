@@ -297,7 +297,7 @@ Unique constraint: `(workflow_type, role)`.
 
 ### lt_config_invocation_roles
 
-Roles allowed to invoke a workflow via the API. When a workflow has `invocable: true` and this table has entries for it, only users holding one of these roles (or superadmins) can invoke.
+Roles allowed to invoke a workflow via the API. When a workflow has `invocable: true` and this table has entries for it, only users holding one of these roles, superadmins, and holders of the `admin` role at admin type can invoke. With no entries, any authenticated user can invoke.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|

@@ -71,10 +71,11 @@ Certain API endpoints require builder access (`superadmin` or `engineer` role):
 
 | Endpoint | Access |
 |----------|--------|
-| `POST/PUT/DELETE /api/users` | Builder |
-| `POST /api/users/:id/roles` | Admin (scoped — see below) |
+| `POST/PUT/PATCH/DELETE /api/users` | Builder |
+| `POST /api/users/:id/roles` | Admin (scoped, see below) |
+| `DELETE /api/users/:id/roles/:role` | Admin (scoped, see below) |
 | All `/api/bot-accounts` | Builder |
-| All `/api/roles` mutations | Builder |
+| All `/api/roles` mutations | Admin access or the `engineer` role |
 | All `/api/controlplane` | Builder |
 
 ### Scoped Role Assignment
@@ -86,6 +87,8 @@ When assigning roles via `POST /api/users/:id/roles`, the caller's own roles det
 | `superadmin` | Any role, any type (including `superadmin/superadmin`) |
 | `engineer` | Any role up to `admin` type (never `superadmin` type) |
 | `*/admin` (non-builder) | `member` or `admin` type for roles they themselves hold |
+
+Removing a role follows the same rule for the role at the type the account holds it. Only a superadmin may change, remove roles from, or mint keys for an account that holds a superadmin grant; others receive `403`.
 
 A caller who may assign a role may set any work-surface scope (`read_scope`/`write_scope`) on it. Scope is a refinement of a `member` grant; it is ignored for `admin`/`superadmin`, which always act on the whole queue.
 
@@ -289,7 +292,7 @@ Returns all roles with metadata and usage counts.
 POST /api/roles
 ```
 
-Create a standalone role. Requires admin.
+Create a standalone role. Requires role manager (admin type, superadmin, or engineer).
 
 **Request body:**
 
@@ -325,7 +328,7 @@ Create a standalone role. Requires admin.
 DELETE /api/roles/:role
 ```
 
-Delete a role if it has no references. Requires admin.
+Delete a role if it has no references. Requires role manager (admin type, superadmin, or engineer).
 
 **Path parameters:**
 
@@ -494,7 +497,7 @@ Returns all escalation chain pairs.
 POST /api/roles/escalation-chains
 ```
 
-Add a single escalation chain entry. Requires admin.
+Add a single escalation chain entry. Requires role manager (admin type, superadmin, or engineer).
 
 **Request body:**
 
@@ -527,7 +530,7 @@ Add a single escalation chain entry. Requires admin.
 DELETE /api/roles/escalation-chains
 ```
 
-Remove a single escalation chain entry. Requires admin.
+Remove a single escalation chain entry. Requires role manager (admin type, superadmin, or engineer).
 
 **Request body:**
 
@@ -576,7 +579,7 @@ Returns the allowed escalation targets for a specific role.
 PUT /api/roles/:role/escalation-targets
 ```
 
-Replace all escalation targets for a role. Requires admin.
+Replace all escalation targets for a role. Requires role manager (admin type, superadmin, or engineer).
 
 **Path parameters:**
 

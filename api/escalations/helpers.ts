@@ -39,6 +39,16 @@ export async function getEscalationReadScope(userId: string): Promise<Escalation
   return { global: false, allRoles, selfRoles };
 }
 
+/** Whether a read scope admits one escalation: the same rule as assertReadAccess, with no lookup. */
+export function scopeAdmits(
+  scope: EscalationReadScope,
+  userId: string,
+  escalation: { role: string; assigned_to?: string | null },
+): boolean {
+  if (scope.global || scope.allRoles.includes(escalation.role)) return true;
+  return scope.selfRoles.includes(escalation.role) && escalation.assigned_to === userId;
+}
+
 export function validateIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) && ids.length > 0;
 }

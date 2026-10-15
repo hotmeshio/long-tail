@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as api from '../../../api/announcements';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 
 const publishAnnouncementSchema = z.object({
   body: z.string().describe('Markdown body — the only required field.'),
@@ -31,7 +32,7 @@ export function registerAnnouncementTools(server: McpServer): void {
         'subscribers — never include secrets.',
       inputSchema: publishAnnouncementSchema,
     },
-    async (args: z.infer<typeof publishAnnouncementSchema>) => {
+    async (args: z.infer<typeof publishAnnouncementSchema>, extra?: ToolCallExtra) => {
       const result = await api.createAnnouncement(
         {
           body: args.body,
@@ -40,7 +41,7 @@ export function registerAnnouncementTools(server: McpServer): void {
           roles: args.roles,
           expiresAt: args.expires_at,
         },
-        { userId: 'lt-system', role: 'superadmin' },
+        externalCaller(extra) ?? { userId: 'lt-system', role: 'superadmin' },
       );
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };

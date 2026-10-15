@@ -11,6 +11,8 @@ import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlGenerator from '../../../services/yaml-workflow/generator';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../../services/yaml-workflow/workers';
+import { deployRefusal } from '../../../api/yaml-workflows/deploy';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import { getTaskByWorkflowId } from '../../../services/task';
 import {
   listYamlWorkflowsSchema,
@@ -177,13 +179,17 @@ export function registerYamlWorkflowTools(server: McpServer): void {
         'are deployed together.',
       inputSchema: deployYamlWorkflowSchema,
     },
-    async (args: z.infer<typeof deployYamlWorkflowSchema>) => {
+    async (args: z.infer<typeof deployYamlWorkflowSchema>, extra?: ToolCallExtra) => {
       const wf = await yamlDb.getYamlWorkflow(args.id);
       if (!wf) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'YAML workflow not found' }) }],
           isError: true,
         };
+      }
+      const refused = await deployRefusal(wf, externalCaller(extra));
+      if (refused) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: refused.error }) }], isError: true };
       }
 
       const deployVersion = wf.app_version || '1';

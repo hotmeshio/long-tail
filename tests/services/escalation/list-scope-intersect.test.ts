@@ -103,4 +103,13 @@ describe('list role filter intersects read scope (integration)', () => {
     });
     expect(outOfScope.total).toBe(0);
   });
+
+  it('an empty scope sees nothing, with or without a role filter', async () => {
+    const all = await escalationService.listEscalations({ status: 'pending', visibleRoles: [] });
+    expect(all).toEqual({ escalations: [], total: 0 });
+    const byMetadata = await escalationService.findByMetadata('k', 'v', 'pending', 50, 0, { allRoles: [], selfRoles: [] });
+    expect(byMetadata).toEqual({ escalations: [], total: 0 });
+    const available = await escalationService.listAvailableEscalations({ role: A, visibleRoles: [] });
+    expect(available.total).toBe(0);
+  });
 });

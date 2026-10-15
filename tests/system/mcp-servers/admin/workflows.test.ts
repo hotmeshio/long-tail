@@ -7,7 +7,7 @@ const mockGetWorkflowConfig = vi.fn();
 
 vi.mock('../../../../services/workflow-invocation', () => ({
   invokeWorkflow: (...a: unknown[]) => mockInvokeWorkflow(...a),
-  checkInvocationRoles: vi.fn(),
+  authorizeInvocation: vi.fn(),
 }));
 vi.mock('../../../../services/config', () => ({
   listWorkflowConfigs: vi.fn().mockResolvedValue([]),

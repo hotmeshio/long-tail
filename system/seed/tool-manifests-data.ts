@@ -1,8 +1,11 @@
+import type { LTToolManifestEntry } from '../../types';
+
 // ── Data, storage, HTTP, and OAuth tool manifests ───────────────────────────
 
-export const TRANSLATION_TOOLS = [
+export const TRANSLATION_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'translate_content',
+    gate: 'caller',
     description: 'Translate content text to the target language. Returns the translated content and detected source language.',
     read_safe: true,
     inputSchema: {
@@ -17,9 +20,10 @@ export const TRANSLATION_TOOLS = [
   },
 ];
 
-export const VISION_ANALYSIS_TOOLS = [
+export const VISION_ANALYSIS_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'analyze_image',
+    gate: 'caller',
     description: 'Analyze an image and extract structured data: description, text content, and notable objects. Accepts storage paths directly (e.g., "google_homepage.png" from capture_page) — no need to read_file first.',
     read_safe: true,
     inputSchema: {
@@ -33,6 +37,7 @@ export const VISION_ANALYSIS_TOOLS = [
   },
   {
     name: 'describe_image',
+    gate: 'caller',
     description: 'Generate a detailed description of an image. Accepts storage paths directly (e.g., "screenshot.png" from capture_page) — no need to read_file first.',
     read_safe: true,
     inputSchema: {
@@ -55,9 +60,10 @@ export const DB_QUERY_TOOLS = [
   { name: 'get_system_health', description: 'Full system overview: durable workflow execution counts by type (active/completed), task counts by status, escalation counts by status, recent activity window, MCP servers (with tool counts and tags), compiled workflow totals, and workflow configurations.', read_safe: true, inputSchema: { type: 'object', properties: {} } },
 ];
 
-export const FILE_STORAGE_TOOLS = [
+export const FILE_STORAGE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'read_file',
+    gate: 'builder',
     description: 'Read file content from managed storage. Returns content, size, and detected MIME type. Supports utf8 (text) or base64 encoding.',
     read_safe: true,
     inputSchema: {
@@ -71,6 +77,7 @@ export const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'write_file',
+    gate: 'builder',
     description: 'Write content to a file in managed storage. Creates directories as needed. Returns the storage reference and size.',
     read_safe: false,
     inputSchema: {
@@ -85,6 +92,7 @@ export const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'list_files',
+    gate: 'builder',
     description: 'List files in a storage directory. Returns file paths, sizes, and modification timestamps.',
     read_safe: true,
     inputSchema: {
@@ -97,6 +105,7 @@ export const FILE_STORAGE_TOOLS = [
   },
   {
     name: 'delete_file',
+    gate: 'builder',
     description: 'Remove a file from managed storage.',
     read_safe: false,
     inputSchema: {
@@ -109,9 +118,10 @@ export const FILE_STORAGE_TOOLS = [
   },
 ];
 
-export const HTTP_FETCH_TOOLS = [
+export const HTTP_FETCH_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'http_request',
+    gate: 'builder',
     description: 'Make an HTTP request to any URL. Supports all methods, custom headers, and request bodies. Returns status, headers, and body.',
     read_safe: false,
     inputSchema: {
@@ -128,8 +138,9 @@ export const HTTP_FETCH_TOOLS = [
   },
   {
     name: 'fetch_json',
+    gate: 'builder',
     description: 'GET a URL and parse the response as JSON. Convenience wrapper around http_request.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -141,8 +152,9 @@ export const HTTP_FETCH_TOOLS = [
   },
   {
     name: 'fetch_text',
+    gate: 'builder',
     description: 'GET a URL and return the response as text. Returns content, status, and content type.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -154,9 +166,10 @@ export const HTTP_FETCH_TOOLS = [
   },
 ];
 
-export const SCHEMA_EXCHANGE_TOOLS = [
+export const SCHEMA_EXCHANGE_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'exchange',
+    gate: 'builder',
     description: 'Exchange data with an external service endpoint under schema enforcement. Validates request body against request_schema before sending and response body against response_schema after receiving. Transport is hidden — the principle is endpoint + schema + validated exchange.',
     read_safe: false,
     inputSchema: {
@@ -180,6 +193,7 @@ export const SCHEMA_EXCHANGE_TOOLS = [
   },
   {
     name: 'validate_schema',
+    gate: 'caller',
     description: 'Validate any value against a JSON Schema without making a network call. Useful for pre-validation, testing, and transform verification.',
     read_safe: true,
     inputSchema: {
@@ -193,15 +207,17 @@ export const SCHEMA_EXCHANGE_TOOLS = [
   },
 ];
 
-export const DOCS_TOOLS = [
+export const DOCS_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'list_docs',
+    gate: 'caller',
     description: 'List all available documentation files with their titles.',
     read_safe: true,
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'search_docs',
+    gate: 'caller',
     description: 'Search across all documentation for a keyword or phrase. Returns matching files with line context.',
     read_safe: true,
     inputSchema: {
@@ -214,6 +230,7 @@ export const DOCS_TOOLS = [
   },
   {
     name: 'read_doc',
+    gate: 'caller',
     description: 'Read the full content of a documentation file.',
     read_safe: true,
     inputSchema: {
@@ -226,11 +243,12 @@ export const DOCS_TOOLS = [
   },
 ];
 
-export const OAUTH_TOOLS = [
+export const OAUTH_TOOLS: LTToolManifestEntry[] = [
   {
     name: 'get_access_token',
+    gate: 'caller',
     description: 'Get a fresh OAuth access token for an external service. Automatically refreshes expired tokens.',
-    read_safe: true,
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -243,6 +261,7 @@ export const OAUTH_TOOLS = [
   },
   {
     name: 'list_connections',
+    gate: 'caller',
     description: 'List all OAuth providers connected for a user. Returns provider, label, and credential type for each connection.',
     read_safe: true,
     inputSchema: {
@@ -255,6 +274,7 @@ export const OAUTH_TOOLS = [
   },
   {
     name: 'revoke_connection',
+    gate: 'caller',
     description: 'Disconnect an OAuth provider for a user, removing stored tokens. Use label to target a specific credential.',
     read_safe: false,
     inputSchema: {

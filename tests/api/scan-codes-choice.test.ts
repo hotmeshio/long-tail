@@ -21,6 +21,9 @@ vi.mock('../../api/scan-codes/locate', () => ({
 vi.mock('../../api/scan-codes/verbs', () => ({
   dispatchChoiceVerb: vi.fn(),
 }));
+vi.mock('../../api/escalations/helpers', () => ({
+  assertReadAccess: vi.fn(async () => null),
+}));
 
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
@@ -28,6 +31,7 @@ import { actingIdentitySatisfied } from '../../api/scan-codes/identity';
 import { peekGrant } from '../../api/scan-codes/grant';
 import { locateForStep } from '../../api/scan-codes/locate';
 import { dispatchChoiceVerb } from '../../api/scan-codes/verbs';
+import { assertReadAccess } from '../../api/escalations/helpers';
 import { executeScanChoice } from '../../api/scan-codes/choice';
 import { SCAN_OUTCOMES } from '../../types';
 
@@ -85,6 +89,28 @@ describe('executeScanChoice — the pointer is never authority', () => {
     esc.getEscalation.mockResolvedValue({ id: 'esc-1', metadata: {} } as any);
     const result = await executeScanChoice(pointer, auth);
     expect(result.data?.outcome).toBe(SCAN_OUTCOMES.UNCONFIGURED);
+  });
+
+  it('a row the actor may not read is CONFLICT, as a row that left the presented state, and reveals no target', async () => {
+    vi.mocked(assertReadAccess).mockResolvedValueOnce({ status: 403, error: 'Not authorized to view this escalation' });
+    const result = await executeScanChoice(pointer, auth);
+    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.CONFLICT);
+    expect((result.data as any)?.parsed).toBeUndefined();
+    expect(locate).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('with no grant, a badge-required choice parks for the next badge scan before any row is read', async () => {
+    // The 60s grant expired between render and tap; the station reads only its own roles.
+    satisfied.mockResolvedValue(false);
+    vi.mocked(assertReadAccess).mockResolvedValue({ status: 403, error: 'Not authorized to view this escalation' });
+    const result = await executeScanChoice(pointer, auth);
+    expect(result.data?.outcome).toBe(SCAN_OUTCOMES.NOT_PRIMED);
+    expect(result.data?.notPrimed).toEqual({ markdown: 'badge' });
+    expect((result.data as any)?.parsed).toBeUndefined();
+    expect(esc.getEscalation).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    vi.mocked(assertReadAccess).mockResolvedValue(null);
   });
 
   it('a row that moved out of the presented state is CONFLICT', async () => {

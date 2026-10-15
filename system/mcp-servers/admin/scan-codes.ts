@@ -3,15 +3,14 @@
  *
  * Schemes map a code's leading two digits (10-99) to a target metadata facet
  * and parse shape; rules map a single-digit category (0-9) to ordered
- * condition/action steps over the escalation surface. execute_scan_code runs a raw code as
- * the lt-system principal (see escalations.ts for the principal rationale).
+ * condition/action steps over the escalation surface. execute_scan_code and
+ * execute_scan_choice run as the `/mcp` caller, or as lt-system for internal calls.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as scanCodesApi from '../../../api/scan-codes';
-import { ensureSystemBot } from '../../../services/iam';
-import type { LTApiAuth } from '../../../types/sdk';
+import { callerAuth, type ToolCallExtra } from '../caller-auth';
 import {
   executeScanCodeSchema,
   executeScanChoiceSchema,
@@ -20,13 +19,6 @@ import {
   upsertScanRuleSchema,
   deleteScanRuleSchema,
 } from './schemas';
-
-let systemPrincipalId: string | null = null;
-
-async function systemAuth(): Promise<LTApiAuth> {
-  if (!systemPrincipalId) systemPrincipalId = await ensureSystemBot();
-  return { userId: systemPrincipalId, role: 'superadmin' };
-}
 
 function asText(payload: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
@@ -49,14 +41,14 @@ export function registerScanCodeTools(server: McpServer): void {
         'identity_primed, identity_unknown, unconfigured, invalid_code, forbidden, conflict.',
       inputSchema: executeScanCodeSchema,
     },
-    async (args: z.infer<typeof executeScanCodeSchema>) => {
+    async (args: z.infer<typeof executeScanCodeSchema>, extra?: ToolCallExtra) => {
       const result = await scanCodesApi.executeScanCode({
         code: args.code,
         actingToken: args.actingToken,
         previousActingToken: args.previousActingToken,
         subject: args.subject,
         stationRole: args.stationRole,
-      }, await systemAuth());
+      }, await callerAuth(extra));
       return asText(result.data ?? { error: result.error });
     },
   );
@@ -73,8 +65,8 @@ export function registerScanCodeTools(server: McpServer): void {
         'and RBAC before the verb runs.',
       inputSchema: executeScanChoiceSchema,
     },
-    async (args: z.infer<typeof executeScanChoiceSchema>) => {
-      const result = await scanCodesApi.executeScanChoice(args, await systemAuth());
+    async (args: z.infer<typeof executeScanChoiceSchema>, extra?: ToolCallExtra) => {
+      const result = await scanCodesApi.executeScanChoice(args, await callerAuth(extra));
       return asText(result.data ?? { error: result.error });
     },
   );

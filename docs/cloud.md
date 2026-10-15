@@ -39,14 +39,14 @@ The worker container registers the LT interceptor, starts workflow workers, and 
 // worker.ts — Worker container entry point
 import { start } from '@hotmeshio/long-tail';
 import * as reviewContent from './workflows/review-content';
-import * as verifyDocument from './workflows/verify-document';
+import * as kitchenSink from './workflows/kitchen-sink';
 
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
   workers: [
     { taskQueue: 'long-tail', workflow: reviewContent.reviewContent },
-    { taskQueue: 'long-tail-verify', workflow: verifyDocument.verifyDocument },
+    { taskQueue: 'long-tail-examples', workflow: kitchenSink.kitchenSink },
   ],
   telemetry: process.env.HONEYCOMB_API_KEY
     ? { honeycomb: { apiKey: process.env.HONEYCOMB_API_KEY } }
@@ -217,6 +217,11 @@ The API Deployment sits behind a Service + Ingress. The worker Deployment has no
 | `HONEYCOMB_API_KEY` | — | yes | Honeycomb telemetry (optional) |
 | `HMSH_TELEMETRY` | — | yes | Span verbosity: `info` or `debug` |
 | `NATS_URL` | — | yes | NATS server for milestone events (optional) |
+| `NATS_WS_TICKET_TTL_SECONDS` | yes | — | Lifetime of the dashboard's WebSocket proxy ticket (default: 300) |
+| `NATS_RECONNECT_INITIAL_MS` | yes | — | Dashboard reconnect: first backoff delay (default: 1000) |
+| `NATS_RECONNECT_MAX_MS` | yes | — | Dashboard reconnect: backoff cap (default: 60000) |
+| `NATS_LIVE_NOTICE_AFTER_MS` | yes | — | How long live updates stay down before the dashboard shows a notice (default: 30000) |
+| `NATS_RECONNECT_SPREAD_MS` | yes | — | Window the first retry after a drop and the catch-up refetch spread across (default: 5000) |
 | `OPENAI_API_KEY` | — | yes | For workflows that call OpenAI (optional) |
 
 Environment variables serve as fallbacks. When using `start()`, prefer passing config directly — it's explicit and type-checked. The API container does not need telemetry, event, or AI keys — it never executes workflow code. The worker container does not need `JWT_SECRET` or `PORT` — it never serves HTTP.

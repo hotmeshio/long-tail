@@ -1,5 +1,7 @@
 import { getPool } from '../lib/db';
-import type { LTApiResult } from '../types/sdk';
+import { capabilityAccess } from '../modules/capabilities';
+import { builtinServerFor, builtinToolGate } from './mcp/tools';
+import type { LTApiAuth, LTApiResult } from '../types/sdk';
 
 const LIST_SERVERS_WITH_TOOLS = `
   SELECT id, name, description, tags, tool_manifest, compile_hints, category
@@ -54,12 +56,18 @@ function resolveCategory(server: { category?: string; tags?: string[] }): string
   return 'Other';
 }
 
-export async function listCapabilities(): Promise<LTApiResult> {
+/**
+ * Every tool the caller may run, by category. A built-in server's tool is
+ * listed only when its manifest gate admits the caller, the same rule the
+ * tool-call route applies; an external server's tools are listed as before.
+ */
+export async function listCapabilities(auth?: LTApiAuth): Promise<LTApiResult> {
   try {
     const pool = getPool();
     const { rows } = await pool.query(LIST_SERVERS_WITH_TOOLS);
 
     const categoryMap = new Map<string, CapabilityTool[]>();
+    const access = capabilityAccess(auth?.userId ? { userId: auth.userId } : undefined);
 
     for (const server of rows) {
       const category = resolveCategory(server);
@@ -69,7 +77,9 @@ export async function listCapabilities(): Promise<LTApiResult> {
         categoryMap.set(category, []);
       }
 
+      const builtin = await builtinServerFor(server.name);
       for (const tool of tools) {
+        if (builtin && !(await access(builtinToolGate(builtin, tool.name)))) continue;
         categoryMap.get(category)!.push({
           name: tool.name,
           description: tool.description || '',
@@ -81,7 +91,7 @@ export async function listCapabilities(): Promise<LTApiResult> {
     }
 
     const categories: CapabilityCategory[] = CATEGORY_ORDER
-      .filter((name) => categoryMap.has(name))
+      .filter((name) => (categoryMap.get(name)?.length ?? 0) > 0)
       .map((name) => ({
         name,
         tools: categoryMap.get(name)!.sort((a, b) => a.name.localeCompare(b.name)),

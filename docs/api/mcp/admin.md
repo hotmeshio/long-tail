@@ -1,6 +1,6 @@
 # Admin
 
-Unified system management — tasks, escalations, workflows, diagnostics, agents, bot accounts, control plane, pipelines, topics, users, roles, and settings.
+Unified system management: tasks, escalations, workflows, diagnostics, agents, bot accounts, control plane, pipelines, topics, users, roles, personas, scan codes, announcements, and settings.
 
 | Property | Value |
 |----------|-------|
@@ -11,7 +11,7 @@ Unified system management — tasks, escalations, workflows, diagnostics, agents
 
 ## Access
 
-Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read` can call the Read-safe tools; the rest (Read-safe: No) change state and require an `mcp:full` key, and the account's role must permit the action on the target. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section for the full model.
+Each tool below is marked **Read-safe**. A service-account key scoped `mcp:read` can call the Read-safe tools; the rest (Read-safe: No) change state and require an `mcp:full` key, and the account's role must permit the action on the target. Each tool also declares a role gate (`caller`, `admin`, `builder`, or `roleManager`); a tool appears only to accounts that hold it. See the MCP guide's [Access](../../mcp.md#access-which-tools-and-which-records) section for the full model.
 
 ## Compile Hints
 
@@ -189,6 +189,57 @@ and want to skip the id lookup.
 | signalKey | string | Yes | Deterministic signal key of the escalation |
 | resolverPayload | object | Yes | Resolution payload |
 
+### accumulate_item
+
+Add one item to an open accumulator escalation. Interim adds return outcome `accepted` with the count held and the remaining slots. The add that reaches max completes the row and wakes the waiting workflow with the ordered collection. A reciprocal row is written in the same statement, both or neither.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Accumulator escalation UUID (the container) |
+| itemKey | string | Yes | Key the item is held under |
+| payload | object | No | Item payload, delivered inside `$accumulated` |
+| metadata | object | No | Merge patch for the container metadata, same statement |
+| reciprocal | object | No | A second accumulator row written in the same statement. Exactly one of `id`, `signalKey`, or `key`/`value` |
+| initiatedBy | string | No | `lt_users.id` of the person the add is for, recorded as the entry actor (attribution only) |
+
+### remove_item
+
+Remove one held item from a pending open accumulator escalation. The row stays pending and the waiting workflow stays asleep.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Yes | Accumulator escalation UUID |
+| itemKey | string | Yes | Held item key to remove |
+| reciprocal | object | No | A second accumulator row written in the same statement. Exactly one of `id`, `signalKey`, or `key`/`value` |
+| initiatedBy | string | No | `lt_users.id` of the person the removal is for, recorded as the entry actor (attribution only) |
+
+### get_escalation_items
+
+The held items of an accumulator or batch escalation in arrival order, with the count and max. Select by `id` or by `signalKey`.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | No | Accumulator or batch escalation UUID |
+| signalKey | string | No | The row's `signal_key`, when the caller knows the signal id rather than the row id |
+
 ### escalate_escalation
 
 Route a pending escalation to a different role per the escalation chain.
@@ -333,6 +384,20 @@ Assign multiple escalations to a specific user.
 | targetUserId | string | Yes | User to assign to |
 | durationMinutes | integer | No | Lock duration |
 
+### bulk_unassign
+
+Return claimed escalations to the available pool. This is the admin override of a live claim; a claimant returning their own row uses `release_escalation`. Unclaimed and terminal rows are skipped.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| ids | string[] | Yes | Escalation UUIDs to return to the pool |
+
 ### bulk_escalate
 
 Escalate multiple escalations to a different role.
@@ -376,6 +441,78 @@ Update the priority of multiple escalations.
 |-------|------|----------|-------------|
 | ids | string[] | Yes | Escalation IDs |
 | priority | integer | Yes | New priority value |
+
+### resolve_by_ids
+
+Resolve a set of escalations by id in one guarded statement, for rows woken collectively (no per-row signal delivery). Callers may resolve only rows whose role they hold.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| ids | string[] | Yes | Escalation ids to resolve as one set |
+| resolverPayload | object | Yes | Resolution payload applied to every row |
+| metadata | object | No | Outcome patch merged into each row |
+
+### search_by_facets
+
+Faceted search over a pond, scoped to the caller's role. Filter by type, status, availability, and metadata facets; sort by columns; page with `limit`/`offset`.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| role | string | Yes | Pond role to target (the escalation role) |
+| types | string[] | No | Only rows whose escalation type is one of these |
+| subtypes | string[] | No | Only rows whose escalation subtype is one of these |
+| status | string | No | Status filter (e.g. `pending`) |
+| available | boolean | No | Only rows not currently claimed |
+| facets | object | No | Metadata facet equality filters |
+| orderBy | object[] | No | Sort order over columns |
+| limit | integer | No | Max results |
+| offset | integer | No | Pagination offset |
+
+### claim_groups
+
+Batch-claim complete origin groups (orders) in priority order over a pond, assigned to the calling principal. Scoped to the pond role.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| query | object | Yes | Facet query selecting the pond |
+| limit | integer | No | Max groups to claim |
+| durationMinutes | integer | No | Claim TTL in minutes |
+| sizeFacet | string | No | Metadata key holding the group size |
+
+### claim_by_facets
+
+Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), assigned to the calling principal. Scoped to the pond role.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| query | object | Yes | Facet query selecting the rows |
+| limit | integer | No | Max rows to claim |
+| durationMinutes | integer | No | Claim TTL in minutes |
+| allOrNone | boolean | No | Commit only if the full limit was acquired |
 
 ### aggregate_by_facets
 
@@ -555,7 +692,8 @@ Start a workflow registered read-safe (side-effect-free). Same contract as `invo
 Check workflow status and result. Returns status (`running` | `complete` | `failed`)
 and the result when complete; a failed run carries `terminated` (true when an
 interrupt ended it) and `error`. Resolution is namespace-aware — pass `app_id` to read a
-workflow (e.g. a child) running in a non-default HotMesh namespace.
+workflow (e.g. a child) running in a non-default HotMesh namespace. Readable by a builder,
+or by the person who started the run or the account it runs as.
 
 | | |
 |---|---|
@@ -567,6 +705,20 @@ workflow (e.g. a child) running in a non-default HotMesh namespace.
 |-------|------|----------|-------------|
 | workflow_id | string | Yes | Workflow ID to check |
 | app_id | string | No | HotMesh namespace for resolution (default: durable) |
+
+### terminate_workflow
+
+Terminate a workflow: kills the durable handle and cancels the workflow's pending escalations. Use this to stop a workflow. `interrupt_pipeline_job` is an engine-level interrupt that leaves escalation rows stranded as orphans.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workflow_id | string | Yes | HotMesh workflow ID to terminate |
 
 ## MCP Servers
 
@@ -904,6 +1056,155 @@ Define an escalation path from one role to another.
 |-------|------|----------|-------------|
 | source_role | string | Yes | Source role |
 | target_role | string | Yes | Target role |
+
+## Personas
+
+A persona is a named role bundle: each linked role carries a relationship scope, and assigning the persona to a user adds the user to every linked role at that scope. Holder memberships are reconciled whenever a link changes.
+
+### list_personas
+
+List all personas with their role links and holder counts.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:** None.
+
+### get_persona
+
+Fetch one persona with its role links and current assignees.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Persona key |
+
+### create_persona
+
+Create a persona. Link roles with `link_persona_role`, then assign users with `assign_persona`.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Stable key (a-z, 0-9, hyphens, underscores; starts with a letter) |
+| title | string | No | Display title, e.g. "Print Manager" |
+| description | string | No | One-paragraph description of the persona's day |
+
+### update_persona
+
+Update a persona's title or description with PATCH semantics: omitted fields keep their values, `null` clears.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Persona key to update |
+| title | string \| null | No | New display title (`null` clears) |
+| description | string \| null | No | New description (`null` clears) |
+
+### delete_persona
+
+Delete a persona. Memberships it sustains are removed, or re-homed to a sibling persona the user still holds. Direct grants stay as they are.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Persona key to delete |
+
+### link_persona_role
+
+Link a role to a persona, or change an existing link's relationship. Every current holder's memberships are reconciled in the same transaction.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Persona key |
+| role | string | Yes | Role to link (created if absent) |
+| relationship | string | Yes | `write-all` (full worker), `write-self` (acts on own assignments), `read-all` (observer), or `write-none` (same as `read-all`) |
+
+### unlink_persona_role
+
+Remove a role link from a persona and reconcile every holder's memberships.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| key | string | Yes | Persona key |
+| role | string | Yes | Role link to remove |
+
+### assign_persona
+
+Assign a persona to a user, adding the user to each linked role at the linked scope. Idempotent: re-assigning overlays fresh from the persona's current links. When bundles overlap the highest allowance wins, and direct grants are only raised.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | string | Yes | User UUID |
+| key | string | Yes | Persona key |
+
+### unassign_persona
+
+Unassign a persona from a user. Removes only the memberships the persona sustains; rows another held persona still grants are re-homed to it, and direct grants stay as they are.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | string | Yes | User UUID |
+| key | string | Yes | Persona key |
+
+### get_user_personas
+
+The personas a user holds plus the composed role and scope map their memberships form. Each row names its sustaining persona, or `null` for a direct grant.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | string | Yes | User UUID |
 
 ## Maintenance
 
@@ -1569,7 +1870,7 @@ Export the full workflow state using HotMesh durable export.
 
 ### export_workflow_execution
 
-Export workflow state as a structured execution event history.
+Export workflow state as a structured execution event history. Readable by a builder, or by the person who started the run or the account it runs as.
 
 | | |
 |---|---|
@@ -1613,36 +1914,11 @@ Return the numeric status semaphore for a workflow.
 |-------|------|----------|-------------|
 | workflow_id | string | Yes | Workflow ID |
 
-## Ortho Pipeline
+## Overview
 
-AI-operable tools for driving the orthotic manufacturing pipeline. Each order passes through eight sequential stages (design → review → print → grind → glue → finish → qa → ship). The pipeline is a HotMesh durable workflow; each stage suspends at a `conditional` checkpoint until an escalation is resolved.
+### get_system_overview
 
-A Claude agent loop calls `ortho_submit` to start an order, polls `ortho_pending` to see what's waiting, drives each stage forward with `ortho_complete_stage`, and monitors progress with `ortho_status`.
-
-### ortho_submit
-
-Start a new orthotic manufacturing order through the 8-stage pipeline.
-
-| | |
-|---|---|
-| Read-safe | No |
-
-**Parameters:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `order_id` | `string` | Yes | Unique order identifier (e.g. `"ORD-001"`) |
-| `item_type` | `string` | Yes | Item type (e.g. `"insole-standard"`, `"insole-diabetic"`) |
-| `stages` | `string[]` | No | Override the stage sequence. Default: `["design","review","print","grind","glue","finish","qa","ship"]` |
-| `metadata` | `object` | No | Additional order metadata passed through to each stage escalation |
-
-**Returns:** `{ workflow_id, order_id, item_type, stages, message }`
-
----
-
-### ortho_pending
-
-List open ortho-pipeline stage escalations waiting to be completed.
+Triage-ready system state in one call: escalation queue pressure (aging, unclaimed, by role), task throughput (created, completed, failed), hourly trends, infrastructure status (MCP servers, agents, compiled workflows), and a business process summary.
 
 | | |
 |---|---|
@@ -1652,36 +1928,13 @@ List open ortho-pipeline stage escalations waiting to be completed.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `stage` | `string` | No | Filter to a specific stage (e.g. `"design"`). Omit to see all stages |
-| `limit` | `integer` | No | Max results (default: 50) |
+| period | string | No | Time window for trends and throughput: `1h`, `24h` (default), or `7d` |
 
-**Returns:** `{ count, escalations }` where each escalation includes `id`, `stage`, `order_id`, `item_type`, `description`, `created_at`, `workflow_id`.
+## Domain Context
 
----
+### get_domain_context
 
-### ortho_complete_stage
-
-Complete a pending ortho pipeline stage. Claims the escalation and resolves it with notes and outcome data. Resolving automatically advances the workflow — a new escalation for the next stage appears within seconds.
-
-| | |
-|---|---|
-| Read-safe | No |
-
-**Parameters:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `escalation_id` | `string` | Yes | Escalation ID from `ortho_pending` |
-| `notes` | `string` | Yes | Completion notes — what was done, any decisions made |
-| `outcome` | `object` | No | Structured outcome data specific to this stage |
-
-**Returns:** `{ resolved, escalation_id, status, message }`
-
----
-
-### ortho_status
-
-Get the current status and completed stage results for an ortho pipeline workflow.
+The deployment's domain dictionary merged with live platform state: how the operation's jargon maps to roles, workflows, escalations, and metadata facets. With no arguments it returns the overview and index; `{ topic, name }` returns specific entries. Topic `term` looks a word or alias up across every kind. With no dictionary registered it serves a view derived from the live registries. See [Domain Dictionary](../../domain-dictionary.md).
 
 | | |
 |---|---|
@@ -1691,26 +1944,133 @@ Get the current status and completed stage results for an ortho pipeline workflo
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `workflow_id` | `string` | Yes | Workflow ID from `ortho_submit` |
+| topic | string | No | `term`, `entity`, `role`, `workflow`, `facet`, `action`, `rule`, or `runbook`. Omit for the overview and index |
+| name | string | No | One entry: a term or alias (case-insensitive), a live role name, a workflow type, or a runbook name |
 
-**Returns:** `{ workflow_id, status }` where `status` is `"running"` while in progress or `"complete"` with `result` containing all stage outputs once finished.
+## Scan Codes
 
----
+Scan codes have the form `version:category:target`. A scheme defines how a code parses and which metadata facet the target resolves against; a rule defines the steps a category runs. See [Scan Codes](../../scan-codes.md).
 
-**Agent loop example:**
+### execute_scan_code
 
-```
-ortho_submit({ order_id: "ORD-042", item_type: "insole-diabetic" })
-→ { workflow_id: "wf-abc123", stages: ["design", "review", ...] }
+Execute a raw scan code. Parses it against the configured schemes, walks the rule's condition and action steps, and returns a structured outcome (`executed`, `confirm_required`, `matched_list`, `no_match_fallback`, `unconfigured`, `invalid_code`, `forbidden`, `conflict`). Identity schemes mint an acting-identity grant.
 
-ortho_pending({ stage: "design" })
-→ [{ id: "esc-001", stage: "design", order_id: "ORD-042" }]
+| | |
+|---|---|
+| Read-safe | No |
 
-ortho_complete_stage({ escalation_id: "esc-001", notes: "3mm heel, D-width approved", outcome: { spec_version: "v2" } })
-→ { resolved: true }
+**Parameters:**
 
-... repeat through all 8 stages ...
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| code | string | Yes | Raw scan string, e.g. `10:1:SN123` or `10175433211` |
+| actingToken | string | No | Acting-identity grant (`eph:v1:acting_identity:*`); verbs run as the badged person |
+| previousActingToken | string | No | The grant an identity scan replaces, revoked on mint (best effort) |
 
-ortho_status({ workflow_id: "wf-abc123" })
-→ { status: "complete", result: { order_id: "ORD-042", results: [...] } }
-```
+### execute_scan_choice
+
+Execute one choice presented by a PRESENT step. The pointer (scheme, category, step, choice, escalation) is re-validated against live config, the row's current state, the acting-identity gate, and RBAC before the verb runs.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| schemeVersion | integer | Yes | Scheme version of the presented choice |
+| category | string | Yes | Rule category |
+| stepIndex | integer | Yes | Index of the PRESENT step |
+| choiceIndex | integer | Yes | Index of the chosen option |
+| escalationId | string | Yes | Escalation the choice screen presented |
+| actingToken | string | No | Acting-identity grant; the choice attributes to the badged person |
+
+### list_scan_schemes
+
+List all scan-code schemes: version, name, target facet, and encoding.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:** None.
+
+### upsert_scan_scheme
+
+Create or replace a scan scheme: which metadata facet the scanned target resolves against and how the code string parses (fixed digits or delimited text). `kind: identity` makes the scheme a badge layer that mints acting-identity grants.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| version | integer | Yes | Two-digit scheme version (10-99) |
+| name | string | Yes | Scheme display name |
+| description | string | No | Scheme description |
+| target_facet | string | Yes | Metadata key the target resolves against: an escalation metadata key for action schemes, an `lt_users.metadata` key (e.g. `badge_id`) for identity schemes |
+| encoding | string | No | `fixed` (digits only, UPC) or `delimited` (text with separators) |
+| delimiter | string | No | Separator for delimited encoding (default `:`) |
+| target_length | integer | No | Target digit count for fixed encoding |
+| kind | string | No | `action` (steps over escalations, default) or `identity` (a badge that mints a short-lived acting-identity grant) |
+| grant_ttl_seconds | integer | No | Identity kind: lifetime of a minted grant |
+| grant_max_uses | integer | No | Identity kind: `0` = TTL-bound; `n` = the grant covers n scan requests |
+| enabled | boolean | No | Whether the scheme is active |
+
+### upsert_scan_rule
+
+Create or replace a scan rule for a scheme category: a friendly name, ordered condition and action steps (the first matching query wins), a fallback screen when nothing matches, and a not-primed screen for identity-required steps.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| scheme_version | integer | Yes | Scheme version |
+| category | string | Yes | Single-digit category (0-9) |
+| name | string | Yes | Friendly label printed next to the physical code |
+| steps | object[] | Yes | Ordered condition/action steps; first match wins |
+| fallback | object | No | Screen rendered when no step matches (identity schemes: the unknown-badge screen) |
+| notPrimed | object | No | "Scan your badge" screen, rendered when an acting identity is required and absent |
+| enabled | boolean | No | Whether the rule is active |
+
+### delete_scan_rule
+
+Delete one scan rule by scheme version and category.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| scheme_version | integer | Yes | Scheme version |
+| category | string | Yes | Rule category |
+
+## Announcements
+
+### publish_announcement
+
+Publish a dashboard announcement: a banner every targeted user sees live and on their next load until it expires or they dismiss it. Bodies broadcast to all authenticated subscribers, so keep secrets out of them.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| body | string | Yes | Markdown body |
+| title | string | No | Headline shown on the collapsed banner |
+| layout | string | No | Presentation form (default `banner`) |
+| roles | string[] | No | Target roles; omitted = everyone |
+| expires_at | string | No | ISO timestamp; omitted = 24 hours from now |

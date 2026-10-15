@@ -9,6 +9,10 @@ Managed file storage for reading, writing, listing, and deleting files.
 | AI required | No |
 | Credential providers | — |
 
+## Access
+
+Every tool on this server requires builder access (superadmin or the `engineer` role).
+
 ## Compile Hints
 
 None.

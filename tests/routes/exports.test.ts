@@ -4,6 +4,13 @@ import { setupRouteTest, authHeaders } from './setup';
 const ctx = setupRouteTest(4612);
 
 describe('Exports routes', () => {
+  it('reads need builder; a member is refused', async () => {
+    for (const path of ['jobs?app_id=durable', 'nonexistent-wf-id', 'nonexistent-wf-id/execution', 'nonexistent-wf-id/envelopes', 'nonexistent-wf-id/status', 'nonexistent-wf-id/state']) {
+      const res = await fetch(`${ctx.BASE}/workflow-states/${path}`, { headers: authHeaders(ctx.memberToken) });
+      expect({ path, status: res.status }).toEqual({ path, status: 403 });
+    }
+  });
+
   describe('GET /api/workflow-states/jobs', () => {
     it('returns 401 without auth', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/jobs`);
@@ -12,14 +19,14 @@ describe('Exports routes', () => {
 
     it('returns 400 when app_id is missing', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/jobs?limit=5`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(400);
     });
 
     it('returns 200 with app_id (schema may not exist without workers)', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/jobs?app_id=durable&limit=5`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       // Schema may not exist in test env — both are valid
       if (res.status === 200) {
@@ -40,7 +47,7 @@ describe('Exports routes', () => {
 
     it('returns 404 for unknown workflow', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/nonexistent-wf-id`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -54,7 +61,7 @@ describe('Exports routes', () => {
 
     it('returns 404 for unknown workflow', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/nonexistent-wf-id/execution`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -68,7 +75,7 @@ describe('Exports routes', () => {
 
     it('returns 404 for unknown workflow', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/nonexistent-wf-id/status`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });
@@ -82,7 +89,7 @@ describe('Exports routes', () => {
 
     it('returns 404 for unknown workflow', async () => {
       const res = await fetch(`${ctx.BASE}/workflow-states/nonexistent-wf-id/state`, {
-        headers: authHeaders(ctx.memberToken),
+        headers: authHeaders(ctx.builderToken),
       });
       expect(res.status).toBe(404);
     });

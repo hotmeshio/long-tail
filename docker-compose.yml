@@ -34,6 +34,8 @@ services:
       - POSTGRES_DB=longtail
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET:-lt-dev-secret}
+      # OAuth sign-in for MCP clients (Claude Code: claude mcp add --transport http lt http://localhost:3000/mcp)
+      - LT_OAUTH_ISSUER=${LT_OAUTH_ISSUER:-http://localhost:3000}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}

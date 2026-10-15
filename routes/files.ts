@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
 import jwt from 'jsonwebtoken';
 
 import { getStorageBackend } from '../lib/storage';

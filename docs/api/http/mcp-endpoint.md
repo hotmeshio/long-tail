@@ -139,12 +139,15 @@ Claude Code calls `get_system_overview` — one call returns triage, throughput,
 
 ## Authentication
 
-Two token types are supported:
+The credential travels in the `Authorization: Bearer` header. The host's session cookie does not authenticate `/mcp`. Three token types are supported:
 
 | Type | Format | Use case |
 |------|--------|----------|
-| JWT | Standard Bearer token from `POST /api/auth/login` | Interactive sessions, testing |
+| OAuth access token | Issued by the Long Tail OAuth server for this resource (when the OAuth server is enabled) | MCP clients that sign in a person |
+| JWT | Signed user token, such as the one from `POST /api/auth/login` | Interactive sessions, testing |
 | API key | `lt_bot_*` prefix | Service accounts, automation |
+
+When the OAuth server is enabled, a `401` response carries a `WWW-Authenticate: Bearer resource_metadata="..."` challenge so MCP clients can discover how to sign in. An access token authenticates only while its grant is live.
 
 ### Service Account Setup
 

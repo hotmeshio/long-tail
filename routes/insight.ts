@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 
 import * as api from '../api/insight';
 
@@ -24,7 +25,7 @@ router.post('/mcp-query', async (req, res) => {
  * The LLM reasons about tool schemas and constructs the YAML declaratively.
  * Body: { prompt: string, tags?: string[], wait?: boolean, feedback?: string, prior_yaml?: string }
  */
-router.post('/build-workflow', async (req, res) => {
+router.post('/build-workflow', requireBuilder, async (req, res) => {
   const { prompt, tags, wait, feedback, prior_yaml, answers, prior_questions } = req.body;
   const result = await api.buildWorkflow(
     { prompt, tags, wait, feedback, prior_yaml, answers, prior_questions },
@@ -38,7 +39,7 @@ router.post('/build-workflow', async (req, res) => {
  * Refine a previously built workflow using execution feedback.
  * Body: { prompt: string, prior_yaml: string, feedback: string, tags?: string[], wait?: boolean }
  */
-router.post('/build-workflow/refine', async (req, res) => {
+router.post('/build-workflow/refine', requireBuilder, async (req, res) => {
   const { prompt, prior_yaml, feedback, tags, wait } = req.body;
   const result = await api.refineWorkflow(
     { prompt, prior_yaml, feedback, tags, wait },

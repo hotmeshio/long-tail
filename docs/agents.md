@@ -22,7 +22,9 @@ This is **event-driven automation**. The event bus is the nervous system. Agents
 
 Give your agent a name and describe what it does. Names are lowercase kebab-case and appear everywhere — in the sidebar, in event payloads, in logs.
 
-The **run as** identity controls which service account the agent uses when invoking workflows. This determines what credentials, OAuth tokens, and permissions are available. If unset, workflows run as the invoking user.
+The **run as** identity controls which service account the agent uses when invoking workflows. This determines what credentials, OAuth tokens, and permissions are available. A subscription's own `execute_as` takes precedence over the agent's identity; with neither set, the workflow runs as `lt-system`.
+
+Configuring an agent or subscription requires builder access and the right to act as the identity it runs as (the same rule as an [`execute_as` override](iam.md#when-to-use-a-service-account)). An agent or subscription that would run as `lt-system`, and any capability subscription, is configured by a superadmin only.
 
 ## motivation
 

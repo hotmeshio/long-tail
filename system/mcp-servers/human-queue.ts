@@ -3,6 +3,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { callerAuth, type ToolCallExtra } from './caller-auth';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as escalationService from '../../services/escalation';
 import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
@@ -291,15 +293,20 @@ export async function createHumanQueueServer(options?: {
         + 'item keys are rejected. The payload validates against the same form_schema a single-item resolve uses.',
       inputSchema: resolveBatchItemSchema,
     },
-    async (args: z.infer<typeof resolveBatchItemSchema>) => {
+    async (args: z.infer<typeof resolveBatchItemSchema>, extra?: ToolCallExtra) => {
       const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
       if (rejected) return rejected;
 
+      // The fill's actor is the caller: the person at /mcp, else lt-system.
+      const actor = (await callerAuth(extra)).userId;
       const result = await escalationService.resolveBatchItem(
         args.escalation_id,
         args.item_key,
         args.payload,
         { source: 'mcp_server' },
+        undefined,
+        undefined,
+        actor,
       );
       if (result.outcome !== 'accepted' && result.outcome !== 'completed') {
         return {
@@ -470,7 +477,7 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:server] ${name} ready (7 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:server] ${name} ready (${registeredToolCount(server)} tools registered)`);
   return server;
 }
 

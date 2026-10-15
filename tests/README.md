@@ -6,8 +6,11 @@
 # Frontend tests (fast — ~4s)
 cd dashboard && npx vitest run
 
-# Backend: fast unit/integration tests only (~75s)
-npx vitest run --exclude 'tests/workflows/**'
+# Backend: fast tests (no workflow suites, no live-model tests)
+npm run test:fast
+
+# Backend: tests that call a live model (spend provider credits)
+npm run test:llm
 
 # Backend: workflow tests only (~3min)
 npx vitest run tests/workflows
@@ -58,7 +61,7 @@ npm run test:integration
 
 | File | What it covers |
 |------|---------------|
-| `yaml-workflow-utils.test.ts` | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
+| `services/yaml-workflow/utils.test.ts` | YAML parsing, LLM compaction, tool arg capping, name sanitization, step extraction |
 | `escalations.test.ts` | Create, claim, filter, stats, bulk operations |
 | `routes/*.test.ts` | HTTP API routes (files mirroring routes/ — see tests/routes/) |
 | `pattern-detector.test.ts` | Iteration pattern detection, array source matching |
@@ -68,19 +71,19 @@ npm run test:integration
 | `users.test.ts` | User CRUD, role assignment |
 | `db-server.test.ts` | MCP DB server tools (find_tasks, escalation stats) |
 | `events.test.ts` | NATS event adapter, publish/subscribe |
-| `mcp.test.ts` | MCP server CRUD, tag-based discovery |
+| `services/mcp/servers.test.ts` | MCP server CRUD, tag-based discovery |
 | `invocation.test.ts` | Workflow invocation API |
 | `start.test.ts` | Startup configuration, adapter registration |
 | `hotmesh-utils.test.ts` | HotMesh utility functions |
 | `controlplane.test.ts` | Rollcall, throttle, streams |
-| `analyze-documents.test.ts` | Document analysis utilities |
-| `oauth-providers.test.ts` | OAuth provider registry, URL generation, display names |
-| `oauth-crypto.test.ts` | AES-256-GCM encrypt/decrypt, tamper detection, edge cases |
-| `nats-pubsub.test.ts` | NATS pub/sub reliability |
-| `oauth-routes.test.ts` | OAuth flow logic: state, CSRF, JWT issuance |
-| `mcp-client.test.ts` | Built-in server auto-connection |
-| `oauth-state.test.ts` | CSRF state + PKCE code verifier management |
-| `oauth-init.test.ts` | Provider auto-detection from env vars and startup config |
+| `services/oauth/providers.test.ts` | OAuth provider registry, URL generation, display names |
+| `services/oauth/crypto.test.ts` | AES-256-GCM encrypt/decrypt, tamper detection, edge cases |
+| `unit/events/nats-adapter.test.ts` | NATS adapter publish/subscribe |
+| `lib/events/nats-ws-*.test.ts` | WebSocket proxy: ticket, upgrade check, subscribe-only filter |
+| `services/oauth/routes.test.ts` | OAuth flow logic: state, CSRF, JWT issuance |
+| `services/mcp/client.test.ts` | Built-in server auto-connection |
+| `services/oauth/state.test.ts` | CSRF state + PKCE code verifier management |
+| `services/oauth/init.test.ts` | Provider auto-detection from env vars and startup config |
 | `vision-server.test.ts` | Vision MCP server tools |
 | `publish.test.ts` | Event publishing |
 
@@ -88,11 +91,7 @@ npm run test:integration
 
 | File | Why | Timeout |
 |------|-----|---------|
-| `workflows/process-claim.test.ts` | Vision API + full escalation lifecycle | 90s per test |
 | `workflows/export.test.ts` | Large export reconstruction, many assertions | 60s per test |
-| `workflows/mcp-triage.test.ts` | LLM agentic loop with tool calls | 60s per test |
-| `workflows/verify-document.test.ts` | Vision API latency | 60s per test |
-| `workflows/verify-document-mcp.test.ts` | Multiple Vision API calls | 60s per test |
 | `workflows/kitchen-sink.test.ts` | Durable 2s sleep built into workflow | 60s setup |
 
 These are **integration tests that depend on external APIs and durable workflow timing**. Occasional failures are expected (API timeouts, race conditions in scout role acquisition). Re-running a single failed file usually passes.

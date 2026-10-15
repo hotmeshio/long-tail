@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 
 import * as api from '../api/workflow-sets';
 
@@ -8,7 +9,7 @@ const router = Router();
  * POST /api/workflow-sets
  * Create a workflow set from a specification and start the planner workflow.
  */
-router.post('/', async (req, res) => {
+router.post('/', requireBuilder, async (req, res) => {
   const { name, description, specification } = req.body;
   const result = await api.createWorkflowSet(
     { name, description, specification },
@@ -36,7 +37,7 @@ router.get('/', async (req, res) => {
  * Get a single workflow set with its plan and workflow statuses.
  */
 router.get('/:id', async (req, res) => {
-  const result = await api.getWorkflowSet({ id: req.params.id });
+  const result = await api.getWorkflowSet({ id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -44,10 +45,10 @@ router.get('/:id', async (req, res) => {
  * PUT /api/workflow-sets/:id/plan
  * Update the plan (engineer adjustments before building).
  */
-router.put('/:id/plan', async (req, res) => {
+router.put('/:id/plan', requireBuilder, async (req, res) => {
   const { plan, namespaces } = req.body;
   const result = await api.updateWorkflowSetPlanApi({
-    id: req.params.id,
+    id: String(req.params.id),
     plan,
     namespaces,
   });
@@ -58,10 +59,10 @@ router.put('/:id/plan', async (req, res) => {
  * POST /api/workflow-sets/:id/add
  * Add additional workflows to an existing set from a new specification.
  */
-router.post('/:id/add', async (req, res) => {
+router.post('/:id/add', requireBuilder, async (req, res) => {
   const { specification } = req.body;
   const result = await api.addToWorkflowSet(
-    { id: req.params.id, specification },
+    { id: String(req.params.id), specification },
     req.auth ? { userId: req.auth.userId } : undefined,
   );
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -71,8 +72,8 @@ router.post('/:id/add', async (req, res) => {
  * POST /api/workflow-sets/:id/build
  * Trigger the build phase (resume the planner workflow).
  */
-router.post('/:id/build', async (req, res) => {
-  const result = await api.buildWorkflowSet({ id: req.params.id });
+router.post('/:id/build', requireBuilder, async (req, res) => {
+  const result = await api.buildWorkflowSet({ id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 
@@ -80,8 +81,8 @@ router.post('/:id/build', async (req, res) => {
  * POST /api/workflow-sets/:id/deploy
  * Deploy all namespaces in the set.
  */
-router.post('/:id/deploy', async (req, res) => {
-  const result = await api.deployWorkflowSet({ id: req.params.id });
+router.post('/:id/deploy', requireBuilder, async (req, res) => {
+  const result = await api.deployWorkflowSet({ id: String(req.params.id) });
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

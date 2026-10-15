@@ -1,10 +1,13 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
-import express, { Router } from 'express';
+import { Router, jsonBody, serveStatic } from '../lib/http';
 import type { Server as HttpServer } from 'http';
+
+const CONSENT_PAGE_PATH = '/oauth/consent';
 
 import routes from '../routes';
 import mcpEndpoint from '../routes/mcp-endpoint';
+import { createWellKnownRouter } from '../routes/oauth-well-known';
 import { eventRegistry } from '../lib/events';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { NatsEventAdapter } from '../lib/events/nats';
@@ -89,6 +92,7 @@ export class LTExpressAdapter {
       }
       attachNatsWsProxy(server, natsAdapter.wsProxyTarget, {
         basePath: this.basePath,
+        authToken: natsAdapter.authToken,
         onWsUrlDerived: (url) => {
           if (!natsAdapter.wsUrl) {
             natsAdapter.setWsUrl(url);
@@ -109,7 +113,7 @@ export class LTExpressAdapter {
   getRouter(): Router {
     const router = Router();
 
-    router.use(express.json());
+    router.use(jsonBody());
 
     // Health check
     router.get('/health', (_req, res) => {
@@ -125,10 +129,12 @@ export class LTExpressAdapter {
     // Dashboard static assets
     const dashboardDist = this.resolveDashboardDist();
     if (dashboardDist) {
-      router.use(express.static(dashboardDist, { index: false }));
+      router.use(serveStatic(dashboardDist, { index: false }));
 
-      // SPA fallback — inject base path into index.html
-      const indexHtml = readFileSync(path.join(dashboardDist, 'index.html'), 'utf-8');
+      // SPA fallback — inject base path into index.html. Outside production
+      // the file is re-read per request so dashboard rebuilds show without a restart.
+      const indexPath = path.join(dashboardDist, 'index.html');
+      const cachedIndex = process.env.NODE_ENV === 'production' ? readFileSync(indexPath, 'utf-8') : null;
       const basePath = this.basePath;
 
       // Serve __LT_BASE__ as external script (CSP-safe, no inline scripts)
@@ -136,8 +142,15 @@ export class LTExpressAdapter {
         res.type('application/javascript').send(`window.__LT_BASE__="${basePath}";`);
       });
 
-      router.get('/{*splat}', (_req, res) => {
-        const html = indexHtml.replace(
+      router.get('/{*splat}', (req, res) => {
+        // The consent page grants access to a person's account: never inside
+        // a frame. Browsers enforce every CSP header, so appending a second
+        // policy keeps the host's and still refuses framing.
+        if (req.path.startsWith(CONSENT_PAGE_PATH)) {
+          res.setHeader('X-Frame-Options', 'DENY');
+          res.append('Content-Security-Policy', "frame-ancestors 'none'");
+        }
+        const html = (cachedIndex ?? readFileSync(indexPath, 'utf-8')).replace(
           '<head>',
           '<head>' +
           `<base href="${basePath}/">` +
@@ -148,6 +161,20 @@ export class LTExpressAdapter {
     }
 
     return router;
+  }
+
+  /**
+   * The OAuth well-known documents. Mount at the host's root, not under the
+   * base path: clients look for them at the origin. It answers only its two
+   * paths and passes everything else on.
+   */
+  getWellKnownRouter(): Router {
+    return createWellKnownRouter();
+  }
+
+  /** Whether a built dashboard was found to serve. */
+  hasDashboard(): boolean {
+    return this.resolveDashboardDist() !== null;
   }
 
   private resolveDashboardDist(): string | null {

@@ -122,7 +122,7 @@ const result = await lt.tasks.listProcesses({
 
 ## getProcess
 
-Get a single process with all its tasks and escalations.
+Get a single process with all its tasks and escalations. With `auth` as the second argument, only the escalations that caller may read.
 
 ```typescript
 const result = await lt.tasks.getProcess({ originId: 'origin_xyz' });
@@ -136,7 +136,7 @@ const result = await lt.tasks.getProcess({ originId: 'origin_xyz' });
 
 **Returns:** `LTApiResult<{ origin_id, tasks, escalations }>`
 
-**Auth:** Not required
+**Auth:** Optional (filters escalations to the caller's readable ones when provided)
 
 ---
 

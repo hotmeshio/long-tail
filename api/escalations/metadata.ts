@@ -48,6 +48,9 @@ export async function findByMetadata(
     // WHERE and COUNT. Global access → no filter. Never filter a fetched page
     // controller-side — that shrinks the page and reports a wrong total.
     const scope = await getEscalationReadScope(auth.userId);
+    if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
+      return { status: 200, data: { escalations: [], total: 0 } };
+    }
     const result = await escalationService.findByMetadata(
       input.key, input.value, input.status, input.limit, input.offset,
       scope.global

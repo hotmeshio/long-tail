@@ -20,10 +20,11 @@ export function createSocketIOAuthenticator(
   const secret = startConfig.auth?.secret ?? config.JWT_SECRET;
   if (!secret) return undefined;
 
-  return (token: string): boolean => {
+  return (token: string): false | { userId: string } => {
     try {
       const payload = jwt.verify(token, secret);
-      return !!(payload && typeof payload === 'object' && (payload as any).userId);
+      const userId = payload && typeof payload === 'object' ? (payload as any).userId : undefined;
+      return typeof userId === 'string' && userId ? { userId } : false;
     } catch {
       return false;
     }

@@ -4,9 +4,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAnnouncements, ANNOUNCEMENT_SUBJECT, type Announcement } from '../../api/announcements';
 import { useEventSubscription } from '../../hooks/useEventContext';
 import { useAuth } from '../../hooks/useAuth';
+import { useNatsStatus } from '../../hooks/useNats';
 import { MarkdownRenderer } from '../common/display/MarkdownRenderer';
 
 const DISMISSED_KEY_PREFIX = 'lt-announcement-dismissed:';
+export const LIVE_UPDATES_NOTICE = 'Live updates unavailable. Reconnecting… Refresh if this persists.';
 
 /** MarkdownRenderer injects HTML unescaped — author bodies must be entity-escaped first. */
 function escapeEntities(text: string): string {
@@ -24,6 +26,7 @@ function isDismissed(id: string): boolean {
 /**
  * The dashboard announcement surface (system.surfaces.dashboard). Live events
  * broadcast to every socket, so the client re-filters by role and expiry.
+ * The same row says when live updates are down; that notice clears itself.
  */
 export function AnnouncementBanner() {
   const { isAuthenticated, userRoleNames } = useAuth();
@@ -31,6 +34,7 @@ export function AnnouncementBanner() {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dismissTick, setDismissTick] = useState(0);
+  const { unavailable: liveUpdatesDown } = useNatsStatus();
 
   useEventSubscription(ANNOUNCEMENT_SUBJECT, () => {
     queryClient.invalidateQueries({ queryKey: ['announcements'] });
@@ -55,7 +59,7 @@ export function AnnouncementBanner() {
     return () => clearTimeout(timer);
   }, [data, dismissTick]);
 
-  if (visible.length === 0) return null;
+  if (visible.length === 0 && !liveUpdatesDown) return null;
 
   const dismiss = (id: string) => {
     try {
@@ -67,6 +71,14 @@ export function AnnouncementBanner() {
   return (
     // Above the resting header (z-30) — its logo art overflows onto this row.
     <div data-testid="announcement-banner" className="relative z-40">
+      {liveUpdatesDown && (
+        <div data-testid="live-updates-notice" role="status" className="border-b border-status-warning/25 bg-status-warning/10">
+          <div className="flex items-center gap-2 px-4 py-1.5">
+            <span className="text-2xs font-semibold uppercase tracking-widest text-status-warning">Notice</span>
+            <span className="truncate text-xs text-text-primary">{LIVE_UPDATES_NOTICE}</span>
+          </div>
+        </div>
+      )}
       {visible.map((a) => {
         const expanded = expandedId === a.id;
         const headline = a.title ?? a.body.split('\n')[0];

@@ -71,6 +71,14 @@ export async function applyServerAuthConfig(startConfig: LTStartConfig): Promise
     });
   }
 
+  const oauthServer = startConfig.auth?.oauthServer
+    ?? (config.LT_OAUTH_ISSUER ? { issuer: config.LT_OAUTH_ISSUER } : undefined);
+  if (oauthServer) {
+    const { setOAuthServerConfig } = await import('../modules/oauth-server');
+    setOAuthServerConfig(oauthServer);
+    loggerRegistry.info(`[long-tail] OAuth authorization server enabled — issuer ${oauthServer.issuer}`);
+  }
+
   // SSO — store config for requireAuth fallback and /api/auth/sso exchange
   if (startConfig.auth?.sso) {
     const { setSSOConfig } = await import('../modules/sso');

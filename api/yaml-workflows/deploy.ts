@@ -2,6 +2,32 @@ import * as yamlDb from '../../services/yaml-workflow/db';
 import * as yamlDeployer from '../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../services/yaml-workflow/workers';
 import { invokeYamlWorkflow as invokeYamlWorkflowService } from '../../services/yaml-workflow/invoke';
+import { assertMayActAs, InvocationError } from '../../services/workflow-invocation';
+import { capabilityAccess } from '../../modules/capabilities';
+import { builtinServerFor, builtinToolGate } from '../mcp/tools';
+import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
+
+/**
+ * A compiled workflow's tool steps run with lt-system authority. Deploying or
+ * activating one needs the caller to be able to call every built-in tool it
+ * uses: automation never does more than its author may. Null when allowed;
+ * without a caller (in-process), allowed.
+ */
+export async function deployRefusal(wf: LTYamlWorkflowRecord, auth: LTApiAuth | undefined): Promise<LTApiResult | null> {
+  if (!auth?.userId) return null;
+  const access = capabilityAccess({ userId: auth.userId });
+  // A deploy publishes every workflow sharing the app id, so every one is checked.
+  const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
+  const steps = [wf, ...siblings.filter((w) => w.id !== wf.id)].flatMap((w) => w.activity_manifest ?? []);
+  for (const step of steps) {
+    if (step.tool_source !== 'mcp' || !step.mcp_server_id || !step.mcp_tool_name) continue;
+    const builtin = await builtinServerFor(step.mcp_server_id);
+    if (builtin && !(await access(builtinToolGate(builtin, step.mcp_tool_name)))) {
+      return { status: 403, error: `Forbidden: this workflow calls ${step.mcp_tool_name}, which is not available to you` };
+    }
+  }
+  return null;
+}
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import { isNotFoundError } from './helpers';
 
@@ -17,12 +43,14 @@ import { isNotFoundError } from './helpers';
  */
 export async function deployYamlWorkflow(input: {
   id: string;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
     const wf = await yamlDb.getYamlWorkflow(input.id);
     if (!wf) {
       return { status: 404, error: 'YAML workflow not found' };
     }
+    const refused = await deployRefusal(wf, auth);
+    if (refused) return refused;
 
     // Compute the next app-level version for the namespace.
     // Each deploy increments regardless of individual tool versions —
@@ -70,12 +98,14 @@ export async function deployYamlWorkflow(input: {
  */
 export async function activateYamlWorkflow(input: {
   id: string;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
     const wf = await yamlDb.getYamlWorkflow(input.id);
     if (!wf) {
       return { status: 404, error: 'YAML workflow not found' };
     }
+    const refused = await deployRefusal(wf, auth);
+    if (refused) return refused;
     if (wf.status !== 'deployed' && wf.status !== 'active') {
       return { status: 400, error: 'Workflow must be deployed before activation' };
     }
@@ -131,6 +161,10 @@ export async function invokeYamlWorkflow(input: {
     if (wf.status !== 'active') {
       return { status: 400, error: 'Workflow must be active to invoke' };
     }
+    if (input.execute_as) {
+      if (!auth?.userId) return { status: 403, error: 'execute_as requires an authenticated caller' };
+      await assertMayActAs(auth.userId, input.execute_as);
+    }
 
     const result = await invokeYamlWorkflowService(wf, {
       data: input.data,
@@ -141,6 +175,7 @@ export async function invokeYamlWorkflow(input: {
     });
     return { status: 200, data: result };
   } catch (err: any) {
+    if (err instanceof InvocationError) return { status: err.statusCode, error: err.message };
     if (isNotFoundError(err)) {
       return { status: 404, error: 'YAML workflow not found' };
     }

@@ -1,3 +1,9 @@
+/** A positive integer from the environment, or the default when unset or malformed. */
+function positiveInt(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 export const config = {
   POSTGRES_HOST: process.env.POSTGRES_HOST || 'localhost',
   POSTGRES_PORT: parseInt(process.env.POSTGRES_PORT || '5415', 10),
@@ -13,11 +19,27 @@ export const config = {
   NATS_URL: process.env.NATS_URL || 'nats://localhost:4222',
   NATS_WS_URL: process.env.NATS_WS_URL || '',
   NATS_TOKEN: process.env.NATS_TOKEN || '',
+  /** A subscribe-only NATS credential for browsers that connect without the proxy. */
+  NATS_DASHBOARD_TOKEN: process.env.NATS_DASHBOARD_TOKEN || '',
+  /** How long a browser's WebSocket proxy ticket admits an upgrade. The dashboard fetches one per attempt. */
+  NATS_WS_TICKET_TTL_SECONDS: positiveInt('NATS_WS_TICKET_TTL_SECONDS', 300),
+  /**
+   * Dashboard reconnect: first backoff delay, delay cap, how long a drop lasts
+   * before the banner shows, and the window the first retry and catch-up
+   * refetch spread across.
+   */
+  NATS_RECONNECT_INITIAL_MS: positiveInt('NATS_RECONNECT_INITIAL_MS', 1000),
+  NATS_RECONNECT_MAX_MS: positiveInt('NATS_RECONNECT_MAX_MS', 60000),
+  NATS_LIVE_NOTICE_AFTER_MS: positiveInt('NATS_LIVE_NOTICE_AFTER_MS', 30000),
+  NATS_RECONNECT_SPREAD_MS: positiveInt('NATS_RECONNECT_SPREAD_MS', 5000),
 
   PORT: parseInt(process.env.PORT || '3000', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',
 
   JWT_SECRET: process.env.JWT_SECRET || '',
+
+  // Enables the OAuth authorization server for /mcp when start() passes no auth.oauthServer.
+  LT_OAUTH_ISSUER: process.env.LT_OAUTH_ISSUER || '',
 
   HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
 

@@ -75,6 +75,18 @@ describe('aggregateByFacets — the read gate', () => {
     expect(result.error).toContain('printer-service');
   });
 
+  it('entity beside role/roles is a 400 before the gate, for both aggregate and timeline', async () => {
+    svc.resolveEntitySystem.mockResolvedValue([{ role: 'printer-fleet', source: 'role' }]);
+    for (const query of [{ entity: 'serialNumber', role: 'finance' }, { entity: 'serialNumber', roles: ['finance'] }]) {
+      const agg = await aggregateByFacets({ query, groupBy: { state: true }, measure: { kind: 'membership' } } as any, auth);
+      const tl = await timelineByFacet({ query, facet: 'serialNumber', value: 'X' } as any, auth);
+      expect(agg.status).toBe(400);
+      expect(tl.status).toBe(400);
+    }
+    expect(svc.aggregateByFacets).not.toHaveBeenCalled();
+    expect(svc.timelineByFacet).not.toHaveBeenCalled();
+  });
+
   it('an unknown entity key is a 400 naming the configuration gap, before any scope answer', async () => {
     svc.resolveEntitySystem.mockRejectedValue(
       new (escalationService as any).AnalyticsInputError('no roles declare entity_facet "serialNumber"'),

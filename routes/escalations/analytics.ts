@@ -1,4 +1,4 @@
-import type { Router } from 'express';
+import type { Router } from '../../lib/http';
 
 import * as api from '../../api/escalations';
 

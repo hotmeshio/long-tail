@@ -259,6 +259,15 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
                   >
                     Credentials
                   </Link>
+                  {settings?.auth?.oauthServer && (
+                    <Link
+                      to="/connected-apps"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                    >
+                      Connected apps
+                    </Link>
+                  )}
                   {scanEnabled && (
                     <button
                       onClick={() => { setMenuOpen(false); toggleScanPanel(); }}

@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from '../lib/http';
+import { requireBuilder } from '../modules/auth';
 import path from 'path';
 
 import * as api from '../api/files';
@@ -12,7 +13,7 @@ const router = Router();
  * List files and directories at a given prefix.
  * Query: ?prefix=screenshots/&pageSize=100&continuationToken=...
  */
-router.get('/browse', async (req, res) => {
+router.get('/browse', requireBuilder, async (req, res) => {
   const result = await api.browseFiles({
     prefix: req.query.prefix as string,
     pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string, 10) : undefined,
@@ -25,7 +26,7 @@ router.get('/browse', async (req, res) => {
  * GET /api/file-browser/metadata/*
  * Get metadata for a single file.
  */
-router.get('/metadata/{*filePath}', async (req, res) => {
+router.get('/metadata/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {
@@ -41,7 +42,7 @@ router.get('/metadata/{*filePath}', async (req, res) => {
  * Generate a time-limited signed URL for sharing.
  * Body: { path, expiresIn } — expiresIn in seconds (3600, 21600, 86400, 604800, 2592000)
  */
-router.post('/signed-url', async (req, res) => {
+router.post('/signed-url', requireBuilder, async (req, res) => {
   const { path: filePath, expiresIn } = req.body;
   if (!filePath || !expiresIn) {
     res.status(400).json({ error: 'path and expiresIn are required' });
@@ -58,7 +59,7 @@ router.post('/signed-url', async (req, res) => {
  * DELETE /api/file-browser/delete/*
  * Permanently delete a file.
  */
-router.delete('/delete/{*filePath}', async (req, res) => {
+router.delete('/delete/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {
@@ -73,7 +74,7 @@ router.delete('/delete/{*filePath}', async (req, res) => {
  * GET /api/file-browser/download/*
  * Download a file with Content-Disposition: attachment.
  */
-router.get('/download/{*filePath}', async (req, res) => {
+router.get('/download/{*filePath}', requireBuilder, async (req, res) => {
   const raw = (req.params as any).filePath;
   const filePath = Array.isArray(raw) ? raw.join('/') : raw;
   if (!filePath) {
@@ -100,7 +101,7 @@ router.get('/download/{*filePath}', async (req, res) => {
  * Query: ?path=images/photo.png (target path including filename)
  * Body: raw file bytes (Content-Type should match the file type)
  */
-router.post('/upload', async (req, res) => {
+router.post('/upload', requireBuilder, async (req, res) => {
   const targetPath = req.query.path as string;
   if (!targetPath) {
     res.status(400).json({ error: 'path query parameter required (e.g., ?path=images/photo.png)' });

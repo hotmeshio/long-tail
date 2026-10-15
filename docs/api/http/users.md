@@ -1,6 +1,6 @@
 # Users API
 
-Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication. Mutating endpoints (create, update, delete, role management) require admin access (`admin` or `superadmin` role).
+Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication. Creating, updating, patching, and deleting users require builder access (superadmin or the `engineer` role). Adding and removing roles require admin access and follow the assignment rules in the [Roles API](roles.md#scoped-role-assignment). Only a superadmin may grant the `superadmin` type or change a superadmin account.
 
 For service identities (CI bots, schedulers, automated agents), use the [Service Accounts API](service-accounts.md) instead. Service accounts share the same RBAC system but authenticate with API keys rather than passwords or OAuth.
 
@@ -76,6 +76,8 @@ GET /api/users/:id
 POST /api/users
 ```
 
+**Auth:** Requires builder access. Every initial role must be one the caller may assign (see [Roles API](roles.md#scoped-role-assignment)); otherwise `403`.
+
 **Request body:**
 
 | Field | Type | Required | Description |
@@ -140,6 +142,8 @@ Each element in `roles`:
 PUT /api/users/:id
 ```
 
+**Auth:** Requires builder access. Changing a superadmin account requires superadmin (`403` otherwise).
+
 Partial update — only the fields you include are changed.
 
 **Request body:**
@@ -174,7 +178,7 @@ Partial update — only the fields you include are changed.
 PATCH /api/users/:id/properties
 ```
 
-Atomically patch the user's properties dictionary (`metadata`) — one statement, never read-merge-write. Editing one property can never clobber another; a rename preserves its value with no key-absent window. Builder only (the same gate as every other user write).
+Atomically patch the user's properties dictionary (`metadata`) — one statement, never read-merge-write. Editing one property can never clobber another; a rename preserves its value with no key-absent window. Requires builder access, the same gate as every other user write. Changing a superadmin account requires superadmin.
 
 **Request body:**
 
@@ -225,6 +229,8 @@ The property keys the platform itself resolves identities against — every enab
 ```
 DELETE /api/users/:id
 ```
+
+**Auth:** Requires builder access. Changing a superadmin account requires superadmin (`403` otherwise).
 
 Deletes the user and all associated role assignments (cascade).
 

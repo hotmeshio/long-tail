@@ -3,13 +3,19 @@ import type { Server as HttpServer } from 'http';
 
 import { loggerRegistry } from '../logger';
 import { subjectMatchesPattern } from './matching';
+import { eventForViewer, viewerFor, type BrowserViewer } from './browser-view';
 import type { LTEvent, LTEventAdapter } from '../../types';
 
 /**
  * Callback to verify a Socket.IO handshake token.
  * Return `true` to allow the connection, `false` to reject.
  */
-export type SocketIOAuthenticator = (token: string) => boolean | Promise<boolean>;
+/**
+ * Verifies a socket's token. Returning the person (`{ userId }`) lets delivery
+ * follow their capabilities; `true` admits the socket with the browser view
+ * (lib/events/browser-view.ts).
+ */
+export type SocketIOAuthenticator = (token: string) => boolean | { userId: string } | Promise<boolean | { userId: string }>;
 
 /**
  * Socket.IO event adapter for browser clients.
@@ -86,6 +92,7 @@ export class SocketIOEventAdapter implements LTEventAdapter {
           if (!valid) {
             return next(new Error('Authentication failed'));
           }
+          if (typeof valid === 'object') socket.data.ltUserId = valid.userId;
           next();
         } catch {
           next(new Error('Authentication failed'));
@@ -99,6 +106,9 @@ export class SocketIOEventAdapter implements LTEventAdapter {
       // switches the socket from broadcast to scoped delivery.
       const patterns = new Set<string>();
       socket.data.ltPatterns = patterns;
+      // Until the lookup answers, the socket receives the browser view.
+      socket.data.ltViewer = { builder: false } satisfies BrowserViewer;
+      viewerFor(socket.data.ltUserId).then((viewer) => { socket.data.ltViewer = viewer; });
       socket.on('lt.subscribe', (pattern: unknown) => {
         if (typeof pattern === 'string' && pattern.length > 0 && pattern.length <= 256) {
           patterns.add(pattern);
@@ -120,14 +130,15 @@ export class SocketIOEventAdapter implements LTEventAdapter {
     const channel = `lt.events.${event.type}`;
     for (const socket of this.io.of('/').sockets.values()) {
       const patterns = socket.data.ltPatterns as Set<string> | undefined;
+      const delivered = eventForViewer(event, (socket.data.ltViewer as BrowserViewer | undefined) ?? { builder: false });
       if (!patterns || patterns.size === 0) {
-        // Legacy scope: a socket with no registered patterns gets everything.
-        socket.emit(channel, event);
+        // Legacy scope: a socket with no registered patterns gets every subject.
+        socket.emit(channel, delivered);
         continue;
       }
       for (const pattern of patterns) {
         if (subjectMatchesPattern(channel, pattern)) {
-          socket.emit(channel, event);
+          socket.emit(channel, delivered);
           break;
         }
       }

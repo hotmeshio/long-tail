@@ -2,7 +2,7 @@
 
 Browse, register, and manage the topic catalog — a persistent registry of known event topics with descriptions, payload schemas, and subscriber counts.
 
-All endpoints require authentication.
+All endpoints require authentication. Registering, updating, deleting, and publishing (`POST /api/topics/by-name/:topic/publish`) require builder access (superadmin or the `engineer` role). Publishing a subject that starts with `system.` or `agent.` requires superadmin.
 
 ## List topics
 
@@ -94,6 +94,8 @@ Subscribers are matched using NATS-style pattern matching — an agent subscribe
 POST /api/topics
 ```
 
+**Auth:** Requires builder access.
+
 Manually register a topic in the catalog. Use this to pre-declare topics before first publish.
 
 **Body:**
@@ -134,6 +136,8 @@ Manually register a topic in the catalog. Use this to pre-declare topics before 
 PUT /api/topics/by-name/:topic
 ```
 
+**Auth:** Requires builder access.
+
 Partial update — only include fields to change. System topics (`source: 'system'`) can be updated (description, tags) but not deleted.
 
 **Body:**
@@ -154,6 +158,8 @@ Partial update — only include fields to change. System topics (`source: 'syste
 ```
 DELETE /api/topics/by-name/:topic
 ```
+
+**Auth:** Requires builder access.
 
 Permanently removes a topic from the catalog. System topics are protected.
 

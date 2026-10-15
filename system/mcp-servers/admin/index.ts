@@ -35,6 +35,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
+import { registeredToolCount } from '../../../services/mcp/registered-tools';
 
 import { registerTaskTools } from './tasks';
 import { registerEscalationTools } from './escalations';
@@ -59,8 +60,6 @@ import { registerScanCodeTools } from './scan-codes';
 import { registerDomainContextTools } from './domain-context';
 import { registerAnnouncementTools } from './announcements';
 
-const TOOL_COUNT = 105;
-
 let server: McpServer | null = null;
 
 export async function createAdminServer(options?: {
@@ -76,31 +75,30 @@ export async function createAdminServer(options?: {
     server = instance;
   }
 
-  registerTaskTools(instance);              //  2 tools
-  registerEscalationTools(instance);        // 20 tools (RO + RW single + metadata + bulk)
-  registerWorkflowConfigTools(instance);    //  3 tools
-  registerWorkflowTools(instance);          //  5 tools (+ terminate_workflow, invoke_workflow_read_safe)
-  registerMcpServerTools(instance);         //  4 tools
-  registerYamlWorkflowTools(instance);      //  5 tools
-  registerUserTools(instance);              // 10 tools (users + roles + role schemas)
-  registerPersonaTools(instance);           // 10 tools (persona CRUD + links + assignment)
-  registerMaintenanceTools(instance);       //  1 tool
-  registerAgentTools(instance);             //  5 tools
-  registerAgentSubscriptionTools(instance); //  3 tools
-  registerBotAccountTools(instance);        //  7 tools
-  registerControlPlaneTools(instance);      //  5 tools
-  registerPipelineTools(instance);          //  4 tools
-  registerTopicTools(instance);             //  5 tools
-  registerSettingsTools(instance);          //  1 tool
-  registerExportTools(instance);            //  4 tools
-  registerOverviewTools(instance);          //  1 tool
-  registerDiagnosticsTools(instance);       //  3 tools
-  registerScanCodeTools(instance);          //  5 tools (scan schemes + rules + execute)
-  registerDomainContextTools(instance);     //  1 tool  (get_domain_context)
-  registerAnnouncementTools(instance);      //  1 tool  (publish_announcement)
-  // Total: 105
+  registerTaskTools(instance);
+  registerEscalationTools(instance);
+  registerWorkflowConfigTools(instance);
+  registerWorkflowTools(instance);
+  registerMcpServerTools(instance);
+  registerYamlWorkflowTools(instance);
+  registerUserTools(instance);
+  registerPersonaTools(instance);
+  registerMaintenanceTools(instance);
+  registerAgentTools(instance);
+  registerAgentSubscriptionTools(instance);
+  registerBotAccountTools(instance);
+  registerControlPlaneTools(instance);
+  registerPipelineTools(instance);
+  registerTopicTools(instance);
+  registerSettingsTools(instance);
+  registerExportTools(instance);
+  registerOverviewTools(instance);
+  registerDiagnosticsTools(instance);
+  registerScanCodeTools(instance);
+  registerDomainContextTools(instance);
+  registerAnnouncementTools(instance);
 
-  loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${TOOL_COUNT} tools registered)`);
+  loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }
 

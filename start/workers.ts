@@ -320,7 +320,7 @@ export async function startWorkers(
 
     // 1. Register all factories (runtime — always applied)
     for (const [name, entry] of Object.entries(allFactories)) {
-      registerBuiltinServer(name, entry.factory);
+      registerBuiltinServer(name, entry.factory, entry.config?.toolManifest);
     }
     loggerRegistry.info(`[long-tail] ${Object.keys(allFactories).length} MCP server factories registered`);
 

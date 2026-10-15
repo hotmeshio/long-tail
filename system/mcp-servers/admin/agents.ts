@@ -5,6 +5,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import * as api from '../../../api/agents';
+import { assertMayConfigureAgent } from '../../../services/agent/authority';
+import { InvocationError } from '../../../services/workflow-invocation';
+import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import {
   listAgentsSchema,
   getAgentSchema,
@@ -12,6 +15,17 @@ import {
   updateAgentSchema,
   deleteAgentSchema,
 } from './schemas';
+
+/** An MCP error for a refused authority check; null when the call may go on. */
+async function refusal(check: () => Promise<void>) {
+  try {
+    await check();
+    return null;
+  } catch (err: any) {
+    if (!(err instanceof InvocationError)) throw err;
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: err.message }) }], isError: true };
+  }
+}
 
 export function registerAgentTools(server: McpServer): void {
 
@@ -63,7 +77,10 @@ export function registerAgentTools(server: McpServer): void {
         'optional schedules, and event subscriptions.',
       inputSchema: createAgentSchema,
     },
-    async (args: z.infer<typeof createAgentSchema>) => {
+    async (args: z.infer<typeof createAgentSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? await refusal(() => assertMayConfigureAgent(caller.userId, { ...(args as any), id: undefined })) : null;
+      if (refused) return refused;
       const result = await api.createAgent(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };
@@ -80,7 +97,10 @@ export function registerAgentTools(server: McpServer): void {
       description: 'Update an existing agent automation.',
       inputSchema: updateAgentSchema,
     },
-    async (args: z.infer<typeof updateAgentSchema>) => {
+    async (args: z.infer<typeof updateAgentSchema>, extra?: ToolCallExtra) => {
+      const caller = externalCaller(extra);
+      const refused = caller ? await refusal(() => assertMayConfigureAgent(caller.userId, args as any)) : null;
+      if (refused) return refused;
       const result = await api.updateAgent(args);
       if (result.error) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }], isError: true };

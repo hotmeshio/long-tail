@@ -9,6 +9,10 @@ HTTP client tools for making GET, POST, and arbitrary HTTP requests.
 | AI required | No |
 | Credential providers | — |
 
+## Access
+
+Every tool on this server requires builder access (superadmin or the `engineer` role).
+
 ## Compile Hints
 
 HTTP response bodies may be large. Prefer specific fields from parsed JSON rather than raw body.
@@ -39,7 +43,7 @@ GET a URL and parse the response as JSON. Convenience wrapper around http_reques
 
 | | |
 |---|---|
-| Read-safe | Yes |
+| Read-safe | No |
 
 **Parameters:**
 
@@ -54,7 +58,7 @@ GET a URL and return the response as text. Returns content, status, and content 
 
 | | |
 |---|---|
-| Read-safe | Yes |
+| Read-safe | No |
 
 **Parameters:**
 

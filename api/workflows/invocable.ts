@@ -60,10 +60,10 @@ export async function listInvocableWorkflows(auth: LTApiAuth): Promise<LTApiResu
     const roles = user?.roles ?? [];
 
     const workflows: InvocableWorkflowEntry[] = configs
-      .filter((c) => canInvokeWorkflow(c, roles, auth.role))
+      .filter((c) => canInvokeWorkflow(c, roles))
       .map((c) => ({ ...c, tier: tierOf(c) }));
 
-    if (hasGlobalInvocationAccess(roles, auth.role)) {
+    if (hasGlobalInvocationAccess(roles)) {
       const registered = new Set(configs.map((c) => c.workflow_type));
       for (const [name, { taskQueue }] of getRegisteredWorkers()) {
         if (registered.has(name) || SYSTEM_WORKFLOWS.has(name)) continue;

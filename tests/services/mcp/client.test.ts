@@ -5,6 +5,7 @@ import {
   callServerTool,
   isConnected,
   clear,
+  getBuiltinToolManifest,
 } from '../../../services/mcp/client';
 import { createTranslationServer } from '../../../system/mcp-servers/translation';
 
@@ -80,5 +81,13 @@ describe('MCP Client — built-in server resolution', () => {
       content: 'hello', target_language: 'es',
     });
     expect(result).toBeDefined();
+  });
+
+  it('keeps the tool manifest a server was registered with', () => {
+    const manifest = [{ name: 'send_message', gate: 'caller' as const, description: 'Send', inputSchema: {} }];
+    registerBuiltinServer('host-slack', createTranslationServer, manifest as any);
+    expect(getBuiltinToolManifest('host-slack')).toBe(manifest);
+    registerBuiltinServer('host-slack', createTranslationServer);
+    expect(getBuiltinToolManifest('host-slack')).toBeUndefined();
   });
 });

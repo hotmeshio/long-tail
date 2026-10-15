@@ -42,6 +42,11 @@ async function effectiveRoles(query: AnalyticsQuery | undefined): Promise<string
   // query will actually touch. Resolution throws AnalyticsInputError (→ 400)
   // for unknown keys, before any scope decision.
   if (query?.entity) {
+    // The gate covers the entity's roles only, so a role filter beside it is
+    // refused here, before the gate, rather than reaching the query unchecked.
+    if (query.role !== undefined || query.roles !== undefined) {
+      throw new AnalyticsInputError('query.entity and query.role/roles are two scoping mechanisms: use one');
+    }
     return (await escalationService.resolveEntitySystem(query.entity)).map((s) => s.role);
   }
   if (query?.role) return [query.role];

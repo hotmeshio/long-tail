@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as claudeCode from '../activities/claude-code';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -105,6 +106,6 @@ export async function createClaudeCodeServer(options?: {
     },
   );
 
-  loggerRegistry.info(`[lt-mcp:claude-code] ${name} ready (2 tools registered)`);
+  loggerRegistry.info(`[lt-mcp:claude-code] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;
 }

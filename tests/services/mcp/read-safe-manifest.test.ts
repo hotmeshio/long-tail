@@ -35,6 +35,7 @@ describe('admin MCP read-safe manifest', () => {
     const manifestNames = new Set(ADMIN_TOOLS.map((t) => t.name));
     const unlisted = registered.filter((name) => !manifestNames.has(name));
     expect(unlisted).toEqual([]);
+    expect(registered).toEqual([...manifestNames].sort());
 
     for (const entry of ADMIN_TOOLS) {
       expect(typeof (entry as any).read_safe, `read_safe missing on ${entry.name}`).toBe('boolean');

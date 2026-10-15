@@ -19,6 +19,8 @@ export interface AppSettings {
     ssoKeepaliveSeconds?: number | null;
     /** Pause the keepalive after this much inactivity; null/absent = no idle gate. */
     ssoKeepaliveIdleTimeoutSeconds?: number | null;
+    /** MCP clients can connect with OAuth; the Connected apps page applies. */
+    oauthServer?: boolean;
   };
   search?: {
     /** Global search bar in the header. Default: off. */
