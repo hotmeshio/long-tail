@@ -147,6 +147,8 @@ export function createClient(options: LTClientOptions = {}) {
       // Analytics surface (grouped membership/dwell + per-entity timeline), read_all-gated.
       aggregateByFacets: bindAuth(escalationsApi.aggregateByFacets, auth),
       timelineByFacet: bindAuth(escalationsApi.timelineByFacet, auth),
+      getRelated: bindAuth(escalationsApi.getRelatedAggregates, auth),
+      getRelatedRows: bindAuth(escalationsApi.getRelatedRows, auth),
     },
 
     // ── Workflows ──────────────────────────────────────────────────────────

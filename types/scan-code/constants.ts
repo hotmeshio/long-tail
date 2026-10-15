@@ -205,3 +205,11 @@ export const SCAN_HOLD_TTL_MAX_SECONDS = 600;
 
 /** Separator between a code and its ordinal in batch keys (`<gtin>#2`). */
 export const SCAN_FILL_SEPARATOR_DEFAULT = '#';
+
+/** How the station renders a fact's value: the list column formats, so a fact and a list cell read the same. */
+export const SCAN_FACT_FORMATS = {
+  DATE: 'date',
+  AGE: 'age',
+  AGO: 'ago',
+} as const;
+export type ScanFactFormat = (typeof SCAN_FACT_FORMATS)[keyof typeof SCAN_FACT_FORMATS];

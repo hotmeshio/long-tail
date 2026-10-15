@@ -103,6 +103,12 @@ describe('presentStep — curated facts', () => {
     expect(result?.data?.facts).toEqual([{ label: 'Table', value: '' }]);
   });
 
+  it('a formatted fact carries its raw value and the format', async () => {
+    satisfied.mockResolvedValue(true);
+    const result = await presentStep(twoChoices([{ label: 'Serial', value: '{item.serialNumber}', format: 'date' }]), ctx);
+    expect(result?.data?.facts).toEqual([{ label: 'Serial', value: 'SER-9', format: 'date' }]);
+  });
+
   it('a step without facts answers without them, so the station lists metadata as before', async () => {
     satisfied.mockResolvedValue(true);
     expect(await presentStep(twoChoices(), ctx).then((r) => r?.data && 'facts' in r.data)).toBe(false);

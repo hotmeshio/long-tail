@@ -8,6 +8,7 @@ import { registerSingleRoutes } from './single';
 import { registerResolveRoutes } from './resolve';
 import { registerFacetRoutes } from './facets';
 import { registerAnalyticsRoutes } from './analytics';
+import { registerRelatedRoutes } from './related';
 
 const router = Router();
 
@@ -33,6 +34,9 @@ registerFacetRoutes(router);
 
 // POST /aggregate-by-facets, /timeline-by-facet
 registerAnalyticsRoutes(router);
+
+// POST /related, /related/rows
+registerRelatedRoutes(router);
 
 // PATCH /:id/escalate, GET /by-workflow/:workflowId,
 // GET /:id, POST /:id/claim, POST /:id/release

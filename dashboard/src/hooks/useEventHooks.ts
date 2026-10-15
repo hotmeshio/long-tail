@@ -218,6 +218,25 @@ export function useEscalationListEvents(scope?: {
   });
 }
 
+/** The query keys of related-set reads (list columns and row details). */
+export const RELATED_QUERY_KEYS = [['escalations', 'related'], ['escalations', 'related-rows']];
+
+/**
+ * Refresh a list's related sets when rows move in the roles those sets read:
+ * an upstream row advancing changes what is coming toward the host rows.
+ */
+export function useRelatedSetEvents(roles: string[]): void {
+  const invalidate = useThrottledInvalidation('LIST');
+  const rolesKey = [...new Set(roles)].sort().join(',');
+  const patterns = useMemo(
+    () => (rolesKey ? rolesKey.split(',').map((role) => escalationPattern({ role })) : []),
+    [rolesKey],
+  );
+  useEventSubscriptions(patterns, () => {
+    invalidate(RELATED_QUERY_KEYS);
+  });
+}
+
 /**
  * Invalidate a single escalation detail on that item's own events. The id is
  * the subject's fourth token, so the broker delivers exactly this item's

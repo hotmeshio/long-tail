@@ -77,6 +77,7 @@ export function registerListRoutes(router: Router): void {
         available: req.query.available != null ? req.query.available === 'true' : undefined,
         jeopardy: req.query.jeopardy === '1' || req.query.jeopardy === 'true' || undefined,
         include: req.query.include as string | undefined,
+        groupBy: (req.query.groupBy as string) || undefined,
       },
       req.auth!,
     );
@@ -109,6 +110,7 @@ export function registerListRoutes(router: Router): void {
         orderBy: jsonParam(req.query.orderBy),
         jeopardy: req.query.jeopardy === '1' || req.query.jeopardy === 'true' || undefined,
         include: req.query.include as string | undefined,
+        groupBy: (req.query.groupBy as string) || undefined,
       },
       req.auth!,
     );

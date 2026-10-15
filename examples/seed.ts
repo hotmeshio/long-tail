@@ -15,6 +15,7 @@ import { seedRichFormRole } from './seed-rich-form';
 import { seedAcmeRoles } from './seed-acme';
 import { seedRelatedEscalationsRoles } from './seed-related-escalations';
 import { seedTransitionChainRoles } from './seed-transition-chain';
+import { seedConsolidationRoles } from './seed-consolidation';
 import { seedPolicyDocumentRole } from './seed-policy-document';
 import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
@@ -125,6 +126,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedAcmeRoles();
   await seedRelatedEscalationsRoles();
   await seedTransitionChainRoles();
+  await seedConsolidationRoles();
   await seedPolicyDocumentRole();
   await seedWorkbenchRole();
   await seedWorkbenchEscalation();

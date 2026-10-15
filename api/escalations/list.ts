@@ -1,6 +1,7 @@
 import * as escalationService from '../../services/escalation';
 import { getFeatureFlags } from '../../modules/features';
 import { getEscalationReadScope } from './helpers';
+import { FACET_KEY } from '../../services/escalation/facet-sql';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import type { FacetRange, FacetOrder } from '../../types';
 
@@ -25,6 +26,11 @@ export interface FacetInput {
    * carries the full record.
    */
   include?: string;
+  /**
+   * Page by groups of this metadata key: a page holds whole groups and
+   * `total` counts groups. The response adds `groups: [{ key, ids }]`.
+   */
+  groupBy?: string;
 }
 
 /** Strip the heavyweight JSON columns from list rows unless asked back. */
@@ -44,6 +50,15 @@ function projectListResult<T extends { escalations: Record<string, any>[] }>(
   return { ...result, escalations: projectListRows(result.escalations, include) };
 }
 
+type FacetedSearch = Parameters<typeof escalationService.searchEscalationsFaceted>[0];
+
+/** Run a scoped faceted search, paged by groups when the caller asked. */
+async function runFacetedSearch(search: FacetedSearch, groupBy?: string) {
+  return groupBy
+    ? escalationService.searchEscalationsGrouped({ ...search, groupKey: groupBy })
+    : escalationService.searchEscalationsFaceted(search);
+}
+
 /** True when the caller asked for anything the plain list path can't express. */
 function hasFacetQuery(i: FacetInput): boolean {
   return !!(
@@ -54,7 +69,8 @@ function hasFacetQuery(i: FacetInput): boolean {
     i.orderBy?.length ||
     i.roles?.length ||
     i.available != null ||
-    i.jeopardy === true
+    i.jeopardy === true ||
+    !!i.groupBy
   );
 }
 
@@ -97,6 +113,9 @@ export async function listEscalations(
 ): Promise<LTApiResult> {
   try {
     const scope = await getEscalationReadScope(auth.userId);
+    if (input.groupBy != null && !FACET_KEY.test(input.groupBy)) {
+      return { status: 400, error: 'groupBy must be a metadata key (letters, numbers, underscores)' };
+    }
     if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
     }
@@ -105,7 +124,7 @@ export async function listEscalations(
     // language (facets/block/range/exists/metadata-sort) IN SQL — the caller's
     // role(s) can only NARROW within their scope, never widen past it.
     if (hasFacetQuery(input)) {
-      const result = await escalationService.searchEscalationsFaceted({
+      const result = await runFacetedSearch({
         global: scope.global,
         visibleRoles: scope.global ? undefined : scope.allRoles,
         selfRoles: scope.global ? undefined : scope.selfRoles,
@@ -129,7 +148,7 @@ export async function listEscalations(
         search: input.search,
         limit: input.limit ?? 50,
         offset: input.offset ?? 0,
-      });
+      }, input.groupBy);
       return { status: 200, data: projectListResult(result, input.include) };
     }
 
@@ -190,13 +209,16 @@ export async function listAvailableEscalations(
 ): Promise<LTApiResult> {
   try {
     const scope = await getEscalationReadScope(auth.userId);
+    if (input.groupBy != null && !FACET_KEY.test(input.groupBy)) {
+      return { status: 400, error: 'groupBy must be a metadata key (letters, numbers, underscores)' };
+    }
     if (!scope.global && scope.allRoles.length === 0 && scope.selfRoles.length === 0) {
       return { status: 200, data: { escalations: [], total: 0 } };
     }
 
     // Faceted path — same as listEscalations but pinned to the available pool.
     if (hasFacetQuery(input)) {
-      const result = await escalationService.searchEscalationsFaceted({
+      const result = await runFacetedSearch({
         global: scope.global,
         visibleRoles: scope.global ? undefined : scope.allRoles,
         selfRoles: scope.global ? undefined : scope.selfRoles,
@@ -219,7 +241,7 @@ export async function listAvailableEscalations(
         search: input.search,
         limit: input.limit ?? 50,
         offset: input.offset ?? 0,
-      });
+      }, input.groupBy);
       return { status: 200, data: projectListResult(result, input.include) };
     }
 

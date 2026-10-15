@@ -17,6 +17,10 @@ describe('portalRefreshPlan', () => {
     expect(plan.keysFor('system.escalation.reviewer.abc.claimed')).toEqual([
       ['escalations', { role: 'reviewer' }],
       ['escalations', 'available', { role: 'reviewer' }],
+      ['escalations', { roles: ['reviewer'] }],
+      ['escalations', 'available', { roles: ['reviewer'] }],
+      ['escalations', 'related', 'reviewer'],
+      ['escalations', 'related-rows', 'reviewer'],
     ]);
     expect(plan.keysFor('system.escalation.printer-harvest.abc.resolved')[0]).toEqual(['escalations', { role: 'printer-harvest' }]);
   });
@@ -24,10 +28,18 @@ describe('portalRefreshPlan', () => {
   it('maps a sanitized subject token back to its role', () => {
     const plan = portalRefreshPlan([{ url: '/escalations/available?role=qc%20inspector' }], same);
     expect(plan.patterns).toEqual(['lt.events.system.escalation.qc-inspector.*.>']);
-    expect(plan.keysFor('system.escalation.qc-inspector.x.created')).toEqual([
+    expect(plan.keysFor('system.escalation.qc-inspector.x.created').slice(0, 2)).toEqual([
       ['escalations', { role: 'qc inspector' }],
       ['escalations', 'available', { role: 'qc inspector' }],
     ]);
+  });
+
+  it('refreshes a panel pinned by a lone roles entry, and that queue\'s related sets', () => {
+    const plan = portalRefreshPlan([{ url: '/escalations/available?roles=%5B%22bin%22%5D' }], same);
+    expect(plan.patterns).toEqual(['lt.events.system.escalation.bin.*.>']);
+    const keys = plan.keysFor('system.escalation.bin.x.updated');
+    expect(keys).toContainEqual(['escalations', 'available', { roles: ['bin'] }]);
+    expect(keys).toContainEqual(['escalations', 'related', 'bin']);
   });
 
   it('widens to the whole family when a URL names several roles or none, and for an unknown token', () => {

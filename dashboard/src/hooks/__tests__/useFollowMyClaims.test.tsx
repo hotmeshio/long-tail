@@ -16,6 +16,10 @@ vi.mock('../useAuth', () => ({
   }),
 }));
 
+// The badged person on a shared station, when one is primed.
+const acting: { identity: { actorId: string } | null } = { identity: null };
+vi.mock('../useActingIdentity', () => ({ useActingIdentity: () => ({ identity: acting.identity }) }));
+
 // Capture the subscription so tests can fire events through the handler.
 const captured: { patterns: string[]; handler: (e: any) => void } = { patterns: [], handler: () => {} };
 vi.mock('../useEventContext', () => ({
@@ -52,6 +56,7 @@ function mount(pathname = '/escalations/available') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  acting.identity = null;
 });
 
 describe('useFollowMyClaims — the directed hand-off', () => {
@@ -102,6 +107,23 @@ describe('useFollowMyClaims — the directed hand-off', () => {
   it('ignores malformed events with no assignee', () => {
     mount('/escalations/detail/esc-parent');
     captured.handler({ type: 'x.claimed', escalationId: 'esc-child', assignedAtCreation: true, data: { parent_id: 'esc-parent' } });
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('lands the badged person on a shared station on a child born to them', () => {
+    acting.identity = { actorId: 'packer-7' };
+    mount('/escalations/detail/parent-1');
+    captured.handler(handoffEvent('child-9', 'packer-7', 'parent-1'));
+    expect(navigateSpy).toHaveBeenCalledWith('/escalations/detail/child-9');
+  });
+
+  it('still follows a child born to the signed-in account while a badge is primed', () => {
+    acting.identity = { actorId: 'packer-7' };
+    mount('/escalations/detail/parent-1');
+    captured.handler(handoffEvent('child-3', 'me', 'parent-1'));
+    expect(navigateSpy).toHaveBeenCalledWith('/escalations/detail/child-3');
+    navigateSpy.mockClear();
+    captured.handler(handoffEvent('child-4', 'someone-else', 'parent-1'));
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 });

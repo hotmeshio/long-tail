@@ -26,6 +26,7 @@ import { StationDetailPanel } from './StationDetailPanel';
 import { jeopardyQueueLink } from './priority-link';
 import { useAccess } from '../../hooks/useAccess';
 import { displayRoleTitle } from '../../lib/role-display';
+import { buildRoleSequences, type RoleSequence } from '../../lib/role-segment';
 
 // Column band tints — same hues as the chart bands. Two sets: the slate
 // configuration trio (target, SLA, workers) and the vivid status trio. The
@@ -54,56 +55,16 @@ const PERIOD_HOURS: Record<Period, number> = {
   '30d': 720,
 };
 
-interface OrderedStation {
-  role: RoleDetail;
-  depth: number;
-}
-
 /**
  * One sequence of stations, named by its origin role. Execution is a graph;
  * each fragment is the human-readable line the user composed via parent_role.
  * Cross-fragment edges live in upstream_roles and render as a merge affordance
  * on the chart, never as a bend in the line.
  */
-interface SequenceFragment {
-  origin: RoleDetail;
-  stations: OrderedStation[];
-}
-
-// ── Fragment builder — BFS per parent_role root, tracking actual depth ────────
+type SequenceFragment = RoleSequence<RoleDetail>;
 
 export function buildFragments(roles: RoleDetail[]): SequenceFragment[] {
-  const opsRoles = roles.filter((r) => r.ops_visible);
-  const roleMap = new Map(opsRoles.map((r) => [r.role, r]));
-  const visited = new Set<string>();
-
-  // Roots: no parent, or parent not in ops set — each roots its own fragment.
-  const roots = opsRoles.filter((r) => !r.parent_role || !roleMap.has(r.parent_role));
-
-  const fragments: SequenceFragment[] = roots.map((root) => {
-    const stations: OrderedStation[] = [];
-    const queue: OrderedStation[] = [{ role: root, depth: 0 }];
-    while (queue.length > 0) {
-      const item = queue.shift()!;
-      if (visited.has(item.role.role)) continue;
-      visited.add(item.role.role);
-      stations.push(item);
-      opsRoles
-        .filter((c) => c.parent_role === item.role.role && !visited.has(c.role))
-        .forEach((c) => queue.push({ role: c, depth: item.depth + 1 }));
-    }
-    return { origin: root, stations };
-  });
-
-  // Unreachable (cycles / dangling) — each stands alone rather than vanishing.
-  opsRoles
-    .filter((r) => !visited.has(r.role))
-    .forEach((r) => fragments.push({ origin: r, stations: [{ role: r, depth: 0 }] }));
-
-  // Longest line first — the primary sequence leads; side-quests follow.
-  return fragments.sort(
-    (a, b) => b.stations.length - a.stations.length || a.origin.role.localeCompare(b.origin.role),
-  );
+  return buildRoleSequences(roles);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

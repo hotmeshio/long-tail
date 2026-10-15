@@ -2,6 +2,7 @@ import * as roleService from '../services/role';
 import { PORTAL_KEY, PORTAL_LIMITS, ROLE_PROPERTY_KEYS, type PortalCount, type RolePin, type RolePortal } from '../services/role/types';
 import { badgeGrantError } from '../services/role/badge-grant';
 import { FACET_KEY } from '../services/escalation/facet-sql';
+import { listSchemaRelationsError } from '../shared/list-schema';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -298,6 +299,8 @@ export async function updateRole(input: {
     }
     const grantError = badgeGrantError(input.properties?.[ROLE_PROPERTY_KEYS.BADGE_GRANT]);
     if (grantError) return { status: 400, error: grantError };
+    const listSchemaError = input.list_schema != null ? listSchemaRelationsError(input.list_schema) : null;
+    if (listSchemaError) return { status: 400, error: `list_schema: ${listSchemaError}` };
     if (input.portals != null && !isPortalList(input.portals)) {
       return {
         status: 400,

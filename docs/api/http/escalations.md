@@ -62,6 +62,7 @@ GET /api/escalations
 | `available` | `true`/`false` | `true` = unclaimed/expired only; `false` = held now |
 | `jeopardy` | `1`/`true` | Only rows past their role's priority threshold — the exact predicate behind the Pace Board's priority count, so a jeopardy list's total equals the badge. Age from the role's `priority_facet` metadata timestamp (`created_at` when unset) against `priority_threshold_minutes` (`sla_minutes` when unset); undialed roles contribute no rows |
 | `orderBy` | array of `{field, direction?, numeric?}` | Sort by column or `metadata.<key>` |
+| `groupBy` | string | A metadata key: the page holds whole groups of rows sharing it (a row without it is a group of one), `total` counts groups, and the response adds `groups: [{ key, ids }]` in page order. A role's grouped `facet-table` sends it |
 
 When any faceted parameter is present the request runs through the scoped faceted query.
 Example (URL-encode the JSON values):
@@ -1433,3 +1434,48 @@ One entity's ordered interval sequence — every escalation the entity facet app
 **Response 400** — same validation class as the aggregate: a rejected filter field, an invalid window, a malformed facet key.
 
 **Response 403** — timelines always take the full gate: an entity's movement history is item-level disclosure. The caller must hold `read_all` on every role in scope (for `entity`, every role in the derived system); a roleless query requires a global principal.
+
+## Related sets
+
+The related sets a role's `list_schema` declares under `x-lt-related` (see [List Schema](../../hitl/x-lt-list-schema.md#related-sets)), read for list rows. The server reads the declaration from the stored list schema; the caller names the role, the rows, and the schema version it rendered. Every count and row is scoped to the caller's read scope; a role the caller cannot read answers 404.
+
+```
+POST /api/escalations/related
+```
+
+Body: `{ role, ids, version? }`, with up to 100 ids (one page). One statement runs per declared (set, split) pair, whatever the page size.
+
+**Response 200:**
+
+```json
+{
+  "version": 3,
+  "sets": {
+    "contents": {
+      "source": "items",
+      "roles": ["order-stage"],
+      "aggregates": {
+        "reciprocal.metadata.serviceLevel": {
+          "6f1c…": { "count": 3, "splits": { "standard": 2, "express": 1 } }
+        }
+      }
+    },
+    "coming": {
+      "source": "query",
+      "roles": ["order-prep", "order-check", "order-stage"],
+      "roleLabels": { "order-prep": "Order · Prep", "order-check": "Order · Check", "order-stage": "Order · Staged" },
+      "restricted": [],
+      "aggregates": { "role": { "6f1c…": { "count": 2, "splits": { "order-check": 1, "order-prep": 1 } } } }
+    }
+  }
+}
+```
+
+`aggregates` is keyed by `splitBy` (`""` when a column is unsplit), then row id. `hidden` counts items whose reciprocal row the caller cannot read; `unresolved` marks a row whose facet templates did not resolve; `restricted` names query roles outside the caller's full read scope (not counted). `roles` names the roles whose rows a set reads, so a list can follow their events: a query set's resolved roles in order, or, for an item set split by `reciprocal.metadata.<key>`, the roles of the readable reciprocal rows. 400 for a bad body or a segment naming no sequence; 422 when the stored declaration no longer validates.
+
+```
+POST /api/escalations/related/rows
+```
+
+Body: `{ role, id, set, version?, limit? }` (`limit` 1..100, default 25). Returns `{ source, rows, total }`; an items row is `{ item: { itemKey, payload, at, actor?, reciprocalId? }, escalation }` (the reciprocal row, or null when unreadable), a query row is `{ escalation }` in role order then age, with `restricted` and `roleLabels`.
+

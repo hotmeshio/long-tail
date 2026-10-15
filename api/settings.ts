@@ -10,6 +10,7 @@ import { getFeatureFlags } from '../modules/features';
 import { getSearchConfig } from '../modules/search';
 import { getBranding } from '../modules/branding';
 import { getOAuthServerSettings } from '../modules/oauth-server';
+import { getDisplay } from '../modules/display';
 import { LONG_TAIL_VERSION, HOTMESH_VERSION } from '../modules/version';
 import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
@@ -46,7 +47,7 @@ function resolveNatsWsUrl(
  * environment block (long-tail + HotMesh versions, Node env/version).
  *
  * @param req — the incoming HTTP request, used to derive NATS WS URL from headers when proxying
- * @returns `{ status: 200, data: { telemetry, escalation, events, auth, ai, features, environment } }`
+ * @returns `{ status: 200, data: { telemetry, escalation, events, auth, ai, features, search, branding, display, environment } }`
  */
 export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
   try {
@@ -94,6 +95,7 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
         features: getFeatureFlags(),
         search: getSearchConfig(),
         branding: getBranding(),
+        display: getDisplay(),
         environment: {
           longTailVersion: LONG_TAIL_VERSION,
           hotmeshVersion: HOTMESH_VERSION,

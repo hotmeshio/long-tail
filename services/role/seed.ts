@@ -12,6 +12,7 @@ import { GET_ROLE_ROW, LIST_CONFIGURED_ROLES } from './sql';
 
 import type { LTRoleConfig } from '../../types/startup';
 import { badgeGrantError } from './badge-grant';
+import { listSchemaRelationsError } from '../../shared/list-schema';
 import { ROLE_PROPERTY_KEYS } from './types';
 import type { UpdateRoleInput } from './types';
 
@@ -100,6 +101,8 @@ export async function applyRoleConfig(
 ): Promise<RoleApplyOutcome> {
   const grantError = badgeGrantError(cfg.properties?.[ROLE_PROPERTY_KEYS.BADGE_GRANT]);
   if (grantError) throw new Error(`role ${cfg.role}: ${grantError}`);
+  const listSchemaError = cfg.list_schema != null ? listSchemaRelationsError(cfg.list_schema) : null;
+  if (listSchemaError) throw new Error(`role ${cfg.role}: list_schema: ${listSchemaError}`);
   const created = await createRole(cfg.role);
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLE_ROW, [cfg.role]);
