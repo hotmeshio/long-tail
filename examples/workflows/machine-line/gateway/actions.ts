@@ -21,11 +21,17 @@ export type Action =
   | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any> }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   | { kind: 'claim'; as: Actor; rowId: string }
-  | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any> }
+  | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; complete?: Completion }
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
   | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
   | { kind: 'settleReply'; cmdId: string; status: string; reason: string };
+
+/** Resolve the row with `payload` once it holds every one of `keys`. */
+export interface Completion {
+  keys: string[];
+  payload: Record<string, any>;
+}
 
 export interface Plan {
   actions: Action[];

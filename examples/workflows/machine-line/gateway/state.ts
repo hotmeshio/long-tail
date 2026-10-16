@@ -1,7 +1,8 @@
 /**
  * What the gateway knows: the open handoff rows (from escalation events, so a
- * replay rebuilds it), recently closed ones (so replayed machine events are
- * recognized as done), open alarm rows, and each machine's link state.
+ * replay rebuilds it), recently closed ones and how they ended (so replayed
+ * machine events are recognized as done), open alarm rows, and each
+ * machine's link: presence, last message, software and boot id.
  */
 
 import type { HandoffFacets } from '../contracts';
@@ -9,10 +10,14 @@ import type { HandoffFacets } from '../contracts';
 export const DISPATCH_STATE = { NONE: 'none', PENDING: 'pending', ACCEPTED: 'accepted', REFUSED: 'refused' } as const;
 export type DispatchState = typeof DISPATCH_STATE[keyof typeof DISPATCH_STATE];
 
+export const ROW_END = { RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
+export type RowEnd = typeof ROW_END[keyof typeof ROW_END];
+
 export interface HandoffRow extends HandoffFacets {
   id: string;
   role: string;
   dispatch: DispatchState;
+  ended?: RowEnd;
 }
 
 export interface AlarmTrack {
@@ -26,8 +31,12 @@ export interface AlarmTrack {
 export interface LinkTrack {
   online: boolean;
   since: number;
+  lastSeen: number;
   rowId?: string;
+  quietRowId?: string;
   watching?: boolean;
+  software?: string;
+  bootId?: string;
 }
 
 const CLOSED_LIMIT = 2_000;
@@ -48,10 +57,11 @@ export class GatewayState {
     return this.openRows.get(id);
   }
 
-  close(id: string): HandoffRow | undefined {
+  close(id: string, ended: RowEnd = ROW_END.RESOLVED): HandoffRow | undefined {
     const row = this.openRows.get(id);
     if (!row) return undefined;
     this.openRows.delete(id);
+    row.ended = ended;
     this.closedRows.set(id, row);
     if (this.closedRows.size > CLOSED_LIMIT) {
       const oldest = this.closedRows.keys().next().value;
@@ -68,24 +78,29 @@ export class GatewayState {
     return [...this.openRows.values()];
   }
 
-  /** The open handoff for this unit that `pred` picks (latest attempt first). */
+  /** The open handoff carrying this unit that `pred` picks (latest attempt first). */
   openFor(unitId: string, pred: (r: HandoffRow) => boolean): HandoffRow | undefined {
-    return this.open().filter((r) => r.unitId === unitId && pred(r)).sort((a, b) => b.attempt - a.attempt)[0];
+    return this.open().filter((r) => carries(r, unitId) && pred(r)).sort((a, b) => b.attempt - a.attempt)[0];
   }
 
   closedFor(unitId: string, pred: (r: HandoffRow) => boolean): HandoffRow | undefined {
-    return [...this.closedRows.values()].find((r) => r.unitId === unitId && pred(r));
+    return [...this.closedRows.values()].find((r) => carries(r, unitId) && pred(r));
+  }
+
+  link(machineId: string, now = Date.now()): LinkTrack {
+    let link = this.links.get(machineId);
+    if (!link) {
+      link = { online: true, since: now, lastSeen: now };
+      this.links.set(machineId, link);
+    }
+    return link;
   }
 
   alarmKey(machineId: string, alarmId: string): string {
     return `${machineId}/${alarmId}`;
   }
+}
 
-  alarmByRow(rowId: string): AlarmTrack | undefined {
-    return [...this.alarms.values()].find((a) => a.rowId === rowId);
-  }
-
-  linkByRow(rowId: string): [string, LinkTrack] | undefined {
-    return [...this.links.entries()].find(([, l]) => l.rowId === rowId);
-  }
+function carries(row: HandoffRow, unitId: string): boolean {
+  return row.units.some((u) => u.unitId === unitId);
 }

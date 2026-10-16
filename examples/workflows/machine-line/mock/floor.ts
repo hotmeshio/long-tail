@@ -1,9 +1,9 @@
 /**
  * The floor between stations: where each finished unit waits, which station
- * expects it, and the carrier transfer that joins them. A receiver says READY
- * when its station is clear; the sender says RELEASED; after the travel time
- * the receiver confirms ARRIVED. Faults armed on either side are spent on the
- * next transfer that involves it.
+ * expects it, and the carrier transfer that joins them, one unit at a time. A
+ * receiver says READY when it can take the unit; the sender says RELEASED;
+ * after the travel time the receiver confirms ARRIVED. Faults armed on either
+ * side are spent on the next transfer that involves it.
  */
 
 import { JOB_EVENT, LEVEL, TRANSFER_FAILURE } from '../protocol';
@@ -18,13 +18,15 @@ export const TRANSFER_FAULT = {
   INCOMPLETE: 'incomplete',
   /** The receiver reads a different carrier than the one dispatched. */
   CARRIER_MISMATCH: 'carrier_mismatch',
+  /** The receiver cannot read the unit's id. */
+  UNREADABLE: 'unreadable',
   /** Nothing happens and nothing is reported. */
   STALL: 'stall',
 } as const;
 export type TransferFault = typeof TRANSFER_FAULT[keyof typeof TRANSFER_FAULT];
 
 interface Expectation { receiver: MockMachine; job: Job; announced: boolean; stalled: boolean }
-interface Holding { sender: MockMachine | null; job: Job; carrierId: string | null }
+interface Holding { sender: MockMachine | null; job: Job; unitId: string; carrierId: string | null }
 
 export class Floor {
   private expects = new Map<string, Expectation>();
@@ -37,10 +39,10 @@ export class Floor {
 
   constructor(private readonly settings: MockSettings) {}
 
-  /** A station accepted a dispatch for this unit. */
-  expect(receiver: MockMachine, job: Job): void {
-    this.expects.set(job.unitId, { receiver, job, announced: false, stalled: false });
-    if (!job.from && !this.holds.has(job.unitId)) this.holds.set(job.unitId, { sender: null, job, carrierId: job.carrierId });
+  /** A station accepted a dispatch that includes this unit. */
+  expect(receiver: MockMachine, job: Job, unitId: string, carrierId: string | null): void {
+    this.expects.set(unitId, { receiver, job, announced: false, stalled: false });
+    if (!job.from && !this.holds.has(unitId)) this.holds.set(unitId, { sender: null, job, unitId, carrierId });
     this.poke();
   }
 
@@ -49,13 +51,18 @@ export class Floor {
   }
 
   /** A finished unit waits at its station for the next one. */
-  hold(sender: MockMachine, job: Job, carrierId: string | null): void {
-    this.holds.set(job.unitId, { sender, job, carrierId });
+  hold(sender: MockMachine, job: Job, unitId: string, carrierId: string | null): void {
+    this.holds.set(unitId, { sender, job, unitId, carrierId });
     this.poke();
   }
 
   drop(unitId: string): void {
     this.holds.delete(unitId);
+  }
+
+  /** Forget every unit a restarted machine was holding. */
+  forgetSender(machineId: string): void {
+    for (const [unitId, h] of this.holds) if (h.sender?.def.machineId === machineId) this.holds.delete(unitId);
   }
 
   arm(machineId: string, fault: TransferFault): void {
@@ -108,10 +115,10 @@ export class Floor {
     if (!e || e.stalled) return;
     const { receiver, job } = e;
     const rid = receiver.def.machineId;
-    if (receiver.cell.station || this.inbound.has(rid) || !receiver.canProduce()) return;
+    if (!receiver.cell.canTake(job) || this.inbound.has(rid) || !receiver.canProduce()) return;
     if (!e.announced) {
       e.announced = true;
-      await receiver.cell.announceReady(job);
+      await receiver.cell.announceReady(job, unitId);
     }
     const h = this.holds.get(unitId);
     if (!h) return;
@@ -120,7 +127,7 @@ export class Floor {
       this.expects.delete(unitId);
       this.holds.delete(unitId);
       this.inbound.add(rid);
-      this.later(receiver.ms(this.settings.arrivalDelaySec), () => void this.land(receiver, job, h, h.carrierId, null));
+      this.later(receiver.ms(this.settings.arrivalDelaySec), () => void this.land(receiver, h, h.carrierId, null));
       return;
     }
     const sender = h.sender;
@@ -132,7 +139,8 @@ export class Floor {
     }
     if (fault === TRANSFER_FAULT.JAM) {
       this.blocked.add(sender.def.machineId);
-      await sender.cell.publishJob(JOB_EVENT.TRANSFER_FAILED, h.job, { peer: rid, failure: TRANSFER_FAILURE.JAM });
+      const unit = h.job.units.find((u) => u.unitId === unitId)!;
+      await sender.cell.publishJob(JOB_EVENT.TRANSFER_FAILED, h.job, unit, { peer: rid, failure: TRANSFER_FAILURE.JAM });
       await sender.alarms.raise('TRANSFER-JAM', LEVEL.CRITICAL, `${unitId} jammed leaving ${sender.def.machineId}`, {
         zone: `${sender.def.machineId}-outfeed`, autoClears: false, action: 'Clear the outfeed, then clear the alarm', jobId: h.job.jobId,
       });
@@ -141,34 +149,48 @@ export class Floor {
     this.expects.delete(unitId);
     this.holds.delete(unitId);
     this.inbound.add(rid);
-    await sender.cell.release(h.job, rid);
+    await sender.cell.release(h.job, unitId, rid);
     const from = sender.def.machineId;
     if (fault === TRANSFER_FAULT.INCOMPLETE) {
-      this.later(receiver.ms(this.settings.handshakeTimeoutSec), () => void this.incomplete(receiver, job, h));
+      this.later(receiver.ms(this.settings.handshakeTimeoutSec), () => void this.incomplete(receiver, h));
+      return;
+    }
+    if (fault === TRANSFER_FAULT.UNREADABLE) {
+      this.later(receiver.ms(this.settings.transferSec), () => void this.unreadable(receiver, h, from));
       return;
     }
     const carrierRead = fault === TRANSFER_FAULT.CARRIER_MISMATCH ? `${h.carrierId ?? 'none'}-misread` : h.carrierId;
-    this.later(receiver.ms(this.settings.transferSec), () => void this.land(receiver, job, h, carrierRead, from));
+    this.later(receiver.ms(this.settings.transferSec), () => void this.land(receiver, h, carrierRead, from));
   }
 
-  private async land(receiver: MockMachine, job: Job, h: Holding, carrierRead: string | null, from: string | null): Promise<void> {
+  private async land(receiver: MockMachine, h: Holding, carrierRead: string | null, from: string | null): Promise<void> {
     this.inbound.delete(receiver.def.machineId);
-    const ok = await receiver.cell.receive(job.unitId, carrierRead, from);
+    const ok = await receiver.cell.receive(h.unitId, carrierRead, from);
     if (!ok) this.returnToOutfeed(h);
     this.poke();
   }
 
-  private async incomplete(receiver: MockMachine, job: Job, h: Holding): Promise<void> {
+  private async unreadable(receiver: MockMachine, h: Holding, from: string): Promise<void> {
     this.inbound.delete(receiver.def.machineId);
-    await receiver.cell.publishJob(JOB_EVENT.TRANSFER_FAILED, job, {
-      peer: h.sender?.def.machineId ?? null, failure: TRANSFER_FAILURE.INCOMPLETE_HANDSHAKE,
-    });
+    await receiver.cell.refuseUnreadable(h.unitId, from);
+    this.returnToOutfeed(h);
+  }
+
+  private async incomplete(receiver: MockMachine, h: Holding): Promise<void> {
+    this.inbound.delete(receiver.def.machineId);
+    const job = receiver.cell.jobForUnit(h.unitId);
+    const unit = job?.units.find((u) => u.unitId === h.unitId);
+    if (job && unit) {
+      await receiver.cell.publishJob(JOB_EVENT.TRANSFER_FAILED, job, unit, {
+        peer: h.sender?.def.machineId ?? null, failure: TRANSFER_FAILURE.INCOMPLETE_HANDSHAKE,
+      });
+    }
     this.returnToOutfeed(h);
   }
 
   /** A unit that failed to transfer goes back to the sender's outfeed. */
   private returnToOutfeed(h: Holding): void {
-    this.holds.set(h.job.unitId, h);
+    this.holds.set(h.unitId, h);
     this.poke();
   }
 }

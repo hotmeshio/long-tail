@@ -40,10 +40,10 @@ const ENVELOPE = closed({
 const RECIPE = { anyOf: [closed({ id: STR, version: STR }), { type: 'null' }] };
 
 const BODY: Record<MessageKind, Schema> = {
-  [MESSAGE_KIND.PRESENCE]: closed({ online: BOOL }),
+  [MESSAGE_KIND.PRESENCE]: closed({ online: BOOL, software: STR }, ['software']),
   [MESSAGE_KIND.SNAPSHOT]: closed({
-    mode: oneOf(MODE), enabled: BOOL, recipe: RECIPE,
-    jobs: { type: 'array', items: closed({ jobId: STR, unitId: STR, status: STR }) },
+    bootId: STR, software: STR, mode: oneOf(MODE), enabled: BOOL, recipe: RECIPE,
+    jobs: { type: 'array', items: closed({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
     alarms: { type: 'array', items: STR },
     cycles: INT0,
   }),
@@ -59,7 +59,7 @@ const BODY: Record<MessageKind, Schema> = {
   }, ['peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure']),
   [MESSAGE_KIND.ALARM]: closed({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
-    raisedAt: TS, clearedAt: TS_N, ackedBy: STR_N, ackedAt: TS_N,
+    raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,
     zone: STR_N, autoClears: BOOL, action: STR_N, jobId: STR_N,
   }),
   [MESSAGE_KIND.TELEMETRY]: closed({ readings: { type: 'object', additionalProperties: NUM } }),

@@ -19,6 +19,8 @@ export type VerbOutcome = typeof VERB_OUTCOME[keyof typeof VERB_OUTCOME];
 export interface VerbResult {
   outcome: VerbOutcome;
   detail?: string;
+  /** After an accumulate: the item keys the row now holds, when the response carries them. */
+  itemKeys?: string[];
 }
 
 export interface LineEscalations {
@@ -26,6 +28,8 @@ export interface LineEscalations {
   accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult>;
   resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult>;
   create(as: Actor, input: CreateRowInput): Promise<{ id: string }>;
+  /** The item keys an accumulator row holds. */
+  itemKeys(id: string): Promise<string[]>;
   /** Open rows of a type, in the projection escalation events carry. */
   listOpen(type: string): Promise<Record<string, any>[]>;
 }

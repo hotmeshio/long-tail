@@ -24,6 +24,8 @@ export interface GatewaySettings {
   offlineDebounceMs: number;
   /** How long a dispatch stays valid at the machine (expiresAt). */
   dispatchTtlMs: number;
+  /** A connected machine silent this long gets a quiet row; 0 turns the check off. */
+  quietMs: number;
 }
 
 export interface GatewayDeps {
@@ -39,6 +41,7 @@ export class MachineGateway {
   readonly state = new GatewayState();
   private readonly executor: Executor;
   private readonly log: GatewayLog;
+  private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
     this.log = deps.log ?? consoleLog;
@@ -55,10 +58,16 @@ export class MachineGateway {
     await this.reconcile();
     await this.deps.feed.consume((event) => this.onEscalation(event));
     await this.deps.bus.consume((msg) => this.onMachine(msg));
+    const { quietMs } = this.deps.settings;
+    if (quietMs > 0) {
+      const machines = this.deps.line.machines.map((m) => m.machineId);
+      this.quietTimer = setInterval(() => this.executor.checkQuiet(machines, quietMs), Math.max(10, Math.floor(quietMs / 4)));
+    }
     this.log.info(GATEWAY_LOG.STARTED, { site: this.deps.line.siteId, line: this.deps.line.lineId });
   }
 
   async stop(): Promise<void> {
+    if (this.quietTimer) clearInterval(this.quietTimer);
     this.executor.stop();
     await this.deps.feed.close();
     await this.deps.bus.close();
@@ -96,7 +105,7 @@ export class MachineGateway {
     if (seen.violations.length && msg.deliveries === 1) {
       this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
     }
-    const plan = planMachineMessage(this.state, seen.parsed, seen.body);
+    const plan = planMachineMessage(this.state, seen.parsed, seen.body, this.deps.settings.dispatchTtlMs);
     try {
       await this.executor.apply(plan.actions);
       return plan.disposition;

@@ -20,11 +20,11 @@ function created(state: GatewayState, id: string, from: string | null, to: strin
 
 describe('planner: rows that are not there yet, or anymore', () => {
   it('naks an arrival whose row does not exist yet, acks one whose row closed', () => {
-    expect(planMachineMessage(new GatewayState(), ...job('cut-01', { event: 'arrived' })).disposition).toBe('nak');
+    expect(planMachineMessage(new GatewayState(), ...job('cut-01', { event: 'arrived' }), 1).disposition).toBe('nak');
     const state = new GatewayState();
     created(state, 'e1', 'press-01', 'cut-01');
     state.close('e1');
-    expect(planMachineMessage(state, ...job('cut-01', { event: 'arrived' }))).toEqual({ actions: [], disposition: 'ack' });
+    expect(planMachineMessage(state, ...job('cut-01', { event: 'arrived' }), 1)).toEqual({ actions: [], disposition: 'ack' });
   });
 
   it('dispatches once per row even when created and claimed both arrive', () => {
@@ -45,7 +45,7 @@ describe('planner: arrivals and sender records', () => {
   it('resolves a carrier mismatch as an error instead of a receipt', () => {
     const state = new GatewayState();
     created(state, 'e1', 'press-01', 'cut-01');
-    const plan = planMachineMessage(state, ...job('cut-01', { event: 'arrived', carrierId: 'CR-9' }));
+    const plan = planMachineMessage(state, ...job('cut-01', { event: 'arrived', carrierId: 'CR-9' }), 1);
     expect(plan.actions[0]).toMatchObject({ kind: 'resolve', as: 'cut-01', payload: { received: false, errorCode: 'carrier-mismatch' } });
   });
 
@@ -53,15 +53,15 @@ describe('planner: arrivals and sender records', () => {
     const state = new GatewayState();
     created(state, 'e1', 'press-01', 'cut-01');
     for (const event of ['queued', 'ready', 'started', 'progress', 'released']) {
-      expect(planMachineMessage(state, ...job('cut-01', { event }))).toEqual({ actions: [], disposition: 'ack' });
+      expect(planMachineMessage(state, ...job('cut-01', { event }), 1)).toEqual({ actions: [], disposition: 'ack' });
     }
   });
 
   it('accumulates the sender record and naks it until the next row exists', () => {
     const state = new GatewayState();
-    expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' })).disposition).toBe('nak');
+    expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' }), 1).disposition).toBe('nak');
     created(state, 'e2', 'press-01', 'cut-01');
-    expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' })).actions[0])
-      .toMatchObject({ kind: 'accumulate', rowId: 'e2', itemKey: 'released', as: 'press-01' });
+    expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' }), 1).actions[0])
+      .toMatchObject({ kind: 'accumulate', rowId: 'e2', itemKey: 'released:U1', as: 'press-01' });
   });
 });

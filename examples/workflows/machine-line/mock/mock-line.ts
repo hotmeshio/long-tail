@@ -48,6 +48,19 @@ export class MockLine {
     return { siteId: this.line.siteId, lineId: this.line.lineId, machines: [...this.machines.values()].map((m) => m.snapshot()) };
   }
 
+  /** The machine gives up a queued job by itself. */
+  async withdraw(machineId: string, input: { jobId: string }): Promise<boolean> {
+    const m = this.machine(machineId);
+    const job = m.cell.jobs.get(input.jobId);
+    if (!job || job.status !== 'queued') return false;
+    await m.cell.withdraw(job);
+    return true;
+  }
+
+  restart(machineId: string): Promise<void> {
+    return this.machine(machineId).restart();
+  }
+
   arrive(machineId: string, input: { unitId: string; carrierId?: string | null }): Promise<boolean> {
     return this.floor.arrive(this.machine(machineId), input.unitId, input.carrierId ?? null);
   }
@@ -70,8 +83,8 @@ export class MockLine {
     return record.alarmId;
   }
 
-  clearAlarm(machineId: string, input: { alarmId: string }): Promise<boolean> {
-    return hmi.clearAlarm(this.machine(machineId), input.alarmId);
+  clearAlarm(machineId: string, input: { alarmId: string; by?: string }): Promise<boolean> {
+    return hmi.clearAlarm(this.machine(machineId), input.alarmId, input.by ?? null);
   }
 
   fault(machineId: string, input: { code: string }): Promise<string> {
@@ -82,16 +95,16 @@ export class MockLine {
     return hmi.emergencyStop(this.machine(machineId));
   }
 
-  reset(machineId: string): Promise<void> {
-    return hmi.reset(this.machine(machineId));
+  reset(machineId: string, input: { by?: string } = {}): Promise<void> {
+    return hmi.reset(this.machine(machineId), input.by ?? null);
   }
 
   maintenanceStart(machineId: string): Promise<void> {
     return hmi.maintenanceStart(this.machine(machineId));
   }
 
-  maintenanceEnd(machineId: string): Promise<void> {
-    return hmi.maintenanceEnd(this.machine(machineId));
+  maintenanceEnd(machineId: string, input: { by?: string } = {}): Promise<void> {
+    return hmi.maintenanceEnd(this.machine(machineId), input.by ?? null);
   }
 
   recipes(machineId: string, input: { id: string; version: string }): Record<string, string[]> {

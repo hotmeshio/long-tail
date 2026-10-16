@@ -45,7 +45,7 @@ describe('mock floor: the handoff', () => {
     expect(await h.line.arrive('press-01', { unitId: 'NOPE' })).toBe(false);
     expect(h.line.machine('press-01').alarms.list()[0].code).toBe('UNIT-NOT-DISPATCHED');
     await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', 'U1'));
-    expect(await h.line.arrive('press-01', { unitId: 'U1', carrierId: 'CR-1' })).toBe(true);
+    expect(await h.line.arrive('press-01', { unitId: 'U1', carrierId: 'CR-U1' })).toBe(true);
   });
 });
 
@@ -101,6 +101,6 @@ describe('mock floor: transfer faults', () => {
     expect(h.line.machine('press-01').snapshot().link.outbox).toBeGreaterThan(0);
     await h.line.network('press-01', { mode: 'restore' });
     expect(h.line.machine('press-01').snapshot().link.outbox).toBe(0);
-    expect(JSON.parse(h.broker.retained(presence)[0].payload).body).toEqual({ online: true });
+    expect(JSON.parse(h.broker.retained(presence)[0].payload).body).toEqual({ online: true, software: '1.0.0' });
   });
 });

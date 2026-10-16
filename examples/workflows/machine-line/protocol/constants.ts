@@ -3,8 +3,8 @@
  * controller over MQTT. Each machine publishes under its own subtree and
  * hears only its own commands. Every message is a small JSON envelope.
  *
- *   {root}/{site}/{line}/{machine}/presence     retained; birth and will
- *   {root}/{site}/{line}/{machine}/snapshot     retained; full machine state
+ *   {root}/{site}/{line}/{machine}/presence     retained; birth and will, with the software version
+ *   {root}/{site}/{line}/{machine}/snapshot     retained; full machine state and its boot id
  *   {root}/{site}/{line}/{machine}/job          job lifecycle and unit handoff
  *   {root}/{site}/{line}/{machine}/alarm/{id}   retained while active
  *   {root}/{site}/{line}/{machine}/telemetry    best effort readings
@@ -49,9 +49,11 @@ export type Level = typeof LEVEL[keyof typeof LEVEL];
 export const STOPPING_LEVELS: readonly Level[] = [LEVEL.CRITICAL, LEVEL.EMERGENCY];
 
 /**
- * Job events. A unit moves between machines in a handshake: the receiver says
- * READY, the sender says RELEASED, the receiver confirms ARRIVED. ARRIVED is
- * the receipt that ends a handoff.
+ * Job events, one per unit: a job carries one or more units through a
+ * machine together. A unit moves between machines in a handshake: the
+ * receiver says READY, the sender says RELEASED, the receiver confirms
+ * ARRIVED. ARRIVED is the receipt that ends a handoff. WITHDRAWN means the
+ * job left the queue, by a cancel or by the machine giving it up.
  */
 export const JOB_EVENT = {
   QUEUED: 'queued',
@@ -73,6 +75,7 @@ export const TRANSFER_FAILURE = {
   JAM: 'jam',
   INCOMPLETE_HANDSHAKE: 'incomplete-handshake',
   CARRIER_MISMATCH: 'carrier-mismatch',
+  UNREADABLE_ID: 'unreadable-id',
 } as const;
 export type TransferFailure = typeof TRANSFER_FAILURE[keyof typeof TRANSFER_FAILURE];
 

@@ -43,6 +43,10 @@ export interface MachineDef {
   measurements: MeasurementDef[];
   /** fault code → description. */
   faults: Record<string, string>;
+  /** The software version the machine reports. */
+  software?: string;
+  /** Versions the line controller will dispatch to; unset allows any. */
+  allowedSoftware?: string[];
 }
 
 export interface LineDef {

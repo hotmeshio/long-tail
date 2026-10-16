@@ -15,18 +15,20 @@ describe('gateway: the golden path', () => {
     const intoCut = await rig.handoff('U1', 'press-01', 'cut-01');
     const intoInspect = await rig.handoff('U1', 'cut-01', 'inspect-01');
 
+    // The receiving machine resolves each row once every unit's arrival is held.
     for (const [row, machine] of [[intoPress, 'press-01'], [intoCut, 'cut-01'], [intoInspect, 'inspect-01']] as const) {
       expect(row.status).toBe('resolved');
       expect(row.resolved_by).toBe(machine);
-      expect(row.resolver_payload).toMatchObject({ received: true, receiver: machine });
+      expect(row.resolver_payload).toEqual({ received: true, receiver: machine, units: ['U1'] });
     }
     expect(rig.lt.calls.filter((c) => c.verb === 'claim').map((c) => c.as)).toEqual(['press-01', 'cut-01', 'inspect-01']);
-    expect(intoCut.items.map((i) => [i.itemKey, i.actor])).toEqual([['released', 'press-01']]);
+    expect(intoCut.items.map((i) => [i.itemKey, i.actor])).toEqual([['released:U1', 'press-01'], ['arrived:U1', 'cut-01']]);
     expect(intoCut.items[0].payload).toMatchObject({ event: 'finished', result: 'ok', jobId: 'U1-press-01' });
+    expect(intoCut.items[1].payload).toMatchObject({ unitId: 'U1', carrierId: 'CR-U1', from: 'press-01' });
 
     // The final handoff goes to a person: the same row type, resolved from the dashboard.
     const exit = rig.park('U1', 'inspect-01', null);
-    await until(() => rig.lt.rows.get(exit.id)!.items.some((i) => i.itemKey === 'released'));
+    await until(() => rig.lt.rows.get(exit.id)!.items.some((i) => i.itemKey === 'released:U1'));
     await rig.line.unload('inspect-01', { unitId: 'U1' });
     rig.lt.personResolves(exit.id, { received: true, receiver: 'person-1' });
     expect(rig.lt.rows.get(exit.id)!.status).toBe('resolved');
@@ -37,7 +39,7 @@ describe('gateway: the golden path', () => {
     rig = await startRig();
     await rig.handoff('U1', null, 'press-01');
     const [dispatch] = rig.recorder.commands('press-01', OP.DISPATCH);
-    expect(dispatch.args).toMatchObject({ jobId: 'U1-press-01', carrierId: 'CR-1', from: null, recipe: { id: 'RCP-BOND-A', version: '2' } });
+    expect(dispatch.args).toMatchObject({ jobId: 'U1-press-01', units: [{ unitId: 'U1', carrierId: 'CR-U1' }], from: null, recipe: { id: 'RCP-BOND-A', version: '2' } });
     expect(dispatch.args.expiresAt).toMatch(/Z$/);
     expect(rig.recorder.commands('press-01', OP.DISPATCH)).toHaveLength(1);
   });
@@ -67,7 +69,7 @@ describe('gateway: error roads', () => {
     rig = await startRig({}, { replyTimeoutMs: 200 });
     rig.line.config('press-01', { replyMode: 'drop' });
     const ended = await rig.handoff('U1', null, 'press-01');
-    expect(ended.resolver_payload).toMatchObject({ received: true, receiver: 'press-01' });
+    expect(ended.items.map((i) => i.itemKey)).toEqual(['arrived:U1']);
     await rig.gateway.idle();
     expect(rig.lt.rows.get(ended.id)!.resolver_payload).toMatchObject({ received: true });
   });
@@ -77,7 +79,7 @@ describe('gateway: error roads', () => {
     await rig.handoff('U1', null, 'press-01');
     rig.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
     const ended = await rig.handoff('U1', 'press-01', 'cut-01');
-    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'sender-rejected', reason: 'BOND-WEAK' });
+    expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', reason: 'BOND-WEAK' });
     await until(() => rig.recorder.commands('cut-01', OP.CANCEL)[0]);
   });
 
@@ -94,7 +96,7 @@ describe('gateway: error roads', () => {
     await rig.line.clearAlarm('press-01', { alarmId: alarm.metadata.alarmId });
     expect((await rig.lt.ended(alarm.id)).resolver_payload).toMatchObject({ decision: 'cleared' });
     const retry = await rig.handoff('U1', 'press-01', 'cut-01', 2);
-    expect(retry.resolver_payload).toMatchObject({ received: true, receiver: 'cut-01' });
+    expect(retry.items.map((i) => i.itemKey)).toContain('arrived:U1');
   });
 
   it('an incomplete handshake resolves incomplete-handshake', async () => {

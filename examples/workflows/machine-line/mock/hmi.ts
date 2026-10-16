@@ -25,15 +25,15 @@ export async function emergencyStop(m: MockMachine): Promise<string> {
   return alarm.alarmId;
 }
 
-/** An operator resets the machine after an emergency stop. */
-export async function reset(m: MockMachine): Promise<void> {
-  await m.alarms.clearWhere((a) => a.level === LEVEL.EMERGENCY);
+/** An operator resets the machine after an emergency stop; the reset names them. */
+export async function reset(m: MockMachine, by: string | null = null): Promise<void> {
+  await m.alarms.clearWhere((a) => a.level === LEVEL.EMERGENCY, by);
   if (m.mode === MODE.EMERGENCY_STOP) await m.setMode(MODE.IDLE);
   await m.resumeWork();
 }
 
-export async function clearAlarm(m: MockMachine, alarmId: string): Promise<boolean> {
-  const cleared = await m.alarms.clear(alarmId);
+export async function clearAlarm(m: MockMachine, alarmId: string, by: string | null = null): Promise<boolean> {
+  const cleared = await m.alarms.clear(alarmId, by);
   if (cleared) await m.resumeWork();
   return cleared;
 }
@@ -43,8 +43,8 @@ export async function maintenanceStart(m: MockMachine): Promise<void> {
 }
 
 /** The window closes; a repair clears the critical alarms that opened it. */
-export async function maintenanceEnd(m: MockMachine): Promise<void> {
-  await m.alarms.clearWhere((a) => a.level === LEVEL.CRITICAL);
+export async function maintenanceEnd(m: MockMachine, by: string | null = null): Promise<void> {
+  await m.alarms.clearWhere((a) => a.level === LEVEL.CRITICAL, by);
   await m.setMode(MODE.IDLE);
   await m.resumeWork();
 }

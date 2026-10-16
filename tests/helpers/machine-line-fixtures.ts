@@ -95,13 +95,14 @@ export async function startHarness(settings: Partial<MockSettings> = {}, lineDef
   return { broker, line, recorder, command, stop: async () => { await line.stop(); broker.shutdown(); } };
 }
 
-/** Dispatch arguments for `unitId` at `machineId` on the default line. */
-export function dispatchArgs(machineId: string, unitId: string, extra: Record<string, any> = {}): Record<string, any> {
+/** Dispatch arguments for one or more units at `machineId` on the default line; the job is named after the first. */
+export function dispatchArgs(machineId: string, units: string | string[], extra: Record<string, any> = {}): Record<string, any> {
+  const ids = Array.isArray(units) ? units : [units];
   const def = machineById(DEFAULT_LINE, machineId);
   const [id, versions] = Object.entries(def.recipes)[0];
   return {
-    jobId: `${unitId}-${machineId}`, unitId, orderRef: 'ORD-1',
-    recipe: { id, version: versions[versions.length - 1] }, carrierId: 'CR-1', from: null, ...extra,
+    jobId: `${ids[0]}-${machineId}`, orderRef: 'ORD-1', recipe: { id, version: versions[versions.length - 1] },
+    units: ids.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), from: null, ...extra,
   };
 }
 

@@ -1,17 +1,17 @@
 /**
  * Escalation events to gateway actions. A new handoff row for a machine is the
  * cue to dispatch, exactly as a new row is the cue for a person to look at the
- * dashboard. Ended rows withdraw their dispatch; an alarm row a person
- * resolves acknowledges the alarm at the machine.
+ * dashboard. A cancelled row stops both sides; an expired one withdraws its
+ * dispatch; an alarm row a person resolves acknowledges the alarm at the machine.
  */
 
-import { ROW_TYPE, dispatchCommandId, type HandoffFacets } from '../contracts';
+import { HANDOFF_ERROR, ROW_TYPE, dispatchCommandId, type HandoffFacets } from '../contracts';
 import { OP, isoTs } from '../protocol';
-import type { LineDef } from '../line';
+import { machineById, type LineDef } from '../line';
 import type { EscalationEvent } from '../transport';
-import type { Action } from './actions';
-import { cancelDispatch } from './plan-shared';
-import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
+import { CONTROLLER, type Action } from './actions';
+import { cancelDispatch, cancelSender } from './plan-shared';
+import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 
 const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
@@ -20,9 +20,9 @@ export function handoffFromEvent(data: Record<string, any>): HandoffRow {
   return {
     id: data.id,
     role: data.role,
-    unitId: String(md.unitId),
+    units: Array.isArray(md.units) ? md.units : [],
     jobId: String(md.jobId),
-    carrierId: md.carrierId ?? null,
+    senderJobId: md.senderJobId ?? null,
     orderRef: String(md.orderRef ?? ''),
     fromMachine: md.fromMachine ?? null,
     toMachine: md.toMachine ?? null,
@@ -40,26 +40,37 @@ export function handoffFromEvent(data: Record<string, any>): HandoffRow {
 export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string, any> {
   return {
     jobId: row.jobId,
-    unitId: row.unitId,
     orderRef: row.orderRef,
     recipe: { id: row.recipeId, version: row.recipeVersion },
-    carrierId: row.carrierId,
+    units: row.units,
     from: row.fromMachine,
     expiresAt: isoTs(expiresAt),
     ...(row.artifactUrl ? { artifact: { url: row.artifactUrl, sha256: row.artifactSha256 } } : {}),
   };
 }
 
+export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
+  return { kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs) };
+}
+
 export function planEscalationEvent(state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number): Action[] {
   const type = event.data?.type;
   if (type === ROW_TYPE.HANDOFF) return planHandoff(state, line, event, dispatchTtlMs);
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
-  if (type === ROW_TYPE.MACHINE_OFFLINE) return planOfflineRow(state, event);
+  if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   return [];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {
   return !!machineId && line.machines.some((m) => m.machineId === machineId);
+}
+
+/** A machine on a version the line does not allow is refused before any dispatch. */
+function softwareRefusal(state: GatewayState, line: LineDef, machineId: string): string | null {
+  const allowed = machineById(line, machineId).allowedSoftware;
+  const software = state.links.get(machineId)?.software;
+  if (!allowed || !software || allowed.includes(software)) return null;
+  return `${machineId} runs ${software}; allowed: ${allowed.join(', ')}`;
 }
 
 function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number): Action[] {
@@ -69,11 +80,20 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
     state.index(handoffFromEvent({ ...event.data, id, role: event.role }));
     const row = state.get(id)!;
     if (!onLine(line, row.toMachine) || row.dispatch !== DISPATCH_STATE.NONE) return [];
+    const refusal = softwareRefusal(state, line, row.toMachine);
+    if (refusal) {
+      row.dispatch = DISPATCH_STATE.REFUSED;
+      return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { received: false, errorCode: HANDOFF_ERROR.SOFTWARE_UNSUPPORTED, detail: refusal } }];
+    }
     row.dispatch = DISPATCH_STATE.PENDING;
-    return [{ kind: 'dispatch', rowId: id, machineId: row.toMachine, cmdId: dispatchCommandId(id), args: dispatchArgs(row, Date.now() + dispatchTtlMs) }];
+    return [dispatchAction(row, row.toMachine, dispatchTtlMs)];
   }
-  if (event.verb === VERB.CANCELLED || event.verb === VERB.EXPIRED) {
-    const row = state.close(id);
+  if (event.verb === VERB.CANCELLED) {
+    const row = state.close(id, ROW_END.CANCELLED);
+    return row ? [...cancelDispatch(row), ...cancelSender(row)] : [];
+  }
+  if (event.verb === VERB.EXPIRED) {
+    const row = state.close(id, ROW_END.EXPIRED);
     return row ? cancelDispatch(row) : [];
   }
   if (event.verb === VERB.RESOLVED) state.close(id);
@@ -97,11 +117,18 @@ function planAlarmRow(state: GatewayState, event: EscalationEvent): Action[] {
   }];
 }
 
-function planOfflineRow(state: GatewayState, event: EscalationEvent): Action[] {
+function planLinkRow(state: GatewayState, event: EscalationEvent): Action[] {
   const machineId = event.data.metadata?.machineId;
   const link = machineId ? state.links.get(machineId) : undefined;
   if (!link) return [];
-  if (event.verb === VERB.CREATED) link.rowId = event.escalationId;
-  if (event.verb === VERB.RESOLVED || event.verb === VERB.CANCELLED) link.rowId = undefined;
+  const quiet = event.data.type === ROW_TYPE.MACHINE_QUIET;
+  const ended = event.verb === VERB.RESOLVED || event.verb === VERB.CANCELLED;
+  if (quiet) {
+    if (event.verb === VERB.CREATED) link.quietRowId = event.escalationId;
+    if (ended && link.quietRowId === event.escalationId) link.quietRowId = undefined;
+  } else {
+    if (event.verb === VERB.CREATED) link.rowId = event.escalationId;
+    if (ended && link.rowId === event.escalationId) link.rowId = undefined;
+  }
   return [];
 }

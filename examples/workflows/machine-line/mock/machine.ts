@@ -9,6 +9,8 @@ import {
   alarmTopic, buildEnvelope, clientIdOf, machineTopic, parsePayload,
   type MachineIdent, type Mode,
 } from '../protocol';
+import { randomUUID } from 'crypto';
+
 import { identOf, type LineDef, type MachineDef } from '../line';
 import type { MachineLink } from '../transport';
 import { Alarms, type AlarmRecord } from './alarms';
@@ -25,7 +27,8 @@ export class MockMachine {
   readonly clientId: string;
   readonly alarms: Alarms;
   readonly cell = new Cell(this);
-  readonly commands = new CommandHandler(this);
+  commands = new CommandHandler(this);
+  bootId = randomUUID();
   readonly timers = new TimerBag();
   readonly recipes: Record<string, string[]>;
   mode: Mode = MODE.IDLE;
@@ -80,6 +83,24 @@ export class MockMachine {
     this.beats.clear();
     this.timers.clear();
     if (this.link.connected) await this.network('graceful');
+  }
+
+  get software(): string {
+    return this.def.software ?? '1.0.0';
+  }
+
+  /** The machine controller restarts: queue, station, alarms and command memory are lost. */
+  async restart(): Promise<void> {
+    if (this.link.connected) await this.link.disconnect(false);
+    this.cell.forget();
+    this.floor.forgetSender(this.def.machineId);
+    this.alarms.reset();
+    this.commands = new CommandHandler(this);
+    this.mode = MODE.IDLE;
+    this.recipe = null;
+    this.bootId = randomUUID();
+    await this.connect();
+    await this.publishSnapshot();
   }
 
   /** drop: the link is lost (the will fires); restore: reconnect; graceful: say offline first. */
@@ -150,10 +171,12 @@ export class MockMachine {
 
   async publishSnapshot(): Promise<void> {
     await this.publish(CHANNEL.SNAPSHOT, {
+      bootId: this.bootId,
+      software: this.software,
       mode: this.mode,
       enabled: this.enabled,
       recipe: this.recipe,
-      jobs: [...this.cell.jobs.values()].map((j) => ({ jobId: j.jobId, unitId: j.unitId, status: j.status })),
+      jobs: [...this.cell.jobs.values()].map((j) => ({ jobId: j.jobId, units: j.units.map((u) => u.unitId), status: j.status })),
       alarms: this.alarms.list().map((a) => a.alarmId),
       cycles: this.counters.cycles,
     }, { retain: true });
@@ -173,7 +196,7 @@ export class MockMachine {
 
   snapshot(): Record<string, any> {
     return {
-      machineId: this.def.machineId, clientId: this.clientId, mode: this.mode, enabled: this.enabled,
+      machineId: this.def.machineId, clientId: this.clientId, bootId: this.bootId, software: this.software, mode: this.mode, enabled: this.enabled,
       link: { connected: this.link.connected, queuedWhileOffline: this.queuedWhileOffline, outbox: this.outbox.length },
       recipe: this.recipe, station: this.cell.station, jobs: [...this.cell.jobs.values()],
       alarms: this.alarms.list(), counters: this.counters, replyMode: this.commands.replyMode,
@@ -181,7 +204,7 @@ export class MockMachine {
   }
 
   private publishPresence(online: boolean): Promise<void> {
-    return this.publish(CHANNEL.PRESENCE, { online }, { retain: true });
+    return this.publish(CHANNEL.PRESENCE, online ? { online, software: this.software } : { online }, { retain: true });
   }
 
   private publishTelemetry(): Promise<void> {

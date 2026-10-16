@@ -57,7 +57,7 @@ describe('contract: job rules', () => {
 describe('contract: alarms and replies', () => {
   const alarm = {
     alarmId: 'A1', code: 'F-101', level: 'critical', text: 't', active: true, raisedAt: '2026-01-01T00:00:00.000Z',
-    clearedAt: null, ackedBy: null, ackedAt: null, zone: null, autoClears: false, action: null, jobId: null,
+    clearedAt: null, clearedBy: null, ackedBy: null, ackedAt: null, zone: null, autoClears: false, action: null, jobId: null,
   };
 
   it('ties alarmId to the topic and allows an empty retained clear', () => {

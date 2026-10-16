@@ -12,6 +12,7 @@ export const ROW_TYPE = {
   HANDOFF_ERROR: 'handoff-error',
   ALARM: 'line-alarm',
   MACHINE_OFFLINE: 'machine-offline',
+  MACHINE_QUIET: 'machine-quiet',
 } as const;
 
 export const LINE_ROLE = {
@@ -23,11 +24,19 @@ export const LINE_ROLE = {
   CONTROLLER: 'line-controller',
 } as const;
 
+export interface HandoffUnit {
+  unitId: string;
+  carrierId: string | null;
+}
+
 /** Metadata on a handoff row. Everything a dispatch needs rides here. */
 export interface HandoffFacets {
-  unitId: string;
+  /** The units that move together as one job. */
+  units: HandoffUnit[];
+  /** The receiver's job for these units. */
   jobId: string;
-  carrierId: string | null;
+  /** The sender's job for these units; cancelled with the row. */
+  senderJobId: string | null;
   orderRef: string;
   fromMachine: string | null;
   toMachine: string | null;
@@ -39,14 +48,23 @@ export interface HandoffFacets {
   attempt: number;
 }
 
-/** The accumulated item that carries the sender's finished-job record. */
-export const RELEASED_ITEM = 'released';
+/**
+ * Items a handoff row accumulates, one per unit: the sender's finished-job
+ * record, and the receiver's arrival. When every unit's arrival is held, the
+ * receiver resolves the row.
+ */
+export const itemKeys = {
+  released: (unitId: string) => `released:${unitId}`,
+  arrived: (unitId: string) => `arrived:${unitId}`,
+};
 
 export const HANDOFF_ERROR = {
   DISPATCH_REFUSED: 'dispatch-refused',
   NO_REPLY: 'no-reply',
   SENDER_REJECTED: 'sender-rejected',
   HANDOFF_TIMEOUT: 'handoff-timeout',
+  SOFTWARE_UNSUPPORTED: 'software-unsupported',
+  WITHDRAWN: 'withdrawn',
   ...TRANSFER_FAILURE,
 } as const;
 export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];
@@ -55,8 +73,10 @@ export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];
 export interface HandoffResolution {
   received: boolean;
   receiver?: string;
-  carrierId?: string | null;
-  receivedAt?: string;
+  /** Every unit received, on success. */
+  units?: string[];
+  /** The unit that failed, on an error. */
+  unitId?: string;
   errorCode?: HandoffErrorCode;
   reason?: string | null;
   detail?: string;
@@ -80,8 +100,8 @@ export interface OperatorResolution {
 
 /** Signal keys for the unit workflow; every attempt mints a fresh key. */
 export const signalKeys = {
-  handoff: (unitId: string, step: number, attempt: number) => `handoff-${unitId}-s${step}-a${attempt}`,
-  handoffError: (unitId: string, step: number, attempt: number) => `handoff-error-${unitId}-s${step}-a${attempt}`,
+  handoff: (jobKey: string, step: number, attempt: number) => `handoff-${jobKey}-s${step}-a${attempt}`,
+  handoffError: (jobKey: string, step: number, attempt: number) => `handoff-error-${jobKey}-s${step}-a${attempt}`,
 };
 
 export const dispatchCommandId = (escalationId: string) => `${escalationId}:dispatch`;

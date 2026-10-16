@@ -60,9 +60,9 @@ describe('gateway: restart and replay', () => {
     expect(rig.lt.rows.get(row.id)!.status).toBe('pending');
 
     rig.gateway = await rig.startGateway();
-    expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ received: true, receiver: 'cut-01' });
+    expect((await rig.lt.ended(row.id)).resolved_by).toBe('cut-01');
     await sleep(20);
-    expect(rig.lt.calls.filter((c) => c.verb === 'resolve' && c.id === row.id)).toHaveLength(1);
+    expect(rig.lt.rows.get(row.id)!.items.filter((i) => i.itemKey === 'arrived:U1')).toHaveLength(1);
   });
 
   it('boot reconciliation re-sends an interrupted dispatch with the same cmdId', async () => {
@@ -70,7 +70,7 @@ describe('gateway: restart and replay', () => {
     await rig.gateway.stop();
     const row = rig.park('U1', null, 'press-01');
     rig.gateway = await rig.startGateway();
-    expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ received: true });
+    expect((await rig.lt.ended(row.id)).resolved_by).toBe('press-01');
     expect(new Set(rig.recorder.commands('press-01').map((c) => c.cmdId))).toEqual(new Set([`${row.id}:dispatch`]));
   });
 });

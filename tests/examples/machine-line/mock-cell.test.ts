@@ -107,7 +107,7 @@ describe('mock cell: the job lifecycle', () => {
     h = await startHarness({ autoArriveAtEntry: false });
     await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', 'U1'));
     const snap = await until(() => h.recorder.of('press-01', 'snapshot').map((e) => e.body).find((b) => b.jobs.length === 1));
-    expect(snap).toMatchObject({ mode: 'idle', enabled: true, jobs: [{ jobId: 'U1-press-01', status: 'queued' }] });
+    expect(snap).toMatchObject({ mode: 'idle', enabled: true, software: '1.0.0', jobs: [{ jobId: 'U1-press-01', units: ['U1'], status: 'queued' }] });
     expect(await h.command('press-01', OP.SNAPSHOT)).toMatchObject({ status: 'accepted' });
   });
 });

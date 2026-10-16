@@ -61,6 +61,13 @@ export class FakeLongTail implements LineEscalations {
     this.emit(row, 'resolved', { resolved_by: person });
   }
 
+  /** A person or the workflow cancelling the row. */
+  cancel(id: string): void {
+    const row = this.rows.get(id)!;
+    row.status = 'cancelled';
+    this.emit(row, 'cancelled');
+  }
+
   /** The row's timeout firing (conditional `timeout`). */
   expire(id: string): void {
     const row = this.rows.get(id)!;
@@ -83,7 +90,7 @@ export class FakeLongTail implements LineEscalations {
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
     if (row.items.some((i) => i.itemKey === itemKey)) return { outcome: VERB_OUTCOME.ALREADY };
     row.items.push({ itemKey, payload, actor: as });
-    return { outcome: VERB_OUTCOME.DONE };
+    return { outcome: VERB_OUTCOME.DONE, itemKeys: row.items.map((i) => i.itemKey) };
   }
 
   async resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult> {
@@ -99,6 +106,10 @@ export class FakeLongTail implements LineEscalations {
 
   async create(_as: Actor, input: CreateRowInput): Promise<{ id: string }> {
     return { id: this.add({ ...input }).id };
+  }
+
+  async itemKeys(id: string): Promise<string[]> {
+    return (this.rows.get(id)?.items ?? []).map((i) => i.itemKey);
   }
 
   async listOpen(type: string): Promise<Record<string, any>[]> {

@@ -8,6 +8,7 @@ export const GATEWAY_LOG = {
   CONTRACT_VIOLATION: 'machine_gateway.contract.violation',
   ALARM_ROW: 'machine_gateway.alarm.row_created',
   OFFLINE_ROW: 'machine_gateway.offline.row_created',
+  QUIET_ROW: 'machine_gateway.quiet.row_created',
 } as const;
 export type GatewayLogEvent = typeof GATEWAY_LOG[keyof typeof GATEWAY_LOG];
 

@@ -14,6 +14,8 @@ export interface AlarmRecord {
   active: boolean;
   raisedAt: string;
   clearedAt: string | null;
+  /** Who cleared it at the machine, when a person did. */
+  clearedBy: string | null;
   ackedBy: string | null;
   ackedAt: string | null;
   zone: string | null;
@@ -49,6 +51,7 @@ export class Alarms {
       active: true,
       raisedAt: isoTs(),
       clearedAt: null,
+      clearedBy: null,
       ackedBy: null,
       ackedAt: null,
       zone: ctx.zone ?? this.zone,
@@ -61,18 +64,18 @@ export class Alarms {
     return record;
   }
 
-  async clear(alarmId: string): Promise<boolean> {
+  async clear(alarmId: string, by: string | null = null): Promise<boolean> {
     const record = this.active.get(alarmId);
     if (!record) return false;
     this.active.delete(alarmId);
-    await this.sink.publishAlarm({ ...record, active: false, clearedAt: isoTs() });
+    await this.sink.publishAlarm({ ...record, active: false, clearedAt: isoTs(), clearedBy: by });
     await this.sink.clearRetainedAlarm(alarmId);
     return true;
   }
 
-  async clearWhere(match: (r: AlarmRecord) => boolean): Promise<string[]> {
+  async clearWhere(match: (r: AlarmRecord) => boolean, by: string | null = null): Promise<string[]> {
     const ids = [...this.active.values()].filter(match).map((r) => r.alarmId);
-    for (const id of ids) await this.clear(id);
+    for (const id of ids) await this.clear(id, by);
     return ids;
   }
 
@@ -83,6 +86,11 @@ export class Alarms {
     record.ackedAt = isoTs();
     await this.sink.publishAlarm(record);
     return true;
+  }
+
+  /** Forget every alarm without publishing (a controller restart). */
+  reset(): void {
+    this.active.clear();
   }
 
   list(): AlarmRecord[] {

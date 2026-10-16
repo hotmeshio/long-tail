@@ -32,6 +32,7 @@ type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
 
 export class Executor {
   private inflight = new Set<Promise<void>>();
+  private quietPending = new Set<string>();
   private timers = new Set<NodeJS.Timeout>();
 
   constructor(private readonly d: ExecutorDeps) {}
@@ -75,7 +76,7 @@ export class Executor {
       case 'claim':
         return this.check(a, await lt.claim(a.as, a.rowId));
       case 'accumulate':
-        return this.check(a, await lt.accumulate(a.as, a.rowId, a.itemKey, a.payload));
+        return this.accumulate(a);
       case 'resolve':
         this.check(a, await lt.resolve(a.as, a.rowId, a.payload));
         state.close(a.rowId);
@@ -87,6 +88,18 @@ export class Executor {
       case 'settleReply':
         replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason });
     }
+  }
+
+  /** Add the item; when the row then holds every key the action waits for, resolve it. */
+  private async accumulate(a: Extract<Action, { kind: 'accumulate' }>): Promise<void> {
+    const { lt, state } = this.d;
+    const result = await lt.accumulate(a.as, a.rowId, a.itemKey, a.payload);
+    this.check(a, result);
+    if (!a.complete || result.outcome === VERB_OUTCOME.INVALID) return;
+    const held = new Set(result.itemKeys ?? await lt.itemKeys(a.rowId));
+    if (!a.complete.keys.every((k) => held.has(k))) return;
+    this.check(a, await lt.resolve(a.as, a.rowId, a.complete.payload));
+    state.close(a.rowId);
   }
 
   private check(a: Action, result: VerbResult): void {
@@ -129,6 +142,27 @@ export class Executor {
     }
     // Cleared at the machine while the row was being created.
     await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.CLEARED, note: `cleared at ${a.machineId}` });
+  }
+
+  /** Raise a quiet row for each connected machine silent longer than `quietMs`. */
+  checkQuiet(machineIds: string[], quietMs: number): void {
+    const now = Date.now();
+    for (const machineId of machineIds) {
+      const link = this.d.state.link(machineId);
+      if (!link.online || link.quietRowId || this.quietPending.has(machineId) || now - link.lastSeen < quietMs) continue;
+      this.quietPending.add(machineId);
+      this.track(this.raiseQuiet(machineId, now - link.lastSeen).finally(() => this.quietPending.delete(machineId)));
+    }
+  }
+
+  private async raiseQuiet(machineId: string, silentMs: number): Promise<void> {
+    const { id } = await this.d.lt.create(CONTROLLER, {
+      type: ROW_TYPE.MACHINE_QUIET, role: LINE_ROLE.OPERATOR, priority: 2,
+      description: `${machineId} is connected but has sent nothing for ${Math.round(silentMs / 1000)} s`,
+      metadata: { machineId, silentMs },
+    });
+    this.d.log.info(GATEWAY_LOG.QUIET_ROW, { row: id, machine: machineId });
+    this.d.state.link(machineId).quietRowId = id;
   }
 
   private watchOffline(machineId: string): void {
