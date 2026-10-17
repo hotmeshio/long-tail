@@ -69,7 +69,7 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
 
     const stamp = Date.now();
     for (const [actor, id] of await ensureLineBots(LINE)) users.set(actor, id);
-    const person = await userService.createUser({ external_id: `line-person-${stamp}`, roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }] });
+    const person = await userService.createUser({ external_id: `line-person-${stamp}`, roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }, { role: 'line-finisher', type: 'member' }] });
     personId = person.id;
 
     line = await startHarness({ msPerSec: 2 }, LINE);
@@ -183,5 +183,21 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     await line.line.unload('press-01', { unitId: 'T1' });
     const final = await handle.result() as { data: Record<string, any> };
     expect(final.data).toMatchObject({ status: 'scrapped', note: 'no decision before the timeout' });
+  }, 90_000);
+
+  it('a route mixing a machine and a person: the workflow waits on both rows the same way', async () => {
+    const routeKey = `R${Durable.guid().slice(0, 8)}`;
+    const steps = [STEPS[0], { role: 'line-finisher' }];
+    const handle = await start(routeKey, ['P1'], { steps, exitRole: 'line-exit' });
+    const intoFinisher = await rowBySignal(signalKeys.handoff(routeKey, 1, 1));
+    expect(intoFinisher).toMatchObject({ role: 'line-finisher', type: 'handoff' });
+    expect((intoFinisher.metadata as any)).toMatchObject({ fromMachine: 'press-01', toMachine: null });
+    for (let i = 0; i < 100 && !(await line.line.unload('press-01', { unitId: 'P1' })); i++) await sleep(50);
+    expect((await escalationApi.resolveEscalation({ id: intoFinisher.id, resolverPayload: { received: true, receiver: 'finisher' } }, { userId: personId })).status).toBe(200);
+    const exit = await rowBySignal(signalKeys.handoff(routeKey, 2, 1));
+    expect((await escalationApi.resolveEscalation({ id: exit.id, resolverPayload: { received: true, receiver: 'person' } }, { userId: personId })).status).toBe(200);
+    const final = await handle.result() as { data: Record<string, any> };
+    expect(final.data.status).toBe('complete');
+    expect(final.data.history.map((h: any) => [h.to, h.received])).toEqual([['press-01', true], ['line-finisher', true], ['exit', true]]);
   }, 90_000);
 });

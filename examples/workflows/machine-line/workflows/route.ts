@@ -4,15 +4,32 @@
  */
 
 import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
-import { stationRole, type LineDef } from '../../../../lib/machines/line';
+import { machineById, machineRole, stationRole, type LineDef } from '../../../../lib/machines/line';
 
 export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
 
-export interface RouteStep {
+/** A station a machine works: the gateway dispatches to it and resolves the handoff as it. */
+export interface MachineStep {
   machineId: string;
   process: string;
   recipe: { id: string; version: string };
+  /** The machine's role when the line names one; line-<process> otherwise. */
+  role?: string;
 }
+
+/** A station people work: its handoff is resolved on the dashboard, like any form. */
+export interface PersonStep {
+  role: string;
+}
+
+export type RouteStep = MachineStep | PersonStep;
+
+export function isMachineStep(step: RouteStep | null): step is MachineStep {
+  return !!step && 'machineId' in step;
+}
+
+const stationKey = (step: RouteStep) => (isMachineStep(step) ? step.machineId : step.role);
+const machineOf = (step: RouteStep | null) => (isMachineStep(step) ? step : null);
 
 export interface UnitRouteInput {
   siteId: string;
@@ -27,17 +44,23 @@ export interface UnitRouteInput {
   handoffTimeout?: string;
   /** How long a failed handoff waits for the operator's decision before the units are scrapped. */
   operatorTimeout?: string;
+  /** The role of the person who receives units at the end of the route; line-exit by default. */
+  exitRole?: string;
 }
 
 /** Every machine on the line in order, each on its first recipe at the newest version. */
 export function lineSteps(line: LineDef): RouteStep[] {
-  return line.machines.map((m) => {
-    const [id, versions] = Object.entries(m.recipes)[0];
-    return { machineId: m.machineId, process: m.process, recipe: { id, version: versions[versions.length - 1] } };
-  });
+  return line.machines.map((m) => machineStep(line, m.machineId));
 }
 
-/** One move: from a machine (null at line entry) to a machine (null at line exit, where a person receives). */
+/** A machine on the line as a route step, on its first recipe at the newest version. */
+export function machineStep(line: LineDef, machineId: string): MachineStep {
+  const m = machineById(line, machineId);
+  const [id, versions] = Object.entries(m.recipes)[0];
+  return { machineId, process: m.process, recipe: { id, version: versions[versions.length - 1] }, role: machineRole(m) };
+}
+
+/** One move between stations: from line entry (null) through each step to line exit (null), where a person receives. */
 export interface Hop {
   index: number;
   from: RouteStep | null;
@@ -49,7 +72,7 @@ export function planHops(steps: RouteStep[]): Hop[] {
   return stops.slice(1).map((to, i) => ({ index: i, from: stops[i], to }));
 }
 
-export const jobIdFor = (routeKey: string, step: RouteStep | null) => `${routeKey}-${step?.machineId ?? 'exit'}`;
+export const jobIdFor = (routeKey: string, step: RouteStep | null) => `${routeKey}-${step ? stationKey(step) : 'exit'}`;
 
 export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number): HandoffFacets {
   return {
@@ -59,26 +82,35 @@ export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number): Han
     jobId: jobIdFor(input.routeKey, hop.to),
     senderJobId: hop.from ? jobIdFor(input.routeKey, hop.from) : null,
     orderRef: input.orderRef,
-    fromMachine: hop.from?.machineId ?? null,
-    toMachine: hop.to?.machineId ?? null,
-    recipeId: hop.to?.recipe.id ?? null,
-    recipeVersion: hop.to?.recipe.version ?? null,
-    process: hop.to?.process ?? null,
-    artifactUrl: hop.to && input.artifact ? input.artifact.url : null,
-    artifactSha256: hop.to && input.artifact ? input.artifact.sha256 : null,
+    fromMachine: machineOf(hop.from)?.machineId ?? null,
+    toMachine: machineOf(hop.to)?.machineId ?? null,
+    recipeId: machineOf(hop.to)?.recipe.id ?? null,
+    recipeVersion: machineOf(hop.to)?.recipe.version ?? null,
+    process: machineOf(hop.to)?.process ?? null,
+    artifactUrl: machineOf(hop.to) && input.artifact ? input.artifact.url : null,
+    artifactSha256: machineOf(hop.to) && input.artifact ? input.artifact.sha256 : null,
     attempt,
   };
 }
 
-/** The row a hop parks: the receiver's role, or the exit role when a person receives. */
+function roleOf(input: UnitRouteInput, step: RouteStep | null): string {
+  if (!step) return input.exitRole ?? LINE_ROLE.EXIT;
+  return isMachineStep(step) ? step.role ?? stationRole(step.process) : step.role;
+}
+
+/**
+ * The row a hop parks, on the receiving station's role: a machine's role (its
+ * gateway resolves it) or a person's (the dashboard does). The row is the same
+ * either way; the workflow does not know which.
+ */
 export function hopRow(input: UnitRouteInput, hop: Hop, attempt: number) {
-  const from = hop.from?.machineId ?? 'line entry';
-  const to = hop.to?.machineId ?? 'line exit';
+  const from = hop.from ? stationKey(hop.from) : 'line entry';
+  const to = hop.to ? stationKey(hop.to) : 'line exit';
   const units = input.units.map((u) => u.unitId).join(', ');
   return {
-    role: hop.to ? stationRole(hop.to.process) : LINE_ROLE.EXIT,
+    role: roleOf(input, hop.to),
     type: ROW_TYPE.HANDOFF,
-    subtype: hop.to ? hop.to.process : 'exit',
+    subtype: hop.to ? (isMachineStep(hop.to) ? hop.to.process : hop.to.role) : 'exit',
     description: hop.to ? `${units}: ${from} → ${to}` : `Receive ${units} from ${from} and take them off the line`,
     metadata: { ...hopFacets(input, hop, attempt) } as Record<string, unknown>,
   };

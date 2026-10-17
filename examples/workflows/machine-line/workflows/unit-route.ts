@@ -9,7 +9,9 @@
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
 import { DECISION, LINE_ROLE, ROW_TYPE, signalKeys, type OperatorResolution } from '../../../../services/machines/contracts';
 import type { LTEnvelope } from '../../../../types';
-import { UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, planHops, readHopOutcome, type Hop, type HopOutcome, type UnitRouteInput } from './route';
+import {
+  UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, isMachineStep, planHops, readHopOutcome, type Hop, type HopOutcome, type RouteStep, type UnitRouteInput,
+} from './route';
 
 export { UNIT_ROUTE_WORKFLOW };
 
@@ -29,7 +31,7 @@ async function handoff(input: UnitRouteInput, hop: Hop, attempt: number): Promis
 }
 
 async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, outcome: HopOutcome): Promise<OperatorResolution> {
-  const where = hop.from?.machineId ?? 'line entry';
+  const where = stationName(hop.from, 'line entry');
   const decision = await conditional<OperatorResolution>(signalKeys.handoffError(input.routeKey, hop.index, attempt), {
     role: LINE_ROLE.OPERATOR,
     type: ROW_TYPE.HANDOFF_ERROR,
@@ -43,6 +45,11 @@ async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, out
   return decision || { decision: DECISION.SCRAP, note: 'no decision before the timeout' };
 }
 
+function stationName(step: RouteStep | null, end = 'exit'): string {
+  if (!step) return end;
+  return isMachineStep(step) ? step.machineId : step.role;
+}
+
 export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
   const input = envelope.data as UnitRouteInput;
   const hops = planHops(input.steps);
@@ -51,7 +58,7 @@ export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
   for (const hop of hops) {
     for (let attempt = 1; ; attempt++) {
       const outcome = await handoff(input, hop, attempt);
-      history.push({ hop: hop.index, to: hop.to?.machineId ?? 'exit', attempt, ...outcome });
+      history.push({ hop: hop.index, to: stationName(hop.to), attempt, ...outcome });
       if (outcome.received) break;
       const { decision, note } = await askOperator(input, hop, attempt, outcome);
       if (decision === DECISION.RETRY) continue;
@@ -59,9 +66,9 @@ export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
         // The units leave automation; a person takes them from where they stopped.
         const exit: Hop = { index: hops.length, from: hop.from, to: null };
         const manual = await handoff(input, exit, 1);
-        return { type: 'return' as const, data: { status: 'manual', at: hop.from?.machineId ?? 'entry', received: manual.received, note, history } };
+        return { type: 'return' as const, data: { status: 'manual', at: stationName(hop.from, 'entry'), received: manual.received, note, history } };
       }
-      return { type: 'return' as const, data: { status: 'scrapped', at: hop.from?.machineId ?? 'entry', note, history } };
+      return { type: 'return' as const, data: { status: 'scrapped', at: stationName(hop.from, 'entry'), note, history } };
     }
   }
   return { type: 'return' as const, data: { status: 'complete', units: input.units.map((u) => u.unitId), history } };

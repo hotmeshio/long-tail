@@ -1,14 +1,17 @@
 /**
  * machine-line: drive the machine line example end to end.
  *
- * Starts unit routes on the line and plays the people: a person at line exit
- * takes the units off the last machine and receives them, a technician
- * clears alarms at the machine, and an operator decides each failed handoff.
- * The machines and the gateway do the rest over MQTT. Rows are watched on
- * Long Tail's NATS, as the gateway watches them.
+ * Starts unit routes on the factory line and plays the people: at every
+ * station people work (and at the inspector, where every route ends) a
+ * person takes the units off the station before and receives them; a
+ * technician clears alarms; an operator decides each failed handoff. The
+ * machines and the gateway do the rest over MQTT. MIX sets the share of
+ * routes minted from the automated manifest; the rest run the manual one,
+ * through the same workflow. Rows are watched on Long Tail's NATS.
  *
  * Usage (after `docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml up -d --build`):
  *   npm run machine:line
+ *   MIX=50 UNITS=8 npm run machine:line          # half automated, half manual, same factory
  *   UNITS=8 BATCH=2 npm run machine:line
  *   FAULT=jam npm run machine:line               # first route jams leaving FAULT_AT; operator retries
  *   FAULT=reject DECIDE=scrap npm run machine:line
@@ -18,6 +21,8 @@
  *   SIM_URL       mock line drill server (default http://localhost:8090)
  *   NATS_URL      Long Tail NATS (default nats://localhost:4222), NATS_TOKEN (default dev_api_secret)
  *   UNITS         units to run (default 6); BATCH units per route (default 2)
+ *   MIX           percent of routes on the automated manifest (default 100); the rest run manual
+ *   MACHINE_LINE_CONFIG, MACHINE_MANIFESTS   line and manifests (default the factory line and manifests.json)
  *   FAULT         jam | incomplete | carrier_mismatch | unreadable | stall | reject | hold | estop | offline
  *   FAULT_AT      machine the fault happens at (default the first machine)
  *   DECIDE        operator decision on a failed handoff: retry | manual | scrap (default retry)
@@ -29,10 +34,12 @@ try { require('dotenv/config'); } catch { /* dotenv optional */ }
 
 import { connect, StringCodec } from 'nats';
 
-import { DECISION, LINE_ROLE, ROW_TYPE } from '../services/machines/contracts';
+import { DECISION, ROW_TYPE } from '../services/machines/contracts';
+import { exitRole, stationRoles } from '../lib/machines/line';
+import { FACTORY_LINE_PATH, automatedAt, loadManifests, manifestSteps } from '../examples/workflows/machine-line/manifests';
 import { loadLine } from '../examples/workflows/machine-line/line';
 import { MODE } from '../lib/machines/protocol';
-import { UNIT_ROUTE_WORKFLOW, lineSteps, type UnitRouteInput } from '../examples/workflows/machine-line/workflows/route';
+import { UNIT_ROUTE_WORKFLOW, type UnitRouteInput } from '../examples/workflows/machine-line/workflows/route';
 
 const env = process.env;
 const BASE_URL = env.BASE_URL || 'http://localhost:3000';
@@ -41,6 +48,7 @@ const NATS_URL = env.NATS_URL || 'nats://localhost:4222';
 const NATS_TOKEN = env.NATS_TOKEN ?? 'dev_api_secret';
 const UNITS = parseInt(env.UNITS || '6', 10);
 const BATCH = Math.max(1, parseInt(env.BATCH || '2', 10));
+const MIX = parseInt(env.MIX || '100', 10);
 const FAULT = env.FAULT || '';
 const DECIDE = env.DECIDE || DECISION.RETRY;
 const OFFLINE_S = parseInt(env.OFFLINE_S || '25', 10);
@@ -52,8 +60,13 @@ const TRANSFER_FAULTS = ['jam', 'incomplete', 'carrier_mismatch', 'unreadable', 
 const RESULT_FAULTS = ['reject', 'hold'];
 const STOPPED = new Set<string>([MODE.FAULTED, MODE.EMERGENCY_STOP]);
 
-const line = loadLine(env.MACHINE_LINE_CONFIG);
-const FAULT_AT = env.FAULT_AT || line.machines[0].machineId;
+const line = loadLine(env.MACHINE_LINE_CONFIG || FACTORY_LINE_PATH);
+const manifests = loadManifests(env.MACHINE_MANIFESTS || undefined);
+const MANIFEST = { AUTOMATED: 'automated', MANUAL: 'manual' } as const;
+const machineRoles = new Set(stationRoles(line));
+const firstMachine = manifests[MANIFEST.AUTOMATED].steps.find((s) => typeof s === 'string') as string;
+const FAULT_AT = env.FAULT_AT || firstMachine;
+const manifestOf = new Map<string, string>();
 const RUN = `L${Date.now().toString(36).slice(-5)}`;
 const counts: Record<string, number> = {};
 
@@ -109,12 +122,12 @@ async function takeUnits(machineId: string | null, units: { unitId: string }[], 
   }
 }
 
-/** Line exit: take each unit off the machine it came from, then receive the set. */
-async function receiveAtExit(row: Record<string, any>): Promise<void> {
+/** A person at a station: take each unit off the machine it came from (if any), then receive the set. */
+async function receive(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   await takeUnits(md.fromMachine ?? null, md.units ?? []);
-  await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { received: true, receiver: 'line-exit-person' } });
-  say(`[exit]     received ${(md.units ?? []).map((u: any) => u.unitId).join(', ')} from ${md.fromMachine ?? 'entry'}`);
+  await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { received: true, receiver: `${row.role}-person` } });
+  say(`[${row.role}]`.padEnd(11) + ` received ${(md.units ?? []).map((u: any) => u.unitId).join(', ')} from ${md.fromMachine ?? 'a person'}`);
 }
 
 /** Operator: make the machines healthy, then decide the failed handoff. */
@@ -130,7 +143,8 @@ async function onRow(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   if (md.siteId !== line.siteId || md.lineId !== line.lineId) return;
   counts[row.type] = (counts[row.type] ?? 0) + 1;
-  if (row.type === ROW_TYPE.HANDOFF && row.role === LINE_ROLE.EXIT && String(md.jobId ?? '').startsWith(RUN)) return receiveAtExit(row);
+  if (row.type === ROW_TYPE.HANDOFF && !machineRoles.has(row.role) && String(md.jobId ?? '').startsWith(RUN)) return receive(row);
+  if (row.type === ROW_TYPE.HANDOFF) return;
   if (row.type === ROW_TYPE.HANDOFF_ERROR && String(md.jobId ?? '').startsWith(RUN)) return decideFailure(row);
   if (row.type === ROW_TYPE.ALARM) {
     say(`[tech]     alarm ${md.code ?? ''} at ${md.machineId}: fixing`);
@@ -149,13 +163,16 @@ async function startRoutes(artifact: { url: string; sha256: string }): Promise<s
     const routeKey = `${RUN}-R${i + 1}`;
     const units = Array.from({ length: Math.min(BATCH, UNITS - n) }, (_, j) => ({ unitId: `${routeKey}-U${j + 1}`, carrierId: `CR-${routeKey}-${j + 1}` }));
     n += units.length;
+    const name = automatedAt(i, MIX) ? MANIFEST.AUTOMATED : MANIFEST.MANUAL;
     const data: UnitRouteInput = {
-      siteId: line.siteId, lineId: line.lineId, routeKey, orderRef: `ORD-${RUN}`, units, steps: lineSteps(line), artifact, handoffTimeout: HANDOFF_TIMEOUT,
+      siteId: line.siteId, lineId: line.lineId, routeKey, orderRef: `ORD-${RUN}`, units,
+      steps: manifestSteps(line, manifests[name]), exitRole: exitRole(line), artifact, handoffTimeout: HANDOFF_TIMEOUT,
     };
     const workflowId = `mur-${routeKey}`;
-    await api('POST', `/workflows/${UNIT_ROUTE_WORKFLOW}/invoke`, { workflowId, data, metadata: { source: 'machine-line' } });
+    await api('POST', `/workflows/${UNIT_ROUTE_WORKFLOW}/invoke`, { workflowId, data, metadata: { source: 'machine-line', manifest: name } });
     ids.push(workflowId);
-    say(`[route]    ${routeKey}: ${units.map((u) => u.unitId).join(', ')}`);
+    manifestOf.set(workflowId, name);
+    say(`[route]    ${routeKey} (${name}): ${units.map((u) => u.unitId).join(', ')}`);
   }
   return ids;
 }
@@ -174,13 +191,24 @@ async function awaitResults(ids: string[]): Promise<Map<string, any>> {
 }
 
 function report(ids: string[], results: Map<string, any>): boolean {
-  console.log('\nroute                    status     hops');
+  console.log('\nroute                    manifest   status     hops');
   let ok = true;
+  const byManifest: Record<string, { routes: number; complete: number; atInspector: number }> = {};
   for (const id of ids) {
     const data = results.get(id);
-    if (data?.status !== 'complete') ok = false;
+    const name = manifestOf.get(id)!;
+    const tally = (byManifest[name] ??= { routes: 0, complete: 0, atInspector: 0 });
+    tally.routes++;
+    if (data?.status === 'complete') tally.complete++;
+    else ok = false;
+    const last = data?.history?.[data.history.length - 1];
+    if (last?.to === 'exit' && last.received) tally.atInspector++;
     const hops = (data?.history ?? []).map((h: any) => `${h.to}${h.received ? '' : `(${h.errorCode})`}`).join(' > ');
-    console.log(`${id.padEnd(24)} ${(data?.status ?? 'timed out').padEnd(10)} ${hops}`);
+    console.log(`${id.padEnd(24)} ${name.padEnd(10)} ${(data?.status ?? 'timed out').padEnd(10)} ${hops}`);
+  }
+  console.log('');
+  for (const [name, t] of Object.entries(byManifest)) {
+    console.log(`${name.padEnd(10)} ${t.complete}/${t.routes} complete, ${t.atInspector} received at ${exitRole(line)}`);
   }
   console.log(`\nrows seen: ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join('  ') || 'none'}`);
   return ok;
@@ -200,14 +228,12 @@ async function main(): Promise<void> {
   const nc = await connect({ servers: NATS_URL, token: NATS_TOKEN || undefined, name: 'machine-line-driver' });
   const sc = StringCodec();
   let chain = Promise.resolve();
-  for (const role of [LINE_ROLE.EXIT, LINE_ROLE.OPERATOR]) {
-    nc.subscribe(`lt.events.system.escalation.${role}.*.created`, {
-      callback: (_err, m) => {
-        const row = JSON.parse(sc.decode(m.data)).data ?? {};
-        chain = chain.then(() => onRow(row)).catch((err) => say(`[driver]   ${err.message}`));
-      },
-    });
-  }
+  nc.subscribe('lt.events.system.escalation.*.*.created', {
+    callback: (_err, m) => {
+      const row = JSON.parse(sc.decode(m.data)).data ?? {};
+      chain = chain.then(() => onRow(row)).catch((err) => say(`[driver]   ${err.message}`));
+    },
+  });
 
   // 3. A job artifact, the fault, and the routes
   const artifact = await sim('POST', '/payloads', `machine-line ${RUN}`);

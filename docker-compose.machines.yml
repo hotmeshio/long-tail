@@ -11,7 +11,7 @@
 x-machine-env: &machine-env
   MACHINE_TRANSPORT: nats
   MACHINE_TOPIC_ROOT: ${MACHINE_TOPIC_ROOT:-line/v1}
-  MACHINE_LINE_CONFIG: ${MACHINE_LINE_CONFIG:-/app/examples/workflows/machine-line/demo-line.json}
+  MACHINE_LINE_CONFIG: ${MACHINE_LINE_CONFIG:-/app/examples/workflows/machine-line/factory-line.json}
   MACHINE_SITE_NATS_URL: nats://site-nats:4222
   MACHINE_SITE_NATS_USER: line-gateway
   MACHINE_SITE_NATS_PASSWORD: ${MACHINE_SITE_NATS_PASSWORD:-dev_gateway_secret}

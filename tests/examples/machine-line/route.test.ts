@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { hopFacets, hopRow, planHops, readHopOutcome, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
+import { hopFacets, hopRow, planHops, readHopOutcome, type RouteStep, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
 
 const INPUT: UnitRouteInput = {
   siteId: 'site-1',
@@ -18,7 +18,8 @@ const INPUT: UnitRouteInput = {
 describe('unit route: hops', () => {
   it('runs entry → each machine → exit', () => {
     const hops = planHops(INPUT.steps);
-    expect(hops.map((h) => [h.from?.machineId ?? null, h.to?.machineId ?? null])).toEqual([
+    const name = (s: RouteStep | null) => (s && 'machineId' in s ? s.machineId : null);
+    expect(hops.map((h) => [name(h.from), name(h.to)])).toEqual([
       [null, 'press-01'], ['press-01', 'cut-01'], ['cut-01', null],
     ]);
     expect(hops.map((h) => h.index)).toEqual([0, 1, 2]);
@@ -36,6 +37,25 @@ describe('unit route: hops', () => {
     expect(hopRow(INPUT, entry, 1)).toMatchObject({ role: 'line-bond', type: 'handoff', subtype: 'bond' });
     expect(hopRow(INPUT, exit, 1)).toMatchObject({ role: 'line-exit', subtype: 'exit' });
     expect(hopRow(INPUT, exit, 1).description).toMatch(/U1, U2 from cut-01/);
+  });
+});
+
+describe('unit route: stations people work', () => {
+  const MIXED: UnitRouteInput = {
+    ...INPUT, exitRole: 'inspector',
+    steps: [INPUT.steps[0], { role: 'finisher' }],
+  };
+
+  it('parks a person\'s handoff on that person\'s role, with no machine to dispatch', () => {
+    const [, intoFinisher, exit] = planHops(MIXED.steps);
+    expect(hopRow(MIXED, intoFinisher, 1)).toMatchObject({ role: 'finisher', subtype: 'finisher' });
+    expect(hopFacets(MIXED, intoFinisher, 1)).toMatchObject({ fromMachine: 'press-01', toMachine: null, recipeId: null, jobId: 'R1-finisher' });
+  });
+
+  it('hands from a person to the exit role the route names', () => {
+    const [, , exit] = planHops(MIXED.steps);
+    expect(hopRow(MIXED, exit, 1)).toMatchObject({ role: 'inspector', subtype: 'exit' });
+    expect(hopFacets(MIXED, exit, 1)).toMatchObject({ fromMachine: null, toMachine: null, senderJobId: 'R1-finisher' });
   });
 });
 

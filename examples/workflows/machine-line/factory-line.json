@@ -1,0 +1,246 @@
+{
+  "siteId": "site-1",
+  "lineId": "line-1",
+  "roles": {
+    "exit": "inspector"
+  },
+  "machines": [
+    {
+      "machineId": "print-01",
+      "process": "print",
+      "carrier": "none",
+      "description": "Print cell whose finished prints go onto the conveyor",
+      "cycleSec": 12,
+      "changeoverSec": 4,
+      "progressEverySec": 4,
+      "rejectReason": "PRINT-WARP",
+      "recipes": {
+        "RCP-PRINT-A": [
+          "3"
+        ]
+      },
+      "materials": [
+        {
+          "material": "filament",
+          "lot": "LOT-F-001"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "layer_mm",
+          "target": 0.2,
+          "unit": "mm",
+          "min": 0.18,
+          "max": 0.22,
+          "noise": 0.005
+        }
+      ],
+      "faults": {
+        "F-401": "Nozzle clogged"
+      }
+    },
+    {
+      "machineId": "print-02",
+      "process": "print",
+      "carrier": "none",
+      "description": "Print cell whose finished prints people harvest by hand",
+      "cycleSec": 12,
+      "changeoverSec": 4,
+      "progressEverySec": 4,
+      "rejectReason": "PRINT-WARP",
+      "recipes": {
+        "RCP-PRINT-A": [
+          "3"
+        ]
+      },
+      "materials": [
+        {
+          "material": "filament",
+          "lot": "LOT-F-001"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "layer_mm",
+          "target": 0.2,
+          "unit": "mm",
+          "min": 0.18,
+          "max": 0.22,
+          "noise": 0.005
+        }
+      ],
+      "faults": {
+        "F-401": "Nozzle clogged"
+      }
+    },
+    {
+      "machineId": "convey-01",
+      "process": "convey",
+      "carrier": "bind",
+      "description": "Takes finished prints off the print cell and seats them on a carrier plate",
+      "cycleSec": 3,
+      "changeoverSec": 1,
+      "rejectReason": "PLATE-MISSEAT",
+      "recipes": {
+        "RCP-CONVEY-A": [
+          "1"
+        ]
+      },
+      "materials": [],
+      "measurements": [
+        {
+          "name": "seat_offset_mm",
+          "target": 0,
+          "unit": "mm",
+          "min": -0.5,
+          "max": 0.5,
+          "noise": 0.1
+        }
+      ],
+      "faults": {
+        "F-501": "Belt stopped"
+      }
+    },
+    {
+      "machineId": "press-01",
+      "process": "bond",
+      "carrier": "none",
+      "description": "Bonds a top layer onto the part and seats it on a carrier plate",
+      "cycleSec": 8,
+      "changeoverSec": 3,
+      "progressEverySec": 4,
+      "rejectReason": "BOND-WEAK",
+      "recipes": {
+        "RCP-BOND-A": [
+          "1",
+          "2"
+        ]
+      },
+      "materials": [
+        {
+          "material": "BONDING-FILM",
+          "lot": "L-1001"
+        },
+        {
+          "material": "TOP-LAYER",
+          "lot": "L-1002"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "temperature_c",
+          "target": 120,
+          "unit": "C",
+          "min": 115,
+          "max": 125,
+          "noise": 1
+        },
+        {
+          "name": "pressure_kpa",
+          "target": 300,
+          "unit": "kPa",
+          "min": 280,
+          "max": 320,
+          "noise": 5
+        },
+        {
+          "name": "dwell_s",
+          "target": 6,
+          "unit": "s",
+          "min": 5.5,
+          "max": 7,
+          "noise": 0.1
+        }
+      ],
+      "faults": {
+        "F-101": "Feeder stalled",
+        "F-102": "Heater out of range"
+      }
+    },
+    {
+      "machineId": "cut-01",
+      "process": "trim",
+      "carrier": "release",
+      "description": "Trims the part to its outline and frees the carrier plate",
+      "cycleSec": 6,
+      "changeoverSec": 3,
+      "rejectReason": "EDGE-OUT",
+      "recipes": {
+        "RCP-TRIM-A": [
+          "1"
+        ]
+      },
+      "materials": [
+        {
+          "material": "CUTTER",
+          "lot": "L-2001"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "cut_force_n",
+          "target": 900,
+          "unit": "N",
+          "min": 800,
+          "max": 1000,
+          "noise": 15
+        },
+        {
+          "name": "feed_mm_s",
+          "target": 50,
+          "unit": "mm/s",
+          "min": 45,
+          "max": 55,
+          "noise": 0.8
+        }
+      ],
+      "faults": {
+        "F-201": "Cutter dull",
+        "F-202": "Fixture not seated"
+      }
+    },
+    {
+      "machineId": "inspect-01",
+      "process": "inspect",
+      "carrier": "none",
+      "description": "Measures and images the finished part",
+      "cycleSec": 4,
+      "changeoverSec": 2,
+      "rejectReason": "DIM-FAIL",
+      "recipes": {
+        "RCP-INSPECT-A": [
+          "1"
+        ]
+      },
+      "materials": [],
+      "measurements": [
+        {
+          "name": "length_mm",
+          "target": 250,
+          "unit": "mm",
+          "min": 249,
+          "max": 251,
+          "noise": 0.3
+        },
+        {
+          "name": "width_mm",
+          "target": 90,
+          "unit": "mm",
+          "min": 89.5,
+          "max": 90.5,
+          "noise": 0.15
+        },
+        {
+          "name": "image_score",
+          "target": 0.95,
+          "min": 0.9,
+          "max": 1,
+          "noise": 0.005
+        }
+      ],
+      "faults": {
+        "F-301": "Camera not ready"
+      }
+    }
+  ]
+}
