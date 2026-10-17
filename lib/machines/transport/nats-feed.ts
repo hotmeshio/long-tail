@@ -10,7 +10,7 @@ import { connect, type ConsumerMessages, type NatsConnection, type Subscription 
 
 import { payloadOf, readDurable } from './nats-durable';
 import { LocalRedelivery, SerialQueue } from './serial';
-import { LINE_STREAM, LT_ESCALATION_SUBJECTS, durableConsumer, ensureConsumer, ensureStreams, lineStreamConfigs } from './streams';
+import { LINE_STREAM, LT_ESCALATION_SUBJECTS, LT_EVENTS_STREAM, durableConsumer, ensureConsumer, ensureStreams } from './streams';
 import { DISPOSITION, toEscalationEvent, type Disposition, type EscalationEvent, type EscalationFeed } from './delivery';
 
 type Handler = (event: EscalationEvent) => Promise<Disposition>;
@@ -27,7 +27,6 @@ export interface JetStreamFeedOptions {
   natsUrl: string;
   user?: string;
   password?: string;
-  root: string;
   durableName: string;
   nakDelayMs?: number;
 }
@@ -40,10 +39,10 @@ export class JetStreamEscalationFeed implements EscalationFeed {
   constructor(private readonly opts: JetStreamFeedOptions) {}
 
   async connect(): Promise<void> {
-    const { natsUrl, user, password, root, durableName } = this.opts;
+    const { natsUrl, user, password, durableName } = this.opts;
     this.nc = await connect({ servers: natsUrl, user, pass: password, name: durableName });
     const jsm = await this.nc.jetstreamManager();
-    await ensureStreams(jsm, lineStreamConfigs(root));
+    await ensureStreams(jsm, [LT_EVENTS_STREAM]);
     await ensureConsumer(jsm, LINE_STREAM.LT_EVENTS, durableConsumer(durableName, [LT_ESCALATION_SUBJECTS]));
   }
 

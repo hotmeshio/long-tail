@@ -7,7 +7,7 @@
 
 import { AckPolicy, DeliverPolicy, nanos, StorageType, type ConsumerConfig, type JetStreamManager, type StreamConfig } from 'nats';
 
-import { CHANNEL, toSubject } from '../protocol';
+import { GENERIC_CHANNELS, type CodecChannels } from '../protocol/codec';
 
 export const LINE_STREAM = {
   EVENTS: 'LINE_EVENTS',
@@ -21,26 +21,33 @@ export const LT_ESCALATION_SUBJECTS = 'lt.events.system.escalation.>';
 const DAY_MS = 86_400_000;
 const ACK_WAIT_MS = 30_000;
 
-/** The channels the gateway acts on; telemetry only proves a machine is alive. */
-const EVENT_CHANNELS = [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/*`, CHANNEL.REPLY];
-
 type Scope = { root: string; siteId?: string; lineId?: string };
 
-function subjectsFor({ root, siteId = '*', lineId = '*' }: Scope, channels: string[]): string[] {
-  return channels.map((c) => toSubject(`${root}/${siteId}/${lineId}/*/${c}`));
+/** An MQTT filter as a NATS subject: levels become tokens, `+` becomes `*`, `#` becomes `>`. */
+export function filterToSubject(filter: string): string {
+  return filter.split('/').map((level) => (level === '+' ? '*' : level === '#' ? '>' : level)).join('.');
 }
 
-export function lineStreamConfigs(root: string): Partial<StreamConfig>[] {
+function subjectsFor({ root, siteId = '+', lineId = '+' }: Scope, channels: string[]): string[] {
+  return channels.map((c) => filterToSubject(`${root}/${siteId}/${lineId}/+/${c}`));
+}
+
+/** Long Tail's escalation events, captured from the leafnode. */
+export const LT_EVENTS_STREAM: Partial<StreamConfig> = {
+  name: LINE_STREAM.LT_EVENTS, subjects: [LT_ESCALATION_SUBJECTS], max_age: nanos(7 * DAY_MS), storage: StorageType.File,
+};
+
+export function lineStreamConfigs(root: string, channels: CodecChannels = GENERIC_CHANNELS): Partial<StreamConfig>[] {
   return [
-    { name: LINE_STREAM.EVENTS, subjects: subjectsFor({ root }, EVENT_CHANNELS), max_age: nanos(30 * DAY_MS), storage: StorageType.File },
-    { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor({ root }, [CHANNEL.TELEMETRY]), max_age: nanos(3 * DAY_MS), storage: StorageType.File },
-    { name: LINE_STREAM.LT_EVENTS, subjects: [LT_ESCALATION_SUBJECTS], max_age: nanos(7 * DAY_MS), storage: StorageType.File },
+    { name: LINE_STREAM.EVENTS, subjects: subjectsFor({ root }, channels.events), max_age: nanos(30 * DAY_MS), storage: StorageType.File },
+    { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor({ root }, channels.telemetry), max_age: nanos(3 * DAY_MS), storage: StorageType.File },
+    LT_EVENTS_STREAM,
   ];
 }
 
-/** The telemetry subject for one line, read live rather than replayed. */
-export function telemetrySubject(root: string, siteId: string, lineId: string): string {
-  return subjectsFor({ root, siteId, lineId }, [CHANNEL.TELEMETRY])[0];
+/** The telemetry subjects for one line, read live rather than replayed. */
+export function telemetrySubjects(root: string, siteId: string, lineId: string, channels: CodecChannels = GENERIC_CHANNELS): string[] {
+  return subjectsFor({ root, siteId, lineId }, channels.telemetry);
 }
 
 /**
@@ -57,8 +64,8 @@ export function durableConsumer(name: string, filterSubjects: string[]): Partial
   };
 }
 
-export function lineEventConsumer(root: string, siteId: string, lineId: string, name: string): Partial<ConsumerConfig> {
-  return durableConsumer(name, subjectsFor({ root, siteId, lineId }, EVENT_CHANNELS));
+export function lineEventConsumer(root: string, siteId: string, lineId: string, name: string, channels: CodecChannels = GENERIC_CHANNELS): Partial<ConsumerConfig> {
+  return durableConsumer(name, subjectsFor({ root, siteId, lineId }, channels.events));
 }
 
 /** Create or update each stream, then the consumer. Safe on every boot. */

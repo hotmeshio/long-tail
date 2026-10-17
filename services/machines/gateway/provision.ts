@@ -6,9 +6,8 @@
  * mints a fresh session key per bot, revoking the previous one.
  */
 
-import { LINE_ROLE } from '../contracts';
 import { clientIdOf } from '../../../lib/machines/protocol';
-import { controllerId, identOf, stationRole, type LineDef } from '../../../lib/machines/line';
+import { controllerId, exitRole, identOf, operatorRole, stationRoles, type LineDef } from '../../../lib/machines/line';
 import { CONTROLLER, type Actor } from './actions';
 import type { LtHttp } from './lt-http';
 
@@ -22,16 +21,16 @@ export interface Identity {
 
 /** The bots a line needs: one per machine, plus the controller. */
 export function lineIdentities(line: LineDef): Identity[] {
-  const stations = [...new Set(line.machines.map((m) => stationRole(m.process)))];
+  const stations = stationRoles(line);
   const machines = line.machines.map((m) => ({
     actor: m.machineId,
     botName: `machine-${clientIdOf(identOf(line, m.machineId))}`,
-    roles: [...stations, LINE_ROLE.EXIT],
+    roles: [...stations, exitRole(line)],
   }));
   const controller = {
     actor: CONTROLLER,
     botName: controllerId(line),
-    roles: [...stations, LINE_ROLE.EXIT, LINE_ROLE.OPERATOR],
+    roles: [...stations, exitRole(line), operatorRole(line)],
   };
   return [controller, ...machines];
 }

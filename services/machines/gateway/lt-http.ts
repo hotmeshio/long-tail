@@ -6,6 +6,7 @@
  * it is delivered again.
  */
 
+import type { OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
 import { VERB_OUTCOME, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 
@@ -84,8 +85,8 @@ export class HttpLineEscalations implements LineEscalations {
     return view.items.map((i) => i.itemKey);
   }
 
-  async listOpen(type: string): Promise<Record<string, any>[]> {
-    const query = new URLSearchParams({ type, status: 'pending', limit: '500' });
+  async listOpen(filter: OpenRowQuery): Promise<Record<string, any>[]> {
+    const query = new URLSearchParams({ ...filter, status: 'pending', limit: '500' });
     const page = await this.http.request<{ escalations: Record<string, any>[] }>('GET', `/escalations?${query}`, this.tokenFor(CONTROLLER));
     return page.escalations;
   }

@@ -5,6 +5,7 @@
  * protocol that resolves it differs.
  */
 
+import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE } from '../../lib/machines/line';
 import { TRANSFER_FAILURE } from '../../lib/machines/protocol';
 
 export const ROW_TYPE = {
@@ -17,9 +18,9 @@ export const ROW_TYPE = {
 
 export const LINE_ROLE = {
   /** People who clear alarms, bring machines back and decide failed handoffs. */
-  OPERATOR: 'line-operator',
+  OPERATOR: DEFAULT_OPERATOR_ROLE,
   /** People who take finished units off the line: the final handoff. */
-  EXIT: 'line-exit',
+  EXIT: DEFAULT_EXIT_ROLE,
   /** The gateway's own identity. */
   CONTROLLER: 'line-controller',
 } as const;

@@ -8,19 +8,18 @@
  */
 
 import type { LTRoleConfig } from '../../types/startup';
-import { stationRole, type LineDef } from '../../lib/machines/line';
-import { LINE_ROLE } from './contracts';
+import { exitRole, machineRole, operatorRole, type LineDef } from '../../lib/machines/line';
 import { HANDOFF_FORM_SCHEMA, OPERATOR_FORM_SCHEMA } from './forms';
 
 const BOARD = { sla_minutes: 10, target_per_hour: 60, priority_threshold_minutes: 10, ops_visible: true };
 
 export function machineRoleConfigs(line: LineDef): LTRoleConfig[] {
-  const stations = [...new Map(line.machines.map((m) => [stationRole(m.process), m])).values()];
+  const stations = [...new Map(line.machines.map((m) => [machineRole(m), m])).values()];
   const chain: LTRoleConfig[] = stations.map((m, i) => ({
-    role: stationRole(m.process),
+    role: machineRole(m),
     title: `Line: ${m.process}`,
     description: `Units handed to ${m.process}; the machine claims and resolves each handoff.`,
-    ...(i > 0 ? { parent_role: stationRole(stations[i - 1].process) } : {}),
+    ...(i > 0 ? { parent_role: machineRole(stations[i - 1]) } : {}),
     form_schema: HANDOFF_FORM_SCHEMA,
     enforce_schema: false,
     ...BOARD,
@@ -28,17 +27,17 @@ export function machineRoleConfigs(line: LineDef): LTRoleConfig[] {
   return [
     ...chain,
     {
-      role: LINE_ROLE.EXIT,
+      role: exitRole(line),
       title: 'Line exit',
       description: 'Finished units leaving the line; a person confirms they are in hand.',
       ...(chain.length ? { parent_role: chain[chain.length - 1].role } : {}),
-      upstream_roles: [LINE_ROLE.OPERATOR],
+      upstream_roles: [operatorRole(line)],
       form_schema: HANDOFF_FORM_SCHEMA,
       enforce_schema: false,
       ...BOARD,
     },
     {
-      role: LINE_ROLE.OPERATOR,
+      role: operatorRole(line),
       title: 'Line operator',
       description: 'Failed handoffs, stopping alarms, and machines that went dark or quiet.',
       form_schema: OPERATOR_FORM_SCHEMA,

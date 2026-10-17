@@ -11,6 +11,8 @@ import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
 import type { LineDef } from './machines';
+import type { LineCodec } from '../lib/machines/protocol/codec';
+import type { HandoffRowAdapter } from '../services/machines/rows';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
@@ -216,6 +218,10 @@ export interface LTMachinesConfig {
   env?: Record<string, string | undefined>;
   /** Declare each line's station, exit and operator roles where `roles` does not. Default true. */
   declareRoles?: boolean;
+  /** The machines' wire protocol; the generic line protocol under MACHINE_TOPIC_ROOT by default. */
+  codec?: LineCodec;
+  /** Reads the host's rows into machine handoffs; the standard handoff facets by default. */
+  rows?: HandoffRowAdapter;
 }
 
 export interface LTRoleConfig {

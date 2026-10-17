@@ -13,7 +13,8 @@ import { toTopic } from '../protocol';
 import { MqttSession } from './mqtt-session';
 import { payloadOf, readDurable } from './nats-durable';
 import { SerialQueue } from './serial';
-import { LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubject } from './streams';
+import { LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects } from './streams';
+import type { CodecChannels } from '../protocol/codec';
 import type { Disposition, InboundMessage, MachineBus } from './delivery';
 
 export interface NatsBusOptions {
@@ -26,6 +27,8 @@ export interface NatsBusOptions {
   root: string;
   siteId: string;
   lineId: string;
+  /** The codec's channels: which subjects are durable events and which are live telemetry. */
+  channels: CodecChannels;
   nakDelayMs?: number;
 }
 
@@ -33,7 +36,7 @@ export class NatsMachineBus implements MachineBus {
   private nc?: NatsConnection;
   private session?: MqttSession;
   private messages?: ConsumerMessages;
-  private telemetry?: Subscription;
+  private telemetry: Subscription[] = [];
   private readonly queue = new SerialQueue();
 
   constructor(private readonly opts: NatsBusOptions) {}
@@ -43,22 +46,22 @@ export class NatsMachineBus implements MachineBus {
   }
 
   async connect(): Promise<void> {
-    const { natsUrl, user, password, controllerId, root, siteId, lineId } = this.opts;
+    const { natsUrl, user, password, controllerId, root, siteId, lineId, channels } = this.opts;
     this.nc = await connect({ servers: natsUrl, user, pass: password, name: controllerId });
     const jsm = await this.nc.jetstreamManager();
-    await ensureStreams(jsm, lineStreamConfigs(root));
-    await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer(root, siteId, lineId, this.durableName));
+    await ensureStreams(jsm, lineStreamConfigs(root, channels));
+    await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer(root, siteId, lineId, this.durableName, channels));
     this.session = await MqttSession.open(this.opts.mqtt, controllerId);
   }
 
   async consume(handler: (msg: InboundMessage) => Promise<Disposition>): Promise<void> {
     const nc = this.nats();
-    const { root, siteId, lineId, nakDelayMs = 1_000 } = this.opts;
+    const { root, siteId, lineId, channels, nakDelayMs = 1_000 } = this.opts;
     this.messages = await readDurable(nc.jetstream(), LINE_STREAM.EVENTS, this.durableName, this.queue, (m) =>
       handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: m.info.deliveryCount }), nakDelayMs);
-    this.telemetry = nc.subscribe(telemetrySubject(root, siteId, lineId), {
+    this.telemetry = telemetrySubjects(root, siteId, lineId, channels).map((subject) => nc.subscribe(subject, {
       callback: (_err, m) => void this.queue.run(() => handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: 1 })),
-    });
+    }));
   }
 
   async publish(topic: string, payload: string, opts: { retain?: boolean } = {}): Promise<void> {
@@ -70,7 +73,7 @@ export class NatsMachineBus implements MachineBus {
   }
 
   async close(): Promise<void> {
-    this.telemetry?.unsubscribe();
+    for (const sub of this.telemetry) sub.unsubscribe();
     await this.messages?.close();
     await this.queue.drained();
     await this.session?.close(true);

@@ -8,6 +8,7 @@ import type { Actor, CreateRowInput } from './actions';
 import { verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
+import type { OpenRowQuery } from '../rows';
 
 export class ApiLineEscalations implements LineEscalations {
   constructor(private readonly userFor: (as: Actor) => string) {}
@@ -46,8 +47,8 @@ export class ApiLineEscalations implements LineEscalations {
     return (result.data as any).items.map((i: any) => i.itemKey);
   }
 
-  async listOpen(type: string): Promise<Record<string, any>[]> {
-    const result = await escalationApi.listEscalations({ type, status: 'pending', limit: 500 } as any, this.auth(CONTROLLER));
+  async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {
+    const result = await escalationApi.listEscalations({ ...query, status: 'pending', limit: 500 }, this.auth(CONTROLLER));
     if (result.status >= 300) throw new Error(`list failed ${result.status}: ${result.error}`);
     return (result.data as any).escalations;
   }

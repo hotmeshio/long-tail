@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  LINE_STREAM, LT_ESCALATION_SUBJECTS, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubject,
+  LINE_STREAM, LT_ESCALATION_SUBJECTS, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects, filterToSubject,
 } from '../../../lib/machines/transport';
 
 describe('site streams', () => {
@@ -20,7 +20,7 @@ describe('site streams', () => {
     const c = lineEventConsumer('line/v1', 'site-1', 'line-1', 'gw');
     expect(c).toMatchObject({ durable_name: 'gw', ack_policy: 'explicit', deliver_policy: 'new' });
     expect(c.filter_subjects).toContain('line.v1.site-1.line-1.*.job');
-    expect(telemetrySubject('line/v1', 'site-1', 'line-1')).toBe('line.v1.site-1.line-1.*.telemetry');
+    expect(telemetrySubjects('line/v1', 'site-1', 'line-1')).toEqual(['line.v1.site-1.line-1.*.telemetry']);
   });
 });
 
@@ -40,6 +40,20 @@ function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: E
     },
   } as any;
 }
+
+describe('channels from a codec', () => {
+  it('maps MQTT filters to NATS subjects', () => {
+    expect(filterToSubject('a/+/b/#')).toBe('a.*.b.>');
+  });
+
+  it('builds the streams and the consumer from the codec\'s own channels', () => {
+    const channels = { events: ['state', 'work', 'events/alert/+'], telemetry: ['readings/raw'] };
+    const [events, telemetry] = lineStreamConfigs('acme/v1', channels);
+    expect(events.subjects).toEqual(['acme.v1.*.*.*.state', 'acme.v1.*.*.*.work', 'acme.v1.*.*.*.events.alert.*']);
+    expect(telemetry.subjects).toEqual(['acme.v1.*.*.*.readings.raw']);
+    expect(lineEventConsumer('acme/v1', 's', 'l', 'gw', channels).filter_subjects).toContain('acme.v1.s.l.*.work');
+  });
+});
 
 describe('ensuring streams and consumers', () => {
   it('adds missing streams and updates existing ones', async () => {

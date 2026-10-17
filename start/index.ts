@@ -83,7 +83,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
 
   // 5b. Machines, after the workers exist so their rows publish lifecycle events
   const machines = startConfig.machines
-    ? MachineSurface.start({ lines: startConfig.machines.lines, env: startConfig.machines.env, callbacks: eventRegistry.getAdapter(CallbackEventAdapter) })
+    ? MachineSurface.start({ ...startConfig.machines, callbacks: eventRegistry.getAdapter(CallbackEventAdapter) })
     : null;
 
   // 6. Start embedded server (if enabled)

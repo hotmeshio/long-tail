@@ -12,30 +12,12 @@ import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
+import { standardRows, type HandoffRowAdapter } from '../rows';
 
 const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
-export function handoffFromEvent(data: Record<string, any>): HandoffRow {
-  const md: Partial<HandoffFacets> = data.metadata ?? {};
-  return {
-    id: data.id,
-    role: data.role,
-    siteId: String(md.siteId ?? ''),
-    lineId: String(md.lineId ?? ''),
-    units: Array.isArray(md.units) ? md.units : [],
-    jobId: String(md.jobId),
-    senderJobId: md.senderJobId ?? null,
-    orderRef: String(md.orderRef ?? ''),
-    fromMachine: md.fromMachine ?? null,
-    toMachine: md.toMachine ?? null,
-    recipeId: md.recipeId ?? null,
-    recipeVersion: md.recipeVersion ?? null,
-    process: md.process ?? null,
-    artifactUrl: md.artifactUrl ?? null,
-    artifactSha256: md.artifactSha256 ?? null,
-    attempt: Number(md.attempt ?? 1),
-    dispatch: DISPATCH_STATE.NONE,
-  };
+function handoffRow(id: string, role: string, facets: HandoffFacets): HandoffRow {
+  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE };
 }
 
 /** Dispatch arguments for a handoff row. */
@@ -56,15 +38,19 @@ export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs
 }
 
 /** Rows for another line belong to that line's gateway. */
-function onThisLine(line: LineDef, data: Record<string, any>): boolean {
-  const md = data?.metadata ?? {};
-  return md.siteId === line.siteId && md.lineId === line.lineId;
+function onThisLine(line: LineDef, at: { siteId?: unknown; lineId?: unknown }): boolean {
+  return at.siteId === line.siteId && at.lineId === line.lineId;
 }
 
-export function planEscalationEvent(state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number): Action[] {
+export function planEscalationEvent(
+  state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number, rows: HandoffRowAdapter = standardRows,
+): Action[] {
+  const view = { ...event.data, id: event.escalationId, role: event.role };
+  const facets = rows.toHandoff(view);
+  if (facets) return onThisLine(line, facets) ? planHandoff(state, line, event, facets, dispatchTtlMs) : [];
+  if (state.get(event.escalationId)) return planHandoff(state, line, event, null, dispatchTtlMs);
   const type = event.data?.type;
-  if (!onThisLine(line, event.data)) return [];
-  if (type === ROW_TYPE.HANDOFF) return planHandoff(state, line, event, dispatchTtlMs);
+  if (!onThisLine(line, event.data?.metadata ?? {})) return [];
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   return [];
@@ -82,11 +68,11 @@ function softwareRefusal(state: GatewayState, line: LineDef, machineId: string):
   return `${machineId} runs ${software}; allowed: ${allowed.join(', ')}`;
 }
 
-function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number): Action[] {
+function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, facets: HandoffFacets | null, dispatchTtlMs: number): Action[] {
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
-    if (state.isClosed(id)) return [];
-    state.index(handoffFromEvent({ ...event.data, id, role: event.role }));
+    if (state.isClosed(id) || !facets) return [];
+    state.index(handoffRow(id, event.role, facets));
     const row = state.get(id)!;
     if (!onLine(line, row.toMachine) || row.dispatch !== DISPATCH_STATE.NONE) return [];
     const refusal = softwareRefusal(state, line, row.toMachine);

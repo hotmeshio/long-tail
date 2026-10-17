@@ -5,6 +5,7 @@
  * held) are not errors: replays and races land there.
  */
 
+import type { OpenRowQuery } from '../rows';
 import type { Actor, CreateRowInput } from './actions';
 
 export const VERB_OUTCOME = {
@@ -31,7 +32,8 @@ export interface LineEscalations {
   /** The item keys an accumulator row holds. */
   itemKeys(id: string): Promise<string[]>;
   /** Open rows of a type, in the projection escalation events carry. */
-  listOpen(type: string): Promise<Record<string, any>[]>;
+  /** Pending rows matching every given field. */
+  listOpen(query: OpenRowQuery): Promise<Record<string, any>[]>;
 }
 
 /** Map an HTTP status to a verb outcome; anything else is a real failure. */

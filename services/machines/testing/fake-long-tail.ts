@@ -10,6 +10,7 @@ import { VERB_OUTCOME, type LineEscalations, type VerbResult } from '../gateway/
 import { ROW_TYPE, type HandoffFacets } from '../contracts';
 import type { MemoryEscalationFeed } from '../../../lib/machines/transport';
 import { until } from './wait';
+import type { OpenRowQuery } from '../rows';
 
 export interface FakeRow {
   id: string;
@@ -50,6 +51,11 @@ export class FakeLongTail implements LineEscalations {
   /** What the unit workflow's conditionalAccumulator does: park a handoff row. */
   park(role: string, facets: HandoffFacets): FakeRow {
     return this.add({ type: ROW_TYPE.HANDOFF, role, metadata: { ...facets } });
+  }
+
+  /** Park any row, as a host workflow parks its own. */
+  parkRow(input: { type: string; role: string; subtype?: string; metadata: Record<string, any> }): FakeRow {
+    return this.add({ ...input, metadata: { ...input.metadata } });
   }
 
   /** A person resolving a row on the dashboard. */
@@ -114,9 +120,10 @@ export class FakeLongTail implements LineEscalations {
     return (this.rows.get(id)?.items ?? []).map((i) => i.itemKey);
   }
 
-  async listOpen(type: string): Promise<Record<string, any>[]> {
-    return [...this.rows.values()].filter((r) => r.type === type && r.status === 'pending')
-      .map((r) => ({ id: r.id, type: r.type, role: r.role, status: r.status, metadata: r.metadata }));
+  async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {
+    return [...this.rows.values()]
+      .filter((r) => r.status === 'pending' && (!query.type || r.type === query.type) && (!query.role || r.role === query.role))
+      .map((r) => ({ id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, metadata: r.metadata }));
   }
 
   ofType(type: string): FakeRow[] {

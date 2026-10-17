@@ -5,9 +5,9 @@
  * verbs a person would, as the machine. Neither side knows about the other.
  */
 
-import { ROW_TYPE } from '../contracts';
+import { standardRows, type HandoffRowAdapter } from '../rows';
 import type { LineDef } from '../../../lib/machines/line';
-import { inspectMessage } from '../../../lib/machines/protocol';
+import { genericCodec, type Envelope, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
@@ -35,19 +35,27 @@ export interface GatewayDeps {
   line: LineDef;
   settings: GatewaySettings;
   log?: GatewayLog;
+  /** Reads a host's rows into handoffs; the standard handoff facets by default. */
+  rows?: HandoffRowAdapter;
+  /** The machines' wire protocol; the line protocol under `settings.topicRoot` by default. */
+  codec?: LineCodec;
 }
 
 export class MachineGateway {
   readonly state = new GatewayState();
+  private readonly rows: HandoffRowAdapter;
+  private readonly codec: LineCodec;
   private readonly executor: Executor;
   private readonly log: GatewayLog;
   private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
     this.log = deps.log ?? consoleLog;
+    this.rows = deps.rows ?? standardRows;
+    this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot });
     this.executor = new Executor({
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
-      topicRoot: deps.settings.topicRoot, replyTimeoutMs: deps.settings.replyTimeoutMs,
+      codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
   }
@@ -80,17 +88,21 @@ export class MachineGateway {
 
   /** Open handoff rows at boot, so a dispatch interrupted by a restart is sent again (same cmdId). */
   private async reconcile(): Promise<void> {
-    const rows = await this.deps.lt.listOpen(ROW_TYPE.HANDOFF);
-    for (const data of rows) {
-      const event: EscalationEvent = { type: 'reconcile', escalationId: data.id, role: data.role, verb: 'created', data };
-      await this.executor.apply(planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs));
+    let handoffs = 0;
+    for (const query of this.rows.openRows(this.deps.line)) {
+      for (const data of await this.deps.lt.listOpen(query)) {
+        const event: EscalationEvent = { type: 'reconcile', escalationId: data.id, role: data.role, verb: 'created', data };
+        const actions = planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs, this.rows);
+        if (this.state.get(data.id)) handoffs++;
+        await this.executor.apply(actions);
+      }
     }
-    this.log.info(GATEWAY_LOG.RECONCILED, { handoffs: rows.length });
+    this.log.info(GATEWAY_LOG.RECONCILED, { handoffs });
   }
 
   private async onEscalation(event: EscalationEvent): Promise<Disposition> {
     try {
-      await this.executor.apply(planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs));
+      await this.executor.apply(planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs, this.rows));
       return DISPOSITION.ACK;
     } catch (err: any) {
       this.log.error(GATEWAY_LOG.VERB_FAILED, { event: event.type, error: err.message });
@@ -99,19 +111,33 @@ export class MachineGateway {
   }
 
   private async onMachine(msg: InboundMessage): Promise<Disposition> {
-    const { topicRoot } = this.deps.settings;
-    const seen = inspectMessage(topicRoot, msg.topic, msg.payload, msg.retained);
-    if (!seen.parsed) return DISPOSITION.TERM;
-    if (seen.violations.length && msg.deliveries === 1) {
-      this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
+    const decoded = this.codec.decode(msg.topic, msg.payload, msg.retained);
+    let outcome: Disposition = DISPOSITION.TERM;
+    for (const seen of decoded) {
+      if (!seen.parsed) continue;
+      if (seen.violations.length && msg.deliveries === 1) {
+        this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
+      }
+      outcome = worse(outcome, await this.applyMachine(msg.topic, seen.parsed, seen.body));
     }
-    const plan = planMachineMessage(this.state, seen.parsed, seen.body, this.deps.settings.dispatchTtlMs);
+    return outcome;
+  }
+
+  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<Disposition> {
+    const plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
     try {
       await this.executor.apply(plan.actions);
       return plan.disposition;
     } catch (err: any) {
-      this.log.error(GATEWAY_LOG.VERB_FAILED, { topic: msg.topic, error: err.message });
+      this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
       return DISPOSITION.NAK;
     }
   }
+}
+
+const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };
+
+/** One wire message may decode to several; any that must be retried retries the message. */
+function worse(a: Disposition, b: Disposition): Disposition {
+  return RANK[b] > RANK[a] ? b : a;
 }

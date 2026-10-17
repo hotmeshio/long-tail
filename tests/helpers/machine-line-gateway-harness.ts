@@ -4,7 +4,7 @@
  * handoff row and wait for it to end.
  */
 
-import { MachineGateway, type GatewaySettings } from '../../services/machines/gateway/gateway';
+import { MachineGateway, type GatewayDeps, type GatewaySettings } from '../../services/machines/gateway/gateway';
 import { silentLog } from '../../services/machines/gateway/log';
 import { LINE_ROLE, type HandoffFacets } from '../../services/machines/contracts';
 import { machineById, stationRole, type LineDef } from '../../lib/machines/line';
@@ -47,7 +47,9 @@ export function facetsFor(units: string | string[], from: string | null, to: str
   };
 }
 
-export async function startRig(mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE): Promise<LineRig> {
+export async function startRig(
+  mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: Pick<GatewayDeps, 'rows' | 'codec'> = {},
+): Promise<LineRig> {
   const base = await startHarness(mock, line);
   const feed = new MemoryEscalationFeed(base.broker);
   const lt = new FakeLongTail(feed);
@@ -56,7 +58,7 @@ export async function startRig(mock: Partial<MockSettings> = {}, gw: Partial<Gat
   const startGateway = async () => {
     const gateway = new MachineGateway({
       bus: new MemoryMachineBus(base.broker, lineFilter(ROOT, line.siteId, line.lineId)),
-      feed, lt, line, settings, log: silentLog,
+      feed, lt, line, settings, log: silentLog, ...seams,
     });
     await gateway.start();
     return gateway;

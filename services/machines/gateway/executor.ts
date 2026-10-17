@@ -5,9 +5,9 @@
  * caused it is delivered again.
  */
 
-import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE } from '../contracts';
-import { identOf, type LineDef } from '../../../lib/machines/line';
-import { CHANNEL, OP, REPLY_STATUS, buildEnvelope, machineTopic } from '../../../lib/machines/protocol';
+import { DECISION, HANDOFF_ERROR, ROW_TYPE } from '../contracts';
+import { identOf, operatorRole, type LineDef } from '../../../lib/machines/line';
+import { OP, REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
@@ -21,7 +21,7 @@ export interface ExecutorDeps {
   replies: ReplyWaiter;
   state: GatewayState;
   line: LineDef;
-  topicRoot: string;
+  codec: LineCodec;
   replyTimeoutMs: number;
   dispatchAttempts: number;
   offlineDebounceMs: number;
@@ -57,9 +57,9 @@ export class Executor {
   }
 
   async publishCommand(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<void> {
-    const ident = identOf(this.d.line, machineId);
-    const env = buildEnvelope(ident, { cmdId, op, args });
-    await this.d.bus.publish(machineTopic(this.d.topicRoot, ident, CHANNEL.CMD), JSON.stringify(env));
+    for (const wire of this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args })) {
+      await this.d.bus.publish(wire.topic, wire.payload);
+    }
   }
 
   private track(work: Promise<void>): void {
@@ -133,7 +133,7 @@ export class Executor {
   }
 
   private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<void> {
-    const { id } = await this.d.lt.create(CONTROLLER, a.row);
+    const { id } = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
     this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: id, machine: a.machineId, alarm: a.alarmId });
     const track = this.d.state.alarms.get(this.d.state.alarmKey(a.machineId, a.alarmId));
     if (track) {
@@ -157,7 +157,7 @@ export class Executor {
 
   private async raiseQuiet(machineId: string, silentMs: number): Promise<void> {
     const { id } = await this.d.lt.create(CONTROLLER, {
-      type: ROW_TYPE.MACHINE_QUIET, role: LINE_ROLE.OPERATOR, priority: 2,
+      type: ROW_TYPE.MACHINE_QUIET, role: operatorRole(this.d.line), priority: 2,
       description: `${machineId} is connected but has sent nothing for ${Math.round(silentMs / 1000)} s`,
       metadata: { siteId: this.d.line.siteId, lineId: this.d.line.lineId, machineId, silentMs },
     });
@@ -180,7 +180,7 @@ export class Executor {
     if (link.online || link.rowId) return;
     const since = new Date(link.since).toISOString();
     const { id } = await this.d.lt.create(CONTROLLER, {
-      type: ROW_TYPE.MACHINE_OFFLINE, role: LINE_ROLE.OPERATOR, priority: 2,
+      type: ROW_TYPE.MACHINE_OFFLINE, role: operatorRole(this.d.line), priority: 2,
       description: `${machineId} has been offline since ${since}`,
       metadata: { siteId: this.d.line.siteId, lineId: this.d.line.lineId, machineId, offlineSince: since },
     });

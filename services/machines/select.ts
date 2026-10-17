@@ -6,7 +6,7 @@
 
 import { ESCALATION_FEED, MACHINE_TRANSPORT, type MachineLineConfig, type MqttEndpoint } from './config';
 import { controllerId, type LineDef } from '../../lib/machines/line';
-import { lineFilter } from '../../lib/machines/protocol';
+import { genericCodec, lineFilter, type LineCodec } from '../../lib/machines/protocol';
 import { MqttMachineBus } from '../../lib/machines/transport/mqtt-bus';
 import { MqttMachineLink } from '../../lib/machines/transport/mqtt-link';
 import { NatsMachineBus } from '../../lib/machines/transport/nats-bus';
@@ -22,16 +22,22 @@ function mqttOf(config: MachineLineConfig): MqttEndpoint {
   return config.mqtt;
 }
 
+/** The codec for a line when the host supplies none: the line protocol under MACHINE_TOPIC_ROOT. */
+export function defaultCodec(config: MachineLineConfig): LineCodec {
+  return genericCodec({ root: config.topicRoot });
+}
+
 /** The gateway's view of every machine on the line. */
-export function createMachineBus(config: MachineLineConfig, line: LineDef): MachineBus {
+export function createMachineBus(config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config)): MachineBus {
   switch (config.transport) {
     case MACHINE_TRANSPORT.NATS:
       return new NatsMachineBus({
         natsUrl: config.siteNatsUrl!, user: config.siteNatsUser, password: config.siteNatsPassword,
-        mqtt: mqttOf(config), controllerId: controllerId(line), root: config.topicRoot, siteId: line.siteId, lineId: line.lineId,
+        mqtt: mqttOf(config), controllerId: controllerId(line), root: codec.root, siteId: line.siteId, lineId: line.lineId,
+        channels: codec.channels,
       });
     case MACHINE_TRANSPORT.MQTT:
-      return new MqttMachineBus(mqttOf(config), controllerId(line), lineFilter(config.topicRoot, line.siteId, line.lineId));
+      return new MqttMachineBus(mqttOf(config), controllerId(line), lineFilter(codec.root, line.siteId, line.lineId));
     default:
       throw new Error(`MACHINE_TRANSPORT=${config.transport} ${IN_PROCESS_ONLY}`);
   }
@@ -46,7 +52,7 @@ export function createEscalationFeed(config: MachineLineConfig, line: LineDef, c
     case ESCALATION_FEED.JETSTREAM:
       return new JetStreamEscalationFeed({
         natsUrl: config.siteNatsUrl!, user: config.siteNatsUser, password: config.siteNatsPassword,
-        root: config.topicRoot, durableName: `${controllerId(line)}-escalations`,
+        durableName: `${controllerId(line)}-escalations`,
       });
     case ESCALATION_FEED.CORE:
       return new CoreEscalationFeed({ natsUrl: config.ltNatsUrl!, token: config.ltNatsToken });

@@ -6,4 +6,5 @@ export * from './gateway';
 export * from './roles';
 export * from './identities';
 export * from './surface';
+export * from './rows';
 export * from '../../lib/machines';

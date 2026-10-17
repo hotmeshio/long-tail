@@ -14,7 +14,9 @@ import { MachineGateway } from './gateway/gateway';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './gateway/log';
 import { ensureLineBots } from './identities';
 import { LineLeadership } from './leadership';
-import { createEscalationFeed, createMachineBus } from './select';
+import { createEscalationFeed, createMachineBus, defaultCodec } from './select';
+import type { LineCodec } from '../../lib/machines/protocol';
+import type { HandoffRowAdapter } from './rows';
 
 type Env = Record<string, string | undefined>;
 
@@ -24,6 +26,8 @@ export interface MachineSurfaceOptions {
   env?: Env;
   callbacks?: CallbackEventAdapter;
   log?: GatewayLog;
+  codec?: LineCodec;
+  rows?: HandoffRowAdapter;
 }
 
 /** Inside Long Tail an MQTT-only deployment reads escalation events in process. */
@@ -68,8 +72,11 @@ class LineRun {
       return id;
     };
     const { config, line } = this;
+    const codec = this.opts.codec ?? defaultCodec(config);
     this.gateway = new MachineGateway({
-      bus: createMachineBus(config, line),
+      bus: createMachineBus(config, line, codec),
+      codec,
+      rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
       lt: new ApiLineEscalations(userFor),
       line,

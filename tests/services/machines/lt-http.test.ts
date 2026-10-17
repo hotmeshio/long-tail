@@ -53,7 +53,7 @@ describe('Long Tail HTTP client', () => {
     const lt = client(server);
     expect(await lt.create('controller', { type: 'line-alarm', role: 'line-operator', description: 'd', priority: 1, metadata: {} })).toEqual({ id: 'e9' });
     expect(await lt.itemKeys('e1')).toEqual(['arrived:U1', 'released:U1']);
-    expect(await lt.listOpen('handoff')).toEqual([{ id: 'e1', type: 'handoff' }]);
+    expect(await lt.listOpen({ type: 'handoff' })).toEqual([{ id: 'e1', type: 'handoff' }]);
     expect(server.seen[2].path).toBe('/escalations?type=handoff&status=pending&limit=500');
     expect(server.seen.every((s) => s.auth === 'Bearer tok-controller')).toBe(true);
   });

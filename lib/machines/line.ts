@@ -58,7 +58,30 @@ export function controllerId(line: LineDef): string {
   return `line-controller-${line.siteId}-${line.lineId}`;
 }
 
-/** The Long Tail role a machine resolves handoffs under. */
+/** The default role name for a process. */
 export function stationRole(process: string): string {
   return `line-${process.replace(/_/g, '-')}`;
+}
+
+export const DEFAULT_EXIT_ROLE = 'line-exit';
+export const DEFAULT_OPERATOR_ROLE = 'line-operator';
+
+/** The Long Tail role a machine resolves handoffs under. */
+export function machineRole(def: Pick<MachineDef, 'role' | 'process'>): string {
+  return def.role ?? stationRole(def.process);
+}
+
+/** Every station role on the line, once each, in route order. */
+export function stationRoles(line: LineDef): string[] {
+  return [...new Set(line.machines.map(machineRole))];
+}
+
+/** The role of the person who receives units at line exit. */
+export function exitRole(line: LineDef): string {
+  return line.roles?.exit ?? DEFAULT_EXIT_ROLE;
+}
+
+/** The role of the person who decides failed handoffs and closes alarm and machine rows. */
+export function operatorRole(line: LineDef): string {
+  return line.roles?.operator ?? DEFAULT_OPERATOR_ROLE;
 }

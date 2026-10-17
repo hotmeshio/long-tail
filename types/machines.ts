@@ -39,6 +39,8 @@ export interface MeasurementDef {
 }
 
 export interface MachineDef {
+  /** The role whose handoff rows this machine resolves; defaults to line-<process>. */
+  role?: string;
   machineId: string;
   process: string;
   description: string;
@@ -61,6 +63,8 @@ export interface MachineDef {
 }
 
 export interface LineDef {
+  /** Role names for the person at line exit and the operator; default line-exit and line-operator. */
+  roles?: { exit?: string; operator?: string };
   siteId: string;
   lineId: string;
   machines: MachineDef[];
