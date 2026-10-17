@@ -106,7 +106,7 @@ export class Cell {
   /** The job leaves the queue (cancelled, or given up by the machine). */
   async withdraw(job: Job): Promise<void> {
     this.jobs.delete(job.jobId);
-    for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m);
+    for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m, job);
     if (this.station === job) this.station = null;
     for (const u of job.units) await this.publishJob(JOB_EVENT.WITHDRAWN, job, u);
     this.m.floor.poke();
@@ -239,7 +239,7 @@ export class Cell {
   forget(): void {
     this.m.timers.cancel(this.cycleTimer);
     this.m.timers.cancel(this.progressTimer);
-    for (const job of this.jobs.values()) for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m);
+    for (const job of this.jobs.values()) for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m, job);
     this.jobs.clear();
     this.station = null;
   }

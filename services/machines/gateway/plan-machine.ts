@@ -62,10 +62,17 @@ function missing(state: GatewayState, unitId: string, pred: (r: HandoffRow) => b
   return state.closedFor(unitId, pred) ? ack() : nak;
 }
 
+/** Whether a machine's job id is one of the jobs a handoff's units became under `jobId`. */
+function ownsJob(state: GatewayState, r: HandoffRow, jobId: string | null, reported: unknown): boolean {
+  if (!jobId || typeof reported !== 'string') return true;
+  return dispatchJobs(jobId, r.units, state.unitsPerDispatch).some((j) => j.jobId === reported);
+}
+
 function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: string): Plan {
   const unitId = b.unitId;
-  const toHere = (r: HandoffRow) => r.toMachine === m;
-  const fromHere = (r: HandoffRow) => r.fromMachine === m;
+  // An event from an earlier attempt's job never touches a later attempt's row.
+  const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(state, r, r.jobId, b.jobId);
+  const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(state, r, r.senderJobId, b.jobId);
 
   if (b.event === JOB_EVENT.ARRIVED) {
     const row = state.openFor(unitId, toHere);

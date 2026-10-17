@@ -1,19 +1,25 @@
 /**
- * The machine line through the public API, against the machines override:
+ * The factory line through the public API, against the machines override:
  *   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml up -d --build
  *   MACHINE_SIM_URL=http://localhost:8090 npm run test:integration:skip-reset -- machine-line
  *
- * A unit route runs on the real orchestrator; the gateway dispatches over the
- * site broker and resolves each handoff as the machine's bot; the test plays
- * the person at line exit and the operator.
+ * Unit routes from both manifests run on the real orchestrator; the gateway
+ * dispatches over the machine broker and resolves each machine handoff as
+ * the machine's bot; the test plays the people and the operator.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
 
-import { lineSteps, UNIT_ROUTE_WORKFLOW } from '../../examples/workflows/machine-line/workflows/route';
-import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
+import { UNIT_ROUTE_WORKFLOW, type RouteStep } from '../../examples/workflows/machine-line/workflows/route';
+import { loadLine } from '../../examples/workflows/machine-line/line';
+import { FACTORY_LINE_PATH, loadManifests, manifestSteps } from '../../examples/workflows/machine-line/manifests';
+import { exitRole } from '../../lib/machines/line';
 
 const BASE_URL = process.env.LT_BASE_URL || 'http://localhost:3000';
+const LINE = loadLine(FACTORY_LINE_PATH);
+const MANIFESTS = loadManifests();
+const AUTOMATED = manifestSteps(LINE, MANIFESTS.automated);
+const MANUAL = manifestSteps(LINE, MANIFESTS.manual);
 const SIM_URL = process.env.MACHINE_SIM_URL;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let token = '';
@@ -53,25 +59,38 @@ async function result(workflowId: string, ms = 90_000): Promise<any> {
   }
 }
 
-async function start(routeKey: string, unitIds: string[]): Promise<string> {
+async function start(routeKey: string, unitIds: string[], steps: RouteStep[] = AUTOMATED): Promise<string> {
   const workflowId = `mur-${routeKey}`;
   await api(`/workflows/${UNIT_ROUTE_WORKFLOW}/invoke`, 'POST', {
     workflowId,
     data: {
-      siteId: DEFAULT_LINE.siteId, lineId: DEFAULT_LINE.lineId, routeKey, orderRef: `ORD-${routeKey}`,
-      units: unitIds.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), steps: lineSteps(DEFAULT_LINE), handoffTimeout: '3m',
+      siteId: LINE.siteId, lineId: LINE.lineId, routeKey, orderRef: `ORD-${routeKey}`, exitRole: exitRole(LINE),
+      units: unitIds.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), steps, handoffTimeout: '3m',
     },
   });
   return workflowId;
 }
 
-async function receiveAtExit(routeKey: string, unitIds: string[]): Promise<void> {
-  const [exit] = await rowsFor(`${routeKey}-exit`, (rows) => rows.some((r) => r.status === 'pending'));
-  const last = DEFAULT_LINE.machines[DEFAULT_LINE.machines.length - 1].machineId;
-  for (const unitId of unitIds) {
-    for (let i = 0; i < 40 && !(await sim(`/sim/${last}/unload`, 'POST', { unitId })).result; i++) await sleep(250);
+/** A person at a station: wait for the sender's release of each unit, take the units off, receive them. */
+async function receive(jobId: string, unitIds: string[]): Promise<void> {
+  const [row] = await rowsFor(jobId, (rows) => rows.some((r) => r.status === 'pending'));
+  const from = row.metadata.fromMachine;
+  if (from) {
+    await until(async () => {
+      const { items = [] } = await api(`/escalations/${row.id}/items`);
+      return unitIds.every((u) => items.some((i: any) => i.itemKey === `released:${u}`));
+    });
+    for (const unitId of unitIds) expect((await sim(`/sim/${from}/unload`, 'POST', { unitId })).result).toBe(true);
   }
-  await api(`/escalations/${exit.id}/resolve`, 'POST', { resolverPayload: { received: true, receiver: 'integration-test' } });
+  await api(`/escalations/${row.id}/resolve`, 'POST', { resolverPayload: { received: true, receiver: 'integration-test' } });
+}
+
+async function until(check: () => Promise<boolean>, ms = 90_000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('condition not met in time');
+    await sleep(500);
+  }
 }
 
 describe.skipIf(!SIM_URL)('machine line over the site broker', () => {
@@ -79,13 +98,14 @@ describe.skipIf(!SIM_URL)('machine line over the site broker', () => {
     token = (await call(`${BASE_URL}/api/auth/login`, 'POST', { username: 'superadmin', password: 'l0ngt@1l' }, false)).token;
   });
 
-  it('two units ride the line; each machine resolves its own handoff as its bot; a person receives them', async () => {
+  it('automated: two units ride the machines; each resolves its own handoff as its bot; a person receives them', async () => {
     const routeKey = `IT${Date.now().toString(36)}`;
-    const id = await start(routeKey, [`${routeKey}-A`, `${routeKey}-B`]);
-    await receiveAtExit(routeKey, [`${routeKey}-A`, `${routeKey}-B`]);
-    const data = await result(id);
+    const units = [`${routeKey}-A`, `${routeKey}-B`];
+    const id = await start(routeKey, units);
+    await receive(`${routeKey}-exit`, units);
+    const data = await result(id, 180_000);
     expect(data.status).toBe('complete');
-    expect(data.history.map((h: any) => h.to)).toEqual(['press-01', 'cut-01', 'inspect-01', 'exit']);
+    expect(data.history.map((h: any) => h.to)).toEqual(['print-01', 'convey-01', 'press-01', 'cut-01', 'inspect-01', 'exit']);
 
     const [intoCut] = await rowsFor(`${routeKey}-cut-01`, (rows) => rows.some((r) => r.status === 'resolved'));
     const bots = await api('/bot-accounts?search=machine-site-1-line-1-cut-01&limit=5');
@@ -94,19 +114,30 @@ describe.skipIf(!SIM_URL)('machine line over the site broker', () => {
     expect(intoCut.assigned_to).toBe(cutBot.id);
     expect(intoCut.metadata.resolved_by).toBe(cutBot.id);
     expect(payload).toMatchObject({ received: true });
-  }, 120_000);
+  }, 240_000);
+
+  it('manual: the same workflow through people at each station, received at the same inspector', async () => {
+    const routeKey = `IT${Date.now().toString(36)}`;
+    const units = [`${routeKey}-M`];
+    const id = await start(routeKey, units, MANUAL);
+    for (const station of ['harvester', 'bonder', 'finisher', 'exit']) await receive(`${routeKey}-${station}`, units);
+    const data = await result(id, 180_000);
+    expect(data.status).toBe('complete');
+    expect(data.history.map((h: any) => [h.to, h.received])).toEqual([['print-02', true], ['harvester', true], ['bonder', true], ['finisher', true], ['exit', true]]);
+  }, 240_000);
 
   it('a jam parks an operator row; after the technician clears it, retry completes the route', async () => {
     const routeKey = `IT${Date.now().toString(36)}`;
-    await sim('/sim/press-01/transfer', 'POST', { fault: 'jam' });
+    // Spent on the next move involving cut-01: press-01 → cut-01, which jams leaving press-01.
+    await sim('/sim/cut-01/transfer', 'POST', { fault: 'jam' });
     const id = await start(routeKey, [`${routeKey}-J`]);
-    const [decide] = await rowsFor(`${routeKey}-cut-01`, (rows) => rows.some((r) => r.type === 'handoff-error' && r.status === 'pending'));
+    const [decide] = await rowsFor(`${routeKey}-cut-01`, (rows) => rows.some((r) => r.type === 'handoff-error' && r.status === 'pending'), 180_000);
     const press = await sim('/sim/press-01');
     for (const alarm of press.alarms.filter((a: any) => a.active)) await sim('/sim/press-01/clear-alarm', 'POST', { alarmId: alarm.alarmId, by: 'tech' });
     await api(`/escalations/${decide.id}/resolve`, 'POST', { resolverPayload: { decision: 'retry', note: 'cleared' } });
-    await receiveAtExit(routeKey, [`${routeKey}-J`]);
-    const data = await result(id);
+    await receive(`${routeKey}-exit`, [`${routeKey}-J`]);
+    const data = await result(id, 180_000);
     expect(data.status).toBe('complete');
     expect(data.history.filter((h: any) => h.to === 'cut-01').map((h: any) => [h.attempt, h.received, h.errorCode])).toEqual([[1, false, 'jam'], [2, true, undefined]]);
-  }, 120_000);
+  }, 240_000);
 });

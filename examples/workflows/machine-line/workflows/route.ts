@@ -72,15 +72,20 @@ export function planHops(steps: RouteStep[]): Hop[] {
   return stops.slice(1).map((to, i) => ({ index: i, from: stops[i], to }));
 }
 
-export const jobIdFor = (routeKey: string, step: RouteStep | null) => `${routeKey}-${step ? stationKey(step) : 'exit'}`;
+/** A station's job for a route; a retry is a new job, so nothing meant for the last attempt reaches it. */
+export function jobIdFor(routeKey: string, step: RouteStep | null, attempt = 1): string {
+  const base = `${routeKey}-${step ? stationKey(step) : 'exit'}`;
+  return attempt > 1 ? `${base}-a${attempt}` : base;
+}
 
-export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number): HandoffFacets {
+/** `senderAttempt` is the attempt of the hop that brought the units to the sender. */
+export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt = 1): HandoffFacets {
   return {
     siteId: input.siteId,
     lineId: input.lineId,
     units: input.units,
-    jobId: jobIdFor(input.routeKey, hop.to),
-    senderJobId: hop.from ? jobIdFor(input.routeKey, hop.from) : null,
+    jobId: jobIdFor(input.routeKey, hop.to, attempt),
+    senderJobId: hop.from ? jobIdFor(input.routeKey, hop.from, senderAttempt) : null,
     orderRef: input.orderRef,
     fromMachine: machineOf(hop.from)?.machineId ?? null,
     toMachine: machineOf(hop.to)?.machineId ?? null,
@@ -103,7 +108,7 @@ function roleOf(input: UnitRouteInput, step: RouteStep | null): string {
  * gateway resolves it) or a person's (the dashboard does). The row is the same
  * either way; the workflow does not know which.
  */
-export function hopRow(input: UnitRouteInput, hop: Hop, attempt: number) {
+export function hopRow(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt = 1) {
   const from = hop.from ? stationKey(hop.from) : 'line entry';
   const to = hop.to ? stationKey(hop.to) : 'line exit';
   const units = input.units.map((u) => u.unitId).join(', ');
@@ -112,7 +117,7 @@ export function hopRow(input: UnitRouteInput, hop: Hop, attempt: number) {
     type: ROW_TYPE.HANDOFF,
     subtype: hop.to ? (isMachineStep(hop.to) ? hop.to.process : hop.to.role) : 'exit',
     description: hop.to ? `${units}: ${from} → ${to}` : `Receive ${units} from ${from} and take them off the line`,
-    metadata: { ...hopFacets(input, hop, attempt) } as Record<string, unknown>,
+    metadata: { ...hopFacets(input, hop, attempt, senderAttempt) } as Record<string, unknown>,
   };
 }
 

@@ -17,12 +17,12 @@ describe('machine line config', () => {
     expect(c).toMatchObject({ siteNatsUser: 'gw', siteNatsPassword: 'pw', quietMs: 0, dispatchTtlMs: 1000 });
   });
 
-  it('nats needs the site NATS and the MQTT endpoint, and defaults to the jetstream feed on MQTT 3.1.1', () => {
+  it('nats needs the site NATS and the machine broker, and defaults to the jetstream feed on MQTT 5', () => {
     expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats' })).toThrow(/MACHINE_SITE_NATS_URL/);
     expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222' })).toThrow(/MACHINE_MQTT_URL/);
     const c = loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883' });
     expect(c.feed).toBe('jetstream');
-    expect(c.mqtt?.protocolVersion).toBe(4);
+    expect(c.mqtt?.protocolVersion).toBe(5);
   });
 
   it('mqtt defaults to MQTT 5 and the core feed, which needs Long Tail NATS', () => {

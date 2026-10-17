@@ -145,27 +145,37 @@ export class MachineGateway {
   private async onMachine(msg: InboundMessage): Promise<Disposition> {
     const decoded = this.codec.decode(msg.topic, msg.payload, msg.retained);
     let outcome: Disposition = DISPOSITION.TERM;
+    let failed = false;
     for (const seen of decoded) {
       if (!seen.parsed) continue;
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
       }
-      outcome = worse(outcome, await this.applyMachine(msg.topic, seen.parsed, seen.body));
+      const applied = await this.applyMachine(msg.topic, seen.parsed, seen.body);
+      failed ||= applied.failed;
+      outcome = worse(outcome, applied.disposition);
+    }
+    // No row has claimed it after this many tries, so it is not racing its row: stop. A failed verb always retries.
+    if (outcome === DISPOSITION.NAK && !failed && msg.deliveries >= MAX_DELIVERIES) {
+      this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries });
+      return DISPOSITION.TERM;
     }
     return outcome;
   }
 
-  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<Disposition> {
+  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<{ disposition: Disposition; failed: boolean }> {
     const plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
     try {
       await this.executor.apply(plan.actions);
-      return plan.disposition;
+      return { disposition: plan.disposition, failed: false };
     } catch (err: any) {
       this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
-      return DISPOSITION.NAK;
+      return { disposition: DISPOSITION.NAK, failed: true };
     }
   }
 }
+
+const MAX_DELIVERIES = 30;
 
 const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };
 

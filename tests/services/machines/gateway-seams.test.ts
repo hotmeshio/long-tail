@@ -8,7 +8,9 @@ import type { HandoffRowAdapter } from '../../../services/machines/rows';
 import { lineIdentities } from '../../../services/machines/gateway/provision';
 import { machineRoleConfigs } from '../../../services/machines/roles';
 import { ROOT, until } from '../../helpers/machine-line-fixtures';
-import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
+import { facetsFor, startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
+import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
+import { RecordingLog } from '../../../services/machines/testing/recording-log';
 
 let rig: LineRig;
 afterEach(async () => rig?.stop());
@@ -77,6 +79,13 @@ describe('gateway seams: role names from the line', () => {
   const named = { ...structuredClone(DEFAULT_LINE), roles: { exit: 'inspector', operator: 'supervisor' } };
   named.machines[0].role = 'press-cell';
 
+  it('puts machine bots on the roles of people who take units straight from a machine', () => {
+    const withReceivers = { ...named, roles: { ...named.roles, receivers: ['harvester'] } };
+    const [controller, press] = lineIdentities(withReceivers);
+    expect(press.roles).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector', 'harvester']);
+    expect(controller.roles).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector', 'harvester', 'supervisor']);
+  });
+
   it('declares and assigns the line\'s own role names', () => {
     expect(machineRoleConfigs(named).map((r) => r.role)).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector', 'supervisor']);
     const [controller, press] = lineIdentities(named);
@@ -89,5 +98,17 @@ describe('gateway seams: role names from the line', () => {
     await rig.line.fault('press-01', { code: 'F-101' });
     const alarm = await until(() => [...rig.lt.rows.values()].find((r) => r.type === ROW_TYPE.ALARM), 2_000);
     expect(alarm.role).toBe('supervisor');
+  });
+});
+
+describe('gateway seams: a row outside a machine\'s roles', () => {
+  it('logs when a machine cannot see the row it records a release on', async () => {
+    const log = new RecordingLog();
+    rig = await startRig({}, {}, DEFAULT_LINE, { log });
+    rig.lt.holds.set('press-01', new Set(['line-bond', 'line-exit']));
+    await rig.handoff('U1', null, 'press-01');
+    rig.lt.parkRow({ type: ROW_TYPE.HANDOFF, role: 'harvester', metadata: { ...facetsFor('U1', 'press-01', null) } });
+    await until(() => log.of(GATEWAY_LOG.ROW_NOT_VISIBLE).length, 2_000);
+    expect(log.of(GATEWAY_LOG.ROW_NOT_VISIBLE)[0]).toMatchObject({ action: 'accumulate', as: 'press-01', role: 'harvester' });
   });
 });

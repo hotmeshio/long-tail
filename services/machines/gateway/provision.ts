@@ -7,7 +7,7 @@
  */
 
 import { clientIdOf } from '../../../lib/machines/protocol';
-import { controllerId, exitRole, identOf, operatorRole, stationRoles, type LineDef } from '../../../lib/machines/line';
+import { controllerId, identOf, operatorRole, receiverRoles, stationRoles, type LineDef } from '../../../lib/machines/line';
 import { CONTROLLER, type Actor } from './actions';
 import type { LtHttp } from './lt-http';
 
@@ -25,12 +25,12 @@ export function lineIdentities(line: LineDef): Identity[] {
   const machines = line.machines.map((m) => ({
     actor: m.machineId,
     botName: `machine-${clientIdOf(identOf(line, m.machineId))}`,
-    roles: [...stations, exitRole(line)],
+    roles: [...stations, ...receiverRoles(line)],
   }));
   const controller = {
     actor: CONTROLLER,
     botName: controllerId(line),
-    roles: [...stations, exitRole(line), operatorRole(line)],
+    roles: [...stations, ...receiverRoles(line), operatorRole(line)],
   };
   return [controller, ...machines];
 }

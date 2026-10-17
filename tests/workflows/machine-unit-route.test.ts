@@ -192,7 +192,7 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     const intoFinisher = await rowBySignal(signalKeys.handoff(routeKey, 1, 1));
     expect(intoFinisher).toMatchObject({ role: 'line-finisher', type: 'handoff' });
     expect((intoFinisher.metadata as any)).toMatchObject({ fromMachine: 'press-01', toMachine: null });
-    for (let i = 0; i < 100 && !(await line.line.unload('press-01', { unitId: 'P1' })); i++) await sleep(50);
+    for (let i = 0; i < 100 && !(await line.line.unload('press-01', { unitId: 'P1' })); i++) await sleepFor(50);
     expect((await escalationApi.resolveEscalation({ id: intoFinisher.id, resolverPayload: { received: true, receiver: 'finisher' } }, { userId: personId })).status).toBe(200);
     const exit = await rowBySignal(signalKeys.handoff(routeKey, 2, 1));
     expect((await escalationApi.resolveEscalation({ id: exit.id, resolverPayload: { received: true, receiver: 'person' } }, { userId: personId })).status).toBe(200);

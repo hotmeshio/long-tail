@@ -63,8 +63,13 @@ export interface MachineDef {
 }
 
 export interface LineDef {
-  /** Role names for the person at line exit and the operator; default line-exit and line-operator. */
-  roles?: { exit?: string; operator?: string };
+  /**
+   * Role names: the person at line exit and the operator (default line-exit
+   * and line-operator), and `receivers`, any other roles of people who take
+   * units straight from a machine. Machine bots join the exit and receiver
+   * roles so they can record their releases on those rows.
+   */
+  roles?: { exit?: string; operator?: string; receivers?: string[] };
   siteId: string;
   lineId: string;
   machines: MachineDef[];
@@ -133,7 +138,7 @@ export interface EscalationFeed {
 
 export interface MqttEndpoint {
   url: string;
-  /** 4 = MQTT 3.1.1 (the NATS listener), 5 = MQTT 5. */
+  /** 5 = MQTT 5 (the machine broker), 4 = MQTT 3.1.1. */
   protocolVersion: 4 | 5;
   /** File paths may contain {clientId}, so each machine presents its own certificate. */
   caFile?: string;

@@ -82,10 +82,16 @@ export async function ensureStreams(jsm: JetStreamManager, streams: Partial<Stre
 }
 
 export async function ensureConsumer(jsm: JetStreamManager, stream: string, config: Partial<ConsumerConfig>): Promise<void> {
+  let existing;
   try {
-    await jsm.consumers.info(stream, config.durable_name!);
+    existing = await jsm.consumers.info(stream, config.durable_name!);
   } catch (err: any) {
     if (!/consumer not found/i.test(err?.message ?? '')) throw err;
     await jsm.consumers.add(stream, config);
+    return;
   }
+  // The consumer keeps its position; only its subjects follow the codec's channels.
+  const want = [...(config.filter_subjects ?? [])].sort();
+  const have = [...(existing.config.filter_subjects ?? [])].sort();
+  if (want.join('|') !== have.join('|')) await jsm.consumers.update(stream, config.durable_name!, { filter_subjects: config.filter_subjects });
 }

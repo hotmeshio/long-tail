@@ -35,8 +35,12 @@ function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: E
       update: async (name: string) => { calls.push(`update ${name}`); },
     },
     consumers: {
-      info: async (_s: string, name: string) => { if (!consumers.includes(name)) throw notFound('consumer'); return {}; },
+      info: async (_s: string, name: string) => {
+        if (!consumers.includes(name)) throw notFound('consumer');
+        return { config: { filter_subjects: ['line.v1.s.l.*.job'] } };
+      },
       add: async (s: string, c: any) => { calls.push(`consumer ${s}/${c.durable_name}`); },
+      update: async (s: string, name: string, c: any) => { calls.push(`update ${s}/${name} ${c.filter_subjects.length}`); },
     },
   } as any;
 }
@@ -66,10 +70,16 @@ describe('ensuring streams and consumers', () => {
     await expect(ensureStreams(fakeJsm([], [], new Error('authorization violation')), lineStreamConfigs('line/v1'))).rejects.toThrow(/authorization/);
   });
 
-  it('creates a consumer once and leaves an existing one where it is', async () => {
+  it('creates a missing consumer, and moves an existing one to new subjects without losing its place', async () => {
     const jsm = fakeJsm([], ['gw']);
     await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer('line/v1', 's', 'l', 'gw'));
     await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer('line/v1', 's', 'l', 'other'));
-    expect(jsm.calls).toEqual([`consumer ${LINE_STREAM.EVENTS}/other`]);
+    expect(jsm.calls).toEqual([`update ${LINE_STREAM.EVENTS}/gw 6`, `consumer ${LINE_STREAM.EVENTS}/other`]);
+  });
+
+  it('leaves a consumer alone when its subjects already match', async () => {
+    const jsm = fakeJsm([], ['gw']);
+    await ensureConsumer(jsm, LINE_STREAM.EVENTS, { durable_name: 'gw', filter_subjects: ['line.v1.s.l.*.job'] });
+    expect(jsm.calls).toEqual([]);
   });
 });

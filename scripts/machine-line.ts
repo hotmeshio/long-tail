@@ -22,7 +22,7 @@
  *   NATS_URL      Long Tail NATS (default nats://localhost:4222), NATS_TOKEN (default dev_api_secret)
  *   UNITS         units to run (default 6); BATCH units per route (default 2)
  *   MIX           percent of routes on the automated manifest (default 100); the rest run manual
- *   MACHINE_LINE_CONFIG, MACHINE_MANIFESTS   line and manifests (default the factory line and manifests.json)
+ *   MACHINE_LINE_CONFIG, MACHINE_MANIFESTS   line and manifests (default the factory line and route-manifests.json)
  *   FAULT         jam | incomplete | carrier_mismatch | unreadable | stall | reject | hold | estop | offline
  *   FAULT_AT      machine the fault happens at (default the first machine)
  *   DECIDE        operator decision on a failed handoff: retry | manual | scrap (default retry)
@@ -114,18 +114,38 @@ async function injectFault(): Promise<void> {
 
 // ── The people ───────────────────────────────────────────────────────────────
 
-/** A person takes units off a machine, waiting briefly for any still finishing. */
-async function takeUnits(machineId: string | null, units: { unitId: string }[], tries = 40): Promise<void> {
-  if (!machineId) return;
+/** A person takes units off a machine; false when a unit was not there to take. */
+async function takeUnits(machineId: string | null, units: { unitId: string }[], tries = 40): Promise<boolean> {
+  if (!machineId) return true;
+  let all = true;
   for (const unit of units) {
-    for (let i = 0; i < tries && !(await sim('POST', `/sim/${machineId}/unload`, { unitId: unit.unitId })).result; i++) await sleep(250);
+    let taken = false;
+    for (let i = 0; i < tries && !(taken = (await sim('POST', `/sim/${machineId}/unload`, { unitId: unit.unitId })).result); i++) await sleep(250);
+    all &&= taken;
   }
+  return all;
+}
+
+/** Wait until the row holds the sender's release of every unit: the machine has finished them. */
+async function released(rowId: string, units: { unitId: string }[], ms = 180_000): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    const { items = [] } = await api('GET', `/escalations/${rowId}/items`);
+    const keys = new Set(items.map((i: any) => i.itemKey));
+    if (units.every((u) => keys.has(`released:${u.unitId}`))) return true;
+    await sleep(500);
+  }
+  return false;
 }
 
 /** A person at a station: take each unit off the machine it came from (if any), then receive the set. */
 async function receive(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
-  await takeUnits(md.fromMachine ?? null, md.units ?? []);
+  const units = md.units ?? [];
+  if (md.fromMachine && !(await released(row.id, units) && await takeUnits(md.fromMachine, units))) {
+    say(`[${row.role}]`.padEnd(11) + ` ${units.map((u: any) => u.unitId).join(', ')} never left ${md.fromMachine}; leaving the row open`);
+    return;
+  }
   await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { received: true, receiver: `${row.role}-person` } });
   say(`[${row.role}]`.padEnd(11) + ` received ${(md.units ?? []).map((u: any) => u.unitId).join(', ')} from ${md.fromMachine ?? 'a person'}`);
 }
@@ -143,7 +163,11 @@ async function onRow(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   if (md.siteId !== line.siteId || md.lineId !== line.lineId) return;
   counts[row.type] = (counts[row.type] ?? 0) + 1;
-  if (row.type === ROW_TYPE.HANDOFF && !machineRoles.has(row.role) && String(md.jobId ?? '').startsWith(RUN)) return receive(row);
+  if (row.type === ROW_TYPE.HANDOFF && !machineRoles.has(row.role) && String(md.jobId ?? '').startsWith(RUN)) {
+    // Each person works their own station; a slow one does not hold up the rest.
+    void receive(row).catch((err) => say(`[driver]   ${err.message}`));
+    return;
+  }
   if (row.type === ROW_TYPE.HANDOFF) return;
   if (row.type === ROW_TYPE.HANDOFF_ERROR && String(md.jobId ?? '').startsWith(RUN)) return decideFailure(row);
   if (row.type === ROW_TYPE.ALARM) {

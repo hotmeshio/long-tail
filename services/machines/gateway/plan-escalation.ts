@@ -76,6 +76,11 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
     state.index(handoffRow(id, event.role, facets));
     const row = state.get(id)!;
     if (!onLine(line, row.toMachine) || row.dispatch !== DISPATCH_STATE.NONE) return [];
+    // Read back already claimed: the machine accepted it before this gateway started.
+    if (event.data?.assigned_to) {
+      row.dispatch = DISPATCH_STATE.ACCEPTED;
+      return [];
+    }
     const refusal = softwareRefusal(state, line, row.toMachine);
     if (refusal) {
       row.dispatch = DISPATCH_STATE.REFUSED;

@@ -78,6 +78,22 @@ describe('mock jobs: repeated dispatch', () => {
   });
 });
 
+describe('mock jobs: a withdrawn entry job', () => {
+  it('a new job for the same units still gets them from line entry', async () => {
+    h = await startHarness({ autoArriveAtEntry: true, arrivalDelaySec: 1 });
+    await h.line.network('press-01', { mode: 'drop' });
+    await h.line.network('press-01', { mode: 'restore' });
+    const first = dispatchArgs('press-01', 'U1');
+    h.line.config('press-01', { cycleSec: 500 });
+    await h.line.machine('press-01').enable(false);
+    await h.command('press-01', OP.DISPATCH, first);
+    expect(await h.command('press-01', OP.CANCEL, { jobId: first.jobId })).toMatchObject({ status: 'accepted' });
+    await h.line.machine('press-01').enable(true);
+    await h.command('press-01', OP.DISPATCH, { ...first, jobId: 'U1-press-01-a2' });
+    await until(() => h.recorder.jobs('press-01', JOB_EVENT.ARRIVED).find((j) => j.jobId === 'U1-press-01-a2'));
+  });
+});
+
 describe('mock jobs: drills', () => {
   it('disarm drops armed results and transfer faults, so the next job runs clean', async () => {
     h = await startHarness();

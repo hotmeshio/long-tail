@@ -125,3 +125,19 @@ describe('recovery: Long Tail and the contract', () => {
     expect(log.of(GATEWAY_LOG.CONTRACT_VIOLATION)).toHaveLength(1);
   });
 });
+
+describe('recovery: a restart while a machine holds the row', () => {
+  it('keeps the claim, sends no second dispatch, and a sender reject still closes the row as the claimant', async () => {
+    rig = await startRig();
+    rig.line.config('press-01', { cycleSec: 150 });
+    rig.line.arm('press-01', { result: 'reject', reason: 'WEAK' });
+    await rig.handoff('U1', null, 'press-01');
+    const row = rig.park('U1', 'press-01', 'cut-01');
+    await until(() => rig.lt.calls.some((c) => c.verb === 'claim' && c.id === row.id));
+    await restartGateway();
+    const ended = await rig.lt.ended(row.id, 2_000);
+    expect(ended).toMatchObject({ status: 'resolved', resolved_by: 'cut-01' });
+    expect(ended.resolver_payload).toMatchObject({ errorCode: 'sender-rejected', reportedBy: 'press-01' });
+    expect(rig.recorder.commands('cut-01', 'dispatch')).toHaveLength(1);
+  });
+});

@@ -2,7 +2,10 @@
   "siteId": "site-1",
   "lineId": "line-1",
   "roles": {
-    "exit": "inspector"
+    "exit": "inspector",
+    "receivers": [
+      "harvester"
+    ]
   },
   "machines": [
     {

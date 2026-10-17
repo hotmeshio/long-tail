@@ -98,7 +98,7 @@ export class HttpLineEscalations implements LineEscalations {
     } catch (err) {
       const outcome = err instanceof LtHttpError && err.status !== undefined ? verbOutcomeOf(err.status) : null;
       if (!outcome) throw err;
-      return { outcome, detail: JSON.stringify((err as LtHttpError).body) };
+      return { outcome, detail: JSON.stringify((err as LtHttpError).body), status: (err as LtHttpError).status };
     }
   }
 }

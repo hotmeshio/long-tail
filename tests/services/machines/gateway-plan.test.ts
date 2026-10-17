@@ -71,3 +71,30 @@ describe('planner: arrivals and sender records', () => {
       .toMatchObject({ kind: 'accumulate', rowId: 'e2', itemKey: 'released:U1', as: 'press-01' });
   });
 });
+
+describe('planner: attempts and restarts', () => {
+  it('ignores an event from an earlier attempt\'s job', () => {
+    const state = new GatewayState();
+    created(state, 'e2', 'press-01', 'cut-01', { jobId: 'U1-cut-01-a2', attempt: 2 });
+    state.get('e2')!.dispatch = 'accepted';
+    expect(planMachineMessage(state, ...job('cut-01', { event: 'withdrawn', jobId: 'U1-cut-01' }), 1).actions).toEqual([]);
+    expect(planMachineMessage(state, ...job('cut-01', { event: 'withdrawn', jobId: 'U1-cut-01-a2' }), 1).actions.length).toBeGreaterThan(0);
+  });
+
+  it('a sender event counts only for the sender job the row names', () => {
+    const state = new GatewayState();
+    created(state, 'e3', 'press-01', 'cut-01', { senderJobId: 'U1-press-01-a2' });
+    const stale = planMachineMessage(state, ...job('press-01', { event: 'finished', jobId: 'U1-press-01', result: 'reject', reason: 'old' }), 1);
+    expect(stale.actions).toEqual([]);
+  });
+
+  it('a row read back already claimed counts as accepted and is not dispatched again', () => {
+    const state = new GatewayState();
+    const actions = planEscalationEvent(state, DEFAULT_LINE, {
+      type: 'reconcile', escalationId: 'e4', role: 'line-trim', verb: 'created',
+      data: { id: 'e4', type: 'handoff', assigned_to: 'bot-cut', metadata: facetsFor('U1', 'press-01', 'cut-01') },
+    }, 60_000);
+    expect(actions).toEqual([]);
+    expect(state.get('e4')!.dispatch).toBe('accepted');
+  });
+});

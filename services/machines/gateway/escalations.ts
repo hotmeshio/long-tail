@@ -20,6 +20,8 @@ export type VerbOutcome = typeof VERB_OUTCOME[keyof typeof VERB_OUTCOME];
 export interface VerbResult {
   outcome: VerbOutcome;
   detail?: string;
+  /** The HTTP status behind an `already` or `invalid` outcome. */
+  status?: number;
   /** After an accumulate: the item keys the row now holds, when the response carries them. */
   itemKeys?: string[];
 }

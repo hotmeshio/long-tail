@@ -28,7 +28,7 @@ describe('unit route: hops', () => {
   it('names the receiver job, the sender job and the attempt on each hop', () => {
     const [entry, middle, exit] = planHops(INPUT.steps);
     expect(hopFacets(INPUT, entry, 1)).toMatchObject({ jobId: 'R1-press-01', senderJobId: null, fromMachine: null, toMachine: 'press-01', recipeId: 'RCP-BOND-A', artifactUrl: 'http://site/payloads/a' });
-    expect(hopFacets(INPUT, middle, 2)).toMatchObject({ jobId: 'R1-cut-01', senderJobId: 'R1-press-01', attempt: 2, units: INPUT.units });
+    expect(hopFacets(INPUT, middle, 2)).toMatchObject({ jobId: 'R1-cut-01-a2', senderJobId: 'R1-press-01', attempt: 2, units: INPUT.units });
     expect(hopFacets(INPUT, exit, 1)).toMatchObject({ jobId: 'R1-exit', toMachine: null, recipeId: null, artifactUrl: null });
   });
 
@@ -37,6 +37,14 @@ describe('unit route: hops', () => {
     expect(hopRow(INPUT, entry, 1)).toMatchObject({ role: 'line-bond', type: 'handoff', subtype: 'bond' });
     expect(hopRow(INPUT, exit, 1)).toMatchObject({ role: 'line-exit', subtype: 'exit' });
     expect(hopRow(INPUT, exit, 1).description).toMatch(/U1, U2 from cut-01/);
+  });
+});
+
+describe('unit route: retries', () => {
+  it('gives a retry its own receiver job, and the next hop the sender job that succeeded', () => {
+    const [, middle, exit] = planHops(INPUT.steps);
+    expect(hopFacets(INPUT, middle, 2)).toMatchObject({ jobId: 'R1-cut-01-a2', senderJobId: 'R1-press-01' });
+    expect(hopFacets(INPUT, exit, 1, 2)).toMatchObject({ jobId: 'R1-exit', senderJobId: 'R1-cut-01-a2' });
   });
 });
 

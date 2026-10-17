@@ -21,7 +21,7 @@ export interface Manifest {
 }
 
 export const FACTORY_LINE_PATH = join(__dirname, 'factory-line.json');
-export const MANIFESTS_PATH = join(__dirname, 'manifests.json');
+export const MANIFESTS_PATH = join(__dirname, 'route-manifests.json');
 
 export function loadManifests(path = MANIFESTS_PATH): Record<string, Manifest> {
   return JSON.parse(readFileSync(path, 'utf8'));

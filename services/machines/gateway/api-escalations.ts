@@ -5,7 +5,7 @@
 
 import * as escalationApi from '../../../api/escalations';
 import type { Actor, CreateRowInput } from './actions';
-import { verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
+import { VERB_OUTCOME, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
 import type { OpenRowQuery } from '../rows';
@@ -20,7 +20,7 @@ export class ApiLineEscalations implements LineEscalations {
   private verb(result: LTApiResult): VerbResult {
     const outcome = verbOutcomeOf(result.status);
     if (!outcome) throw new Error(`escalation verb failed ${result.status}: ${result.error}`);
-    return { outcome, detail: result.error };
+    return outcome === VERB_OUTCOME.DONE ? { outcome } : { outcome, detail: result.error, status: result.status };
   }
 
   async claim(as: Actor, id: string): Promise<VerbResult> {

@@ -38,6 +38,14 @@ export class FakeLongTail implements LineEscalations {
     this.failing.set(verb, times);
   }
 
+  /** Roles each actor holds; an actor outside a row's role gets not found, as Long Tail's RBAC answers. */
+  readonly holds = new Map<string, Set<string>>();
+
+  private hidden(as: Actor, row: FakeRow | undefined): boolean {
+    const roles = this.holds.get(as);
+    return !!row && !!roles && !roles.has(row.role);
+  }
+
   private outage(verb: string): void {
     const left = this.failing.get(verb) ?? 0;
     if (left <= 0) return;
@@ -108,6 +116,7 @@ export class FakeLongTail implements LineEscalations {
     this.outage('accumulate');
     this.calls.push({ verb: 'accumulate', as, id, payload: { itemKey, ...payload } });
     const row = this.rows.get(id);
+    if (this.hidden(as, row)) return { outcome: VERB_OUTCOME.ALREADY, status: 404 };
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
     if (row.items.some((i) => i.itemKey === itemKey)) return { outcome: VERB_OUTCOME.ALREADY };
     row.items.push({ itemKey, payload, actor: as });
@@ -140,7 +149,7 @@ export class FakeLongTail implements LineEscalations {
   async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {
     return [...this.rows.values()]
       .filter((r) => r.status === 'pending' && (!query.type || r.type === query.type) && (!query.role || r.role === query.role))
-      .map((r) => ({ id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, metadata: r.metadata }));
+      .map((r) => ({ id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, assigned_to: r.assigned_to ?? null, metadata: r.metadata }));
   }
 
   ofType(type: string): FakeRow[] {

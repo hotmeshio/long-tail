@@ -99,7 +99,7 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     config.siteNatsUrl = required(env, 'MACHINE_SITE_NATS_URL', transport);
     config.siteNatsUser = env.MACHINE_SITE_NATS_USER;
     config.siteNatsPassword = env.MACHINE_SITE_NATS_PASSWORD;
-    config.mqtt = mqttEndpoint(env, transport, 4);
+    config.mqtt = mqttEndpoint(env, transport, 5);
   }
   if (transport === MACHINE_TRANSPORT.MQTT) config.mqtt = mqttEndpoint(env, transport, 5);
   if (feed === ESCALATION_FEED.JETSTREAM && !config.siteNatsUrl) {

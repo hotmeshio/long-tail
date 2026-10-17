@@ -52,11 +52,13 @@ export class Floor {
     this.poke();
   }
 
-  /** The station no longer expects the unit. */
-  unexpect(unitId: string, receiver: MockMachine): void {
+  /** The station no longer expects the unit; a unit still waiting at line entry for `job` is no longer coming. */
+  unexpect(unitId: string, receiver: MockMachine, job?: Job): void {
     const left = (this.expects.get(unitId) ?? []).filter((e) => e.receiver !== receiver);
     if (left.length) this.expects.set(unitId, left);
     else this.expects.delete(unitId);
+    const h = this.holds.get(unitId);
+    if (job && h && !h.sender && h.job === job) this.holds.delete(unitId);
   }
 
   /** A finished unit waits at its station for the next one. */

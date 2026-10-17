@@ -16,6 +16,9 @@ import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher } from './dispatcher';
 import type { GatewayState } from './state';
 
+const NOT_FOUND = 404;
+const CONFLICT = 409;
+
 export interface ExecutorDeps {
   bus: MachineBus;
   lt: LineEscalations;
@@ -102,8 +105,15 @@ export class Executor {
   }
 
   private check(a: Action, result: VerbResult): void {
+    const rowId = (a as { rowId?: string }).rowId;
     if (result.outcome === VERB_OUTCOME.INVALID) {
-      this.d.log.error(GATEWAY_LOG.VERB_INVALID, { action: a.kind, row: (a as any).rowId, detail: result.detail });
+      this.d.log.error(GATEWAY_LOG.VERB_INVALID, { action: a.kind, row: rowId, detail: result.detail });
+    }
+    // Refused on a row the gateway holds open: outside the actor's roles (404) or claimed by someone else (409).
+    const open = rowId ? this.d.state.get(rowId) : undefined;
+    if (open && (result.status === NOT_FOUND || result.status === CONFLICT)) {
+      const event = result.status === NOT_FOUND ? GATEWAY_LOG.ROW_NOT_VISIBLE : GATEWAY_LOG.ROW_CLAIMED_ELSEWHERE;
+      this.d.log.warn(event, { action: a.kind, row: rowId, as: (a as { as?: string }).as, role: open.role, detail: result.detail });
     }
   }
 

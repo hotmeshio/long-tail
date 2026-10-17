@@ -81,6 +81,11 @@ export function exitRole(line: LineDef): string {
   return line.roles?.exit ?? DEFAULT_EXIT_ROLE;
 }
 
+/** Roles of people who take units straight from a machine: the exit role and any receivers. */
+export function receiverRoles(line: LineDef): string[] {
+  return [...new Set([exitRole(line), ...(line.roles?.receivers ?? [])])];
+}
+
 /** The role of the person who decides failed handoffs and closes alarm and machine rows. */
 export function operatorRole(line: LineDef): string {
   return line.roles?.operator ?? DEFAULT_OPERATOR_ROLE;

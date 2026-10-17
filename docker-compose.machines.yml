@@ -1,5 +1,7 @@
-# Machine line override: a site broker (NATS with JetStream and an MQTT TLS
-# listener) joined to Long Tail's NATS as a leafnode, and the mock line.
+# Machine line override: machines speak MQTT 5 to a machine broker
+# (Mosquitto, client certificates), which bridges the line's topics into a
+# site NATS (JetStream) joined to Long Tail's NATS as a leafnode; and the
+# mock line.
 # Long Tail runs the gateway in process (start({ machines })), resolving
 # escalation rows as each machine; `--profile standalone-gateway` runs it as
 # its own service over the HTTP API instead.
@@ -15,7 +17,8 @@ x-machine-env: &machine-env
   MACHINE_SITE_NATS_URL: nats://site-nats:4222
   MACHINE_SITE_NATS_USER: line-gateway
   MACHINE_SITE_NATS_PASSWORD: ${MACHINE_SITE_NATS_PASSWORD:-dev_gateway_secret}
-  MACHINE_MQTT_URL: mqtts://site-nats:8883
+  MACHINE_MQTT_URL: mqtts://machine-broker:8883
+  MACHINE_MQTT_PROTOCOL: "5"
   MACHINE_MQTT_CA: /etc/site/certs/ca.pem
   MACHINE_MQTT_CERT: /etc/site/certs/{clientId}.pem
   MACHINE_MQTT_KEY: /etc/site/certs/{clientId}.key
@@ -27,7 +30,7 @@ services:
     volumes:
       - ./deploy/machine-site:/etc/site:ro
     depends_on:
-      site-nats:
+      machine-broker:
         condition: service_healthy
 
   nats:
@@ -54,7 +57,6 @@ services:
   site-nats:
     image: nats:2.14-alpine
     ports:
-      - "${MACHINE_MQTT_PORT:-8883}:8883"
       - "${MACHINE_SITE_NATS_PORT:-4223}:4222"
       - "${MACHINE_SITE_MONITOR_PORT:-8223}:8222"
     volumes:
@@ -70,6 +72,23 @@ services:
       machine-site:
         condition: service_completed_successfully
       nats:
+        condition: service_healthy
+
+  machine-broker:
+    image: eclipse-mosquitto:2.0.20
+    ports:
+      - "${MACHINE_MQTT_PORT:-8883}:8883"
+    volumes:
+      - ./deploy/machine-site/mosquitto:/mosquitto/config:ro
+      - ./deploy/machine-site/certs:/certs:ro
+      - machine-broker-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 8883"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      site-nats:
         condition: service_healthy
 
   machine-mock:
@@ -92,7 +111,7 @@ services:
     command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/mock/main.ts"]
     restart: unless-stopped
     depends_on:
-      site-nats:
+      machine-broker:
         condition: service_healthy
 
   machine-gateway:
@@ -114,10 +133,11 @@ services:
     command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/gateway/main.ts"]
     restart: unless-stopped
     depends_on:
-      site-nats:
+      machine-broker:
         condition: service_healthy
       long-tail:
         condition: service_started
 
 volumes:
   machine-site-js:
+  machine-broker-data:

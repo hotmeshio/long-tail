@@ -1,15 +1,14 @@
 /**
- * The site broker's configuration, rendered from the line. One NATS server
- * carries JetStream and the MQTT listener; every machine logs in over TLS
- * with its own client certificate (the certificate's CN is its user) and
- * may publish only under its own topics and hear only its own commands.
- * The gateway logs in twice: over MQTT by certificate to send commands, and
- * over NATS by password to read the streams. A leafnode joins Long Tail's
- * NATS, so escalation events and machine subjects share one subject space.
+ * The site's NATS server, rendered from the line. It runs JetStream and an
+ * MQTT listener that only the machine broker's bridge logs in to (by client
+ * certificate; the CN is its user, and it may publish only under the line's
+ * topics). The gateway logs in by password to read the streams. A leafnode
+ * joins Long Tail's NATS, so escalation events and machine subjects share
+ * one subject space.
  */
 
-import { controllerId, clientIds, type LineDef } from '../line';
-import { CHANNEL, toSubject } from '../protocol';
+import type { LineDef } from '../line';
+import { toSubject } from '../protocol';
 
 export interface SiteConfOptions {
   root: string;
@@ -24,21 +23,16 @@ export interface SiteConfOptions {
 
 const q = JSON.stringify;
 
-function machineUser(subjectBase: string, clientId: string, machineId: string): string {
-  const own = `${subjectBase}.${machineId}`;
-  const cmd = `${own}.${toSubject(CHANNEL.CMD)}`;
-  return [
-    `    { user: ${q(`CN=${clientId}`)}, allowed_connection_types: ["MQTT"],`,
-    `      permissions: { publish: { allow: [${q(`${own}.>`)}], deny: [${q(cmd)}] }, subscribe: { allow: [${q(cmd)}] } } }`,
-  ].join('\n');
+/** The machine broker's bridge identity for a line. */
+export function bridgeId(line: LineDef): string {
+  return `${line.siteId}-${line.lineId}-bridge`;
 }
 
 export function renderSiteConf(line: LineDef, opts: SiteConfOptions): string {
   const base = toSubject(`${opts.root}/${line.siteId}/${line.lineId}`);
-  const machines = line.machines.map((m, i) => machineUser(base, clientIds(line)[i], m.machineId));
-  const controller = [
-    `    { user: ${q(`CN=${controllerId(line)}`)}, allowed_connection_types: ["MQTT"],`,
-    `      permissions: { publish: [${q(`${base}.*.${toSubject(CHANNEL.CMD)}`)}], subscribe: [${q(`${base}.>`)}] } }`,
+  const bridge = [
+    `    { user: ${q(`CN=${bridgeId(line)}`)}, allowed_connection_types: ["MQTT"],`,
+    `      permissions: { publish: [${q(`${base}.>`)}], subscribe: { deny: [">"] } } }`,
   ].join('\n');
   const gateway = `    { user: ${q(opts.gatewayUser)}, password: ${q(opts.gatewayPassword)}, allowed_connection_types: ["STANDARD"] }`;
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.
@@ -49,7 +43,8 @@ jetstream { store_dir: ${q(opts.storeDir)} }
 
 authorization {
   users: [
-${[...machines, controller, gateway].join('\n')}
+${bridge}
+${gateway}
   ]
 }
 
