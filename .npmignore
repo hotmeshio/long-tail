@@ -48,3 +48,6 @@ docs/donotcommit/
 
 # Narrative and concept docs: on GitHub, never in the package
 docs/donotpublish/
+
+# Site deployment files
+deploy/

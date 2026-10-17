@@ -12,6 +12,8 @@ import { eventRegistry } from '../lib/events';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { attachNatsWsProxy } from '../lib/events/nats-ws-proxy';
+import { loggerRegistry } from '../lib/logger';
+import { getOAuthServerSettings } from '../modules/oauth-server';
 
 /**
  * Express adapter for mounting the Long Tail dashboard at an arbitrary subpath
@@ -166,9 +168,19 @@ export class LTExpressAdapter {
   /**
    * The OAuth well-known documents. Mount at the host's root, not under the
    * base path: clients look for them at the origin. It answers only its two
-   * paths and passes everything else on.
+   * paths and passes everything else on. Warns when the issuer's path is not
+   * the base path: the router would then publish metadata for a server that
+   * is not the one mounted here, possibly over the host's own.
    */
   getWellKnownRouter(): Router {
+    const settings = getOAuthServerSettings();
+    const issuerPath = settings ? new URL(settings.issuer).pathname.replace(/\/+$/, '') : null;
+    if (issuerPath !== null && issuerPath !== this.basePath) {
+      loggerRegistry.warn(
+        `[long-tail] OAuth issuer path "${issuerPath || '/'}" differs from the mount path "${this.basePath || '/'}"; `
+        + `set the issuer to https://<host>${this.basePath}`,
+      );
+    }
     return createWellKnownRouter();
   }
 

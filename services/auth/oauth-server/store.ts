@@ -11,9 +11,14 @@ import {
   ROTATE_REFRESH_TOKEN,
   GET_LIVE_GRANT,
   REVOKE_ON_REFRESH_REUSE,
+  REVOKE_ON_CODE_REUSE,
   REVOKE_BY_REFRESH_TOKEN,
   REVOKE_GRANT,
   LIST_GRANTS,
+  PRUNE_REFRESH_TOKENS,
+  PRUNE_CODES,
+  PRUNE_GRANTS,
+  PRUNE_CLIENTS,
 } from './sql';
 
 /** A refresh token reused within this many seconds is treated as a client retry. */
@@ -79,7 +84,8 @@ export async function issueAuthorizationCode(input: {
 /**
  * Exchange a code for the grant and its first refresh token. Null when the
  * code is unknown, used, expired, for another client or redirect URI, fails
- * PKCE, or its grant or owner is no longer active.
+ * PKCE, or its grant or owner is no longer active. A code presented again
+ * after its exchange revokes its grant.
  */
 export async function exchangeAuthorizationCode(input: {
   code: string;
@@ -88,12 +94,17 @@ export async function exchangeAuthorizationCode(input: {
   codeVerifier: string;
   refreshTtlSeconds: number;
 }): Promise<{ snapshot: LTGrantSnapshot; resource: string | null; refreshToken: string } | null> {
+  const pool = getPool();
   const refreshToken = createSecret();
-  const { rows } = await getPool().query(EXCHANGE_CODE, [
-    hashSecret(input.code), input.clientId, input.redirectUri, pkceChallenge(input.codeVerifier),
+  const codeHash = hashSecret(input.code);
+  const { rows } = await pool.query(EXCHANGE_CODE, [
+    codeHash, input.clientId, input.redirectUri, pkceChallenge(input.codeVerifier),
     hashSecret(refreshToken), input.refreshTtlSeconds,
   ]);
-  if (!rows[0]) return null;
+  if (!rows[0]) {
+    await pool.query(REVOKE_ON_CODE_REUSE, [codeHash]);
+    return null;
+  }
   const { resource, ...snapshot } = rows[0];
   return { snapshot, resource, refreshToken };
 }
@@ -143,4 +154,26 @@ export async function listGrants(userId: string): Promise<LTGrantSummary[]> {
   if (!isUuid(userId)) return [];
   const { rows } = await getPool().query(LIST_GRANTS, [userId]);
   return rows;
+}
+
+export interface OAuthPruneCounts {
+  refreshTokens: number;
+  codes: number;
+  grants: number;
+  clients: number;
+}
+
+/**
+ * Delete what the authorization server no longer needs, older than the
+ * window (a Postgres interval): spent and expired refresh tokens and codes,
+ * then grants with neither left or revoked, then clients with no live grant.
+ * Each step reads what the one before it left.
+ */
+export async function pruneOAuthServer(olderThan: string): Promise<OAuthPruneCounts> {
+  const pool = getPool();
+  const refreshTokens = (await pool.query(PRUNE_REFRESH_TOKENS, [olderThan])).rowCount ?? 0;
+  const codes = (await pool.query(PRUNE_CODES, [olderThan])).rowCount ?? 0;
+  const grants = (await pool.query(PRUNE_GRANTS, [olderThan])).rowCount ?? 0;
+  const clients = (await pool.query(PRUNE_CLIENTS, [olderThan])).rowCount ?? 0;
+  return { refreshTokens, codes, grants, clients };
 }

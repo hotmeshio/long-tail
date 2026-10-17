@@ -1,5 +1,6 @@
 import * as yamlDeployer from './deployer';
 import { resolvePrincipal } from '../iam/principal';
+import { InvocationError } from '../workflow-invocation';
 import { publishWorkflowEvent } from '../../lib/events/publish';
 import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 
@@ -18,7 +19,8 @@ interface InvokeOptions {
 /**
  * The identity context compiled workflow activities run under, from the
  * server-side identity: execute_as with the invoker as initiator, else the
- * invoker. Never read from the caller's data.
+ * invoker. Never read from the caller's data. An identity that does not
+ * resolve is refused rather than run with none.
  */
 async function resolveScope(
   executeAs: string | undefined,
@@ -29,7 +31,7 @@ async function resolveScope(
       resolvePrincipal(executeAs),
       userId ? resolvePrincipal(userId) : Promise.resolve(null),
     ]);
-    if (!botPrincipal) return undefined;
+    if (!botPrincipal) throw new InvocationError(`execute_as principal "${executeAs}" not found`, 404);
     return {
       principal: botPrincipal,
       scopes: ['mcp:tool:call'],
@@ -38,7 +40,8 @@ async function resolveScope(
   }
   if (!userId) return undefined;
   const principal = await resolvePrincipal(userId);
-  return principal ? { principal, scopes: ['mcp:tool:call'] } : undefined;
+  if (!principal) throw new InvocationError('User not registered', 403);
+  return { principal, scopes: ['mcp:tool:call'] };
 }
 
 /**

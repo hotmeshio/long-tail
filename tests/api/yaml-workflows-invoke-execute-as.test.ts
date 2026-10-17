@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
   getYamlWorkflow: vi.fn(),
   invokeService: vi.fn(),
   assertMayActAs: vi.fn(),
+  getUserByExternalId: vi.fn(async (id: string) => ({ id: `${id}-uuid` })),
 }));
+vi.mock('../../services/user', () => ({ getUser: vi.fn(), getUserByExternalId: mocks.getUserByExternalId }));
 vi.mock('../../services/yaml-workflow/db', () => ({ getYamlWorkflow: mocks.getYamlWorkflow }));
 vi.mock('../../services/yaml-workflow/deployer', () => ({}));
 vi.mock('../../services/yaml-workflow/workers', () => ({}));

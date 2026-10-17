@@ -97,13 +97,13 @@ router.get('/:agentId/subscriptions', async (req, res) => {
  * Create an event subscription for an agent.
  */
 router.post('/:agentId/subscriptions', requireBuilder, async (req, res) => {
-  const { topic, reaction_type, execute_as } = req.body;
+  const { topic, reaction_type, workflow_type, execute_as } = req.body;
   if (!topic || !reaction_type) {
     res.status(400).json({ error: 'topic and reaction_type are required' });
     return;
   }
   const agentId = String(req.params.agentId);
-  const check = () => assertMayConfigureSubscription(req.auth!.userId, { agentId, reaction_type, execute_as });
+  const check = () => assertMayConfigureSubscription(req.auth!.userId, { agentId, reaction_type, workflow_type, execute_as });
   if (!(await authorized(check, res))) return;
   const result = await subApi.createSubscription({ ...req.body, agentId });
   res.status(result.status).json(result.data ?? { error: result.error });
@@ -117,7 +117,8 @@ router.put('/:agentId/subscriptions/:subId', requireBuilder, async (req, res) =>
   const agentId = String(req.params.agentId);
   const id = String(req.params.subId);
   const check = () => assertMayConfigureSubscription(req.auth!.userId, {
-    agentId, subscriptionId: id, reaction_type: req.body?.reaction_type, execute_as: req.body?.execute_as,
+    agentId, subscriptionId: id, reaction_type: req.body?.reaction_type,
+    workflow_type: req.body?.workflow_type, execute_as: req.body?.execute_as,
   });
   if (!(await authorized(check, res))) return;
   const result = await subApi.updateSubscription({ ...req.body, id });

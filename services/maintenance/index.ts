@@ -79,6 +79,15 @@ async function executeRule(appId: string, rule: LTMaintenanceRule): Promise<void
       break;
     }
 
+    // Drop the authorization server's dead rows: spent or expired tokens and
+    // codes, grants with neither left or long revoked, clients with no live grant.
+    case rule.target === 'oauth' && rule.action === 'delete': {
+      const { pruneOAuthServer } = await import('../auth/oauth-server');
+      const counts = await pruneOAuthServer(rule.olderThan);
+      loggerRegistry.info(`[lt-maintenance] oauth pruned: ${JSON.stringify(counts)} (olderThan: ${rule.olderThan})`);
+      break;
+    }
+
     default:
       loggerRegistry.warn(`[lt-maintenance] unknown rule, skipping: ${JSON.stringify(rule)}`);
   }

@@ -4,15 +4,18 @@
  * Whoever configures one must be able to run as that identity: the same rule
  * as an execute_as override. Automation that would run as lt-system, or a
  * capability subscription (a tool called with lt-system authority), is a
- * superadmin's to configure.
+ * superadmin's to configure. A durable subscription starts its workflow
+ * under that workflow's invocation rules, for the configurer here and for
+ * the run identity each time it fires.
  */
-import { assertMayActAs, InvocationError } from '../workflow-invocation';
+import { assertMayActAs, checkInvocationRoles, InvocationError } from '../workflow-invocation';
 import { isSuperAdmin } from '../user';
 import { getAgent } from './index';
 import { getSubscription } from './subscriptions';
 import type { AgentBehaviors } from '../../types/agent';
 
 const SYSTEM_AUTHORITY = 'runs as lt-system; only superadmin can configure it';
+const DURABLE_REACTION = 'durable';
 
 async function assertIdentity(callerId: string, identity: string | null | undefined, what: string): Promise<void> {
   if (!identity) throw new InvocationError(`${what} has no identity, so it ${SYSTEM_AUTHORITY}`, 403);
@@ -38,7 +41,13 @@ export async function assertMayConfigureAgent(
 /** Refuse a subscription create or update the caller could not run themselves. */
 export async function assertMayConfigureSubscription(
   callerId: string,
-  input: { agentId: string; subscriptionId?: string; reaction_type?: string; execute_as?: string | null },
+  input: {
+    agentId: string;
+    subscriptionId?: string;
+    reaction_type?: string;
+    workflow_type?: string | null;
+    execute_as?: string | null;
+  },
 ): Promise<void> {
   if (await isSuperAdmin(callerId)) return;
   const existing = input.subscriptionId ? await getSubscription(input.subscriptionId) : null;
@@ -49,6 +58,8 @@ export async function assertMayConfigureSubscription(
   if (reaction === 'capability') {
     throw new InvocationError(`a capability subscription calls a tool directly, so it ${SYSTEM_AUTHORITY}`, 403);
   }
+  const workflowType = input.workflow_type !== undefined ? input.workflow_type : existing?.workflow_type;
+  if (reaction === DURABLE_REACTION && workflowType) await checkInvocationRoles(workflowType, callerId);
   const agent = await getAgent(input.agentId);
   const executeAs = input.execute_as !== undefined ? input.execute_as : existing?.execute_as;
   await assertIdentity(callerId, executeAs || agent?.user_id, 'the subscription');

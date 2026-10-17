@@ -23,6 +23,10 @@ export const config = {
   NATS_DASHBOARD_TOKEN: process.env.NATS_DASHBOARD_TOKEN || '',
   /** How long a browser's WebSocket proxy ticket admits an upgrade. The dashboard fetches one per attempt. */
   NATS_WS_TICKET_TTL_SECONDS: positiveInt('NATS_WS_TICKET_TTL_SECONDS', 300),
+  /** Largest WebSocket frame the proxy accepts from a browser, near NATS's own max_payload. */
+  NATS_WS_MAX_PAYLOAD_BYTES: positiveInt('NATS_WS_MAX_PAYLOAD_BYTES', 1024 * 1024),
+  /** How often the proxy rechecks a connection holder's account; a change closes the connection. */
+  NATS_WS_RECHECK_SECONDS: positiveInt('NATS_WS_RECHECK_SECONDS', 60),
   /**
    * Dashboard reconnect: first backoff delay, delay cap, how long a drop lasts
    * before the banner shows, and the window the first retry and catch-up
@@ -37,6 +41,10 @@ export const config = {
   NODE_ENV: process.env.NODE_ENV || 'development',
 
   JWT_SECRET: process.env.JWT_SECRET || '',
+
+  // Mint the seeded mcp-service account's API keys and print them to stdout once, at first seed.
+  // Local docker compose sets it; elsewhere a superadmin mints keys from the dashboard.
+  LT_SEED_SERVICE_KEYS: process.env.LT_SEED_SERVICE_KEYS === 'true',
 
   // Enables the OAuth authorization server for /mcp when start() passes no auth.oauthServer.
   LT_OAUTH_ISSUER: process.env.LT_OAUTH_ISSUER || '',

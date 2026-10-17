@@ -36,6 +36,7 @@ export function validateCronSchedule(expr: string): void {
 const CRON_TOPIC_PREFIX = 'lt.cron';
 const CRON_ID_PREFIX = 'lt-cron';
 const YAML_CRON_TOPIC_PREFIX = 'lt.cron.yaml';
+const CRON_SOURCE = 'cron';
 const YAML_CRON_ID_PREFIX = 'lt-cron-yaml';
 
 /**
@@ -242,9 +243,10 @@ class LTCronRegistry {
         try {
           cronCallCount++;
           loggerRegistry.info(`[lt-cron] tick #${cronCallCount} at ${new Date().toISOString()} — pub(${appId}/${graphTopic})`);
-          const { getEngine } = await import('../yaml-workflow/deployer');
-          const engine = await getEngine(appId);
-          await engine.pub(graphTopic, cronEnvelope, undefined, { entity: graphTopic });
+          // Through the invoke service, so the run carries only the scope the
+          // server resolves for execute_as, never one written in the envelope.
+          const { invokeYamlWorkflow } = await import('../yaml-workflow/invoke');
+          await invokeYamlWorkflow(wf, { data: cronEnvelope, execute_as: wf.execute_as ?? undefined, source: CRON_SOURCE });
           loggerRegistry.info(`[lt-cron] tick #${cronCallCount} published successfully`);
         } catch (err: any) {
           loggerRegistry.error(`[lt-cron] tick #${cronCallCount} failed: ${err?.message}`);

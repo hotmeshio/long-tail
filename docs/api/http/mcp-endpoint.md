@@ -75,7 +75,7 @@ Connect Claude Code to your Long Tail instance as an MCP server. Once connected,
 
 ### Step 1: Get an API key
 
-Start Long Tail (`docker compose up -d --build`). The startup log shows two seeded API keys:
+Start Long Tail (`docker compose up -d --build`). On first start, docker compose sets `LT_SEED_SERVICE_KEYS=true`, so the container's stdout shows two seeded API keys:
 
 ```
 [seed-mcp] read key: lt_bot_<read-key>
@@ -168,11 +168,11 @@ A read key cannot invoke write operations (create, update, delete, invoke workfl
 
 ### Seeded Service Account
 
-Long Tail seeds an `mcp-service` account at startup with two pre-configured API keys:
+Long Tail seeds an `mcp-service` account at startup with two API keys:
 - **read** — scopes: `["mcp:read"]`
 - **full** — scopes: `["mcp:read", "mcp:full"]`
 
-Keys are logged once at startup and cannot be retrieved again. For production, create a new service account and generate keys via the dashboard or API.
+With `LT_SEED_SERVICE_KEYS=true` (local docker compose), the keys are minted at first start and printed once to stdout, never through the logger; they cannot be retrieved again. Without it, the account is created with no keys, and a superadmin mints them from the dashboard or the bot-accounts API.
 
 ## Exposure Control
 
