@@ -33,7 +33,7 @@ export interface ExecutorDeps {
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
-type CommandAction = Extract<Action, { kind: 'command' }>;
+type CommandAction = Extract<Action, { kind: 'command' | 'control' }>;
 
 export class Executor {
   private inflight = new Set<Promise<void>>();
@@ -51,6 +51,7 @@ export class Executor {
     for (const action of actions) {
       if (action.kind === 'dispatch') this.track(this.dispatcher.dispatch(action));
       else if (action.kind === 'command') this.track(this.dispatcher.command(action));
+      else if (action.kind === 'control') this.track(this.dispatcher.control(action));
       else await this.run(action);
     }
   }
@@ -95,7 +96,7 @@ export class Executor {
   /** Add the item; when the row then holds every key the action waits for, resolve it. */
   private async accumulate(a: Extract<Action, { kind: 'accumulate' }>): Promise<void> {
     const { lt, state } = this.d;
-    const result = await lt.accumulate(a.as, a.rowId, a.itemKey, a.payload);
+    const result = await lt.accumulate(a.as, a.rowId, a.itemKey, a.payload, a.metadata);
     this.check(a, result);
     if (!a.complete || result.outcome === VERB_OUTCOME.INVALID) return;
     const held = new Set(result.itemKeys ?? await lt.itemKeys(a.rowId));

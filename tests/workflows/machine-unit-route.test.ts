@@ -129,6 +129,11 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     expect((intoCut.metadata as any).resolved_by).toBe(users.get('cut-01'));
     const items = await escalationApi.getEscalationItems({ id: intoCut.id }, { userId: users.get(CONTROLLER)! });
     expect((items.data as any).items.map((i: any) => i.itemKey).sort()).toEqual(['arrived:A1', 'arrived:A2', 'released:A1', 'released:A2']);
+
+    // The sender's lots ride on the row, so a search by lot finds the units.
+    expect((intoCut.metadata as any).lots).toEqual(['L-1001', 'L-1002']);
+    const byLot = await escalationApi.listEscalations({ facets: { lots: ['L-1001'], lineId: LINE.lineId, orderRef: `ORD-${routeKey}` }, limit: 50 }, { userId: users.get(CONTROLLER)! });
+    expect((byLot.data as any).escalations.map((e: any) => e.id)).toEqual([intoCut.id]);
   }, 90_000);
 
   it('a jam asks the operator; retry after clearing completes the route', async () => {

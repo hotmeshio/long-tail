@@ -60,6 +60,11 @@ export interface MachineDef {
   software?: string;
   /** Versions the line controller will dispatch to; unset allows any. */
   allowedSoftware?: string[];
+  /**
+   * Most jobs the machine is sent or holds at once, queued or in work. Further
+   * handoffs wait in its role queue until it has room. Unset: no limit.
+   */
+  queueDepth?: number;
 }
 
 export interface LineDef {

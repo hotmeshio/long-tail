@@ -20,8 +20,11 @@ export interface CreateRowInput {
 export type Action =
   | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any> }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
+  /** A host's machine-command row: send the command, resolve the row with the reply. */
+  | { kind: 'control'; rowId: string; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   | { kind: 'claim'; as: Actor; rowId: string }
-  | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; complete?: Completion }
+  /** `metadata` is merged into the row's metadata in the same statement. */
+  | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; metadata?: Record<string, any>; complete?: Completion }
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
   | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }

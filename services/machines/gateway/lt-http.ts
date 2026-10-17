@@ -8,7 +8,7 @@
 
 import type { OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
-import { VERB_OUTCOME, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 
 export class LtHttpError extends Error {
   readonly cause?: unknown;
@@ -67,8 +67,8 @@ export class HttpLineEscalations implements LineEscalations {
     return this.verb(as, 'POST', `/escalations/${id}/claim`, { durationMinutes: this.claimMinutes });
   }
 
-  accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult> {
-    return this.verb(as, 'POST', `/escalations/${id}/accumulate`, { itemKey, payload });
+  accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>, metadata?: Record<string, any>): Promise<VerbResult> {
+    return this.verb(as, 'POST', `/escalations/${id}/accumulate`, { itemKey, payload, ...(metadata ? { metadata } : {}) });
   }
 
   resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult> {
@@ -86,9 +86,13 @@ export class HttpLineEscalations implements LineEscalations {
   }
 
   async listOpen(filter: OpenRowQuery): Promise<Record<string, any>[]> {
-    const query = new URLSearchParams({ ...filter, status: 'pending', limit: '500' });
-    const page = await this.http.request<{ escalations: Record<string, any>[] }>('GET', `/escalations?${query}`, this.tokenFor(CONTROLLER));
-    return page.escalations;
+    return readAllPages(async (offset) => {
+      const query = new URLSearchParams({
+        ...filter, status: 'pending', limit: String(OPEN_PAGE), offset: String(offset), sort_by: 'created_at', order: 'asc',
+      });
+      const page = await this.http.request<{ escalations: Record<string, any>[] }>('GET', `/escalations?${query}`, this.tokenFor(CONTROLLER));
+      return page.escalations;
+    });
   }
 
   private async verb(as: Actor, method: string, path: string, body: unknown): Promise<VerbResult> {

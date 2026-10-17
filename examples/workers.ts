@@ -636,6 +636,20 @@ const machineUnitRouteConfig: LTWorkerConfig = {
   },
 };
 
+const machineCommandConfig: LTWorkerConfig = {
+  description:
+    'Machine command: ask one machine to start, stop, pause, resume or change over. Parks a machine-command row on the machine\'s role; the machine gateway sends the command and resolves the row with the machine\'s reply.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: LINE_ROLE.OPERATOR,
+  roles: [LINE_ROLE.OPERATOR],
+  certified: false,
+  envelopeSchema: {
+    data: { siteId: 'site-1', lineId: 'line-1', machineId: 'press-01', role: 'line-bond', requestKey: 'C-0001', op: 'pause', args: {} },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 const fleetToolsConfig: LTWorkerConfig = {
   description: 'Four tools for one machine. Pick the tool; the form shows only its knobs.',
   icon: WORKFLOW_ICONS.WRENCH,
@@ -692,4 +706,5 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.twinBroker, config: twinBrokerConfig },
   { taskQueue: 'long-tail-examples', workflow: fleetToolsWorkflow.fleetTools, config: fleetToolsConfig },
   { taskQueue: 'long-tail-examples', workflow: machineLineWorkflow.machineUnitRoute, config: machineUnitRouteConfig },
+  { taskQueue: 'long-tail-examples', workflow: machineLineWorkflow.machineCommand, config: machineCommandConfig },
 ];

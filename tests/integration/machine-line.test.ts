@@ -13,7 +13,9 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { UNIT_ROUTE_WORKFLOW, type RouteStep } from '../../examples/workflows/machine-line/workflows/route';
 import { loadLine } from '../../examples/workflows/machine-line/line';
 import { FACTORY_LINE_PATH, loadManifests, manifestSteps } from '../../examples/workflows/machine-line/manifests';
-import { exitRole } from '../../lib/machines/line';
+import { exitRole, machineById } from '../../lib/machines/line';
+import { MACHINE_COMMAND_WORKFLOW } from '../../examples/workflows/machine-line';
+import { commandTarget, type CommandTarget } from '../../services/machines/commands';
 
 const BASE_URL = process.env.LT_BASE_URL || 'http://localhost:3000';
 const LINE = loadLine(FACTORY_LINE_PATH);
@@ -71,9 +73,17 @@ async function start(routeKey: string, unitIds: string[], steps: RouteStep[] = A
   return workflowId;
 }
 
+/** Ask a machine for a command through the machineCommand workflow; resolves with the machine's reply. */
+async function command(target: CommandTarget, op: string, args: Record<string, unknown> = {}): Promise<any> {
+  const requestKey = `IT${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const workflowId = `mc-${requestKey}`;
+  await api(`/workflows/${MACHINE_COMMAND_WORKFLOW}/invoke`, 'POST', { workflowId, data: { ...target, requestKey, op, args } });
+  return result(workflowId, 60_000);
+}
+
 /** A person at a station: wait for the sender's release of each unit, take the units off, receive them. */
-async function receive(jobId: string, unitIds: string[]): Promise<void> {
-  const [row] = await rowsFor(jobId, (rows) => rows.some((r) => r.status === 'pending'));
+async function receive(jobId: string, unitIds: string[], ms = 60_000): Promise<void> {
+  const [row] = await rowsFor(jobId, (rows) => rows.some((r) => r.status === 'pending'), ms);
   const from = row.metadata.fromMachine;
   if (from) {
     await until(async () => {
@@ -114,7 +124,42 @@ describe.skipIf(!SIM_URL)('machine line over the site broker', () => {
     expect(intoCut.assigned_to).toBe(cutBot.id);
     expect(intoCut.metadata.resolved_by).toBe(cutBot.id);
     expect(payload).toMatchObject({ received: true });
+
+    // The bonder's lots ride on the row into the cutter: a search by lot finds this route.
+    expect(intoCut.metadata.lots).toEqual(['L-1001', 'L-1002']);
+    const facets = encodeURIComponent(JSON.stringify({ lots: ['L-1001'], orderRef: `ORD-${routeKey}` }));
+    const byLot = await api(`/escalations?facets=${facets}&limit=20`);
+    expect(byLot.escalations.map((r: any) => r.id)).toEqual([intoCut.id]);
   }, 240_000);
+
+  it('a machine-command row pauses and resumes a machine, and a changeover to a version it lacks comes back refused', async () => {
+    const target = commandTarget(LINE, 'convey-01');
+    expect(await command(target, 'pause')).toMatchObject({ accepted: true, machineId: 'convey-01', op: 'pause' });
+    expect((await sim('/sim/convey-01')).enabled).toBe(false);
+    expect(await command(target, 'resume')).toMatchObject({ accepted: true, op: 'resume' });
+    expect((await sim('/sim/convey-01')).enabled).toBe(true);
+    const refused = await command(target, 'changeover', { recipe: { id: 'RCP-NONE', version: '1' } });
+    expect(refused).toMatchObject({ accepted: false, status: 'refused' });
+  }, 120_000);
+
+  it('pacing: a paused print cell is sent no more than its queue depth; the rest wait, then every route completes', async () => {
+    const print = commandTarget(LINE, 'print-01');
+    const depth = machineById(LINE, 'print-01').queueDepth!;
+    expect(await command(print, 'pause')).toMatchObject({ accepted: true });
+    const base = `IT${Date.now().toString(36)}`;
+    const keys = Array.from({ length: depth + 2 }, (_, i) => `${base}x${i}`);
+    const ids: string[] = [];
+    for (const key of keys) ids.push(await start(key, [`${key}-A`]));
+    const intoPrint = async () => Promise.all(keys.map(async (key) => (await rowsFor(`${key}-print-01`, (rows) => rows.length > 0))[0]));
+    await until(async () => (await intoPrint()).filter((r) => r.assigned_to).length >= depth, 60_000);
+    await sleep(3_000);
+    const rows = await intoPrint();
+    expect(rows.filter((r) => r.assigned_to)).toHaveLength(depth);
+    expect(rows.filter((r) => !r.assigned_to && r.status === 'pending')).toHaveLength(2);
+    expect(await command(print, 'resume')).toMatchObject({ accepted: true });
+    await Promise.all(keys.map((key) => receive(`${key}-exit`, [`${key}-A`], 300_000)));
+    for (const id of ids) expect((await result(id, 120_000)).status).toBe('complete');
+  }, 480_000);
 
   it('manual: the same workflow through people at each station, received at the same inspector', async () => {
     const routeKey = `IT${Date.now().toString(36)}`;

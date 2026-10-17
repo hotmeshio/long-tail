@@ -32,7 +32,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
   "roles": { "exit": "inspector", "operator": "line-operator", "receivers": ["harvester"] },
   "machines": [
     { "machineId": "bond-cell-1", "process": "bond", "role": "bond-cell", "carrier": "none",
-      "cycleSec": 8, "recipes": { "RCP-BOND-A": ["2"] }, "allowedSoftware": ["1.4.0"] }
+      "cycleSec": 8, "queueDepth": 4, "recipes": { "RCP-BOND-A": ["2"] }, "allowedSoftware": ["1.4.0"] }
   ]
 }
 ```
@@ -44,6 +44,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 | `roles.operator` | The role that gets failed handoffs, stopping alarms, and offline or quiet machines. Default `line-operator` |
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
 | `machines[].allowedSoftware` | Versions the line accepts. A machine reporting another version is refused before any dispatch |
+| `machines[].queueDepth` | Most jobs the machine is sent or holds at once. Unset: no limit. See [Pacing](#pacing) |
 
 `start({ machines })` declares the station, exit and operator roles unless `roles` already declares them; set `declareRoles: false` to own them all.
 
@@ -80,6 +81,19 @@ When the handoff ends without a receipt, the row resolves `{ received: false, er
 
 A row on a person's role resolves the same way, from the dashboard. A workflow can mix both in one route and never tell them apart.
 
+### Traceability
+
+When a sender finishes a unit, the gateway records the release on the row and, in the same statement, merges two facets into the row's metadata:
+
+| Facet | Holds |
+|---|---|
+| `trace` | One entry per unit: `{ unitId, machineId, jobId, result, materials: [{ material, lot }] }` |
+| `lots` | Every lot those units consumed, once each |
+
+Both are containment-searchable, so the rows that used a lot, and with them the units, are one query: `GET /escalations?facets={"lots":["LOT-7"]}`. A unit's whole path is every handoff row whose `units` holds it. The sender's full finished record stays on the row as its `released:<unit>` item. A codec maps its own lot fields into `materials`.
+
+### Decisions on a failed handoff
+
 `Machines.handoffDecisions(errorCode)` gives the decisions that fit a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit.
 
 A host whose rows already carry their own facets supplies a `HandoffRowAdapter`:
@@ -90,6 +104,43 @@ const rows: Machines.HandoffRowAdapter = {
   toHandoff: (row) => row.type === 'station-step' ? { siteId: row.metadata.plant, /* ... */ } : null,
 };
 ```
+
+## Pacing
+
+A machine with a `queueDepth` is sent no more jobs than that at once. A handoff beyond it waits in the machine's role queue, pending and unclaimed, the way work waits for a busy person. The oldest waiting row goes out when the machine has room, and a full machine holds back its later rows even when a smaller one would fit. A machine with nothing in hand always takes the next row, even one with more jobs than the depth.
+
+A machine's load is every job it has been sent or still holds:
+- rows dispatched into it;
+- rows whose units still wait on it to move on;
+- units that arrived and have not left.
+
+A unit leaves when the machine releases it, when it arrives at the next machine, or when the machine's snapshot no longer lists its job. A replica taking the line reads every open row back before it sends anything, so pacing survives a restart.
+
+## Commands
+
+A host asks a machine to start, stop, pause, resume or change over by parking a `machine-command` row on the machine's role, from a workflow step or through the API, the way it asks a person for anything:
+
+```typescript
+const reply = await conditional<Machines.CommandResolution>(`changeover-${orderId}`, {
+  ...Machines.commandRow(Machines.commandTarget(line, 'bond-cell-1'), 'changeover', { recipe: { id: 'RCP-BOND-B', version: '1' } }),
+  timeout: '10m',
+});
+```
+
+The gateway sends the command and resolves the row with the reply, as the machine that gave it:
+
+```typescript
+{ accepted: true, machineId: 'bond-cell-1', op: 'changeover', status: 'accepted', reason: 'changing over to RCP-BOND-B v1' }
+```
+
+| `status` | Meaning |
+|---|---|
+| `accepted` | The machine took the command |
+| `refused`, `failed` | The machine said no; its reason is in `reason` (a changeover to a version it does not hold is refused) |
+| `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
+| `unsupported` | Not a command a row may ask for, or not a machine on this line; nothing was sent |
+
+The example's `machineCommand` workflow is this one step.
 
 ## The wire
 
@@ -119,7 +170,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `alarm/<id>` (retained while active) | Raise, acknowledgement, clear (with who cleared it) |
 | `telemetry` | Readings |
 | `report/<name>` | Production, availability, inventory and other reporting, kept in the stream |
-| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `enable`, `disable`, `ack-alarm`, `snapshot`; replies `accepted`, `refused`, `failed`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
+| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop`, `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `refused`, `failed`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
 
 ## Rows for people
 
@@ -129,7 +180,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `machine-offline` | Presence goes offline past a debounce | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 
-A replica taking a line reads back its open handoff, alarm, offline and quiet rows. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
+A replica taking a line reads back its open handoff, command, alarm, offline and quiet rows. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
 
 ## Topology and identity
 

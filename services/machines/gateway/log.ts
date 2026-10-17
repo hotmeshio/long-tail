@@ -12,6 +12,7 @@ export const GATEWAY_LOG = {
   ALARM_ROW: 'machine_gateway.alarm.row_created',
   OFFLINE_ROW: 'machine_gateway.offline.row_created',
   QUIET_ROW: 'machine_gateway.quiet.row_created',
+  COMMANDED: 'machine_gateway.command.accepted',
   COMMAND_REFUSED: 'machine_gateway.command.refused',
   COMMAND_UNANSWERED: 'machine_gateway.command.unanswered',
   LEADING: 'machine_gateway.line.leading',

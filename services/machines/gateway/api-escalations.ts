@@ -5,7 +5,7 @@
 
 import * as escalationApi from '../../../api/escalations';
 import type { Actor, CreateRowInput } from './actions';
-import { VERB_OUTCOME, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
 import type { OpenRowQuery } from '../rows';
@@ -27,8 +27,8 @@ export class ApiLineEscalations implements LineEscalations {
     return this.verb(await escalationApi.claimEscalation({ id, durationMinutes: 60 }, this.auth(as)));
   }
 
-  async accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult> {
-    return this.verb(await escalationApi.accumulateItem({ id, itemKey, payload }, this.auth(as)));
+  async accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>, metadata?: Record<string, any>): Promise<VerbResult> {
+    return this.verb(await escalationApi.accumulateItem({ id, itemKey, payload, ...(metadata ? { metadata } : {}) }, this.auth(as)));
   }
 
   async resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult> {
@@ -48,8 +48,12 @@ export class ApiLineEscalations implements LineEscalations {
   }
 
   async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {
-    const result = await escalationApi.listEscalations({ ...query, status: 'pending', limit: 500 }, this.auth(CONTROLLER));
-    if (result.status >= 300) throw new Error(`list failed ${result.status}: ${result.error}`);
-    return (result.data as any).escalations;
+    return readAllPages(async (offset) => {
+      const result = await escalationApi.listEscalations(
+        { ...query, status: 'pending', limit: OPEN_PAGE, offset, sort_by: 'created_at', order: 'asc' }, this.auth(CONTROLLER),
+      );
+      if (result.status >= 300) throw new Error(`list failed ${result.status}: ${result.error}`);
+      return (result.data as any).escalations;
+    });
   }
 }

@@ -45,12 +45,22 @@ export class CommandHandler {
         return this.m.cell.dispatch(a);
       case OP.CANCEL:
         return this.m.cell.cancel(a.jobId);
-      case OP.ENABLE:
+      case OP.START:
+      case OP.RESUME:
         await this.m.enable(true);
-        return { status: REPLY_STATUS.ACCEPTED, reason: 'enabled' };
-      case OP.DISABLE:
+        return { status: REPLY_STATUS.ACCEPTED, reason: op === OP.START ? 'started' : 'resumed' };
+      case OP.STOP:
         await this.m.enable(false);
         return { status: REPLY_STATUS.ACCEPTED, reason: 'finishing the current unit; queue kept' };
+      case OP.PAUSE:
+        await this.m.enable(false);
+        return { status: REPLY_STATUS.ACCEPTED, reason: 'paused at the next safe point' };
+      case OP.CHANGEOVER: {
+        const refused = await this.m.changeover(a.recipe);
+        return refused
+          ? { status: REPLY_STATUS.REFUSED, reason: refused }
+          : { status: REPLY_STATUS.ACCEPTED, reason: `changing over to ${a.recipe.id} v${a.recipe.version}` };
+      }
       case OP.ACKNOWLEDGE_ALARM: {
         const ok = await this.m.alarms.acknowledge(a.alarmId, a.by ?? 'line-controller');
         return ok

@@ -52,6 +52,12 @@ describe('line definition', () => {
     expect(() => validateLine({ ...DEFAULT_LINE, machines: [DEFAULT_LINE.machines[0], DEFAULT_LINE.machines[0]] })).toThrow(/duplicate/);
   });
 
+  it('accepts a whole queue depth of at least 1 and rejects anything else', () => {
+    const withDepth = (queueDepth: unknown) => ({ ...DEFAULT_LINE, machines: [{ ...DEFAULT_LINE.machines[0], queueDepth: queueDepth as number }] });
+    expect(validateLine(withDepth(3)).machines[0].queueDepth).toBe(3);
+    for (const bad of [0, -1, 1.5, '2']) expect(() => validateLine(withDepth(bad))).toThrow(/queueDepth/);
+  });
+
   it('names one Long Tail role per process', () => {
     expect(stationRole('trim')).toBe('line-trim');
     expect(stationRole('final_check')).toBe('line-final-check');

@@ -6,7 +6,7 @@
  */
 
 import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE } from '../../lib/machines/line';
-import { TRANSFER_FAILURE } from '../../lib/machines/protocol';
+import { REPLY_STATUS, TRANSFER_FAILURE } from '../../lib/machines/protocol';
 
 export const ROW_TYPE = {
   HANDOFF: 'handoff',
@@ -14,6 +14,8 @@ export const ROW_TYPE = {
   ALARM: 'line-alarm',
   MACHINE_OFFLINE: 'machine-offline',
   MACHINE_QUIET: 'machine-quiet',
+  /** A host asks a machine to start, stop, pause, resume or change over. */
+  MACHINE_COMMAND: 'machine-command',
 } as const;
 
 export const LINE_ROLE = {
@@ -74,6 +76,28 @@ export const HANDOFF_ERROR = {
 } as const;
 export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];
 
+/** A material lot a machine consumed for a unit. */
+export interface TraceMaterial {
+  material: string;
+  lot: string;
+}
+
+/** One unit as a machine finished it, kept on the handoff row so a search by lot finds it. */
+export interface TraceEntry {
+  unitId: string;
+  machineId: string;
+  jobId: string | null;
+  result: string | null;
+  materials: TraceMaterial[];
+}
+
+/**
+ * Facets a handoff row gains as the sender finishes its units: `trace`, one
+ * entry per unit, and `lots`, every lot those units consumed. Both are
+ * containment-searchable, e.g. `{ lots: ['LOT-7'] }`.
+ */
+export const TRACE_FACET = { TRACE: 'trace', LOTS: 'lots' } as const;
+
 /** What resolves a handoff row, from a machine or from a person's form. */
 export interface HandoffResolution {
   received: boolean;
@@ -121,5 +145,27 @@ export const signalKeys = {
     `handoff-error-${jobKey}-s${step}-a${attempt}${round > 1 ? `-r${round}` : ''}`,
 };
 
+/** Metadata on a machine-command row. */
+export interface CommandFacets {
+  siteId: string;
+  lineId: string;
+  machineId: string;
+  op: string;
+  args: Record<string, unknown>;
+}
+
+export const COMMAND_STATUS = { ...REPLY_STATUS, NO_REPLY: 'no-reply', UNSUPPORTED: 'unsupported' } as const;
+export type CommandStatus = typeof COMMAND_STATUS[keyof typeof COMMAND_STATUS];
+
+/** What resolves a machine-command row: the machine's reply, as data. */
+export interface CommandResolution {
+  accepted: boolean;
+  machineId: string;
+  op: string;
+  status: CommandStatus;
+  reason?: string;
+}
+
 export const dispatchCommandId = (escalationId: string) => `${escalationId}:dispatch`;
+export const controlCommandId = (escalationId: string) => `${escalationId}:command`;
 export const cancelCommandId = (escalationId: string) => `${escalationId}:cancel`;

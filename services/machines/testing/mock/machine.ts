@@ -140,6 +140,20 @@ export class MockMachine {
     this.recipe = { ...recipe };
   }
 
+  /** Change over to a recipe version it holds: changeover mode until it is loaded, then idle. */
+  async changeover(recipe: { id: string; version: string }): Promise<string | null> {
+    if (!this.recipes[recipe?.id]?.includes(String(recipe?.version))) return `recipe ${recipe?.id} v${recipe?.version} is not held`;
+    if (!PRODUCTIVE_MODES.includes(this.mode)) return `cannot change over in ${this.mode}`;
+    await this.setMode(MODE.CHANGEOVER);
+    this.timers.after(this.ms(this.def.changeoverSec), () => void (async () => {
+      if (this.mode !== MODE.CHANGEOVER) return;
+      this.loadRecipe({ id: recipe.id, version: String(recipe.version) });
+      await this.setMode(MODE.IDLE);
+      await this.resumeWork();
+    })());
+    return null;
+  }
+
   recordCycle(ok: boolean): void {
     this.counters.cycles++;
     if (ok) this.counters.ok++;

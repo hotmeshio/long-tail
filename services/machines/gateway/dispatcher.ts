@@ -4,12 +4,13 @@
  * command ids, and the row is claimed once every job is accepted. When a
  * dispatch ends without that, the row is resolved with the error and every
  * job is cancelled, so a dispatch still queued for a machine that was away
- * never runs later. Other commands are tracked for their reply and logged.
+ * never runs later. A machine-command row is resolved with its command's
+ * reply. Other commands are tracked for their reply and logged.
  */
 
-import { HANDOFF_ERROR, cancelCommandId } from '../contracts';
+import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, type CommandResolution } from '../contracts';
 import { identOf, type LineDef } from '../../../lib/machines/line';
-import { OP, REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
+import { OP, REPLY_STATUS, isoTs, type LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
@@ -32,6 +33,7 @@ export interface DispatcherDeps {
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
 type CommandAction = Extract<Action, { kind: 'command' }>;
+type ControlAction = Extract<Action, { kind: 'control' }>;
 
 export class Dispatcher {
   constructor(private readonly d: DispatcherDeps) {}
@@ -59,6 +61,23 @@ export class Dispatcher {
     else if (reply.status !== REPLY_STATUS.ACCEPTED) {
       this.d.log.warn(GATEWAY_LOG.COMMAND_REFUSED, { machine: a.machineId, op: a.op, cmdId: a.cmdId, status: reply.status, reason: reply.reason });
     }
+  }
+
+  /**
+   * A machine-command row: send it, then resolve the row with the reply, as the
+   * machine that gave it. The command expires when the asking ends, so one that
+   * reaches a machine after its row resolved no-reply is refused, never run.
+   */
+  async control(a: ControlAction): Promise<void> {
+    const expiresAt = isoTs(Date.now() + this.d.replyTimeoutMs * this.d.dispatchAttempts);
+    const reply = await this.ask(a.machineId, a.op, a.cmdId, { ...a.args, expiresAt });
+    const outcome: CommandResolution = reply
+      ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason }
+      : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };
+    const context = { row: a.rowId, machine: a.machineId, op: a.op, status: outcome.status, reason: outcome.reason };
+    if (outcome.accepted) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
+    else this.d.log.warn(reply ? GATEWAY_LOG.COMMAND_REFUSED : GATEWAY_LOG.COMMAND_UNANSWERED, context);
+    this.check(a.rowId, 'resolve', await this.d.lt.resolve(reply ? a.machineId : CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
   }
 
   async dispatch(a: DispatchAction): Promise<void> {

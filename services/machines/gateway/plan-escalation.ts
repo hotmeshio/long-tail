@@ -3,39 +3,25 @@
  * cue to dispatch, exactly as a new row is the cue for a person to look at the
  * dashboard. A cancelled row stops both sides; an expired one withdraws its
  * dispatch; an alarm row a person resolves acknowledges the alarm at the machine.
+ * A machine-command row is sent to its machine as the command it names.
  */
 
-import { HANDOFF_ERROR, ROW_TYPE, dispatchCommandId, type HandoffFacets } from '../contracts';
-import { OP, isoTs } from '../../../lib/machines/protocol';
-import { machineById, type LineDef } from '../../../lib/machines/line';
+import { COMMAND_STATUS, ROW_TYPE, controlCommandId, type CommandFacets, type HandoffFacets } from '../contracts';
+import { readCommandFacets } from '../commands';
+import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
+import type { LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
+import { admit, hasRoom, softwareRefusal } from './pacing';
+import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { standardRows, type HandoffRowAdapter } from '../rows';
 
 const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
-function handoffRow(id: string, role: string, facets: HandoffFacets): HandoffRow {
-  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE };
-}
-
-/** Dispatch arguments for a handoff row. */
-export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string, any> {
-  return {
-    jobId: row.jobId,
-    orderRef: row.orderRef,
-    recipe: { id: row.recipeId, version: row.recipeVersion },
-    units: row.units,
-    process: row.process,
-    from: row.fromMachine,
-    expiresAt: isoTs(expiresAt),
-    ...(row.artifactUrl ? { artifact: { url: row.artifactUrl, sha256: row.artifactSha256 } } : {}),
-  };
-}
-
-export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
-  return { kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs) };
+function handoffRow(id: string, role: string, facets: HandoffFacets, metadata?: Record<string, any>): HandoffRow {
+  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata) };
 }
 
 /** Rows for another line belong to that line's gateway. */
@@ -54,40 +40,57 @@ export function planEscalationEvent(
   if (!onThisLine(line, event.data?.metadata ?? {})) return [];
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
+  if (type === ROW_TYPE.MACHINE_COMMAND) return planCommandRow(state, line, event);
   return [];
+}
+
+/** Why the gateway will not send a command row's command; null when it will. */
+function commandRefusal(line: LineDef, c: CommandFacets): string | null {
+  if (!onLine(line, c.machineId)) return `${c.machineId} is not on ${line.siteId}/${line.lineId}`;
+  if (!CONTROL_OPS.includes(c.op as Op)) return `${c.op} is not a command a row may ask for; one of ${CONTROL_OPS.join(', ')}`;
+  return null;
+}
+
+function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEvent): Action[] {
+  const id = event.escalationId;
+  if (event.verb === VERB.RESOLVED || event.verb === VERB.CANCELLED || event.verb === VERB.EXPIRED) {
+    state.endCommand(id);
+    return [];
+  }
+  if (event.verb !== VERB.CREATED && event.verb !== VERB.CLAIMED) return [];
+  const c = readCommandFacets(event.data?.metadata);
+  if (!c || !state.trackCommand(id)) return [];
+  const refusal = commandRefusal(line, c);
+  if (refusal) {
+    return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
+  }
+  return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, cmdId: controlCommandId(id), args: c.args }];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {
   return !!machineId && line.machines.some((m) => m.machineId === machineId);
 }
 
-/** A machine on a version the line does not allow is refused before any dispatch. */
-function softwareRefusal(state: GatewayState, line: LineDef, machineId: string): string | null {
-  const allowed = machineById(line, machineId).allowedSoftware;
-  const software = state.links.get(machineId)?.software;
-  if (!allowed || !software || allowed.includes(software)) return null;
-  return `${machineId} runs ${software}; allowed: ${allowed.join(', ')}`;
-}
-
 function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, facets: HandoffFacets | null, dispatchTtlMs: number): Action[] {
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
     if (state.isClosed(id) || !facets) return [];
-    state.index(handoffRow(id, event.role, facets));
+    state.index(handoffRow(id, event.role, facets, event.data?.metadata));
     const row = state.get(id)!;
+    // The units now wait on the sender as this row's sender job.
+    if (row.fromMachine) for (const u of row.units) state.letGo(row.fromMachine, u.unitId);
     if (!onLine(line, row.toMachine) || row.dispatch !== DISPATCH_STATE.NONE) return [];
     // Read back already claimed: the machine accepted it before this gateway started.
     if (event.data?.assigned_to) {
       row.dispatch = DISPATCH_STATE.ACCEPTED;
       return [];
     }
-    const refusal = softwareRefusal(state, line, row.toMachine);
-    if (refusal) {
-      row.dispatch = DISPATCH_STATE.REFUSED;
-      return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { received: false, errorCode: HANDOFF_ERROR.SOFTWARE_UNSUPPORTED, detail: refusal } }];
+    const refused = !!softwareRefusal(state, line, row.toMachine);
+    if (state.holdDispatch || (!refused && !hasRoom(state, line, row))) {
+      row.dispatch = DISPATCH_STATE.WAITING;
+      return [];
     }
-    row.dispatch = DISPATCH_STATE.PENDING;
-    return [dispatchAction(row, row.toMachine, dispatchTtlMs)];
+    return admit(state, line, row, dispatchTtlMs);
   }
   if (event.verb === VERB.CANCELLED) {
     const row = state.close(id, ROW_END.CANCELLED);

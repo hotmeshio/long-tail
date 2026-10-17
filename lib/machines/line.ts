@@ -25,6 +25,9 @@ export function validateLine(line: LineDef): LineDef {
     if (seen.has(m.machineId)) throw new Error(`duplicate machineId "${m.machineId}"`);
     seen.add(m.machineId);
     if (!(m.cycleSec > 0)) throw new Error(`${m.machineId}: cycleSec must be positive`);
+    if (m.queueDepth !== undefined && !(Number.isInteger(m.queueDepth) && m.queueDepth >= 1)) {
+      throw new Error(`${m.machineId}: queueDepth must be a whole number of at least 1`);
+    }
   }
   return line;
 }

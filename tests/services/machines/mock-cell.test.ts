@@ -53,7 +53,7 @@ describe('mock cell: dispatch', () => {
   it('drops replies when told to (a lost reply)', async () => {
     h = await startHarness();
     h.line.config('press-01', { replyMode: 'drop' });
-    expect(await h.command('press-01', OP.ENABLE)).toBeNull();
+    expect(await h.command('press-01', OP.START)).toBeNull();
   });
 });
 
@@ -85,7 +85,7 @@ describe('mock cell: the job lifecycle', () => {
     await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', 'U1'));
     await sleep(30);
     expect(h.recorder.jobs('press-01', JOB_EVENT.STARTED)).toHaveLength(0);
-    await h.command('press-01', OP.ENABLE);
+    await h.command('press-01', OP.START);
     await until(() => h.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0]);
   });
 

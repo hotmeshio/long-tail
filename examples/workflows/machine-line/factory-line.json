@@ -14,6 +14,7 @@
       "carrier": "none",
       "description": "Print cell whose finished prints go onto the conveyor",
       "cycleSec": 12,
+      "queueDepth": 4,
       "changeoverSec": 4,
       "progressEverySec": 4,
       "rejectReason": "PRINT-WARP",
@@ -48,6 +49,7 @@
       "carrier": "none",
       "description": "Print cell whose finished prints people harvest by hand",
       "cycleSec": 12,
+      "queueDepth": 4,
       "changeoverSec": 4,
       "progressEverySec": 4,
       "rejectReason": "PRINT-WARP",
@@ -82,6 +84,7 @@
       "carrier": "bind",
       "description": "Takes finished prints off the print cell and seats them on a carrier plate",
       "cycleSec": 3,
+      "queueDepth": 4,
       "changeoverSec": 1,
       "rejectReason": "PLATE-MISSEAT",
       "recipes": {
@@ -110,6 +113,7 @@
       "carrier": "none",
       "description": "Bonds a top layer onto the part and seats it on a carrier plate",
       "cycleSec": 8,
+      "queueDepth": 4,
       "changeoverSec": 3,
       "progressEverySec": 4,
       "rejectReason": "BOND-WEAK",
@@ -166,6 +170,7 @@
       "carrier": "release",
       "description": "Trims the part to its outline and frees the carrier plate",
       "cycleSec": 6,
+      "queueDepth": 4,
       "changeoverSec": 3,
       "rejectReason": "EDGE-OUT",
       "recipes": {
@@ -208,6 +213,7 @@
       "carrier": "none",
       "description": "Measures and images the finished part",
       "cycleSec": 4,
+      "queueDepth": 4,
       "changeoverSec": 2,
       "rejectReason": "DIM-FAIL",
       "recipes": {

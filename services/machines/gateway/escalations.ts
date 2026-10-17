@@ -28,14 +28,27 @@ export interface VerbResult {
 
 export interface LineEscalations {
   claim(as: Actor, id: string): Promise<VerbResult>;
-  accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult>;
+  /** `metadata` is merged (shallow) into the row's metadata in the same statement as the item. */
+  accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>, metadata?: Record<string, any>): Promise<VerbResult>;
   resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult>;
   create(as: Actor, input: CreateRowInput): Promise<{ id: string }>;
   /** The item keys an accumulator row holds. */
   itemKeys(id: string): Promise<string[]>;
-  /** Open rows of a type, in the projection escalation events carry. */
-  /** Pending rows matching every given field. */
+  /** Every pending row matching each given field, oldest first, in the projection escalation events carry. */
   listOpen(query: OpenRowQuery): Promise<Record<string, any>[]>;
+}
+
+/** Rows per page when reading open rows back. */
+export const OPEN_PAGE = 500;
+
+/** Read every page of `page(offset)`, oldest first, until a short page. */
+export async function readAllPages(page: (offset: number) => Promise<Record<string, any>[]>): Promise<Record<string, any>[]> {
+  const rows: Record<string, any>[] = [];
+  for (let offset = 0; ; offset += OPEN_PAGE) {
+    const batch = await page(offset);
+    rows.push(...batch);
+    if (batch.length < OPEN_PAGE) return rows;
+  }
 }
 
 /** Map an HTTP status to a verb outcome; anything else is a real failure. */

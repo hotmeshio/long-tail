@@ -10,6 +10,8 @@ A person works an escalation row on the dashboard: they claim it, add to it and 
 - bond (`press-01`), finish (`cut-01`) and optical inspect (`inspect-01`);
 - a person at `inspector`, where every route ends.
 
+Each machine has a `queueDepth` of 4, so a burst of orders waits in the role queues instead of overfilling a machine.
+
 [`route-manifests.json`](route-manifests.json) runs it two ways:
 
 | Manifest | Stations |
@@ -68,7 +70,7 @@ The driver mints routes from either manifest and plays the people:
 |---|---|
 | [`factory-line.json`](factory-line.json), [`demo-line.json`](demo-line.json) | The factory, and the small three-machine line the tests use |
 | [`route-manifests.json`](route-manifests.json), [`manifests.ts`](manifests.ts) | The two manifests, the roles people work, the even percentage split |
-| [`workflows/`](workflows/) | `machineUnitRoute` and its pure route planning (machine and person steps) |
+| [`workflows/`](workflows/) | `machineUnitRoute` and its pure route planning (machine and person steps); `machineCommand`, one step that asks a machine to start, stop, pause, resume or change over |
 | [`site/setup.ts`](site/setup.ts) | Certificates and broker configuration for the compose run |
 | [`mock/main.ts`](mock/main.ts), [`gateway/main.ts`](gateway/main.ts) | Process entries for the mock line and the standalone gateway |
 

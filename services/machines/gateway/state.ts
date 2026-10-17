@@ -5,9 +5,11 @@
  * machine's link: presence, last message, software and boot id.
  */
 
-import type { HandoffFacets } from '../contracts';
+import type { HandoffFacets, TraceEntry } from '../contracts';
+import { mergeTrace } from './trace';
 
-export const DISPATCH_STATE = { NONE: 'none', PENDING: 'pending', ACCEPTED: 'accepted', REFUSED: 'refused' } as const;
+/** WAITING: the machine has no room yet (pacing.ts); the row waits in its role queue. */
+export const DISPATCH_STATE = { NONE: 'none', WAITING: 'waiting', PENDING: 'pending', ACCEPTED: 'accepted', REFUSED: 'refused' } as const;
 export type DispatchState = typeof DISPATCH_STATE[keyof typeof DISPATCH_STATE];
 
 export const ROW_END = { RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
@@ -18,6 +20,8 @@ export interface HandoffRow extends HandoffFacets {
   role: string;
   dispatch: DispatchState;
   ended?: RowEnd;
+  /** Finished-unit records already on the row's metadata (trace.ts). */
+  trace?: TraceEntry[];
 }
 
 export interface AlarmTrack {
@@ -46,15 +50,22 @@ const CLOSED_LIMIT = 2_000;
 export class GatewayState {
   /** Units one dispatch may carry, from the codec; null when any number may. */
   unitsPerDispatch: number | null = null;
+  /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
+  holdDispatch = false;
+  /** Units at each machine that arrived and have not left: machine → unit → job. */
+  private held = new Map<string, Map<string, string>>();
   private openRows = new Map<string, HandoffRow>();
   private closedRows = new Map<string, HandoffRow>();
   readonly alarms = new Map<string, AlarmTrack>();
+  private openCommands = new Set<string>();
+  private endedCommands = new Set<string>();
   readonly links = new Map<string, LinkTrack>();
 
   index(row: HandoffRow): void {
     if (this.closedRows.has(row.id)) return;
     const existing = this.openRows.get(row.id);
-    this.openRows.set(row.id, existing ? { ...row, dispatch: existing.dispatch } : row);
+    // An event may carry metadata older than what the gateway already wrote: keep both traces.
+    this.openRows.set(row.id, existing ? { ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace) } : row);
   }
 
   get(id: string): HandoffRow | undefined {
@@ -89,6 +100,42 @@ export class GatewayState {
 
   closedFor(unitId: string, pred: (r: HandoffRow) => boolean): HandoffRow | undefined {
     return [...this.closedRows.values()].find((r) => carries(r, unitId) && pred(r));
+  }
+
+  hold(machineId: string, unitId: string, jobId: string): void {
+    if (!this.held.has(machineId)) this.held.set(machineId, new Map());
+    this.held.get(machineId)!.set(unitId, jobId);
+  }
+
+  letGo(machineId: string, unitId: string): void {
+    this.held.get(machineId)?.delete(unitId);
+  }
+
+  heldAt(machineId: string): string[] {
+    return [...(this.held.get(machineId)?.values() ?? [])];
+  }
+
+  /** Keep only units whose job the machine still lists (its snapshot). */
+  keepHeld(machineId: string, jobIds: Set<string>): void {
+    const units = this.held.get(machineId);
+    if (!units) return;
+    for (const [unitId, jobId] of units) if (!jobIds.has(jobId)) units.delete(unitId);
+  }
+
+  /** Track a machine-command row; false when it is already tracked or has ended. */
+  trackCommand(id: string): boolean {
+    if (this.openCommands.has(id) || this.endedCommands.has(id)) return false;
+    this.openCommands.add(id);
+    return true;
+  }
+
+  endCommand(id: string): void {
+    this.openCommands.delete(id);
+    this.endedCommands.add(id);
+    if (this.endedCommands.size > CLOSED_LIMIT) {
+      const oldest = this.endedCommands.values().next().value;
+      if (oldest) this.endedCommands.delete(oldest);
+    }
   }
 
   link(machineId: string, now = Date.now()): LinkTrack {

@@ -6,7 +6,7 @@
  */
 
 import { standardRows, type HandoffRowAdapter } from '../rows';
-import { DECISION } from '../contracts';
+import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER } from './actions';
 import { alarmsClearedMeanwhile, restoreLineRows } from './reconcile';
 import type { LineDef } from '../../../lib/machines/line';
@@ -17,6 +17,7 @@ import type { LineEscalations } from './escalations';
 import { Executor } from './executor';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './log';
 import { planEscalationEvent } from './plan-escalation';
+import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 
@@ -91,16 +92,40 @@ export class MachineGateway {
   }
 
   /**
-   * On taking the line: open handoff rows (a dispatch interrupted by a restart
-   * is sent again with the same cmdId), the gateway's own alarm, offline and
-   * quiet rows, then the machines' retained state to catch what changed while
-   * no gateway was listening.
+   * On taking the line: open handoff and command rows (a dispatch or command
+   * interrupted by a restart is sent again with the same cmdId), the gateway's
+   * own alarm, offline and quiet rows, then the machines' retained state to
+   * catch what changed while no gateway was listening.
    */
   private async reconcile(): Promise<void> {
-    const handoffs = await this.reconcileHandoffs();
-    const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
-    await this.resync();
-    this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, ...restored });
+    // Handoffs wait until the whole line is read back, so pacing sees every job before it sends one.
+    this.state.holdDispatch = true;
+    try {
+      const handoffs = await this.reconcileHandoffs();
+      const commands = await this.reconcileCommands();
+      const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
+      await this.resync();
+      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, ...restored });
+    } finally {
+      this.state.holdDispatch = false;
+    }
+    await this.pace();
+  }
+
+  /** Send waiting handoffs to machines that have room (pacing.ts). */
+  private async pace(): Promise<void> {
+    await this.executor.apply(planPacing(this.state, this.deps.line, this.deps.settings.dispatchTtlMs));
+  }
+
+  private async reconcileCommands(): Promise<number> {
+    let commands = 0;
+    for (const data of await this.deps.lt.listOpen({ type: ROW_TYPE.MACHINE_COMMAND })) {
+      const event: EscalationEvent = { type: 'reconcile', escalationId: data.id, role: data.role, verb: 'created', data };
+      const actions = planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs, this.rows);
+      if (actions.length) commands++;
+      await this.executor.apply(actions);
+    }
+    return commands;
   }
 
   private async reconcileHandoffs(): Promise<number> {
@@ -135,6 +160,7 @@ export class MachineGateway {
   private async onEscalation(event: EscalationEvent): Promise<Disposition> {
     try {
       await this.executor.apply(planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs, this.rows));
+      await this.pace();
       return DISPOSITION.ACK;
     } catch (err: any) {
       this.log.error(GATEWAY_LOG.VERB_FAILED, { event: event.type, error: err.message });
@@ -167,6 +193,7 @@ export class MachineGateway {
     const plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
     try {
       await this.executor.apply(plan.actions);
+      await this.pace();
       return { disposition: plan.disposition, failed: false };
     } catch (err: any) {
       this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });

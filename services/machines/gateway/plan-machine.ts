@@ -15,9 +15,10 @@ import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, itemKeys } from '../contr
 import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type Envelope, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action, type Plan } from './actions';
-import { dispatchAction } from './plan-escalation';
+import { dispatchAction } from './pacing';
 import { failHandoff } from './plan-shared';
 import { dispatchJobs } from './jobs';
+import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
@@ -83,6 +84,10 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
         received: false, unitId, errorCode: HANDOFF_ERROR.CARRIER_MISMATCH, detail: `${m} read carrier ${b.carrierId}, expected ${expected}`,
       }));
     }
+    // The unit is at the receiver now, and off the sender.
+    const job = dispatchJobs(row.jobId, row.units, state.unitsPerDispatch).find((j) => j.units.some((u) => u.unitId === unitId));
+    if (job) state.hold(m, unitId, job.jobId);
+    if (row.fromMachine) state.letGo(row.fromMachine, unitId);
     const units = row.units.map((u) => u.unitId);
     return ack([{
       kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.arrived(unitId),
@@ -94,7 +99,10 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
   if (b.event === JOB_EVENT.FINISHED) {
     const row = state.openFor(unitId, fromHere);
     if (!row) return missing(state, unitId, fromHere);
-    const released: Action = { kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(unitId), payload: b };
+    row.trace = mergeTrace(row.trace, [traceEntry(m, b)]);
+    const released: Action = {
+      kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(unitId), payload: b, metadata: traceFacets(row.trace),
+    };
     if (b.result === JOB_RESULT.OK) return ack([released]);
     return ack([released, ...failHandoff(state, row, m, {
       received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, reason: b.reason ?? null, detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
@@ -108,7 +116,13 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: b.failure, detail: `${m} reported ${b.failure}` }));
   }
 
+  if (b.event === JOB_EVENT.RELEASED) {
+    state.letGo(m, unitId);
+    return ack();
+  }
+
   if (b.event === JOB_EVENT.WITHDRAWN) {
+    state.letGo(m, unitId);
     const row = state.openFor(unitId, toHere);
     if (!row) return ack();
     return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: HANDOFF_ERROR.WITHDRAWN, detail: `${m} gave up ${b.jobId}` }));
@@ -177,6 +191,7 @@ function planPresence(state: GatewayState, m: string, b: Record<string, any>): P
 function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, ttl: number): Plan {
   const link = state.link(m);
   if (b.software) link.software = b.software;
+  if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(b.jobs.map((j: any) => j?.jobId)));
   const previous = link.bootId;
   link.bootId = b.bootId;
   if (!previous || previous === b.bootId) return ack();

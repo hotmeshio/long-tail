@@ -112,7 +112,7 @@ export class FakeLongTail implements LineEscalations {
     return { outcome: VERB_OUTCOME.DONE };
   }
 
-  async accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult> {
+  async accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>, metadata?: Record<string, any>): Promise<VerbResult> {
     this.outage('accumulate');
     this.calls.push({ verb: 'accumulate', as, id, payload: { itemKey, ...payload } });
     const row = this.rows.get(id);
@@ -120,6 +120,7 @@ export class FakeLongTail implements LineEscalations {
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
     if (row.items.some((i) => i.itemKey === itemKey)) return { outcome: VERB_OUTCOME.ALREADY };
     row.items.push({ itemKey, payload, actor: as });
+    if (metadata) row.metadata = { ...row.metadata, ...metadata };
     return { outcome: VERB_OUTCOME.DONE, itemKeys: row.items.map((i) => i.itemKey) };
   }
 

@@ -87,12 +87,23 @@ export type TransferFailure = typeof TRANSFER_FAILURE[keyof typeof TRANSFER_FAIL
 export const OP = {
   DISPATCH: 'dispatch',
   CANCEL: 'cancel',
-  ENABLE: 'enable',
-  DISABLE: 'disable',
+  /** Take work: begin or continue the queue. */
+  START: 'start',
+  /** Finish the current unit, then take no more; the queue is kept. */
+  STOP: 'stop',
+  /** Halt at the next safe point, holding the current unit; nothing new starts. */
+  PAUSE: 'pause',
+  /** Continue after a pause. */
+  RESUME: 'resume',
+  /** Load a recipe version the machine holds (`args.recipe`); refused when it holds none. */
+  CHANGEOVER: 'changeover',
   ACKNOWLEDGE_ALARM: 'ack-alarm',
   SNAPSHOT: 'snapshot',
 } as const;
 export type Op = typeof OP[keyof typeof OP];
+
+/** Commands a host may ask of a machine through a machine-command row. */
+export const CONTROL_OPS: readonly Op[] = [OP.START, OP.STOP, OP.PAUSE, OP.RESUME, OP.CHANGEOVER];
 
 export const REPLY_STATUS = { ACCEPTED: 'accepted', REFUSED: 'refused', FAILED: 'failed' } as const;
 export type ReplyStatus = typeof REPLY_STATUS[keyof typeof REPLY_STATUS];

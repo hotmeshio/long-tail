@@ -54,7 +54,28 @@ describe('Long Tail HTTP client', () => {
     expect(await lt.create('controller', { type: 'line-alarm', role: 'line-operator', description: 'd', priority: 1, metadata: {} })).toEqual({ id: 'e9' });
     expect(await lt.itemKeys('e1')).toEqual(['arrived:U1', 'released:U1']);
     expect(await lt.listOpen({ type: 'handoff' })).toEqual([{ id: 'e1', type: 'handoff' }]);
-    expect(server.seen[2].path).toBe('/escalations?type=handoff&status=pending&limit=500');
+    expect(server.seen[2].path).toBe('/escalations?type=handoff&status=pending&limit=500&offset=0&sort_by=created_at&order=asc');
     expect(server.seen.every((s) => s.auth === 'Bearer tok-controller')).toBe(true);
+  });
+
+  it('sends an accumulate metadata patch in the body, and none when there is none', async () => {
+    server = await new FakeLtServer().on('POST', /accumulate$/, () => ({ status: 200, body: { outcome: 'accepted' } })).start();
+    const lt = client(server);
+    await lt.accumulate('press-01', 'e1', 'released:U1', { result: 'ok' }, { lots: ['L-1'] });
+    await lt.accumulate('press-01', 'e1', 'arrived:U1', {});
+    expect(server.seen[0].body).toEqual({ itemKey: 'released:U1', payload: { result: 'ok' }, metadata: { lots: ['L-1'] } });
+    expect(server.seen[1].body).toEqual({ itemKey: 'arrived:U1', payload: {} });
+  });
+
+  it('reads every page of open rows, oldest first', async () => {
+    const page = (offset: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${offset + i}` }));
+    server = await new FakeLtServer()
+      .on('GET', /offset=0&/, () => ({ status: 200, body: { escalations: page(0, 500) } }))
+      .on('GET', /offset=500&/, () => ({ status: 200, body: { escalations: page(500, 3) } }))
+      .start();
+    const rows = await client(server).listOpen({ type: 'handoff' });
+    expect(rows).toHaveLength(503);
+    expect(rows[502]).toEqual({ id: 'e502' });
+    expect(server.seen).toHaveLength(2);
   });
 });
