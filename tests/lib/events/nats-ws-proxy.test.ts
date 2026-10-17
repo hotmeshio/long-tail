@@ -3,13 +3,17 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const BUILDER = '22222222-2222-4222-8222-222222222222';
+vi.mock('../../../lib/db', async () => {
+  const { ticketPool } = await import('../../helpers/nats-ws-proxy-fixtures');
+  return { getPool: () => ticketPool };
+});
 vi.mock('../../../lib/events/browser-view', async (io) => ({
   ...(await io<typeof import('../../../lib/events/browser-view')>()),
-  viewerFor: async (userId: string) => ({ builder: userId === BUILDER }),
+  holderView: (await import('../../helpers/nats-ws-proxy-fixtures')).holderViewFixture,
 }));
 
 import { attachNatsWsProxy } from '../../../lib/events/nats-ws-proxy';
+import { holders } from '../../helpers/nats-ws-proxy-fixtures';
 import { signNatsWsTicket } from '../../../lib/events/nats-ws-ticket';
 import { config } from '../../../modules/config';
 
@@ -21,6 +25,8 @@ let upstreamSockets: WebSocket[] = [];
 let server: http.Server;
 let base: string;
 let savedSecret: string;
+const BUILDER = '22222222-2222-4222-8222-222222222222';
+holders.set(BUILDER, { builder: true });
 
 beforeAll(async () => {
   savedSecret = config.JWT_SECRET;
@@ -57,13 +63,15 @@ describe('NATS WebSocket proxy', () => {
     await expect(open(`${base}?ticket=not-a-ticket`)).rejects.toThrow('status 401');
   });
 
-  it('forwards CONNECT with the server credential and SUB, and drops PUB', async () => {
+  it('forwards CONNECT with the server credential and SUB, and closes on PUB', async () => {
     received = [];
     const ws = await open(`${base}?ticket=${signNatsWsTicket('11111111-1111-4111-8111-111111111111')}`);
+    const closed = new Promise((r) => ws.once('close', r));
     await new Promise((r) => setTimeout(r, 100));
-    ws.send('CONNECT {"verbose":false,"auth_token":"guess"}\r\nSUB lt.events.> 1\r\nPUB system.oauth.grant.revoked 2\r\nhi\r\nPING\r\n');
-    await new Promise((r) => setTimeout(r, 200));
-    ws.close();
+    ws.send('CONNECT {"verbose":false,"auth_token":"guess"}\r\nSUB lt.events.> 1\r\nPING\r\n');
+    await new Promise((r) => setTimeout(r, 100));
+    ws.send('PUB\tsystem.oauth.grant.revoked\t2\r\nhi\r\n');
+    await closed;
     const stream = received.join('');
     expect(stream).toContain('"auth_token":"server-secret"');
     expect(stream).not.toContain('guess');

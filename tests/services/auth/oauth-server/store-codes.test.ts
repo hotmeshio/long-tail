@@ -52,10 +52,19 @@ describe('OAuth store: clients and authorization codes', () => {
     expect(tokens.rows.map((r) => r.token_hash)).not.toContain(refreshToken);
   });
 
-  it('a code works once', async () => {
-    const { code, verifier } = await issueCode(fixture);
+  it('a code works once, and presenting it again revokes its grant', async () => {
+    const { code, grantId, verifier } = await issueCode(fixture);
     expect(await exchange(code, verifier)).not.toBeNull();
     expect(await exchange(code, verifier)).toBeNull();
+    const { rows } = await getPool().query('SELECT revoked_at FROM lt_oauth_grants WHERE id = $1', [grantId]);
+    expect(rows[0].revoked_at).not.toBeNull();
+  });
+
+  it('a code that fails before its first exchange leaves the grant live', async () => {
+    const { code, grantId, verifier } = await issueCode(fixture);
+    expect(await exchange(code, verifier, { redirectUri: 'http://127.0.0.1:1/elsewhere' })).toBeNull();
+    const { rows } = await getPool().query('SELECT revoked_at FROM lt_oauth_grants WHERE id = $1', [grantId]);
+    expect(rows[0].revoked_at).toBeNull();
   });
 
   it('a wrong verifier fails without spending the code', async () => {

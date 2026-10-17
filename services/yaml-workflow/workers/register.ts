@@ -5,12 +5,11 @@ import { getConnection } from '../../../lib/db';
 import { loggerRegistry } from '../../../lib/logger';
 import { systemEventsConfig } from '../../../lib/events/system-events';
 import { exchangeTokensInArgs } from '../../iam/ephemeral';
-import * as mcpClient from '../../mcp/client';
-import { dispatchBuiltinTool } from '../../mcp/client/connection';
 import * as yamlDb from '../db';
 import type { LTYamlWorkflowRecord } from '../../../types/yaml-workflow';
 
 import { wrapWithScope } from './scope';
+import { callStepTool } from './step-tool';
 import { buildLlmCallback, buildTransformCallback } from './callbacks';
 import { wrapWithEvents } from './events';
 
@@ -137,7 +136,7 @@ export async function registerWorkersForWorkflow(
           delete mergedArgs._scope;
           delete mergedArgs.workflowName;
           mergedArgs = await exchangeTokensInArgs(mergedArgs);
-          const result = await mcpClient.callServerTool(dbServerId, toolName, mergedArgs);
+          const result = await callStepTool(dbServerId, toolName, mergedArgs);
           loggerRegistry.debug(`[yaml-workflow:worker] leaving db/${toolName} wf=${wfName} resultKeys=[${Object.keys(result || {}).join(',')}]`);
           return { metadata: { ...data.metadata }, data: result };
         }),
@@ -209,15 +208,7 @@ export async function registerWorkersForWorkflow(
           const exchangedArgs = await exchangeTokensInArgs(mergedArgs);
           const coercedArgs = coerceNumericObjects(exchangedArgs) as Record<string, unknown>;
 
-          // Try direct dispatch for built-in servers (bypasses MCP transport).
-          // Falls through to mcpClient.callServerTool() for external servers.
-          let result: any;
-          const builtin = await dispatchBuiltinTool(serverId, toolName, coercedArgs);
-          if (builtin) {
-            result = builtin.result;
-          } else {
-            result = await mcpClient.callServerTool(serverId, toolName, coercedArgs);
-          }
+          const result = await callStepTool(serverId, toolName, coercedArgs);
 
           if (result && typeof result === 'object' && 'error' in result) {
             loggerRegistry.error(`[yaml-workflow:worker] ${toolName} error: ${JSON.stringify(result).slice(0, 200)}`);

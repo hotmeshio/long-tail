@@ -233,12 +233,16 @@ class AgentTriggerRegistry {
   ): Promise<void> {
     switch (sub.reaction_type) {
       case 'durable': {
-        const { invokeWorkflow } = await import('../workflow-invocation');
+        const { invokeWorkflow, checkInvocationRoles } = await import('../workflow-invocation');
+        // The run identity must be able to start this workflow now. Only a
+        // superadmin configures a subscription with no identity.
+        const runAs = sub.execute_as ?? sub.agent_user_id ?? undefined;
+        if (runAs) await checkInvocationRoles(sub.workflow_type!, runAs);
         await invokeWorkflow({
           workflowType: sub.workflow_type!,
           data: mapped.data ?? mapped,
           metadata: mapped.metadata ?? { source: 'agent', certified: true },
-          executeAs: sub.execute_as ?? sub.agent_user_id ?? undefined,
+          executeAs: runAs,
           options: { workflowId: deterministicId },
           auth: { userId: sub.agent_user_id || 'lt-system', role: 'admin' },
         });

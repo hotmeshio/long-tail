@@ -1,6 +1,7 @@
 import * as yamlDb from '../../services/yaml-workflow/db';
 import { cronRegistry } from '../../services/cron';
-import type { LTApiResult } from '../../types/sdk';
+import type { LTApiAuth, LTApiResult } from '../../types/sdk';
+import { invokeRefusal } from './deploy';
 import { isNotFoundError } from './helpers';
 
 /**
@@ -13,6 +14,7 @@ import { isNotFoundError } from './helpers';
  * @param input.cron_schedule — cron expression (e.g. "0 * * * *")
  * @param input.cron_envelope — optional payload passed to each scheduled invocation
  * @param input.execute_as — optional identity override for scheduled executions
+ * @param auth - the scheduling caller; the run identity must be able to call every built-in tool the workflow uses
  * @returns `{ status: 200, data: YamlWorkflow }` the updated workflow record with cron fields set
  */
 export async function setCronSchedule(input: {
@@ -20,12 +22,14 @@ export async function setCronSchedule(input: {
   cron_schedule: string;
   cron_envelope?: any;
   execute_as?: string;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
     const wf = await yamlDb.getYamlWorkflow(input.id);
     if (!wf) {
       return { status: 404, error: 'YAML workflow not found' };
     }
+    const refused = await invokeRefusal(wf, auth, input.execute_as);
+    if (refused) return refused;
 
     if (!input.cron_schedule || typeof input.cron_schedule !== 'string') {
       return { status: 400, error: 'cron_schedule is required' };

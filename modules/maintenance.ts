@@ -11,6 +11,8 @@ import type { LTMaintenanceConfig } from '../types/maintenance';
  * 3. Strip execution artifacts from entity jobs older than 30 days
  *    (preserves jdata, udata, jmark, hmark — exports always work)
  * 4. Hard-delete pruned jobs older than 180 days
+ * 5. Delete OAuth server rows (expired codes and tokens, unused or revoked
+ *    grants, clients with no live grant) older than 7 days
  *
  * Conservative defaults — execution artifacts (activity inputs, stream
  * history) are needed for rich export data. Pruning too early strips
@@ -42,6 +44,11 @@ export const defaultMaintenanceConfig: LTMaintenanceConfig = {
       action: 'delete',
       olderThan: '180 days',
       pruned: true,
+    },
+    {
+      target: 'oauth',
+      action: 'delete',
+      olderThan: '7 days',
     },
   ],
 };

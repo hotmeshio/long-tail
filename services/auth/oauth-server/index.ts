@@ -12,7 +12,9 @@ export {
   revokeByRefreshToken,
   revokeGrant,
   listGrants,
+  pruneOAuthServer,
   type RevokedGrant,
+  type OAuthPruneCounts,
 } from './store';
 export {
   signAccessToken,

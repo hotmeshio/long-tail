@@ -2,7 +2,7 @@
 
 HotMesh stores execution artifacts in PostgreSQL: stream messages that carry internal signals between activities, transient job rows that track bookkeeping for individual activity invocations, and entity job rows that represent durable workflow instances. Left unmanaged, these tables grow without bound. The maintenance system provides scheduled, rule-based cleanup that runs as a durable cron workflow inside HotMesh itself.
 
-A default configuration ships with Long Tail. It runs nightly at 2 AM, applies four rules in sequence, and requires no setup. The schedule and rules can be replaced at startup or at runtime through the REST API.
+A default configuration ships with Long Tail. It runs weekly, Sundays at 2 AM, applies five rules in sequence, and requires no setup. The schedule and rules can be replaced at startup or at runtime through the REST API.
 
 ## Configuration via start()
 
@@ -29,6 +29,7 @@ await start({
       { target: 'jobs',    olderThan: '14 days',  action: 'prune',  hasEntity: true },
       { target: 'jobs',    olderThan: '180 days', action: 'delete', pruned: true },
       { target: 'escalations', olderThan: '180 days', action: 'delete' },
+      { target: 'oauth',       olderThan: '7 days',   action: 'delete' },
     ],
   },
 });
@@ -43,7 +44,7 @@ await start({
 
 ## What gets cleaned
 
-Five categories of data are subject to maintenance:
+Six categories of data are subject to maintenance:
 
 | Category | Description |
 |---|---|
@@ -52,6 +53,7 @@ Five categories of data are subject to maintenance:
 | **Entity jobs** | Job rows where `entity` is set. These represent actual workflow instances -- the rows that back `Durable.Client.workflow.search()` calls and execution exports. Deleting them removes the workflow record entirely. |
 | **Pruned jobs** | Entity jobs that have already had their execution artifacts stripped (the `pruned_at` column is not `NULL`). These retain core data but no longer carry execution scaffolding. They can be hard-deleted after a longer retention window. |
 | **Terminal escalations** | Escalation rows in a terminal status (`resolved`, `cancelled`, `expired`). Terminal rows are inert audit records -- every engine state transition guards on `status = 'pending'`, so aging them out is safe for live waiters, claims, and signal delivery. The engine-owned prune deletes in atomic batches until the retention horizon is drained. Pending rows are never touched. |
+| **OAuth server rows** | The `/mcp` authorization server's records. Refresh tokens and authorization codes past expiry, or rotated out, longer ago than the window; then grants left with neither, or revoked longer ago than the window; then clients registered longer ago than the window with no live grant. A client still holding a live refresh token keeps its grant and its registration. |
 
 ## Prune vs. delete
 
@@ -64,26 +66,30 @@ The intended lifecycle for an entity job is: execute, then prune after a short r
 
 ## Default schedule
 
-The built-in configuration (`modules/maintenance.ts`) runs at 2 AM daily and applies four rules in order:
+The built-in configuration (`modules/maintenance.ts`) runs Sundays at 2 AM and applies five rules in order:
 
 ```typescript
 {
-  schedule: '0 2 * * *',
+  schedule: '0 2 * * 0',
   rules: [
-    { target: 'streams', action: 'delete', olderThan: '7 days' },
-    { target: 'jobs', action: 'delete', olderThan: '7 days', hasEntity: false },
-    { target: 'jobs', action: 'prune',  olderThan: '7 days', hasEntity: true },
-    { target: 'jobs', action: 'delete', olderThan: '90 days', pruned: true },
+    { target: 'streams', action: 'delete', olderThan: '30 days' },
+    { target: 'jobs', action: 'delete', olderThan: '30 days', hasEntity: false },
+    { target: 'jobs', action: 'prune',  olderThan: '30 days', hasEntity: true },
+    { target: 'jobs', action: 'delete', olderThan: '180 days', pruned: true },
+    { target: 'oauth', action: 'delete', olderThan: '7 days' },
   ],
 }
 ```
 
 | Rule | Effect |
 |---|---|
-| 1. Delete streams older than 7 days | Removes internal message data that is no longer needed for replay or debugging. |
-| 2. Delete transient jobs older than 7 days | Removes activity-level bookkeeping rows that have no associated workflow entity. |
-| 3. Prune entity jobs older than 7 days | Strips execution artifacts from workflow instances while preserving core data. Exports and search remain functional. |
-| 4. Delete pruned jobs older than 90 days | Hard-deletes workflow instances that were pruned at least 90 days ago. This is the final removal. |
+| 1. Delete streams older than 30 days | Removes internal message data that is no longer needed for replay or debugging. |
+| 2. Delete transient jobs older than 30 days | Removes activity-level bookkeeping rows that have no associated workflow entity. |
+| 3. Prune entity jobs older than 30 days | Strips execution artifacts from workflow instances while preserving core data. Exports and search remain functional. |
+| 4. Delete pruned jobs older than 180 days | Hard-deletes workflow instances that were pruned at least 180 days ago. This is the final removal. |
+| 5. Delete OAuth server rows older than 7 days | Removes expired codes and tokens, unused or revoked grants, and clients with no live grant. |
+
+A custom `rules` list replaces the defaults, so include the `oauth` rule when the OAuth server is enabled.
 
 Rules execute sequentially. If one fails, the remaining rules still run; failures are logged and do not halt the cycle.
 
@@ -95,7 +101,7 @@ Defined in `types/maintenance.ts`. Each rule describes a single cleanup operatio
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `target` | `'streams' \| 'jobs' \| 'escalations'` | Yes | The resource type to act on. |
+| `target` | `'streams' \| 'jobs' \| 'escalations' \| 'oauth'` | Yes | The resource type to act on. |
 | `action` | `'delete' \| 'prune'` | Yes | Whether to remove entirely or strip execution artifacts. |
 | `olderThan` | `string` | Yes | A PostgreSQL interval expression: `'7 days'`, `'24 hours'`, `'90 days'`. |
 | `hasEntity` | `boolean` | No | When `target` is `'jobs'`: `true` selects entity jobs, `false` selects transient jobs (where `entity IS NULL`). |
