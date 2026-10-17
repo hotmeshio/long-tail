@@ -3,6 +3,7 @@ import { loggerRegistry } from './lib/logger';
 import { midnightTheme } from './themes/midnight';
 
 import { start } from './start';
+import { loadLine as loadMachineLine } from './lib/machines/line';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ export { resolveCredential } from './services/iam/credentials';
 export * as KnowledgeApi from './api/knowledge';
 export type { LTClient, LTClientOptions } from './sdk';
 export * as api from './api';
+export * as Machines from './services/machines';
 export { LTExpressAdapter } from './adapters/express';
 
 // ─── Server ──────────────────────────────────────────────────────────────────
@@ -170,6 +172,11 @@ async function main() {
     escalation: {
       strategy: 'mcp',
     },
+    // Machines resolve rows over MQTT when a line and a transport are configured
+    // (docker-compose.machines.yml sets both).
+    machines: process.env.MACHINE_TRANSPORT && process.env.MACHINE_LINE_CONFIG
+      ? { lines: [loadMachineLine(process.env.MACHINE_LINE_CONFIG)] }
+      : undefined,
     branding: {
       ...(process.env.WHITE_LABEL ? { appName: process.env.WHITE_LABEL } : {}),
       // Midnight ships as a registered theme — the working proof that a

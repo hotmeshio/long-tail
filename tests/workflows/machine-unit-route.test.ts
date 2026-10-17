@@ -11,16 +11,17 @@ import * as userService from '../../services/user';
 import { eventRegistry } from '../../lib/events';
 import { systemEventsConfig } from '../../lib/events/system-events';
 import { machineUnitRoute } from '../../examples/workflows/machine-line';
-import { signalKeys } from '../../examples/workflows/machine-line/contracts';
+import { signalKeys } from '../../services/machines/contracts';
 import { lineSteps } from '../../examples/workflows/machine-line/workflows/route';
-import { CONTROLLER } from '../../examples/workflows/machine-line/gateway/actions';
-import { MachineGateway } from '../../examples/workflows/machine-line/gateway/gateway';
-import { silentLog } from '../../examples/workflows/machine-line/gateway/log';
-import { lineIdentities } from '../../examples/workflows/machine-line/gateway/provision';
+import { CONTROLLER } from '../../services/machines/gateway/actions';
+import { MachineGateway } from '../../services/machines/gateway/gateway';
+import { silentLog } from '../../services/machines/gateway/log';
+import { ensureLineBots } from '../../services/machines/identities';
+import { CallbackEventAdapter } from '../../lib/events/callback';
 import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
-import { lineFilter } from '../../examples/workflows/machine-line/protocol';
-import { MemoryEscalationFeed, MemoryMachineBus } from '../../examples/workflows/machine-line/transport';
-import { ApiLineEscalations } from '../helpers/machine-line-api-escalations';
+import { lineFilter } from '../../lib/machines/protocol';
+import { CallbackEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
+import { ApiLineEscalations } from '../../services/machines/gateway/api-escalations';
 import { ROOT, startHarness, type Harness } from '../helpers/machine-line-fixtures';
 import type { LTEscalationRecord } from '../../types';
 
@@ -67,17 +68,15 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     await migrate();
 
     const stamp = Date.now();
-    for (const identity of lineIdentities(LINE)) {
-      const user = await userService.createUser({ external_id: `${identity.botName}-${stamp}`, roles: identity.roles.map((role) => ({ role, type: 'member' as const })) });
-      users.set(identity.actor, user.id);
-    }
+    for (const [actor, id] of await ensureLineBots(LINE)) users.set(actor, id);
     const person = await userService.createUser({ external_id: `line-person-${stamp}`, roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }] });
     personId = person.id;
 
     line = await startHarness({ msPerSec: 2 }, LINE);
-    const feed = new MemoryEscalationFeed(line.broker);
-    eventRegistry.register({ connect: async () => undefined, disconnect: async () => undefined, publish: async (e) => feed.emit(e as any) });
+    const callbacks = new CallbackEventAdapter();
+    eventRegistry.register(callbacks);
     await eventRegistry.connect();
+    const feed = new CallbackEscalationFeed(callbacks, 50);
 
     // Workers first, as start() does: the engine they create carries the
     // system events hook that publishes each handoff row's created event.

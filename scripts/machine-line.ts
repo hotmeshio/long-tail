@@ -29,9 +29,9 @@ try { require('dotenv/config'); } catch { /* dotenv optional */ }
 
 import { connect, StringCodec } from 'nats';
 
-import { DECISION, LINE_ROLE, ROW_TYPE } from '../examples/workflows/machine-line/contracts';
+import { DECISION, LINE_ROLE, ROW_TYPE } from '../services/machines/contracts';
 import { loadLine } from '../examples/workflows/machine-line/line';
-import { MODE } from '../examples/workflows/machine-line/protocol';
+import { MODE } from '../lib/machines/protocol';
 import { UNIT_ROUTE_WORKFLOW, lineSteps, type UnitRouteInput } from '../examples/workflows/machine-line/workflows/route';
 
 const env = process.env;

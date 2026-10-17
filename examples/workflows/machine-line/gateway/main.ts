@@ -3,13 +3,13 @@
  * its bot account, then join the line's bus and Long Tail's escalation feed.
  */
 
-import { loadMachineLineConfig } from '../config';
+import { loadMachineLineConfig } from '../../../../services/machines/config';
 import { loadLine } from '../line';
-import { createEscalationFeed, createMachineBus } from '../transport';
-import type { Actor } from './actions';
-import { MachineGateway } from './gateway';
-import { HttpLineEscalations, LtHttp } from './lt-http';
-import { adminToken, provisionIdentities } from './provision';
+import { createEscalationFeed, createMachineBus } from '../../../../services/machines/select';
+import type { Actor } from '../../../../services/machines/gateway/actions';
+import { MachineGateway } from '../../../../services/machines/gateway/gateway';
+import { HttpLineEscalations, LtHttp } from '../../../../services/machines/gateway/lt-http';
+import { adminToken, provisionIdentities } from '../../../../services/machines/gateway/provision';
 
 const LOGIN_ATTEMPTS = 30;
 const LOGIN_RETRY_MS = 2_000;

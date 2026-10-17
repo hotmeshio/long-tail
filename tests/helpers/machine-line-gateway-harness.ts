@@ -4,15 +4,16 @@
  * handoff row and wait for it to end.
  */
 
-import { MachineGateway, type GatewaySettings } from '../../examples/workflows/machine-line/gateway/gateway';
-import { silentLog } from '../../examples/workflows/machine-line/gateway/log';
-import { LINE_ROLE, type HandoffFacets } from '../../examples/workflows/machine-line/contracts';
-import { DEFAULT_LINE, machineById, stationRole, type LineDef } from '../../examples/workflows/machine-line/line';
-import { lineFilter } from '../../examples/workflows/machine-line/protocol';
-import { MemoryEscalationFeed, MemoryMachineBus } from '../../examples/workflows/machine-line/transport';
-import { FakeLongTail, type FakeRow } from './machine-line-lt-fake';
+import { MachineGateway, type GatewaySettings } from '../../services/machines/gateway/gateway';
+import { silentLog } from '../../services/machines/gateway/log';
+import { LINE_ROLE, type HandoffFacets } from '../../services/machines/contracts';
+import { machineById, stationRole, type LineDef } from '../../lib/machines/line';
+import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
+import { lineFilter } from '../../lib/machines/protocol';
+import { MemoryEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
+import { FakeLongTail, type FakeRow } from '../../services/machines/testing/fake-long-tail';
 import { ROOT, startHarness, type Harness } from './machine-line-fixtures';
-import type { MockSettings } from '../../examples/workflows/machine-line/mock';
+import type { MockSettings } from '../../services/machines/testing/mock';
 
 export const GATEWAY_SETTINGS: GatewaySettings = {
   topicRoot: ROOT,

@@ -11,9 +11,10 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { loadMachineLineConfig } from '../config';
-import { clientIds, controllerId, loadLine } from '../line';
-import { renderSiteConf } from './site-conf';
+import { loadMachineLineConfig } from '../../../../services/machines/config';
+import { clientIds, controllerId } from '../../../../lib/machines/line';
+import { loadLine } from '../line';
+import { renderSiteConf } from '../../../../lib/machines/site/site-conf';
 
 const DAYS = '825';
 const SERVER_NAMES = (process.env.MACHINE_SITE_HOSTNAMES ?? 'site-nats,localhost').split(',');

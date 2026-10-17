@@ -3,8 +3,8 @@
  * route, the row each hop parks, and what a finished row means.
  */
 
-import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../contracts';
-import { stationRole, type LineDef } from '../line';
+import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
+import { stationRole, type LineDef } from '../../../../lib/machines/line';
 
 export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
 

@@ -1,6 +1,8 @@
 # Machine line override: a site broker (NATS with JetStream and an MQTT TLS
-# listener) joined to Long Tail's NATS as a leafnode, the mock line, and the
-# gateway that resolves escalation rows as each machine.
+# listener) joined to Long Tail's NATS as a leafnode, and the mock line.
+# Long Tail runs the gateway in process (start({ machines })), resolving
+# escalation rows as each machine; `--profile standalone-gateway` runs it as
+# its own service over the HTTP API instead.
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml up -d --build
 # Then drive it:
@@ -9,7 +11,7 @@
 x-machine-env: &machine-env
   MACHINE_TRANSPORT: nats
   MACHINE_TOPIC_ROOT: ${MACHINE_TOPIC_ROOT:-line/v1}
-  MACHINE_LINE_CONFIG: ${MACHINE_LINE_CONFIG:-}
+  MACHINE_LINE_CONFIG: ${MACHINE_LINE_CONFIG:-/app/examples/workflows/machine-line/demo-line.json}
   MACHINE_SITE_NATS_URL: nats://site-nats:4222
   MACHINE_SITE_NATS_USER: line-gateway
   MACHINE_SITE_NATS_PASSWORD: ${MACHINE_SITE_NATS_PASSWORD:-dev_gateway_secret}
@@ -19,6 +21,15 @@ x-machine-env: &machine-env
   MACHINE_MQTT_KEY: /etc/site/certs/{clientId}.key
 
 services:
+  long-tail:
+    environment:
+      <<: *machine-env
+    volumes:
+      - ./deploy/machine-site:/etc/site:ro
+    depends_on:
+      site-nats:
+        condition: service_healthy
+
   nats:
     environment:
       - MACHINE_LEAF_PASSWORD=${MACHINE_LEAF_PASSWORD:-dev_leaf_secret}
@@ -85,6 +96,7 @@ services:
         condition: service_healthy
 
   machine-gateway:
+    profiles: ["standalone-gateway"]
     build:
       context: .
       target: development

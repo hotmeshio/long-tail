@@ -6,12 +6,12 @@
  *   MACHINE_MQTT_CERT=/certs/{clientId}.pem ... npx ts-node examples/workflows/machine-line/mock/main.ts
  */
 
-import { loadMachineLineConfig } from '../config';
+import { loadMachineLineConfig } from '../../../../services/machines/config';
 import { loadLine } from '../line';
-import { createLinkFactory } from '../transport';
-import { startDrillServer } from './drills';
-import { MockLine } from './mock-line';
-import { mockSettingsFromEnv } from './settings';
+import { createLinkFactory } from '../../../../services/machines/select';
+import { startDrillServer } from '../../../../services/machines/testing/mock/drills';
+import { MockLine } from '../../../../services/machines/testing/mock/mock-line';
+import { mockSettingsFromEnv } from '../../../../services/machines/testing/mock/settings';
 
 async function main(): Promise<void> {
   // 1. Config, line and links

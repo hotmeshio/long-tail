@@ -7,7 +7,7 @@
  */
 
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
-import { DECISION, LINE_ROLE, ROW_TYPE, signalKeys, type OperatorResolution } from '../contracts';
+import { DECISION, LINE_ROLE, ROW_TYPE, signalKeys, type OperatorResolution } from '../../../../services/machines/contracts';
 import type { LTEnvelope } from '../../../../types';
 import { UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, planHops, readHopOutcome, type Hop, type HopOutcome, type UnitRouteInput } from './route';
 

@@ -4,14 +4,16 @@
  * publishes, and a tiny controller that sends commands and waits for replies.
  */
 
+import { sleep, until } from '../../services/machines/testing/wait';
 import { randomUUID } from 'crypto';
 
-import { DEFAULT_LINE, identOf, machineById, type LineDef } from '../../examples/workflows/machine-line/line';
-import { DEFAULT_MOCK_SETTINGS, MockLine, type MockSettings } from '../../examples/workflows/machine-line/mock';
+import { identOf, machineById, type LineDef } from '../../lib/machines/line';
+import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
+import { DEFAULT_MOCK_SETTINGS, MockLine, type MockSettings } from '../../services/machines/testing/mock';
 import {
   CHANNEL, buildEnvelope, inspectMessage, lineFilter, machineTopic, type Envelope, type Inspection,
-} from '../../examples/workflows/machine-line/protocol';
-import { MemoryBroker, MemoryMachineLink } from '../../examples/workflows/machine-line/transport';
+} from '../../lib/machines/protocol';
+import { MemoryBroker, MemoryMachineLink } from '../../lib/machines/transport';
 
 export const ROOT = 'line/v1';
 
@@ -27,7 +29,6 @@ export const FAST: MockSettings = {
   handshakeTimeoutSec: 20,
 };
 
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface Seen extends Inspection {
   topic: string;
@@ -107,12 +108,5 @@ export function dispatchArgs(machineId: string, units: string | string[], extra:
 }
 
 /** Wait until `check` returns truthy or the budget runs out. */
-export async function until<T>(check: () => T | undefined | null | false, ms = 500): Promise<T> {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    const value = check();
-    if (value) return value;
-    await sleep(2);
-  }
-  throw new Error('condition not met in time');
-}
+
+export { sleep, until };

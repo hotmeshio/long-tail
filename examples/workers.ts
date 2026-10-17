@@ -34,7 +34,7 @@ import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import * as printerTwinWorkflow from './workflows/printer-twin';
 import * as fleetToolsWorkflow from './workflows/fleet-tools';
 import * as machineLineWorkflow from './workflows/machine-line';
-import { LINE_ROLE } from './workflows/machine-line/contracts';
+import { LINE_ROLE } from '../services/machines/contracts';
 import { FLEET_TOOLS_INPUT_SCHEMA, FLEET_TOOLS_ENVELOPE_METADATA, FLEET_SERIALS_LOOKUP, FLEET_MATERIALS_LOOKUP } from './workflows/fleet-tools/forms';
 import { WORKFLOW_ICONS } from '../types/workflow-icons';
 import {
