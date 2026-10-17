@@ -38,6 +38,7 @@ export function facetsFor(units: string | string[], from: string | null, to: str
   const def = to ? machineById(DEFAULT_LINE, to) : null;
   const [recipeId, versions] = def ? Object.entries(def.recipes)[0] : [null, []];
   return {
+    siteId: DEFAULT_LINE.siteId, lineId: DEFAULT_LINE.lineId,
     units: ids.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })),
     jobId: `${ids[0]}-${to ?? 'exit'}`, senderJobId: from ? `${ids[0]}-${from}` : null, orderRef: 'ORD-1',
     fromMachine: from, toMachine: to, recipeId, recipeVersion: versions[versions.length - 1] ?? null,

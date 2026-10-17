@@ -159,7 +159,7 @@ export class Executor {
     const { id } = await this.d.lt.create(CONTROLLER, {
       type: ROW_TYPE.MACHINE_QUIET, role: LINE_ROLE.OPERATOR, priority: 2,
       description: `${machineId} is connected but has sent nothing for ${Math.round(silentMs / 1000)} s`,
-      metadata: { machineId, silentMs },
+      metadata: { siteId: this.d.line.siteId, lineId: this.d.line.lineId, machineId, silentMs },
     });
     this.d.log.info(GATEWAY_LOG.QUIET_ROW, { row: id, machine: machineId });
     this.d.state.link(machineId).quietRowId = id;
@@ -182,7 +182,7 @@ export class Executor {
     const { id } = await this.d.lt.create(CONTROLLER, {
       type: ROW_TYPE.MACHINE_OFFLINE, role: LINE_ROLE.OPERATOR, priority: 2,
       description: `${machineId} has been offline since ${since}`,
-      metadata: { machineId, offlineSince: since },
+      metadata: { siteId: this.d.line.siteId, lineId: this.d.line.lineId, machineId, offlineSince: since },
     });
     this.d.log.info(GATEWAY_LOG.OFFLINE_ROW, { row: id, machine: machineId });
     if (!link.online) link.rowId = id;

@@ -18,7 +18,13 @@ export function cancelSender(row: HandoffRow): Action[] {
   }];
 }
 
-/** End a handoff without a receipt: resolve it with the error, then withdraw the dispatch. */
-export function failHandoff(row: HandoffRow, as: Actor, resolution: HandoffResolution): Action[] {
-  return [{ kind: 'resolve', as, rowId: row.id, payload: { ...resolution } }, ...cancelDispatch(row)];
+/**
+ * End a handoff without a receipt: resolve it with the error, then withdraw the
+ * dispatch. A row the receiver has claimed is resolved by the receiver (only the
+ * claimant may resolve a claimed row); `reportedBy` names who saw the failure.
+ */
+export function failHandoff(row: HandoffRow, reporter: Actor, resolution: HandoffResolution): Action[] {
+  const claimant = row.dispatch === DISPATCH_STATE.ACCEPTED && row.toMachine ? row.toMachine : reporter;
+  const payload = claimant === reporter ? { ...resolution } : { ...resolution, reportedBy: reporter };
+  return [{ kind: 'resolve', as: claimant, rowId: row.id, payload }, ...cancelDispatch(row)];
 }

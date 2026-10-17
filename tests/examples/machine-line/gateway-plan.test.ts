@@ -34,6 +34,12 @@ describe('planner: rows that are not there yet, or anymore', () => {
     expect(again).toEqual([]);
   });
 
+  it('ignores rows that belong to another line', () => {
+    const state = new GatewayState();
+    expect(created(state, 'e7', null, 'press-01', { lineId: 'line-2' })).toEqual([]);
+    expect(state.get('e7')).toBeUndefined();
+  });
+
   it('does not dispatch a handoff to a person', () => {
     const state = new GatewayState();
     expect(created(state, 'e9', 'inspect-01', null)).toEqual([]);

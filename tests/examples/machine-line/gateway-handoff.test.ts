@@ -79,7 +79,9 @@ describe('gateway: error roads', () => {
     await rig.handoff('U1', null, 'press-01');
     rig.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
     const ended = await rig.handoff('U1', 'press-01', 'cut-01');
-    expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', reason: 'BOND-WEAK' });
+    // The receiver holds the claim, so it resolves; the payload names the sender that reported it.
+    expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', reason: 'BOND-WEAK', reportedBy: 'press-01' });
+    expect(ended.resolved_by).toBe('cut-01');
     await until(() => rig.recorder.commands('cut-01', OP.CANCEL)[0]);
   });
 

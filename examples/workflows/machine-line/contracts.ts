@@ -31,6 +31,9 @@ export interface HandoffUnit {
 
 /** Metadata on a handoff row. Everything a dispatch needs rides here. */
 export interface HandoffFacets {
+  /** The line the row belongs to; a gateway acts only on its own line's rows. */
+  siteId: string;
+  lineId: string;
   /** The units that move together as one job. */
   units: HandoffUnit[];
   /** The receiver's job for these units. */
@@ -65,6 +68,7 @@ export const HANDOFF_ERROR = {
   HANDOFF_TIMEOUT: 'handoff-timeout',
   SOFTWARE_UNSUPPORTED: 'software-unsupported',
   WITHDRAWN: 'withdrawn',
+  CANCELLED: 'cancelled',
   ...TRANSFER_FAILURE,
 } as const;
 export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];
@@ -77,6 +81,8 @@ export interface HandoffResolution {
   units?: string[];
   /** The unit that failed, on an error. */
   unitId?: string;
+  /** The machine that reported the error, when it is not the one resolving. */
+  reportedBy?: string;
   errorCode?: HandoffErrorCode;
   reason?: string | null;
   detail?: string;

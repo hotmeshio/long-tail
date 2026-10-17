@@ -20,6 +20,8 @@ export function handoffFromEvent(data: Record<string, any>): HandoffRow {
   return {
     id: data.id,
     role: data.role,
+    siteId: String(md.siteId ?? ''),
+    lineId: String(md.lineId ?? ''),
     units: Array.isArray(md.units) ? md.units : [],
     jobId: String(md.jobId),
     senderJobId: md.senderJobId ?? null,
@@ -53,8 +55,15 @@ export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs
   return { kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs) };
 }
 
+/** Rows for another line belong to that line's gateway. */
+function onThisLine(line: LineDef, data: Record<string, any>): boolean {
+  const md = data?.metadata ?? {};
+  return md.siteId === line.siteId && md.lineId === line.lineId;
+}
+
 export function planEscalationEvent(state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number): Action[] {
   const type = event.data?.type;
+  if (!onThisLine(line, event.data)) return [];
   if (type === ROW_TYPE.HANDOFF) return planHandoff(state, line, event, dispatchTtlMs);
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);

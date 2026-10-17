@@ -97,6 +97,8 @@ export class FakeLongTail implements LineEscalations {
     this.calls.push({ verb: 'resolve', as, id, payload });
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
+    // Long Tail refuses a resolve by id while someone else holds a live claim (409).
+    if (row.assigned_to && row.assigned_to !== as) return { outcome: VERB_OUTCOME.ALREADY, detail: 'claimed by another' };
     row.status = 'resolved';
     row.resolver_payload = payload;
     row.resolved_by = as;

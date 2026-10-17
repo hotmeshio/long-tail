@@ -36,7 +36,7 @@ function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: En
     case MESSAGE_KIND.JOB:
       return planJob(state, m, b, env?.at);
     case MESSAGE_KIND.ALARM:
-      return planAlarm(state, m, parsed.key ?? b.alarmId, env);
+      return planAlarm(state, parsed, parsed.key ?? b.alarmId, env);
     case MESSAGE_KIND.PRESENCE:
       return planPresence(state, m, b);
     case MESSAGE_KIND.SNAPSHOT:
@@ -109,7 +109,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
   return ack();
 }
 
-function planAlarm(state: GatewayState, m: string, alarmId: string, env: Envelope | null): Plan {
+function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, env: Envelope | null): Plan {
+  const { siteId, lineId, machineId: m } = parsed.ident;
   const key = state.alarmKey(m, alarmId);
   const b: Record<string, any> = env?.body ?? {};
   if (!env || b.active === false) {
@@ -129,7 +130,7 @@ function planAlarm(state: GatewayState, m: string, alarmId: string, env: Envelop
       type: ROW_TYPE.ALARM, subtype: b.level, role: LINE_ROLE.OPERATOR, priority: b.level === LEVEL.EMERGENCY ? 1 : 2,
       description: `${m}: ${b.text}`,
       metadata: {
-        machineId: m, alarmId, code: b.code, level: b.level, raisedAt: b.raisedAt,
+        siteId, lineId, machineId: m, alarmId, code: b.code, level: b.level, raisedAt: b.raisedAt,
         zone: b.zone ?? null, autoClears: b.autoClears ?? false, action: b.action ?? null, jobId: b.jobId ?? null,
       },
     },
