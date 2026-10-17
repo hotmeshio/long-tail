@@ -2,19 +2,26 @@
 
 HotMesh stores execution artifacts in PostgreSQL: stream messages that carry internal signals between activities, transient job rows that track bookkeeping for individual activity invocations, and entity job rows that represent durable workflow instances. Left unmanaged, these tables grow without bound. The maintenance system provides scheduled, rule-based cleanup that runs as a durable cron workflow inside HotMesh itself.
 
-A default configuration ships with Long Tail. It runs weekly, Sundays at 2 AM, applies five rules in sequence, and requires no setup. The schedule and rules can be replaced at startup or at runtime through the REST API.
+Maintenance is opt-in. A default configuration ships with Long Tail: pass `maintenance: true` to `start()` and it runs weekly, Sundays at 2 AM, applying five rules in sequence. A config object of your own replaces it, and the rules can be replaced at runtime through the REST API.
 
 ## Configuration via start()
 
-Maintenance is enabled by default when you call `start()`. To customize or disable it:
+`start()` registers maintenance only when its `maintenance` option asks for it:
+
+| `maintenance` | Effect |
+|---|---|
+| omitted or `false` | No maintenance runs. |
+| `true` | The default configuration (see [Default schedule](#default-schedule)). |
+| an `LTMaintenanceConfig` | That configuration, in place of the default. |
 
 ```typescript
 import { start } from '@hotmeshio/long-tail';
 
-// Default: nightly 2 AM cleanup (no config needed)
+// Default: Sundays at 2 AM
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   workers: [ ... ],
+  maintenance: true,
 });
 
 // Custom schedule and rules
@@ -22,6 +29,7 @@ await start({
   database: { connectionString: process.env.DATABASE_URL },
   workers: [ ... ],
   maintenance: {
+    appId: 'durable',
     schedule: '0 3 * * *',
     rules: [
       { target: 'streams', olderThan: '24 hours', action: 'delete' },
@@ -34,13 +42,14 @@ await start({
   },
 });
 
-// Disabled entirely
+// No maintenance: omit the option (or pass false)
 await start({
   database: { connectionString: process.env.DATABASE_URL },
   workers: [ ... ],
-  maintenance: false,
 });
 ```
+
+Maintenance starts once workers start, and not on a readonly instance.
 
 ## What gets cleaned
 
@@ -66,10 +75,11 @@ The intended lifecycle for an entity job is: execute, then prune after a short r
 
 ## Default schedule
 
-The built-in configuration (`modules/maintenance.ts`) runs Sundays at 2 AM and applies five rules in order:
+The default configuration (`modules/maintenance.ts`, enabled with `maintenance: true`) runs Sundays at 2 AM and applies five rules in order:
 
 ```typescript
 {
+  appId: 'durable',
   schedule: '0 2 * * 0',
   rules: [
     { target: 'streams', action: 'delete', olderThan: '30 days' },
@@ -112,6 +122,7 @@ Defined in `types/maintenance.ts`. Each rule describes a single cleanup operatio
 
 | Field | Type | Description |
 |---|---|---|
+| `appId` | `string` | The HotMesh application namespace to prune. The default configuration uses `'durable'`. |
 | `schedule` | `string` | A cron expression (`'0 2 * * *'`) or an interval string (`'1 day'`). Passed directly to `Virtual.cron` as the `interval` option. |
 | `rules` | `LTMaintenanceRule[]` | An ordered array of rules. Executed sequentially on each cron tick. |
 
@@ -123,14 +134,14 @@ The `maintenanceRegistry` singleton (`services/maintenance/index.ts`) follows th
 |---|---|
 | `register(config)` | Store a maintenance configuration. Replaces any previously registered config. Call before `connect()`. |
 | `connect()` | Start the `Virtual.cron` workflow that fires on the configured schedule. Idempotent -- given the same internal cron ID, duplicate calls do not create duplicate schedules. |
-| `disconnect()` | Cancel the running cron by calling `Virtual.interrupt`. Safe to call if no cron is running. |
+| `disconnect()` | Mark this registry disconnected, on graceful shutdown or before a reconfiguration. The durable cron job is left in place: it is shared by every container, and another container (or this one after a restart) keeps servicing it. |
 | `clear()` | Remove the config and reset internal state. Used in tests. |
 | `hasConfig` | Boolean property. `true` when a config has been registered. |
 | `config` | Returns the current `LTMaintenanceConfig` or `null`. |
 
 ## Programmatic registration
 
-For advanced use cases, you can register maintenance programmatically instead of through `start()`. The `start()` function handles this automatically when a `maintenance` config is provided (or uses the default when omitted):
+For advanced use cases, you can register maintenance programmatically instead of through `start()`. `start()` does this itself when `maintenance` is `true` (the default configuration) or a config object:
 
 ```typescript
 import { maintenanceRegistry, defaultMaintenanceConfig } from '@hotmeshio/long-tail';
@@ -144,6 +155,7 @@ To use a custom config instead, register it in place of the default:
 import { maintenanceRegistry } from '@hotmeshio/long-tail';
 
 maintenanceRegistry.register({
+  appId: 'durable',
   schedule: '0 3 * * 0',  // Sundays at 3 AM
   rules: [
     { target: 'streams', action: 'delete', olderThan: '14 days' },
@@ -154,7 +166,7 @@ maintenanceRegistry.register({
 });
 ```
 
-The registry accepts exactly one config at a time. Calling `register()` again overwrites the previous config. The cron does not start until `connect()` is called — which happens inside `start()` when `hasConfig` is `true`.
+The registry accepts exactly one config at a time. Calling `register()` again overwrites the previous config. The cron does not start until `connect()` is called, which `start()` does when `hasConfig` is `true`.
 
 ## Runtime API
 
@@ -162,12 +174,13 @@ The REST API allows administrators to replace the maintenance config while the s
 
 ### `GET /api/config/maintenance`
 
-Returns the current configuration and whether a cron is active.
+Returns the current configuration. `active` is `true` when a configuration is registered; `config` is `null` and `active` is `false` when none is.
 
 ```json
 {
   "config": {
-    "schedule": "0 2 * * *",
+    "appId": "durable",
+    "schedule": "0 2 * * 0",
     "rules": [ ... ]
   },
   "active": true
@@ -180,6 +193,7 @@ Admin-only (requires `requireAdmin` middleware). Accepts a full replacement conf
 
 ```json
 {
+  "appId": "durable",
   "schedule": "0 4 * * *",
   "rules": [
     { "target": "streams", "action": "delete", "olderThan": "3 days" },
@@ -192,11 +206,13 @@ Admin-only (requires `requireAdmin` middleware). Accepts a full replacement conf
 
 The endpoint performs three operations in sequence:
 
-1. **Disconnect** -- calls `maintenanceRegistry.disconnect()` to cancel the running cron via `Virtual.interrupt`.
+1. **Disconnect** -- calls `maintenanceRegistry.disconnect()`.
 2. **Register** -- calls `maintenanceRegistry.register()` with the new config.
-3. **Connect** -- calls `maintenanceRegistry.connect()` to start a new cron with the updated schedule and rules.
+3. **Connect** -- calls `maintenanceRegistry.connect()`, which registers this container's cron worker with the new rules.
 
-Returns the new config and `{ "restarted": true }` on success. Returns `400` if `schedule` or `rules` is missing, and `500` if any step fails.
+The new rules apply to the ticks this container runs. The configuration is held in memory: other containers keep the rules they started with, and a restart returns this one to its `start()` configuration. The schedule is fixed when the cron job is first created: an existing job keeps its schedule (see [How it works internally](#how-it-works-internally)).
+
+Returns the new config and `{ "restarted": true }` on success. Returns `400` if `appId`, `schedule` or `rules` is missing, and `500` if any step fails.
 
 ## Custom schedule example
 
@@ -206,6 +222,7 @@ A production deployment that processes high volumes might want aggressive short-
 import { maintenanceRegistry } from '@hotmeshio/long-tail';
 
 maintenanceRegistry.register({
+  appId: 'durable',
   schedule: '0 */6 * * *',  // every 6 hours
   rules: [
     { target: 'streams', action: 'delete', olderThan: '24 hours' },
@@ -223,8 +240,8 @@ This cleans streams and transient jobs within two days, prunes entity jobs after
 The maintenance system runs on top of HotMesh's `Virtual.cron`, the same primitive that powers durable recurring workflows throughout the platform.
 
 1. **Registration.** `maintenanceRegistry.register(config)` stores the config in memory. No I/O occurs.
-2. **Connection.** `maintenanceRegistry.connect()` calls `Virtual.cron()` with a fixed topic (`lt.maintenance.prune`) and a fixed cron ID (`lt-maintenance-nightly`). HotMesh persists the cron schedule in PostgreSQL, making it durable across restarts. If a cron with that ID already exists, it is replaced.
-3. **Execution.** On each tick of the schedule, the cron callback iterates the rules array. For each rule, it translates the rule's fields into the appropriate `dbaService.prune()` parameters and executes the call. Rules run sequentially; a failure in one rule is logged and does not prevent subsequent rules from running.
-4. **Disconnection.** `maintenanceRegistry.disconnect()` calls `Virtual.interrupt()` with the same topic and cron ID, which cancels the recurring schedule. This is called during graceful shutdown and before reconfiguration via the REST API.
+2. **Connection.** `maintenanceRegistry.connect()` calls `Virtual.cron()` with a fixed topic (`lt.maintenance.prune`) and a fixed cron ID (`lt-maintenance-nightly`). This registers the container's worker for the topic and starts the cron job. HotMesh persists the job in PostgreSQL, making it durable across restarts. If a job with that ID already exists, it keeps running on the schedule it was created with, and no second job starts.
+3. **Execution.** On each tick of the schedule, the worker that takes the tick runs its rules in order. Stream and job rules call `dbaService.prune()`; escalation rules call the escalation client's batched prune until the window is drained; the `oauth` rule calls the OAuth server prune. A failure in one rule is logged and does not prevent subsequent rules from running.
+4. **Disconnection.** `maintenanceRegistry.disconnect()` marks the registry disconnected, during graceful shutdown and before reconfiguration via the REST API. It does not interrupt the cron job, which other containers keep servicing.
 
 Because the cron is itself a durable workflow, the schedule survives process restarts. If the server goes down at 2 AM and comes back at 2:05 AM, the missed tick executes on reconnection.
