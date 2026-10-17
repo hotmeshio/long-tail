@@ -176,6 +176,7 @@ export type {
   LTAgentConfig,
   LTTopicConfig,
   LTRoleConfig,
+  LTMachinesConfig,
   LTScanSchemeConfig,
   LTScanRuleConfig,
 } from './startup';
@@ -295,3 +296,23 @@ export type {
 
 export { WORKFLOW_ICONS, isWorkflowIcon } from './workflow-icons';
 export type { WorkflowIconName } from './workflow-icons';
+
+export type {
+  MachineDisposition,
+  MachineIdent,
+  Envelope as MachineEnvelope,
+  MaterialDef,
+  MeasurementDef,
+  MachineDef,
+  LineDef,
+  InboundMessage as MachineInboundMessage,
+  LinkWill,
+  PublishOptions as MachinePublishOptions,
+  LinkConnectOptions,
+  MachineLink,
+  MachineBus,
+  EscalationEvent as MachineEscalationEvent,
+  EscalationFeed as MachineEscalationFeed,
+  MqttEndpoint,
+} from './machines';
+

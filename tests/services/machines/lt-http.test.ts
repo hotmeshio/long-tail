@@ -1,0 +1,97 @@
+import { describe, it, expect, afterEach } from 'vitest';
+
+import { HttpLineEscalations, LtHttp, LtHttpError } from '../../../services/machines/gateway/lt-http';
+import { FakeLtServer } from '../../helpers/machine-line-lt-server';
+
+let server: FakeLtServer;
+afterEach(async () => server?.stop());
+
+const tokens: Record<string, string> = { controller: 'tok-controller', 'press-01': 'tok-press' };
+const client = (s: FakeLtServer, timeoutMs?: number) => new HttpLineEscalations(new LtHttp(s.baseUrl, timeoutMs), (a) => tokens[a]);
+
+describe('Long Tail HTTP client', () => {
+  it('runs each verb with the bearer token of the actor it runs as', async () => {
+    server = await new FakeLtServer().on('POST', /\/claim$/, () => ({ status: 200, body: { ok: true } })).start();
+    expect(await client(server).claim('press-01', 'e1')).toEqual({ outcome: 'done' });
+    expect(server.seen[0]).toMatchObject({ path: '/escalations/e1/claim', auth: 'Bearer tok-press', body: { durationMinutes: 1440 } });
+  });
+
+  it('maps 404 and 409 to already, 422 to invalid', async () => {
+    server = await new FakeLtServer()
+      .on('POST', /e404\/resolve$/, () => ({ status: 404, body: { error: 'Escalation not found' } }))
+      .on('POST', /e409\/resolve$/, () => ({ status: 409, body: { error: 'already resolved' } }))
+      .on('POST', /e422\/resolve$/, () => ({ status: 422, body: { code: 'schema_validation' } }))
+      .start();
+    const lt = client(server);
+    expect((await lt.resolve('controller', 'e404', {})).outcome).toBe('already');
+    expect((await lt.resolve('controller', 'e409', {})).outcome).toBe('already');
+    expect(await lt.resolve('controller', 'e422', { decision: 'x' })).toMatchObject({ outcome: 'invalid', detail: expect.stringContaining('schema_validation') });
+    expect(server.seen[2].body).toEqual({ resolverPayload: { decision: 'x' } });
+  });
+
+  it('throws a typed error with status, body and request on any other failure', async () => {
+    server = await new FakeLtServer().on('POST', /accumulate$/, () => ({ status: 500, body: { error: 'boom' } })).start();
+    const err = await client(server).accumulate('press-01', 'e1', 'arrived:U1', {}).catch((e) => e);
+    expect(err).toBeInstanceOf(LtHttpError);
+    expect(err).toMatchObject({ status: 500, body: { error: 'boom' }, context: { method: 'POST', path: '/escalations/e1/accumulate' } });
+  });
+
+  it('times out with AbortController and reports no status', async () => {
+    server = await new FakeLtServer().on('GET', /items$/, () => new Promise((r) => setTimeout(() => r({ status: 200, body: { items: [] } }), 200))).start();
+    const err = await client(server, 30).itemKeys('e1').catch((e) => e);
+    expect(err).toBeInstanceOf(LtHttpError);
+    expect(err.status).toBeUndefined();
+    expect(err.message).toMatch(/timed out after 30 ms/);
+  });
+
+  it('creates rows, reads item keys and lists open rows as the controller', async () => {
+    server = await new FakeLtServer()
+      .on('POST', /^\/escalations$/, () => ({ status: 201, body: { id: 'e9' } }))
+      .on('GET', /\/items$/, () => ({ status: 200, body: { items: [{ itemKey: 'arrived:U1' }, { itemKey: 'released:U1' }] } }))
+      .on('GET', /^\/escalations\?/, () => ({ status: 200, body: { escalations: [{ id: 'e1', type: 'handoff' }], total: 1 } }))
+      .start();
+    const lt = client(server);
+    expect(await lt.create('controller', { type: 'line-alarm', role: 'line-operator', description: 'd', priority: 1, metadata: {} })).toEqual({ id: 'e9' });
+    expect(await lt.itemKeys('e1')).toEqual(['arrived:U1', 'released:U1']);
+    expect(await lt.listOpen({ type: 'handoff' })).toEqual([{ id: 'e1', type: 'handoff' }]);
+    expect(server.seen[2].path).toBe('/escalations?type=handoff&status=pending&limit=500&offset=0&sort_by=created_at&order=asc');
+    expect(server.seen.every((s) => s.auth === 'Bearer tok-controller')).toBe(true);
+  });
+
+  it('sends an accumulate metadata patch in the body, and none when there is none', async () => {
+    server = await new FakeLtServer().on('POST', /accumulate$/, () => ({ status: 200, body: { outcome: 'accepted' } })).start();
+    const lt = client(server);
+    await lt.accumulate('press-01', 'e1', 'released:U1', { result: 'ok' }, { lots: ['L-1'] });
+    await lt.accumulate('press-01', 'e1', 'arrived:U1', {});
+    expect(server.seen[0].body).toEqual({ itemKey: 'released:U1', payload: { result: 'ok' }, metadata: { lots: ['L-1'] } });
+    expect(server.seen[1].body).toEqual({ itemKey: 'arrived:U1', payload: {} });
+  });
+
+  it('reads every page of open rows, oldest first', async () => {
+    const page = (offset: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${offset + i}` }));
+    server = await new FakeLtServer()
+      .on('GET', /offset=0&/, () => ({ status: 200, body: { escalations: page(0, 500) } }))
+      .on('GET', /offset=500&/, () => ({ status: 200, body: { escalations: page(500, 3) } }))
+      .start();
+    const rows = await client(server).listOpen({ type: 'handoff' });
+    expect(rows).toHaveLength(503);
+    expect(rows[502]).toEqual({ id: 'e502' });
+    expect(server.seen).toHaveLength(2);
+  });
+
+  it('reads one row as the controller; not found or not readable is null, and a non-uuid id is never sent', async () => {
+    const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+    const hidden = '9b2f6f4e-1d3c-4a5b-8e7f-0a1b2c3d4e5f';
+    server = await new FakeLtServer()
+      .on('GET', new RegExp(`${id}$`), () => ({ status: 200, body: { id, role: 'line-bond', status: 'pending' } }))
+      .on('GET', new RegExp(`${hidden}$`), () => ({ status: 403, body: { error: 'Forbidden' } }))
+      .start();
+    const lt = client(server);
+    expect(await lt.get(id)).toEqual({ id, role: 'line-bond', status: 'pending' });
+    expect(server.seen[0]).toMatchObject({ path: `/escalations/${id}`, auth: 'Bearer tok-controller' });
+    expect(await lt.get(hidden)).toBeNull();
+    expect(await lt.get('../users')).toBeNull();
+    expect(server.seen).toHaveLength(2);
+  });
+});
+

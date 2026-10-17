@@ -1,0 +1,134 @@
+# Machine line override: machines speak MQTT 5 to a machine broker
+# (Mosquitto, client certificates), which bridges the line's topics into a
+# site NATS (JetStream) of its own; and the mock line.
+# Long Tail runs the gateway in process (start({ machines })), resolving
+# escalation rows as each machine; `--profile standalone-gateway` runs it as
+# its own service over the HTTP API instead.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml up -d --build
+# Then drive it:
+#   npm run machine:line
+
+x-machine-env: &machine-env
+  MACHINE_TRANSPORT: nats
+  MACHINE_TOPIC_ROOT: ${MACHINE_TOPIC_ROOT:-line/v1}
+  MACHINE_LINE_CONFIG: ${MACHINE_LINE_CONFIG:-/app/examples/workflows/machine-line/factory-line.json}
+  MACHINE_SITE_NATS_URL: nats://site-nats:4222
+  MACHINE_SITE_NATS_USER: line-gateway
+  MACHINE_SITE_NATS_PASSWORD: ${MACHINE_SITE_NATS_PASSWORD:-dev_gateway_secret}
+  MACHINE_MQTT_URL: mqtts://machine-broker:8883
+  MACHINE_MQTT_PROTOCOL: "5"
+  MACHINE_MQTT_CA: /etc/site/certs/ca.pem
+  MACHINE_MQTT_CERT: /etc/site/certs/{clientId}.pem
+  MACHINE_MQTT_KEY: /etc/site/certs/{clientId}.key
+
+services:
+  long-tail:
+    environment:
+      <<: *machine-env
+    volumes:
+      - ./deploy/machine-site:/etc/site:ro
+    depends_on:
+      machine-broker:
+        condition: service_healthy
+
+  machine-site:
+    build:
+      context: .
+      target: development
+    entrypoint: []
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      <<: *machine-env
+      MACHINE_SITE_DIR: /app/deploy/machine-site
+    command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/site/setup.ts"]
+
+  site-nats:
+    image: nats:2.14-alpine
+    ports:
+      - "${MACHINE_SITE_NATS_PORT:-4223}:4222"
+      - "${MACHINE_SITE_MONITOR_PORT:-8223}:8222"
+    volumes:
+      - ./deploy/machine-site:/etc/site:ro
+      - machine-site-js:/data
+    command: ["-c", "/etc/site/site.conf"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider 'http://localhost:8222/healthz?js-enabled-only=true' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      machine-site:
+        condition: service_completed_successfully
+
+  machine-broker:
+    image: eclipse-mosquitto:2.0.20
+    ports:
+      - "${MACHINE_MQTT_PORT:-8883}:8883"
+    volumes:
+      - ./deploy/machine-site/mosquitto:/mosquitto/config:ro
+      - ./deploy/machine-site/certs:/certs:ro
+      - machine-broker-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 8883"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      site-nats:
+        condition: service_healthy
+
+  machine-mock:
+    build:
+      context: .
+      target: development
+    entrypoint: []
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./deploy/machine-site:/etc/site:ro
+    ports:
+      - "${MACHINE_MOCK_PORT:-8090}:8090"
+    environment:
+      <<: *machine-env
+      MOCK_LINE_PORT: 8090
+      MOCK_LINE_PUBLIC_URL: http://machine-mock:8090
+      MOCK_LINE_START_ENABLED: "true"
+      MOCK_LINE_MS_PER_SEC: ${MOCK_LINE_MS_PER_SEC:-1000}
+    command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/mock/main.ts"]
+    restart: unless-stopped
+    depends_on:
+      machine-broker:
+        condition: service_healthy
+
+  machine-gateway:
+    profiles: ["standalone-gateway"]
+    build:
+      context: .
+      target: development
+    entrypoint: []
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./deploy/machine-site:/etc/site:ro
+    environment:
+      <<: *machine-env
+      LT_BASE_URL: http://long-tail:3000
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: ${NATS_TOKEN:-dev_api_secret}
+      LT_GATEWAY_USERNAME: ${LT_GATEWAY_USERNAME:-superadmin}
+      LT_GATEWAY_PASSWORD: ${LT_GATEWAY_PASSWORD:-l0ngt@1l}
+      MACHINE_HANDOFF_TIMEOUT: ${MACHINE_HANDOFF_TIMEOUT:-10m}
+    command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/gateway/main.ts"]
+    restart: unless-stopped
+    depends_on:
+      machine-broker:
+        condition: service_healthy
+      long-tail:
+        condition: service_started
+
+volumes:
+  machine-site-js:
+  machine-broker-data:

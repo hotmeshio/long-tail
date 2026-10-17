@@ -10,6 +10,9 @@ import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
 import type { LTLoggerAdapter } from './logger';
+import type { LineDef } from './machines';
+import type { LineCodec } from '../lib/machines/protocol/codec';
+import type { HandoffRowAdapter } from '../services/machines/rows';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
@@ -208,6 +211,19 @@ export interface LTTopicConfig {
  * code-owned roles are compared and applied on every boot; db-owned roles
  * receive their metadata once at creation and belong to the DB afterward.
  */
+export interface LTMachinesConfig {
+  /** The lines this deployment controls. */
+  lines: LineDef[];
+  /** Transport settings; defaults to process.env. */
+  env?: Record<string, string | undefined>;
+  /** Declare each line's station, exit and operator roles where `roles` does not. Default true. */
+  declareRoles?: boolean;
+  /** The machines' wire protocol; the generic line protocol under MACHINE_TOPIC_ROOT by default. */
+  codec?: LineCodec;
+  /** Reads the host's rows into machine handoffs; the standard handoff facets by default. */
+  rows?: HandoffRowAdapter;
+}
+
 export interface LTRoleConfig {
   role: string;
   title?: string;
@@ -589,6 +605,15 @@ export interface LTStartConfig {
    * escalation targets, and ops dials, owned per `configSource`.
    */
   roles?: LTRoleConfig[];
+
+  /**
+   * Machines as resolvers. For each line, one replica runs a gateway that
+   * reads the line's machines over MQTT and resolves the escalation rows
+   * parked on its machine roles, as each machine's bot account. Workflows
+   * park the same rows they park for people. Transports are chosen by
+   * MACHINE_* environment variables (see services/machines/config.ts).
+   */
+  machines?: LTMachinesConfig;
 
   /**
    * Declarative scan schemes (with their rules), owned per `configSource` /

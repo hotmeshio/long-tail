@@ -1,0 +1,147 @@
+{
+  "siteId": "site-1",
+  "lineId": "line-1",
+  "machines": [
+    {
+      "machineId": "press-01",
+      "process": "bond",
+      "carrier": "bind",
+      "description": "Bonds a top layer onto the part and seats it on a carrier plate",
+      "cycleSec": 8,
+      "changeoverSec": 3,
+      "progressEverySec": 4,
+      "rejectReason": "BOND-WEAK",
+      "recipes": {
+        "RCP-BOND-A": [
+          "1",
+          "2"
+        ]
+      },
+      "materials": [
+        {
+          "material": "BONDING-FILM",
+          "lot": "L-1001"
+        },
+        {
+          "material": "TOP-LAYER",
+          "lot": "L-1002"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "temperature_c",
+          "target": 120,
+          "unit": "C",
+          "min": 115,
+          "max": 125,
+          "noise": 1
+        },
+        {
+          "name": "pressure_kpa",
+          "target": 300,
+          "unit": "kPa",
+          "min": 280,
+          "max": 320,
+          "noise": 5
+        },
+        {
+          "name": "dwell_s",
+          "target": 6,
+          "unit": "s",
+          "min": 5.5,
+          "max": 7,
+          "noise": 0.1
+        }
+      ],
+      "faults": {
+        "F-101": "Feeder stalled",
+        "F-102": "Heater out of range"
+      }
+    },
+    {
+      "machineId": "cut-01",
+      "process": "trim",
+      "carrier": "release",
+      "description": "Trims the part to its outline and frees the carrier plate",
+      "cycleSec": 6,
+      "changeoverSec": 3,
+      "rejectReason": "EDGE-OUT",
+      "recipes": {
+        "RCP-TRIM-A": [
+          "1"
+        ]
+      },
+      "materials": [
+        {
+          "material": "CUTTER",
+          "lot": "L-2001"
+        }
+      ],
+      "measurements": [
+        {
+          "name": "cut_force_n",
+          "target": 900,
+          "unit": "N",
+          "min": 800,
+          "max": 1000,
+          "noise": 15
+        },
+        {
+          "name": "feed_mm_s",
+          "target": 50,
+          "unit": "mm/s",
+          "min": 45,
+          "max": 55,
+          "noise": 0.8
+        }
+      ],
+      "faults": {
+        "F-201": "Cutter dull",
+        "F-202": "Fixture not seated"
+      }
+    },
+    {
+      "machineId": "inspect-01",
+      "process": "inspect",
+      "carrier": "none",
+      "description": "Measures and images the finished part",
+      "cycleSec": 4,
+      "changeoverSec": 2,
+      "rejectReason": "DIM-FAIL",
+      "recipes": {
+        "RCP-INSPECT-A": [
+          "1"
+        ]
+      },
+      "materials": [],
+      "measurements": [
+        {
+          "name": "length_mm",
+          "target": 250,
+          "unit": "mm",
+          "min": 249,
+          "max": 251,
+          "noise": 0.3
+        },
+        {
+          "name": "width_mm",
+          "target": 90,
+          "unit": "mm",
+          "min": 89.5,
+          "max": 90.5,
+          "noise": 0.15
+        },
+        {
+          "name": "image_score",
+          "target": 0.95,
+          "min": 0.9,
+          "max": 1,
+          "noise": 0.005
+        }
+      ],
+      "faults": {
+        "F-301": "Camera not ready"
+      }
+    }
+  ]
+}

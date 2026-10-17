@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -49,6 +49,7 @@
     "demo": "bash scripts/demo.sh",
     "ortho:populate": "ts-node scripts/ortho-populate.ts",
     "twin:farm": "ts-node scripts/twin-farm.ts",
+    "machine:line": "ts-node scripts/machine-line.ts",
     "printers:cycle": "ts-node scripts/printer-cycle.ts",
     "consolidation:sim": "ts-node scripts/consolidation-sim.ts",
     "dashboard:install": "cd dashboard && npm install",
@@ -111,11 +112,20 @@
     "@types/node": "^20.19.33",
     "@types/pg": "^8.10.0",
     "dotenv": "^16.3.1",
+    "mqtt": "^5.16.1",
     "rimraf": "^4.4.1",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.4",
     "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "mqtt": "^5.16.1"
+  },
+  "peerDependenciesMeta": {
+    "mqtt": {
+      "optional": true
+    }
   }
 }

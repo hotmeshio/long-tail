@@ -3,6 +3,9 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { loggerRegistry } from '../lib/logger';
 import { telemetryRegistry } from '../lib/telemetry';
 import { eventRegistry } from '../lib/events';
+import { CallbackEventAdapter } from '../lib/events/callback';
+import { MachineSurface } from '../services/machines/surface';
+import { withMachineRoles } from '../services/machines/roles';
 import { maintenanceRegistry } from '../services/maintenance';
 import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
@@ -72,8 +75,16 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   loggerRegistry.info('[long-tail] starting...');
 
   // 4-5. Collect workers, run migrations, start workers, seed data
+  if (startConfig.machines && startConfig.machines.declareRoles !== false) {
+    startConfig = { ...startConfig, roles: withMachineRoles(startConfig.roles, startConfig.machines.lines) };
+  }
   const { workers, builtinMcpServerFactories } = await collectWorkers(startConfig);
   const { adminUserId } = await startWorkers(startConfig, workers, builtinMcpServerFactories);
+
+  // 5b. Machines, after the workers exist so their rows publish lifecycle events
+  const machines = startConfig.machines
+    ? MachineSurface.start({ ...startConfig.machines, callbacks: eventRegistry.getAdapter(CallbackEventAdapter) })
+    : null;
 
   // 6. Start embedded server (if enabled)
   const serverEnabled = startConfig.server?.enabled !== false;
@@ -92,6 +103,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     loggerRegistry.info('[long-tail] shutting down...');
     if (httpServer) {
       await new Promise<void>((resolve) => httpServer!.close(() => resolve()));
+    }
+    if (machines) {
+      await machines.stop();
     }
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.disconnect();
