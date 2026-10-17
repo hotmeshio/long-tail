@@ -2,17 +2,17 @@ import { describe, it, expect } from 'vitest';
 
 import { loadMachineLineConfig } from '../../../services/machines/config';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
-import { CoreEscalationFeed, JetStreamEscalationFeed, MqttMachineBus, MqttMachineLink, NatsMachineBus } from '../../../lib/machines/transport';
+import { CoreEscalationFeed, MqttMachineBus, MqttMachineLink, NatsMachineBus } from '../../../lib/machines/transport';
 import { createEscalationFeed, createLinkFactory, createMachineBus } from '../../../services/machines/select';
 
-const NATS = { MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883' };
+const NATS = { MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883', NATS_URL: 'nats://lt:4222' };
 const MQTT = { MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtts://broker:8883', NATS_URL: 'nats://lt:4222' };
 
 describe('transport selection', () => {
-  it('nats: JetStream bus and feed on the site broker, MQTT links for machines', () => {
+  it('nats: JetStream bus on the site broker, Long Tail NATS core feed, MQTT links for machines', () => {
     const config = loadMachineLineConfig(NATS);
     expect(createMachineBus(config, DEFAULT_LINE)).toBeInstanceOf(NatsMachineBus);
-    expect(createEscalationFeed(config, DEFAULT_LINE)).toBeInstanceOf(JetStreamEscalationFeed);
+    expect(createEscalationFeed(config, DEFAULT_LINE)).toBeInstanceOf(CoreEscalationFeed);
     expect(createLinkFactory(config)()).toBeInstanceOf(MqttMachineLink);
   });
 

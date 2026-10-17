@@ -30,14 +30,13 @@ export interface MachineSurfaceOptions {
   rows?: HandoffRowAdapter;
 }
 
-/** Inside Long Tail an MQTT-only deployment reads escalation events in process. */
+/** Inside Long Tail the gateway reads escalation events in process. */
 export function surfaceConfig(env: Env): MachineLineConfig {
   const transport = env.MACHINE_TRANSPORT;
   if (transport !== MACHINE_TRANSPORT.NATS && transport !== MACHINE_TRANSPORT.MQTT) {
     throw new Error(`start({ machines }) needs MACHINE_TRANSPORT=nats or mqtt (got "${transport ?? ''}")`);
   }
-  const feed = env.MACHINE_ESCALATION_FEED ?? (transport === MACHINE_TRANSPORT.NATS ? ESCALATION_FEED.JETSTREAM : ESCALATION_FEED.IN_PROCESS);
-  return loadMachineLineConfig({ ...env, MACHINE_ESCALATION_FEED: feed });
+  return loadMachineLineConfig({ ...env, MACHINE_ESCALATION_FEED: env.MACHINE_ESCALATION_FEED ?? ESCALATION_FEED.IN_PROCESS });
 }
 
 class LineRun {

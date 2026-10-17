@@ -9,7 +9,7 @@
 import { COMMAND_STATUS, ROW_TYPE, controlCommandId, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
 import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
-import type { LineDef } from '../../../lib/machines/line';
+import { machineById, machineRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
@@ -20,6 +20,13 @@ import { standardRows, type HandoffRowAdapter } from '../rows';
 
 const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
+/** The stored status a row must have for each verb the gateway acts on. */
+const STATUS_FOR_VERB: Record<string, string> = {
+  [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
+};
+
+const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND];
+
 function handoffRow(id: string, role: string, facets: HandoffFacets, metadata?: Record<string, any>): HandoffRow {
   return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata) };
 }
@@ -29,12 +36,32 @@ function onThisLine(line: LineDef, at: { siteId?: unknown; lineId?: unknown }): 
   return at.siteId === line.siteId && at.lineId === line.lineId;
 }
 
+/** Whether an event names a row this line acts on; only then is the stored row read. */
+export function concernsLine(state: GatewayState, line: LineDef, event: EscalationEvent, rows: HandoffRowAdapter = standardRows): boolean {
+  if (!STATUS_FOR_VERB[event.verb]) return false;
+  if (state.get(event.escalationId)) return true;
+  const facets = rows.toHandoff({ ...event.data, id: event.escalationId, role: event.role });
+  if (facets) return onThisLine(line, facets);
+  return LINE_ROW_TYPES.includes(event.data?.type) && onThisLine(line, event.data?.metadata ?? {});
+}
+
+/** Whether a stored row's status agrees with the event's verb, so a stale or invented event does nothing. */
+export function statusFits(verb: string, status: unknown): boolean {
+  return STATUS_FOR_VERB[verb] === status;
+}
+
+/** A handoff into a machine is parked on that machine's role; one to a person, on one of the line's receiver roles. */
+function handoffRoleFits(line: LineDef, facets: HandoffFacets, role: string): boolean {
+  if (onLine(line, facets.toMachine)) return role === machineRole(machineById(line, facets.toMachine));
+  return receiverRoles(line).includes(role);
+}
+
 export function planEscalationEvent(
   state: GatewayState, line: LineDef, event: EscalationEvent, dispatchTtlMs: number, rows: HandoffRowAdapter = standardRows,
 ): Action[] {
   const view = { ...event.data, id: event.escalationId, role: event.role };
   const facets = rows.toHandoff(view);
-  if (facets) return onThisLine(line, facets) ? planHandoff(state, line, event, facets, dispatchTtlMs) : [];
+  if (facets) return onThisLine(line, facets) && handoffRoleFits(line, facets, event.role) ? planHandoff(state, line, event, facets, dispatchTtlMs) : [];
   if (state.get(event.escalationId)) return planHandoff(state, line, event, null, dispatchTtlMs);
   const type = event.data?.type;
   if (!onThisLine(line, event.data?.metadata ?? {})) return [];
@@ -45,8 +72,10 @@ export function planEscalationEvent(
 }
 
 /** Why the gateway will not send a command row's command; null when it will. */
-function commandRefusal(line: LineDef, c: CommandFacets): string | null {
+function commandRefusal(line: LineDef, c: CommandFacets, role: string): string | null {
   if (!onLine(line, c.machineId)) return `${c.machineId} is not on ${line.siteId}/${line.lineId}`;
+  const own = machineRole(machineById(line, c.machineId));
+  if (role !== own) return `commands for ${c.machineId} are parked on ${own}, not ${role}`;
   if (!CONTROL_OPS.includes(c.op as Op)) return `${c.op} is not a command a row may ask for; one of ${CONTROL_OPS.join(', ')}`;
   return null;
 }
@@ -60,7 +89,7 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   if (event.verb !== VERB.CREATED && event.verb !== VERB.CLAIMED) return [];
   const c = readCommandFacets(event.data?.metadata);
   if (!c || !state.trackCommand(id)) return [];
-  const refusal = commandRefusal(line, c);
+  const refusal = commandRefusal(line, c, event.role);
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
@@ -108,7 +137,7 @@ function planAlarmRow(state: GatewayState, event: EscalationEvent): Action[] {
   const md = event.data.metadata ?? {};
   const track = state.alarms.get(state.alarmKey(md.machineId, md.alarmId));
   if (event.verb === VERB.CREATED) {
-    if (track) track.rowId = event.escalationId;
+    if (track && !track.rowId) track.rowId = event.escalationId;
     return [];
   }
   if (!track || (event.verb !== VERB.RESOLVED && event.verb !== VERB.CANCELLED)) return [];

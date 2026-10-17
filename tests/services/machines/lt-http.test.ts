@@ -78,4 +78,20 @@ describe('Long Tail HTTP client', () => {
     expect(rows[502]).toEqual({ id: 'e502' });
     expect(server.seen).toHaveLength(2);
   });
+
+  it('reads one row as the controller; not found or not readable is null, and a non-uuid id is never sent', async () => {
+    const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+    const hidden = '9b2f6f4e-1d3c-4a5b-8e7f-0a1b2c3d4e5f';
+    server = await new FakeLtServer()
+      .on('GET', new RegExp(`${id}$`), () => ({ status: 200, body: { id, role: 'line-bond', status: 'pending' } }))
+      .on('GET', new RegExp(`${hidden}$`), () => ({ status: 403, body: { error: 'Forbidden' } }))
+      .start();
+    const lt = client(server);
+    expect(await lt.get(id)).toEqual({ id, role: 'line-bond', status: 'pending' });
+    expect(server.seen[0]).toMatchObject({ path: `/escalations/${id}`, auth: 'Bearer tok-controller' });
+    expect(await lt.get(hidden)).toBeNull();
+    expect(await lt.get('../users')).toBeNull();
+    expect(server.seen).toHaveLength(2);
+  });
 });
+

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { genericCodec, RECEIPT_FROM } from '../../../lib/machines/protocol';
-import { machineById } from '../../../lib/machines/line';
+import { machineById, machineRole } from '../../../lib/machines/line';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { ROW_TYPE } from '../../../services/machines/contracts';
 import type { HandoffRowAdapter } from '../../../services/machines/rows';
@@ -35,7 +35,7 @@ const hostRows: HandoffRowAdapter = {
 
 function step(order: string, station: string, previous: string | null) {
   return rig.lt.parkRow({
-    type: STATION_STEP, role: `station-${station}`,
+    type: STATION_STEP, role: machineRole(machineById(DEFAULT_LINE, station)),
     metadata: { plant: 'site-1', cell: 'line-1', order, station, previous, parts: [{ serial: `${order}-S1`, plate: `P-${order}` }] },
   });
 }
@@ -104,7 +104,7 @@ describe('gateway seams: role names from the line', () => {
 describe('gateway seams: a row outside a machine\'s roles', () => {
   it('logs when a machine cannot see the row it records a release on', async () => {
     const log = new RecordingLog();
-    rig = await startRig({}, {}, DEFAULT_LINE, { log });
+    rig = await startRig({}, {}, { ...DEFAULT_LINE, roles: { receivers: ['harvester'] } }, { log });
     rig.lt.holds.set('press-01', new Set(['line-bond', 'line-exit']));
     await rig.handoff('U1', null, 'press-01');
     rig.lt.parkRow({ type: ROW_TYPE.HANDOFF, role: 'harvester', metadata: { ...facetsFor('U1', 'press-01', null) } });

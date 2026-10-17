@@ -11,7 +11,7 @@ import { REPLY_DEADLINE_MS } from '../../lib/machines/protocol';
 export const MACHINE_TRANSPORT = { MEMORY: 'memory', NATS: 'nats', MQTT: 'mqtt' } as const;
 export type MachineTransportMode = typeof MACHINE_TRANSPORT[keyof typeof MACHINE_TRANSPORT];
 
-export const ESCALATION_FEED = { MEMORY: 'memory', JETSTREAM: 'jetstream', CORE: 'core', IN_PROCESS: 'in-process' } as const;
+export const ESCALATION_FEED = { MEMORY: 'memory', CORE: 'core', IN_PROCESS: 'in-process' } as const;
 export type EscalationFeedMode = typeof ESCALATION_FEED[keyof typeof ESCALATION_FEED];
 
 export interface MachineLineConfig {
@@ -75,7 +75,7 @@ function mqttEndpoint(env: Env, mode: string, defaultVersion: 4 | 5): MqttEndpoi
 
 const DEFAULT_FEED: Record<MachineTransportMode, EscalationFeedMode> = {
   memory: ESCALATION_FEED.MEMORY,
-  nats: ESCALATION_FEED.JETSTREAM,
+  nats: ESCALATION_FEED.CORE,
   mqtt: ESCALATION_FEED.CORE,
 };
 
@@ -102,9 +102,6 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     config.mqtt = mqttEndpoint(env, transport, 5);
   }
   if (transport === MACHINE_TRANSPORT.MQTT) config.mqtt = mqttEndpoint(env, transport, 5);
-  if (feed === ESCALATION_FEED.JETSTREAM && !config.siteNatsUrl) {
-    throw new Error('MACHINE_ESCALATION_FEED=jetstream needs MACHINE_SITE_NATS_URL (MACHINE_TRANSPORT=nats)');
-  }
   if (feed === ESCALATION_FEED.CORE) {
     config.ltNatsUrl = env.NATS_URL;
     config.ltNatsToken = env.NATS_TOKEN;

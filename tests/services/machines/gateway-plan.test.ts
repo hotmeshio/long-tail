@@ -11,9 +11,9 @@ const ident = (machineId: string) => ({ siteId: 'site-1', lineId: 'line-1', mach
 const job = (machineId: string, body: Record<string, any>) =>
   [{ ident: ident(machineId), kind: 'job' } as ParsedTopic, buildEnvelope(ident(machineId), { unitId: 'U1', ...body })] as const;
 
-function created(state: GatewayState, id: string, from: string | null, to: string | null, extra: Record<string, any> = {}) {
+function created(state: GatewayState, id: string, from: string | null, to: string | null, extra: Record<string, any> = {}, role = 'line-trim') {
   return planEscalationEvent(state, DEFAULT_LINE, {
-    type: 't', escalationId: id, role: 'line-trim', verb: 'created',
+    type: 't', escalationId: id, role, verb: 'created',
     data: { id, type: 'handoff', metadata: { ...facetsFor('U1', from, to), ...extra } },
   }, 60_000);
 }
@@ -30,7 +30,7 @@ describe('planner: rows that are not there yet, or anymore', () => {
   it('dispatches once per row even when created and claimed both arrive', () => {
     const state = new GatewayState();
     expect(created(state, 'e1', 'press-01', 'cut-01')).toHaveLength(1);
-    const again = planEscalationEvent(state, DEFAULT_LINE, { type: 't', escalationId: 'e1', role: 'r', verb: 'claimed', data: { id: 'e1', type: 'handoff', metadata: facetsFor('U1', 'press-01', 'cut-01') } }, 1);
+    const again = planEscalationEvent(state, DEFAULT_LINE, { type: 't', escalationId: 'e1', role: 'line-trim', verb: 'claimed', data: { id: 'e1', type: 'handoff', metadata: facetsFor('U1', 'press-01', 'cut-01') } }, 1);
     expect(again).toEqual([]);
   });
 
@@ -42,8 +42,16 @@ describe('planner: rows that are not there yet, or anymore', () => {
 
   it('does not dispatch a handoff to a person', () => {
     const state = new GatewayState();
-    expect(created(state, 'e9', 'inspect-01', null)).toEqual([]);
+    expect(created(state, 'e9', 'inspect-01', null, {}, 'line-exit')).toEqual([]);
     expect(state.get('e9')?.toMachine).toBeNull();
+  });
+
+  it('ignores a handoff into a machine parked on another role, and one to a person off the receiver roles', () => {
+    const state = new GatewayState();
+    expect(created(state, 'e10', 'press-01', 'cut-01', {}, 'line-bond')).toEqual([]);
+    expect(created(state, 'e11', 'inspect-01', null, {}, 'reviewer')).toEqual([]);
+    expect(state.get('e10')).toBeUndefined();
+    expect(state.get('e11')).toBeUndefined();
   });
 });
 

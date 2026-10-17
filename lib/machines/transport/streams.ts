@@ -1,8 +1,7 @@
 /**
- * The site's durable log. Machine events, telemetry and Long Tail's
- * escalation events (arriving over the leafnode) each land in a JetStream
- * stream; the gateway reads events and escalations through durable
- * consumers, so a restart or a link outage replays instead of losing.
+ * The site's durable log. Machine events and telemetry each land in a
+ * JetStream stream; the gateway reads events through a durable consumer, so
+ * a restart or a link outage replays instead of losing.
  */
 
 import { AckPolicy, DeliverPolicy, nanos, StorageType, type ConsumerConfig, type JetStreamManager, type StreamConfig } from 'nats';
@@ -12,11 +11,7 @@ import { GENERIC_CHANNELS, type CodecChannels } from '../protocol/codec';
 export const LINE_STREAM = {
   EVENTS: 'LINE_EVENTS',
   TELEMETRY: 'LINE_TELEMETRY',
-  LT_EVENTS: 'LINE_LT_EVENTS',
 } as const;
-
-/** Long Tail publishes every LTEvent as `lt.events.<type>`. */
-export const LT_ESCALATION_SUBJECTS = 'lt.events.system.escalation.>';
 
 const DAY_MS = 86_400_000;
 const ACK_WAIT_MS = 30_000;
@@ -32,16 +27,10 @@ function subjectsFor({ root, siteId = '+', lineId = '+' }: Scope, channels: stri
   return channels.map((c) => filterToSubject(`${root}/${siteId}/${lineId}/+/${c}`));
 }
 
-/** Long Tail's escalation events, captured from the leafnode. */
-export const LT_EVENTS_STREAM: Partial<StreamConfig> = {
-  name: LINE_STREAM.LT_EVENTS, subjects: [LT_ESCALATION_SUBJECTS], max_age: nanos(7 * DAY_MS), storage: StorageType.File,
-};
-
 export function lineStreamConfigs(root: string, channels: CodecChannels = GENERIC_CHANNELS): Partial<StreamConfig>[] {
   return [
     { name: LINE_STREAM.EVENTS, subjects: subjectsFor({ root }, channels.events), max_age: nanos(30 * DAY_MS), storage: StorageType.File },
     { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor({ root }, channels.telemetry), max_age: nanos(3 * DAY_MS), storage: StorageType.File },
-    LT_EVENTS_STREAM,
   ];
 }
 

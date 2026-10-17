@@ -11,7 +11,7 @@ import { MqttMachineBus } from '../../lib/machines/transport/mqtt-bus';
 import { MqttMachineLink } from '../../lib/machines/transport/mqtt-link';
 import { NatsMachineBus } from '../../lib/machines/transport/nats-bus';
 import { CallbackEscalationFeed } from '../../lib/machines/transport/callback-feed';
-import { CoreEscalationFeed, JetStreamEscalationFeed } from '../../lib/machines/transport/nats-feed';
+import { CoreEscalationFeed } from '../../lib/machines/transport/nats-feed';
 import type { CallbackEventAdapter } from '../../lib/events/callback';
 import type { EscalationFeed, MachineBus, MachineLink } from '../../lib/machines/transport/delivery';
 
@@ -49,11 +49,6 @@ export function createEscalationFeed(config: MachineLineConfig, line: LineDef, c
     case ESCALATION_FEED.IN_PROCESS:
       if (!callbacks) throw new Error('MACHINE_ESCALATION_FEED=in-process runs inside start({ machines })');
       return new CallbackEscalationFeed(callbacks);
-    case ESCALATION_FEED.JETSTREAM:
-      return new JetStreamEscalationFeed({
-        natsUrl: config.siteNatsUrl!, user: config.siteNatsUser, password: config.siteNatsPassword,
-        durableName: `${controllerId(line)}-escalations`,
-      });
     case ESCALATION_FEED.CORE:
       return new CoreEscalationFeed({ natsUrl: config.ltNatsUrl!, token: config.ltNatsToken });
     default:

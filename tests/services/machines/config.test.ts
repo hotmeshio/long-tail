@@ -11,17 +11,19 @@ describe('machine line config', () => {
 
   it('reads the site broker login and the gateway timings', () => {
     const c = loadMachineLineConfig({
-      MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883',
+      MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883', NATS_URL: 'nats://lt:4222',
       MACHINE_SITE_NATS_USER: 'gw', MACHINE_SITE_NATS_PASSWORD: 'pw', MACHINE_QUIET_MS: '0', MACHINE_DISPATCH_TTL_MS: '1000',
     });
     expect(c).toMatchObject({ siteNatsUser: 'gw', siteNatsPassword: 'pw', quietMs: 0, dispatchTtlMs: 1000 });
   });
 
-  it('nats needs the site NATS and the machine broker, and defaults to the jetstream feed on MQTT 5', () => {
+  it('nats needs the site NATS and the machine broker, and defaults to the core feed on MQTT 5', () => {
     expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats' })).toThrow(/MACHINE_SITE_NATS_URL/);
     expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222' })).toThrow(/MACHINE_MQTT_URL/);
-    const c = loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883' });
-    expect(c.feed).toBe('jetstream');
+    const site = { MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883' };
+    expect(() => loadMachineLineConfig(site)).toThrow(/NATS_URL/);
+    const c = loadMachineLineConfig({ ...site, NATS_URL: 'nats://lt:4222' });
+    expect(c.feed).toBe('core');
     expect(c.mqtt?.protocolVersion).toBe(5);
   });
 

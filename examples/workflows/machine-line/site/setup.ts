@@ -56,7 +56,6 @@ function main(): void {
   // 3. site.conf for the site NATS, mosquitto.conf and acl for the machine broker
   const conf = renderSiteConf(line, {
     root: config.topicRoot,
-    hubLeafUrl: process.env.MACHINE_HUB_LEAF_URL ?? 'nats-leaf://site-leaf:dev_leaf_secret@nats:7422',
     gatewayUser: process.env.MACHINE_SITE_NATS_USER ?? 'line-gateway',
     gatewayPassword: process.env.MACHINE_SITE_NATS_PASSWORD ?? 'dev_gateway_secret',
     certDir: process.env.MACHINE_SITE_CERT_MOUNT ?? '/etc/site/certs',

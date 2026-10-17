@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  LINE_STREAM, LT_ESCALATION_SUBJECTS, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects, filterToSubject,
+  LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects, filterToSubject,
 } from '../../../lib/machines/transport';
 
 describe('site streams', () => {
-  it('splits machine events, telemetry and Long Tail escalation events into three streams', () => {
-    const [events, telemetry, lt] = lineStreamConfigs('line/v1');
+  it('splits machine events and telemetry into two streams', () => {
+    const streams = lineStreamConfigs('line/v1');
+    expect(streams).toHaveLength(2);
+    const [events, telemetry] = streams;
     expect(events.name).toBe(LINE_STREAM.EVENTS);
     expect(events.subjects).toEqual([
       'line.v1.*.*.*.presence', 'line.v1.*.*.*.snapshot', 'line.v1.*.*.*.job', 'line.v1.*.*.*.alarm.*', 'line.v1.*.*.*.cmd.reply', 'line.v1.*.*.*.report.>',
     ]);
     expect(telemetry.subjects).toEqual(['line.v1.*.*.*.telemetry']);
-    expect(lt).toMatchObject({ name: LINE_STREAM.LT_EVENTS, subjects: [LT_ESCALATION_SUBJECTS] });
     expect(events.subjects).not.toContain('line.v1.*.*.*.cmd');
   });
 
@@ -63,7 +64,7 @@ describe('ensuring streams and consumers', () => {
   it('adds missing streams and updates existing ones', async () => {
     const jsm = fakeJsm([LINE_STREAM.EVENTS]);
     await ensureStreams(jsm, lineStreamConfigs('line/v1'));
-    expect(jsm.calls).toEqual([`update ${LINE_STREAM.EVENTS}`, `add ${LINE_STREAM.TELEMETRY}`, `add ${LINE_STREAM.LT_EVENTS}`]);
+    expect(jsm.calls).toEqual([`update ${LINE_STREAM.EVENTS}`, `add ${LINE_STREAM.TELEMETRY}`]);
   });
 
   it('rethrows anything other than not found', async () => {

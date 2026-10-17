@@ -6,16 +6,13 @@ import { MachineSurface, surfaceConfig } from '../../../services/machines/surfac
 const SITE = { MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://broker:8883' };
 
 describe('machine surface configuration', () => {
-  it('reads escalation events from the site stream when the line runs on NATS', () => {
-    expect(surfaceConfig({ MACHINE_TRANSPORT: 'nats', ...SITE }).feed).toBe('jetstream');
-  });
-
-  it('reads escalation events in process when the line runs on a plain MQTT broker', () => {
+  it('reads escalation events in process on either transport', () => {
+    expect(surfaceConfig({ MACHINE_TRANSPORT: 'nats', ...SITE }).feed).toBe('in-process');
     expect(surfaceConfig({ MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtts://broker:8883' }).feed).toBe('in-process');
   });
 
   it('keeps an explicit feed choice', () => {
-    expect(surfaceConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_ESCALATION_FEED: 'in-process', ...SITE }).feed).toBe('in-process');
+    expect(surfaceConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_ESCALATION_FEED: 'core', NATS_URL: 'nats://lt:4222', ...SITE }).feed).toBe('core');
   });
 
   it('refuses the memory transport and a missing transport', () => {

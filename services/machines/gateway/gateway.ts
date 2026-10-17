@@ -16,7 +16,7 @@ import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
 import { Executor } from './executor';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './log';
-import { planEscalationEvent } from './plan-escalation';
+import { concernsLine, planEscalationEvent, statusFits } from './plan-escalation';
 import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
@@ -159,13 +159,26 @@ export class MachineGateway {
 
   private async onEscalation(event: EscalationEvent): Promise<Disposition> {
     try {
-      await this.executor.apply(planEscalationEvent(this.state, this.deps.line, event, this.deps.settings.dispatchTtlMs, this.rows));
+      const verified = await this.verify(event);
+      if (verified) await this.executor.apply(planEscalationEvent(this.state, this.deps.line, verified, this.deps.settings.dispatchTtlMs, this.rows));
       await this.pace();
       return DISPOSITION.ACK;
     } catch (err: any) {
       this.log.error(GATEWAY_LOG.VERB_FAILED, { event: event.type, error: err.message });
       return DISPOSITION.NAK;
     }
+  }
+
+  /**
+   * An event only says which row to look at. The row is read back as the
+   * controller, so a row on a role the line does not hold, or an event that
+   * disagrees with the stored row, does nothing.
+   */
+  private async verify(event: EscalationEvent): Promise<EscalationEvent | null> {
+    if (!concernsLine(this.state, this.deps.line, event, this.rows)) return null;
+    const row = await this.deps.lt.get(event.escalationId);
+    if (!row || !statusFits(event.verb, row.status)) return null;
+    return { ...event, role: row.role, data: row };
   }
 
   private async onMachine(msg: InboundMessage): Promise<Disposition> {

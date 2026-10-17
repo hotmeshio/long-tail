@@ -1,7 +1,6 @@
 # Machine line override: machines speak MQTT 5 to a machine broker
 # (Mosquitto, client certificates), which bridges the line's topics into a
-# site NATS (JetStream) joined to Long Tail's NATS as a leafnode; and the
-# mock line.
+# site NATS (JetStream) of its own; and the mock line.
 # Long Tail runs the gateway in process (start({ machines })), resolving
 # escalation rows as each machine; `--profile standalone-gateway` runs it as
 # its own service over the HTTP API instead.
@@ -33,13 +32,6 @@ services:
       machine-broker:
         condition: service_healthy
 
-  nats:
-    environment:
-      - MACHINE_LEAF_PASSWORD=${MACHINE_LEAF_PASSWORD:-dev_leaf_secret}
-    volumes:
-      - ./docker/nats-hub.conf:/etc/nats/hub.conf:ro
-    command: ["-c", "/etc/nats/hub.conf", "--auth", "dev_api_secret"]
-
   machine-site:
     build:
       context: .
@@ -51,7 +43,6 @@ services:
     environment:
       <<: *machine-env
       MACHINE_SITE_DIR: /app/deploy/machine-site
-      MACHINE_HUB_LEAF_URL: nats-leaf://site-leaf:${MACHINE_LEAF_PASSWORD:-dev_leaf_secret}@nats:7422
     command: ["npx", "ts-node", "--transpile-only", "examples/workflows/machine-line/site/setup.ts"]
 
   site-nats:
@@ -71,8 +62,6 @@ services:
     depends_on:
       machine-site:
         condition: service_completed_successfully
-      nats:
-        condition: service_healthy
 
   machine-broker:
     image: eclipse-mosquitto:2.0.20
@@ -127,6 +116,8 @@ services:
     environment:
       <<: *machine-env
       LT_BASE_URL: http://long-tail:3000
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: ${NATS_TOKEN:-dev_api_secret}
       LT_GATEWAY_USERNAME: ${LT_GATEWAY_USERNAME:-superadmin}
       LT_GATEWAY_PASSWORD: ${LT_GATEWAY_PASSWORD:-l0ngt@1l}
       MACHINE_HANDOFF_TIMEOUT: ${MACHINE_HANDOFF_TIMEOUT:-10m}

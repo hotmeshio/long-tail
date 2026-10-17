@@ -51,7 +51,7 @@ FAULT=jam npm run machine:line            # a jam at the first machine; the oper
 
 The machines override adds:
 - `machine-site`: development certificates, plus `site.conf`, `mosquitto.conf` and the broker ACL, all rendered from the line into the gitignored `deploy/machine-site/`;
-- `site-nats`: JetStream, joined to Long Tail's NATS as a leafnode;
+- `site-nats`: JetStream for the line's topics, a server of its own;
 - `machine-broker`: Mosquitto, MQTT 5 with client certificates, bridged into `site-nats`;
 - `machine-mock`: the simulated line, with drills on `:8090`.
 

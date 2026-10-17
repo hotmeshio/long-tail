@@ -34,6 +34,8 @@ export interface LineEscalations {
   create(as: Actor, input: CreateRowInput): Promise<{ id: string }>;
   /** The item keys an accumulator row holds. */
   itemKeys(id: string): Promise<string[]>;
+  /** The stored row, as the controller sees it; null when it does not exist or the controller may not read it. */
+  get(id: string): Promise<Record<string, any> | null>;
   /** Every pending row matching each given field, oldest first, in the projection escalation events carry. */
   listOpen(query: OpenRowQuery): Promise<Record<string, any>[]>;
 }

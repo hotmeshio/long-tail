@@ -4,6 +4,7 @@
  */
 
 import * as escalationApi from '../../../api/escalations';
+import { isUuid } from '../../../lib/uuid';
 import type { Actor, CreateRowInput } from './actions';
 import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
@@ -45,6 +46,14 @@ export class ApiLineEscalations implements LineEscalations {
     const result = await escalationApi.getEscalationItems({ id }, this.auth(CONTROLLER));
     if (result.status >= 300) throw new Error(`items failed ${result.status}: ${result.error}`);
     return (result.data as any).items.map((i: any) => i.itemKey);
+  }
+
+  async get(id: string): Promise<Record<string, any> | null> {
+    if (!isUuid(id)) return null;
+    const result = await escalationApi.getEscalation({ id }, this.auth(CONTROLLER));
+    if (result.status === 403 || result.status === 404) return null;
+    if (result.status >= 300) throw new Error(`get failed ${result.status}: ${result.error}`);
+    return result.data as Record<string, any>;
   }
 
   async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {

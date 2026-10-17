@@ -50,7 +50,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 
 ## Rows
 
-A machine handoff is a row on the receiving station's role whose metadata says what to move:
+A machine handoff is a row on the receiving machine's role (a handoff to a person goes on one of the line's receiver roles) whose metadata says what to move:
 
 | Facet | Meaning |
 |---|---|
@@ -127,6 +127,8 @@ const reply = await conditional<Machines.CommandResolution>(`changeover-${orderI
 });
 ```
 
+Asking a machine for a command takes the same access as parking any row on its role: write access to that role, or a workflow that parks the row. A command row on any other role resolves `unsupported`.
+
 The gateway sends the command and resolves the row with the reply, as the machine that gave it:
 
 ```typescript
@@ -185,16 +187,19 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 ## Topology and identity
 
 ```
- machines ──MQTT 5, TLS, client cert──▶ machine broker ──bridge──▶ site NATS ──leafnode──▶ Long Tail NATS
+ machines ──MQTT 5, TLS, client cert──▶ machine broker ──bridge──▶ site NATS
                                          (Mosquitto)               JetStream
                                               ▲                        ▲
-                                              └── gateway (commands)    └── gateway (streams)
+                                              └── gateway (commands)    └── gateway (streams, read only)
 ```
 
 - **Machines:** each machine logs in with its own certificate; the CN is its username. The broker ACL lets it write only its own channels and read only its own commands. The line controller may command every machine on the line.
-- **Durable streams:** the bridge carries the line's topics into the site NATS. There JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days); Long Tail's escalation events arrive over the leafnode into `LINE_LT_EVENTS` (7 days). The gateway reads both through durable consumers.
+- **Durable streams:** the bridge carries the line's topics one way, into the site NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer and may publish only JetStream requests and acks.
+- **Escalation events:** the gateway inside Long Tail reads them in process. The site NATS is a server of its own; Long Tail's events and NATS stay inside Long Tail.
 - **Commands:** the gateway publishes commands to the machine broker at QoS 1, so they queue for a machine that is away.
-- **Bot accounts:** in Long Tail each machine is a bot account on its station roles, so `claimed_by` and `resolved_by` name the machine. The controller bot raises the operator rows.
+- **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
+- **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
+- **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role.
 - **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl` render the configuration from the line.
 
 ## Configuration
@@ -202,7 +207,7 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 | Variable | Default | Meaning |
 |---|---|---|
 | `MACHINE_TRANSPORT` | | `nats` (site NATS streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
-| `MACHINE_ESCALATION_FEED` | `jetstream` on nats, `in-process` on mqtt | Where escalation events come from |
+| `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes to Long Tail's NATS (`NATS_URL`, `NATS_TOKEN`) |
 | `MACHINE_TOPIC_ROOT` | `line/v1` | The generic codec's root |
 | `MACHINE_LINE_CONFIG` | | Path of the line JSON |
 | `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | Site NATS for the streams |

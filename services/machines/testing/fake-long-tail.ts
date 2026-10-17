@@ -5,7 +5,7 @@
  * people (exit, operator).
  */
 
-import type { Actor, CreateRowInput } from '../gateway/actions';
+import { CONTROLLER, type Actor, type CreateRowInput } from '../gateway/actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from '../gateway/escalations';
 import { ROW_TYPE, type HandoffFacets } from '../contracts';
 import type { MemoryEscalationFeed } from '../../../lib/machines/transport';
@@ -145,6 +145,15 @@ export class FakeLongTail implements LineEscalations {
 
   async itemKeys(id: string): Promise<string[]> {
     return (this.rows.get(id)?.items ?? []).map((i) => i.itemKey);
+  }
+
+  async get(id: string): Promise<Record<string, any> | null> {
+    const row = this.rows.get(id);
+    if (!row || this.hidden(CONTROLLER, row)) return null;
+    return {
+      id: row.id, type: row.type, subtype: row.subtype, role: row.role, status: row.status,
+      assigned_to: row.assigned_to ?? null, resolved_by: row.resolved_by ?? null, metadata: { ...row.metadata },
+    };
   }
 
   async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {

@@ -6,6 +6,7 @@
  * it is delivered again.
  */
 
+import { isUuid } from '../../../lib/uuid';
 import type { OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
 import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
@@ -83,6 +84,16 @@ export class HttpLineEscalations implements LineEscalations {
   async itemKeys(id: string): Promise<string[]> {
     const view = await this.http.request<{ items: { itemKey: string }[] }>('GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER));
     return view.items.map((i) => i.itemKey);
+  }
+
+  async get(id: string): Promise<Record<string, any> | null> {
+    if (!isUuid(id)) return null;
+    try {
+      return await this.http.request<Record<string, any>>('GET', `/escalations/${encodeURIComponent(id)}`, this.tokenFor(CONTROLLER));
+    } catch (err) {
+      if (err instanceof LtHttpError && (err.status === 403 || err.status === 404)) return null;
+      throw err;
+    }
   }
 
   async listOpen(filter: OpenRowQuery): Promise<Record<string, any>[]> {

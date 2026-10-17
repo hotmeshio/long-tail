@@ -15,7 +15,7 @@ import { mockSettingsFromEnv } from '../../../../services/machines/testing/mock/
 
 async function main(): Promise<void> {
   // 1. Config, line and links
-  const config = loadMachineLineConfig();
+  const config = loadMachineLineConfig({ ...process.env, MACHINE_ESCALATION_FEED: 'memory' });
   const line = loadLine(config.lineConfigPath);
   const settings = mockSettingsFromEnv();
   const port = Number(process.env.MOCK_LINE_PORT ?? 8090);
