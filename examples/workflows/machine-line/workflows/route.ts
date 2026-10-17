@@ -4,7 +4,9 @@
  */
 
 import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../contracts';
-import { stationRole } from '../line';
+import { stationRole, type LineDef } from '../line';
+
+export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
 
 export interface RouteStep {
   machineId: string;
@@ -23,6 +25,14 @@ export interface UnitRouteInput {
   artifact?: { url: string; sha256: string };
   /** How long a handoff waits for its receipt before a person is asked. */
   handoffTimeout?: string;
+}
+
+/** Every machine on the line in order, each on its first recipe at the newest version. */
+export function lineSteps(line: LineDef): RouteStep[] {
+  return line.machines.map((m) => {
+    const [id, versions] = Object.entries(m.recipes)[0];
+    return { machineId: m.machineId, process: m.process, recipe: { id, version: versions[versions.length - 1] } };
+  });
 }
 
 /** One move: from a machine (null at line entry) to a machine (null at line exit, where a person receives). */

@@ -5,7 +5,15 @@ import { DEFAULT_LINE, clientIds, loadLine, stationRole, validateLine } from '..
 
 describe('machine line config', () => {
   it('defaults to the memory transport and memory feed', () => {
-    expect(loadMachineLineConfig({})).toMatchObject({ transport: 'memory', feed: 'memory', topicRoot: 'line/v1', replyTimeoutMs: 5000 });
+    expect(loadMachineLineConfig({})).toMatchObject({ transport: 'memory', feed: 'memory', topicRoot: 'line/v1', replyTimeoutMs: 5000, quietMs: 90_000, dispatchTtlMs: 600_000 });
+  });
+
+  it('reads the site broker login and the gateway timings', () => {
+    const c = loadMachineLineConfig({
+      MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883',
+      MACHINE_SITE_NATS_USER: 'gw', MACHINE_SITE_NATS_PASSWORD: 'pw', MACHINE_QUIET_MS: '0', MACHINE_DISPATCH_TTL_MS: '1000',
+    });
+    expect(c).toMatchObject({ siteNatsUser: 'gw', siteNatsPassword: 'pw', quietMs: 0, dispatchTtlMs: 1000 });
   });
 
   it('nats needs the site NATS and the MQTT endpoint, and defaults to the jetstream feed on MQTT 3.1.1', () => {

@@ -63,3 +63,31 @@ describe('mock jobs: cancel, withdraw, restart', () => {
     expect(await until(() => h.recorder.jobs('cut-01', JOB_EVENT.TRANSFER_FAILED)[0])).toMatchObject({ failure: 'unreadable-id' });
   });
 });
+
+describe('mock jobs: repeated dispatch', () => {
+  it('a repeat while a unit is on its way does not send it twice', async () => {
+    h = await startHarness({ arrivalDelaySec: 40 });
+    const args = dispatchArgs('press-01', 'U1');
+    await h.command('press-01', OP.DISPATCH, args);
+    await until(() => h.recorder.jobs('press-01', JOB_EVENT.READY)[0]);
+    expect(await h.command('press-01', OP.DISPATCH, args, 'cmd-repeat')).toMatchObject({ status: 'accepted' });
+    await h.command('cut-01', OP.DISPATCH, dispatchArgs('cut-01', 'U1', { from: 'press-01' }));
+    await until(() => h.recorder.jobs('cut-01', JOB_EVENT.ARRIVED)[0]);
+    expect(h.recorder.jobs('cut-01', JOB_EVENT.ARRIVED).map((j) => j.peer)).toEqual(['press-01']);
+    expect(h.recorder.jobs('press-01', JOB_EVENT.RELEASED).map((j) => j.peer)).toEqual(['cut-01']);
+  });
+});
+
+describe('mock jobs: drills', () => {
+  it('disarm drops armed results and transfer faults, so the next job runs clean', async () => {
+    h = await startHarness();
+    h.line.arm('press-01', { result: 'reject', reason: 'armed' });
+    h.line.armTransfer('press-01', { fault: 'jam' });
+    h.line.disarm('press-01');
+    await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', 'U1'));
+    await h.command('cut-01', OP.DISPATCH, dispatchArgs('cut-01', 'U1', { from: 'press-01' }));
+    await until(() => h.recorder.jobs('cut-01', JOB_EVENT.ARRIVED)[0]);
+    expect(h.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0]).toMatchObject({ result: 'ok' });
+    expect(h.line.machine('press-01').alarms.list()).toEqual([]);
+  });
+});

@@ -8,7 +8,7 @@ import { MemoryBroker } from './memory-broker';
 import {
   DISPOSITION, toEscalationEvent,
   type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage,
-  type LinkWill, type MachineBus, type MachineLink, type PublishOptions,
+  type LinkConnectOptions, type MachineBus, type MachineLink, type PublishOptions,
 } from './types';
 
 export class MemoryMachineLink implements MachineLink {
@@ -20,7 +20,7 @@ export class MemoryMachineLink implements MachineLink {
     return !!this.clientId && this.broker.isConnected(this.clientId);
   }
 
-  async connect(opts: { clientId: string; will: LinkWill }): Promise<void> {
+  async connect(opts: LinkConnectOptions): Promise<void> {
     this.clientId = opts.clientId;
     this.broker.connect(opts.clientId, opts.will);
   }

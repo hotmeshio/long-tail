@@ -15,6 +15,7 @@ export interface MqttEndpoint {
   url: string;
   /** 4 = MQTT 3.1.1 (the NATS listener), 5 = MQTT 5. */
   protocolVersion: 4 | 5;
+  /** File paths may contain {clientId}, so each machine presents its own certificate. */
   caFile?: string;
   certFile?: string;
   keyFile?: string;
@@ -28,6 +29,8 @@ export interface MachineLineConfig {
   topicRoot: string;
   lineConfigPath?: string;
   siteNatsUrl?: string;
+  siteNatsUser?: string;
+  siteNatsPassword?: string;
   ltNatsUrl?: string;
   ltNatsToken?: string;
   mqtt?: MqttEndpoint;
@@ -35,6 +38,10 @@ export interface MachineLineConfig {
   dispatchAttempts: number;
   handoffTimeout: string;
   offlineDebounceMs: number;
+  /** A connected machine silent this long gets a quiet row; 0 turns the check off. */
+  quietMs: number;
+  /** How long a dispatch stays valid at the machine. */
+  dispatchTtlMs: number;
   ltBaseUrl: string;
 }
 
@@ -93,10 +100,14 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     dispatchAttempts: Math.max(1, int(env, 'MACHINE_DISPATCH_ATTEMPTS', 3)),
     handoffTimeout: env.MACHINE_HANDOFF_TIMEOUT ?? '10m',
     offlineDebounceMs: int(env, 'MACHINE_OFFLINE_DEBOUNCE_MS', 15_000),
+    quietMs: int(env, 'MACHINE_QUIET_MS', 90_000),
+    dispatchTtlMs: int(env, 'MACHINE_DISPATCH_TTL_MS', 600_000),
     ltBaseUrl: env.LT_BASE_URL ?? 'http://localhost:3000',
   };
   if (transport === MACHINE_TRANSPORT.NATS) {
     config.siteNatsUrl = required(env, 'MACHINE_SITE_NATS_URL', transport);
+    config.siteNatsUser = env.MACHINE_SITE_NATS_USER;
+    config.siteNatsPassword = env.MACHINE_SITE_NATS_PASSWORD;
     config.mqtt = mqttEndpoint(env, transport, 4);
   }
   if (transport === MACHINE_TRANSPORT.MQTT) config.mqtt = mqttEndpoint(env, transport, 5);

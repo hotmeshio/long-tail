@@ -135,6 +135,11 @@ export function clientIds(line: LineDef): string[] {
   return line.machines.map((m) => clientIdOf(identOf(line, m.machineId)));
 }
 
+/** The broker and Long Tail identity of the line's gateway. */
+export function controllerId(line: LineDef): string {
+  return `line-controller-${line.siteId}-${line.lineId}`;
+}
+
 /** The Long Tail role a machine resolves handoffs under. */
 export function stationRole(process: string): string {
   return `line-${process.replace(/_/g, '-')}`;

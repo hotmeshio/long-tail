@@ -230,10 +230,15 @@ export class MockMachine {
 
   private async connect(): Promise<void> {
     const will = { topic: machineTopic(this.root, this.ident, CHANNEL.PRESENCE), payload: this.wrap({ online: false }), retain: true };
-    await this.link.connect({ clientId: this.clientId, will });
+    await this.link.connect({ clientId: this.clientId, will, onRestored: () => void this.announce() });
     await this.link.subscribe(machineTopic(this.root, this.ident, CHANNEL.CMD), (msg) => {
       void this.commands.handle(parsePayload(msg.payload));
     });
+    await this.announce();
+  }
+
+  /** Birth, then whatever reliable messages waited for the link. */
+  private async announce(): Promise<void> {
     await this.publishPresence(true);
     const pending = this.outbox.splice(0);
     for (const o of pending) await this.link.publish(o.topic, o.payload, { qos: o.qos, retain: o.retain });

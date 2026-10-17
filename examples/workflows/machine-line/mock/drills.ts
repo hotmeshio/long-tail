@@ -13,6 +13,7 @@ type Handler = (line: MockLine, machineId: string, body: any) => Promise<unknown
 const ROUTES: Record<string, Handler> = {
   arrive: (l, m, b) => l.arrive(m, b),
   arm: (l, m, b) => ({ armed: l.arm(m, b) }),
+  disarm: (l, m) => l.disarm(m),
   transfer: (l, m, b) => l.armTransfer(m, b),
   alarm: async (l, m, b) => ({ alarmId: await l.alarm(m, b) }),
   'clear-alarm': (l, m, b) => l.clearAlarm(m, b),

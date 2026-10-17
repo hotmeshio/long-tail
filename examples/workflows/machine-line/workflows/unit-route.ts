@@ -9,9 +9,9 @@
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
 import { DECISION, LINE_ROLE, ROW_TYPE, signalKeys, type OperatorResolution } from '../contracts';
 import type { LTEnvelope } from '../../../../types';
-import { hopFacets, hopRow, planHops, readHopOutcome, type Hop, type HopOutcome, type UnitRouteInput } from './route';
+import { UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, planHops, readHopOutcome, type Hop, type HopOutcome, type UnitRouteInput } from './route';
 
-export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
+export { UNIT_ROUTE_WORKFLOW };
 
 const DEFAULT_HANDOFF_TIMEOUT = '30m';
 const OPERATOR_TIMEOUT = '7d';

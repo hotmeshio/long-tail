@@ -65,6 +65,12 @@ export class MockLine {
     return this.floor.arrive(this.machine(machineId), input.unitId, input.carrierId ?? null);
   }
 
+  /** Drop every armed result and transfer fault at a machine. */
+  disarm(machineId: string): void {
+    this.machine(machineId).cell.armed = [];
+    this.floor.disarm(machineId);
+  }
+
   arm(machineId: string, input: ArmedResult & { count?: number }): number {
     const m = this.machine(machineId);
     const count = Math.max(1, Number(input.count ?? 1));

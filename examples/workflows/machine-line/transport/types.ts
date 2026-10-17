@@ -35,9 +35,16 @@ export interface PublishOptions {
   retain?: boolean;
 }
 
+export interface LinkConnectOptions {
+  clientId: string;
+  will: LinkWill;
+  /** Called when the transport re-establishes the session by itself (a broker restart). */
+  onRestored?: () => void;
+}
+
 export interface MachineLink {
   readonly connected: boolean;
-  connect(opts: { clientId: string; will: LinkWill }): Promise<void>;
+  connect(opts: LinkConnectOptions): Promise<void>;
   publish(topic: string, payload: string, opts: PublishOptions): Promise<void>;
   subscribe(filter: string, handler: (msg: InboundMessage) => void): Promise<void>;
   /** Graceful drops the will; ungraceful lets the broker publish it. */

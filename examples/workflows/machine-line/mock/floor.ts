@@ -34,6 +34,8 @@ export class Floor {
   private armed = new Map<string, TransferFault[]>();
   private blocked = new Set<string>();
   private inbound = new Set<string>();
+  /** Units on their way to a receiver, so a repeated dispatch does not send them twice. */
+  private transit = new Map<string, Expectation>();
   private timers = new Set<NodeJS.Timeout>();
   private chain: Promise<void> = Promise.resolve();
 
@@ -41,6 +43,8 @@ export class Floor {
 
   /** A station accepted a dispatch that includes this unit. */
   expect(receiver: MockMachine, job: Job, unitId: string, carrierId: string | null): void {
+    const moving = this.transit.get(unitId);
+    if (moving?.receiver === receiver && moving.job === job) return;
     this.expects.set(unitId, { receiver, job, announced: false, stalled: false });
     if (!job.from && !this.holds.has(unitId)) this.holds.set(unitId, { sender: null, job, unitId, carrierId });
     this.poke();
@@ -63,6 +67,10 @@ export class Floor {
   /** Forget every unit a restarted machine was holding. */
   forgetSender(machineId: string): void {
     for (const [unitId, h] of this.holds) if (h.sender?.def.machineId === machineId) this.holds.delete(unitId);
+  }
+
+  disarm(machineId: string): void {
+    this.armed.delete(machineId);
   }
 
   arm(machineId: string, fault: TransferFault): void {
@@ -124,9 +132,7 @@ export class Floor {
     if (!h) return;
     if (!h.sender) {
       if (!this.settings.autoArriveAtEntry) return;
-      this.expects.delete(unitId);
-      this.holds.delete(unitId);
-      this.inbound.add(rid);
+      this.depart(unitId, e, rid);
       this.later(receiver.ms(this.settings.arrivalDelaySec), () => void this.land(receiver, h, h.carrierId, null));
       return;
     }
@@ -146,9 +152,7 @@ export class Floor {
       });
       return;
     }
-    this.expects.delete(unitId);
-    this.holds.delete(unitId);
-    this.inbound.add(rid);
+    this.depart(unitId, e, rid);
     await sender.cell.release(h.job, unitId, rid);
     const from = sender.def.machineId;
     if (fault === TRANSFER_FAULT.INCOMPLETE) {
@@ -163,21 +167,33 @@ export class Floor {
     this.later(receiver.ms(this.settings.transferSec), () => void this.land(receiver, h, carrierRead, from));
   }
 
-  private async land(receiver: MockMachine, h: Holding, carrierRead: string | null, from: string | null): Promise<void> {
+  private depart(unitId: string, e: Expectation, receiverId: string): void {
+    this.transit.set(unitId, e);
+    this.expects.delete(unitId);
+    this.holds.delete(unitId);
+    this.inbound.add(receiverId);
+  }
+
+  private settle(receiver: MockMachine, unitId: string): void {
+    this.transit.delete(unitId);
     this.inbound.delete(receiver.def.machineId);
+  }
+
+  private async land(receiver: MockMachine, h: Holding, carrierRead: string | null, from: string | null): Promise<void> {
+    this.settle(receiver, h.unitId);
     const ok = await receiver.cell.receive(h.unitId, carrierRead, from);
     if (!ok) this.returnToOutfeed(h);
     this.poke();
   }
 
   private async unreadable(receiver: MockMachine, h: Holding, from: string): Promise<void> {
-    this.inbound.delete(receiver.def.machineId);
+    this.settle(receiver, h.unitId);
     await receiver.cell.refuseUnreadable(h.unitId, from);
     this.returnToOutfeed(h);
   }
 
   private async incomplete(receiver: MockMachine, h: Holding): Promise<void> {
-    this.inbound.delete(receiver.def.machineId);
+    this.settle(receiver, h.unitId);
     const job = receiver.cell.jobForUnit(h.unitId);
     const unit = job?.units.find((u) => u.unitId === h.unitId);
     if (job && unit) {

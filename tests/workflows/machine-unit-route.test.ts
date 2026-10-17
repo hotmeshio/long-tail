@@ -12,6 +12,7 @@ import { eventRegistry } from '../../lib/events';
 import { systemEventsConfig } from '../../lib/events/system-events';
 import { machineUnitRoute } from '../../examples/workflows/machine-line';
 import { signalKeys } from '../../examples/workflows/machine-line/contracts';
+import { lineSteps } from '../../examples/workflows/machine-line/workflows/route';
 import { CONTROLLER } from '../../examples/workflows/machine-line/gateway/actions';
 import { MachineGateway } from '../../examples/workflows/machine-line/gateway/gateway';
 import { silentLog } from '../../examples/workflows/machine-line/gateway/log';
@@ -27,10 +28,7 @@ const { Connection, Client, Worker } = Durable;
 const TASK_QUEUE = 'test-machine-unit-route';
 // A line of its own per run, so rows left by another run belong to another line.
 const LINE = { ...structuredClone(DEFAULT_LINE), lineId: `line-${Date.now().toString(36)}` };
-const STEPS = DEFAULT_LINE.machines.map((m) => {
-  const [id, versions] = Object.entries(m.recipes)[0];
-  return { machineId: m.machineId, process: m.process, recipe: { id, version: versions[versions.length - 1] } };
-});
+const STEPS = lineSteps(DEFAULT_LINE);
 
 // The whole surface through the real orchestrator: the durable unit workflow
 // parks handoff rows; the gateway dispatches, claims and resolves them as each

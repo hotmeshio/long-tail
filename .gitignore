@@ -176,7 +176,7 @@ CLAUDE.md
 
 # Machine line: site-specific line config and dev broker certificates, local only
 /examples/workflows/machine-line/line_config/
-/deploy/machine-certs/
+/deploy/machine-site/
 .smoke/
 
 # Planning and brainstorming docs (never checked in)

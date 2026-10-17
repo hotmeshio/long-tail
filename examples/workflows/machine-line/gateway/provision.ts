@@ -8,7 +8,7 @@
 
 import { LINE_ROLE } from '../contracts';
 import { clientIdOf } from '../protocol';
-import { identOf, stationRole, type LineDef } from '../line';
+import { controllerId, identOf, stationRole, type LineDef } from '../line';
 import { CONTROLLER, type Actor } from './actions';
 import type { LtHttp } from './lt-http';
 
@@ -30,7 +30,7 @@ export function lineIdentities(line: LineDef): Identity[] {
   }));
   const controller = {
     actor: CONTROLLER,
-    botName: `${LINE_ROLE.CONTROLLER}-${line.siteId}-${line.lineId}`,
+    botName: controllerId(line),
     roles: [...stations, LINE_ROLE.EXIT, LINE_ROLE.OPERATOR],
   };
   return [controller, ...machines];
