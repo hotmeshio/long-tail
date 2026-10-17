@@ -71,6 +71,14 @@ export class Floor {
     this.holds.delete(unitId);
   }
 
+  /** A person takes a unit back off `sender`'s outfeed, where a failed move left it after the sender closed its job. */
+  takeBack(unitId: string, sender: MockMachine): boolean {
+    const h = this.holds.get(unitId);
+    if (h?.sender !== sender) return false;
+    this.holds.delete(unitId);
+    return true;
+  }
+
   /** Forget every unit a restarted machine was holding. */
   forgetSender(machineId: string): void {
     for (const [unitId, h] of this.holds) if (h.sender?.def.machineId === machineId) this.holds.delete(unitId);

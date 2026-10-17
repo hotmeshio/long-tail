@@ -25,7 +25,8 @@
  *   MACHINE_LINE_CONFIG, MACHINE_MANIFESTS   line and manifests (default the factory line and route-manifests.json)
  *   FAULT         jam | incomplete | carrier_mismatch | unreadable | stall | reject | hold | estop | offline
  *   FAULT_AT      machine the fault happens at (default the first machine)
- *   DECIDE        operator decision on a failed handoff: retry | manual | scrap (default retry)
+ *   DECIDE        operator decision on a failed handoff: retry | manual | scrap (default retry;
+ *                 manual where the row does not offer retry)
  *   OFFLINE_S     how long FAULT=offline keeps the machine away (default 25)
  *   HANDOFF_TIMEOUT  per-handoff timeout (default 5m); TIMEOUT_S whole run (default 300)
  */
@@ -138,11 +139,15 @@ async function released(rowId: string, units: { unitId: string }[], ms = 180_000
   return false;
 }
 
+/** Units the operator sent off the line by hand: the sender already finished them, so no release is coming. */
+const takenOver = new Set<string>();
+
 /** A person at a station: take each unit off the machine it came from (if any), then receive the set. */
 async function receive(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   const units = md.units ?? [];
-  if (md.fromMachine && !(await released(row.id, units) && await takeUnits(md.fromMachine, units))) {
+  const finished = async () => units.every((u: any) => takenOver.has(u.unitId)) || released(row.id, units);
+  if (md.fromMachine && !(await finished() && await takeUnits(md.fromMachine, units))) {
     say(`[${row.role}]`.padEnd(11) + ` ${units.map((u: any) => u.unitId).join(', ')} never left ${md.fromMachine}; leaving the row open`);
     return;
   }
@@ -150,13 +155,20 @@ async function receive(row: Record<string, any>): Promise<void> {
   say(`[${row.role}]`.padEnd(11) + ` received ${(md.units ?? []).map((u: any) => u.unitId).join(', ')} from ${md.fromMachine ?? 'a person'}`);
 }
 
-/** Operator: make the machines healthy, then decide the failed handoff. */
+/** Set once a route left the line on purpose (manual or scrap), so an incomplete run is expected. */
+let offLine = false;
+
+/** Operator: make the machines healthy, then decide the failed handoff; retry falls back to manual where the row does not offer it. */
 async function decideFailure(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   for (const m of line.machines) await fixMachine(m.machineId);
-  if (DECIDE === DECISION.SCRAP) await takeUnits(md.fromMachine ?? null, md.units ?? [], 4);
-  await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { decision: DECIDE, note: `driver: ${md.errorCode}` } });
-  say(`[operator] ${md.jobId} ${md.errorCode} at ${md.fromMachine ?? 'entry'} -> ${DECIDE}`);
+  const allowed: string[] = md.decisions ?? [DECIDE];
+  const decision = allowed.includes(DECIDE) ? DECIDE : allowed[0];
+  if (decision !== DECISION.RETRY) offLine = true;
+  if (decision === DECISION.MANUAL) for (const u of md.units ?? []) takenOver.add(u.unitId);
+  if (decision === DECISION.SCRAP) await takeUnits(md.fromMachine ?? null, md.units ?? [], 4);
+  await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { decision, note: `driver: ${md.errorCode}` } });
+  say(`[operator] ${md.jobId} ${md.errorCode} at ${md.fromMachine ?? 'entry'} -> ${decision}`);
 }
 
 async function onRow(row: Record<string, any>): Promise<void> {
@@ -269,7 +281,7 @@ async function main(): Promise<void> {
   await chain;
   await nc.drain();
   const ok = report(ids, results);
-  process.exit(ok || (FAULT && DECIDE !== DECISION.RETRY) ? 0 : 1);
+  process.exit(ok || offLine ? 0 : 1);
 }
 
 main().catch((err) => {

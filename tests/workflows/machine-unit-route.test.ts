@@ -175,6 +175,25 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     expect(final.data).toMatchObject({ status: 'scrapped', at: 'press-01', note: 'weak bond' });
   }, 90_000);
 
+  it('retry after a reject is not offered: a new row asks again, then manual takes the units from the sender', async () => {
+    const routeKey = `R${Durable.guid().slice(0, 8)}`;
+    line.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
+    const handle = await start(routeKey, ['X1']);
+    const first = await rowBySignal(signalKeys.handoffError(routeKey, 1, 1));
+    expect((first.metadata as any).decisions).toEqual(['manual', 'scrap']);
+    expect((await escalationApi.resolveEscalation({ id: first.id, resolverPayload: { decision: 'retry' } }, { userId: personId })).status).toBe(200);
+    const again = await rowBySignal(signalKeys.handoffError(routeKey, 1, 1, 2));
+    expect(again.description).toMatch(/^retry is not available here/);
+    expect((await escalationApi.resolveEscalation({ id: again.id, resolverPayload: { decision: 'manual', note: 'rework' } }, { userId: personId })).status).toBe(200);
+    const exit = await rowBySignal(signalKeys.handoff(routeKey, STEPS.length + 1, 1));
+    expect((exit.metadata as any).fromMachine).toBe('press-01');
+    await line.line.unload('press-01', { unitId: 'X1' });
+    expect((await escalationApi.resolveEscalation({ id: exit.id, resolverPayload: { received: true, receiver: 'person' } }, { userId: personId })).status).toBe(200);
+    const final = await handle.result() as { data: Record<string, any> };
+    expect(final.data).toMatchObject({ status: 'manual', at: 'press-01', received: true, note: 'rework' });
+    expect(final.data.history.filter((h: any) => h.to === 'cut-01')).toHaveLength(1);
+  }, 90_000);
+
   it('no operator decision before the timeout scraps the units', async () => {
     const routeKey = `R${Durable.guid().slice(0, 8)}`;
     line.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });

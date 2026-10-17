@@ -111,6 +111,6 @@ describe('commands: replies are tracked', () => {
     await rig.line.fault('cut-01', { code: 'F-201' });
     const alarm = await until(() => [...rig.lt.rows.values()].find((r) => r.type === 'line-alarm'), 2_000);
     rig.lt.personResolves(alarm.id, { decision: 'acknowledge' });
-    await until(() => log.of(GATEWAY_LOG.COMMAND_UNANSWERED).some((c) => c.op === OP.ACK_ALARM), 2_000);
+    await until(() => log.of(GATEWAY_LOG.COMMAND_UNANSWERED).some((c) => c.op === OP.ACKNOWLEDGE_ALARM), 2_000);
   });
 });

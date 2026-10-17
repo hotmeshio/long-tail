@@ -3,11 +3,12 @@
  * handoff row for the receiver; a machine resolves it over MQTT through the
  * gateway, a person resolves the last one on the dashboard. A hop that ends
  * without a receipt parks a line-operator row: retry the hop, finish the
- * units by hand, or scrap them.
+ * units by hand, or scrap them. Units the sender finished as not ok are off
+ * the line, so their row offers only manual and scrap.
  */
 
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
-import { DECISION, LINE_ROLE, ROW_TYPE, signalKeys, type OperatorResolution } from '../../../../services/machines/contracts';
+import { DECISION, LINE_ROLE, ROW_TYPE, handoffDecisions, signalKeys, type OperatorResolution } from '../../../../services/machines/contracts';
 import type { LTEnvelope } from '../../../../types';
 import {
   UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, isMachineStep, planHops, readHopOutcome, type Hop, type HopOutcome, type RouteStep, type UnitRouteInput,
@@ -30,19 +31,28 @@ async function handoff(input: UnitRouteInput, hop: Hop, attempt: number, senderA
   return readHopOutcome(result as Record<string, any> | null);
 }
 
+/** Ask until the operator picks one of the decisions this failure allows. */
 async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt: number, outcome: HopOutcome): Promise<OperatorResolution> {
   const where = stationName(hop.from, 'line entry');
-  const decision = await conditional<OperatorResolution>(signalKeys.handoffError(input.routeKey, hop.index, attempt), {
-    role: LINE_ROLE.OPERATOR,
-    type: ROW_TYPE.HANDOFF_ERROR,
-    subtype: outcome.errorCode,
-    description: `${input.units.map((u) => u.unitId).join(', ')} stopped at ${where}: ${outcome.errorCode}. ${outcome.detail ?? ''}`.trim(),
-    priority: 1,
-    workflowType: UNIT_ROUTE_WORKFLOW,
-    metadata: { ...hopFacets(input, hop, attempt, senderAttempt), errorCode: outcome.errorCode, detail: outcome.detail ?? null } as Record<string, unknown>,
-    timeout: input.operatorTimeout ?? OPERATOR_TIMEOUT,
-  });
-  return decision || { decision: DECISION.SCRAP, note: 'no decision before the timeout' };
+  const decisions = handoffDecisions(outcome.errorCode);
+  let refused = '';
+  for (let round = 1; ; round++) {
+    const answer = await conditional<OperatorResolution>(signalKeys.handoffError(input.routeKey, hop.index, attempt, round), {
+      role: LINE_ROLE.OPERATOR,
+      type: ROW_TYPE.HANDOFF_ERROR,
+      subtype: outcome.errorCode,
+      description: `${refused}${input.units.map((u) => u.unitId).join(', ')} stopped at ${where}: ${outcome.errorCode}. ${outcome.detail ?? ''} Choose ${decisions.join(', ')}.`.replace(/\s+/g, ' ').trim(),
+      priority: 1,
+      workflowType: UNIT_ROUTE_WORKFLOW,
+      metadata: {
+        ...hopFacets(input, hop, attempt, senderAttempt), errorCode: outcome.errorCode, detail: outcome.detail ?? null, decisions, round,
+      } as Record<string, unknown>,
+      timeout: input.operatorTimeout ?? OPERATOR_TIMEOUT,
+    });
+    if (!answer) return { decision: DECISION.SCRAP, note: 'no decision before the timeout' };
+    if (decisions.includes(answer.decision)) return answer;
+    refused = `${answer.decision} is not available here. `;
+  }
 }
 
 function stationName(step: RouteStep | null, end = 'exit'): string {

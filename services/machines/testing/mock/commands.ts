@@ -51,7 +51,7 @@ export class CommandHandler {
       case OP.DISABLE:
         await this.m.enable(false);
         return { status: REPLY_STATUS.ACCEPTED, reason: 'finishing the current unit; queue kept' };
-      case OP.ACK_ALARM: {
+      case OP.ACKNOWLEDGE_ALARM: {
         const ok = await this.m.alarms.acknowledge(a.alarmId, a.by ?? 'line-controller');
         return ok
           ? { status: REPLY_STATUS.ACCEPTED, reason: `acknowledged ${a.alarmId}` }

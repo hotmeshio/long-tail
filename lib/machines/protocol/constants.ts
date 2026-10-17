@@ -89,7 +89,7 @@ export const OP = {
   CANCEL: 'cancel',
   ENABLE: 'enable',
   DISABLE: 'disable',
-  ACK_ALARM: 'ack-alarm',
+  ACKNOWLEDGE_ALARM: 'ack-alarm',
   SNAPSHOT: 'snapshot',
 } as const;
 export type Op = typeof OP[keyof typeof OP];

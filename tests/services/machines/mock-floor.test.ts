@@ -40,6 +40,17 @@ describe('mock floor: the handoff', () => {
     expect(h.recorder.jobs('inspect-01', JOB_EVENT.RELEASED)[0]).toMatchObject({ peer: null });
   });
 
+  it('a unit whose receiver job is withdrawn mid-move goes back to the sender outfeed, where a person can take it', async () => {
+    h = await startHarness();
+    await pressThenCut();
+    await until(() => h.recorder.jobs('press-01', JOB_EVENT.RELEASED)[0]);
+    await h.command('cut-01', OP.CANCEL, { jobId: 'U1-cut-01' });
+    await until(() => h.line.machine('cut-01').alarms.list().find((a) => a.code === 'UNIT-NOT-DISPATCHED'));
+    expect(h.recorder.jobs('cut-01', JOB_EVENT.ARRIVED)).toHaveLength(0);
+    expect(await h.line.unload('press-01', { unitId: 'U1' })).toBe(true);
+    expect(await h.line.unload('press-01', { unitId: 'U1' })).toBe(false);
+  });
+
   it('manual arrival delivers an entry unit and refuses one that was not dispatched', async () => {
     h = await startHarness({ autoArriveAtEntry: false });
     expect(await h.line.arrive('press-01', { unitId: 'NOPE' })).toBe(false);

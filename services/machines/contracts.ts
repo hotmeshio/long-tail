@@ -100,6 +100,15 @@ export const DECISION = {
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
+/** Units a sender finished as not ok leave the automated line: they finish by hand or as scrap, and never re-enter it. */
+const LEAVES_LINE: readonly HandoffErrorCode[] = [HANDOFF_ERROR.SENDER_REJECTED];
+
+/** The decisions an operator may take on a failed handoff; retry only while the units are still on the line. */
+export function handoffDecisions(errorCode?: HandoffErrorCode): Decision[] {
+  const offLine = !!errorCode && LEAVES_LINE.includes(errorCode);
+  return offLine ? [DECISION.MANUAL, DECISION.SCRAP] : [DECISION.RETRY, DECISION.MANUAL, DECISION.SCRAP];
+}
+
 export interface OperatorResolution {
   decision: Decision;
   note?: string;
@@ -108,7 +117,8 @@ export interface OperatorResolution {
 /** Signal keys for the unit workflow; every attempt mints a fresh key. */
 export const signalKeys = {
   handoff: (jobKey: string, step: number, attempt: number) => `handoff-${jobKey}-s${step}-a${attempt}`,
-  handoffError: (jobKey: string, step: number, attempt: number) => `handoff-error-${jobKey}-s${step}-a${attempt}`,
+  handoffError: (jobKey: string, step: number, attempt: number, round = 1) =>
+    `handoff-error-${jobKey}-s${step}-a${attempt}${round > 1 ? `-r${round}` : ''}`,
 };
 
 export const dispatchCommandId = (escalationId: string) => `${escalationId}:dispatch`;

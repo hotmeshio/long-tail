@@ -229,7 +229,7 @@ export class Cell {
   async unload(unitId: string): Promise<boolean> {
     const job = this.station;
     const unit = job?.units.find((u) => u.unitId === unitId);
-    if (!job || !unit || unit.status !== UNIT_STATUS.DONE) return false;
+    if (!job || !unit || unit.status !== UNIT_STATUS.DONE) return this.m.floor.takeBack(unitId, this.m);
     this.m.floor.drop(unitId);
     await this.release(job, unitId, null);
     return true;

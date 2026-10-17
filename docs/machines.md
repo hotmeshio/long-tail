@@ -80,6 +80,8 @@ When the handoff ends without a receipt, the row resolves `{ received: false, er
 
 A row on a person's role resolves the same way, from the dashboard. A workflow can mix both in one route and never tell them apart.
 
+`Machines.handoffDecisions(errorCode)` gives the decisions that fit a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit.
+
 A host whose rows already carry their own facets supplies a `HandoffRowAdapter`:
 
 ```typescript

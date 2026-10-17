@@ -22,7 +22,7 @@ export const HANDOFF_FORM_SCHEMA = {
 export const OPERATOR_FORM_SCHEMA = {
   title: 'Line decision',
   description:
-    'A handoff that did not complete: retry it, finish the units by hand, or scrap them. An alarm or a machine that went dark: acknowledge it once handled.',
+    'A handoff that did not complete: retry it, finish the units by hand, or scrap them. Units a machine finished as not ok are off the line: finish them by hand or scrap them. An alarm or a machine that went dark: acknowledge it once handled.',
   'x-lt-order': ['decision', 'note'],
   required: ['decision'],
   properties: {
@@ -30,7 +30,7 @@ export const OPERATOR_FORM_SCHEMA = {
       type: 'string',
       enum: Object.values(DECISION),
       default: DECISION.ACKNOWLEDGE,
-      description: 'retry · manual · scrap for a failed handoff; acknowledge for an alarm or a machine',
+      description: 'One of the row\'s decisions for a failed handoff; acknowledge for an alarm or a machine',
     },
     note: { type: 'string', format: 'textarea', default: '', description: 'What was done' },
     clearedBy: { type: 'string', default: '', description: 'Who cleared it at the machine, when the machine reports it' },

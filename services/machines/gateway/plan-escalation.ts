@@ -113,7 +113,7 @@ function planAlarmRow(state: GatewayState, event: EscalationEvent): Action[] {
   if (event.verb !== VERB.RESOLVED) return [];
   // Still tracked means the machine has not cleared it: a person acknowledged it.
   return [{
-    kind: 'command', machineId: track.machineId, op: OP.ACK_ALARM, cmdId: `${event.escalationId}:ack`,
+    kind: 'command', machineId: track.machineId, op: OP.ACKNOWLEDGE_ALARM, cmdId: `${event.escalationId}:ack`,
     args: { alarmId: track.alarmId, by: event.data.resolved_by ?? 'line-operator' },
   }];
 }
