@@ -1,0 +1,100 @@
+/**
+ * Commands to machines and their replies. A dispatch becomes one command per
+ * job (gateway/jobs.ts); missing replies are asked for again with the same
+ * command ids, and the row is claimed once every job is accepted. When a
+ * dispatch ends without that, the row is resolved with the error and every
+ * job is cancelled, so a dispatch still queued for a machine that was away
+ * never runs later. Other commands are tracked for their reply and logged.
+ */
+
+import { HANDOFF_ERROR, cancelCommandId } from '../contracts';
+import { identOf, type LineDef } from '../../../lib/machines/line';
+import { OP, REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
+import type { MachineBus } from '../../../lib/machines/transport';
+import { CONTROLLER, type Action } from './actions';
+import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
+import { dispatchJobs, type DispatchJob } from './jobs';
+import { GATEWAY_LOG, type GatewayLog } from './log';
+import type { CommandReply, ReplyWaiter } from './reply-waiter';
+import { DISPATCH_STATE, type GatewayState } from './state';
+
+export interface DispatcherDeps {
+  bus: MachineBus;
+  codec: LineCodec;
+  line: LineDef;
+  lt: LineEscalations;
+  replies: ReplyWaiter;
+  state: GatewayState;
+  replyTimeoutMs: number;
+  dispatchAttempts: number;
+  log: GatewayLog;
+}
+
+type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
+type CommandAction = Extract<Action, { kind: 'command' }>;
+
+export class Dispatcher {
+  constructor(private readonly d: DispatcherDeps) {}
+
+  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<void> {
+    for (const wire of this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args })) {
+      await this.d.bus.publish(wire.topic, wire.payload);
+    }
+  }
+
+  /** Publish and wait for the reply, asking again with the same id; null when none came. */
+  async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<CommandReply | null> {
+    for (let attempt = 1; attempt <= this.d.dispatchAttempts; attempt++) {
+      const waiting = this.d.replies.wait(cmdId, this.d.replyTimeoutMs);
+      await this.publish(machineId, op, cmdId, args);
+      const reply = await waiting;
+      if (reply) return reply;
+    }
+    return null;
+  }
+
+  async command(a: CommandAction): Promise<void> {
+    const reply = await this.ask(a.machineId, a.op, a.cmdId, a.args);
+    if (!reply) this.d.log.warn(GATEWAY_LOG.COMMAND_UNANSWERED, { machine: a.machineId, op: a.op, cmdId: a.cmdId });
+    else if (reply.status !== REPLY_STATUS.ACCEPTED) {
+      this.d.log.warn(GATEWAY_LOG.COMMAND_REFUSED, { machine: a.machineId, op: a.op, cmdId: a.cmdId, status: reply.status, reason: reply.reason });
+    }
+  }
+
+  async dispatch(a: DispatchAction): Promise<void> {
+    const { lt, state, log } = this.d;
+    const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
+    const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units })));
+    const row = state.get(a.rowId);
+    if (replies.every((r) => r?.status === REPLY_STATUS.ACCEPTED)) {
+      if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
+      log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r!.reason).join('; ') });
+      this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
+      return;
+    }
+    // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
+    if (!row) return;
+    row.dispatch = DISPATCH_STATE.REFUSED;
+    const refused = replies.find((r) => r && r.status !== REPLY_STATUS.ACCEPTED);
+    const resolution = refused
+      ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${refused.status}: ${refused.reason}` }
+      : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts` };
+    log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { row: a.rowId, machine: a.machineId, ...resolution });
+    const ended = await lt.resolve(refused ? a.machineId : CONTROLLER, a.rowId, resolution);
+    this.check(a.rowId, 'resolve', ended);
+    state.close(a.rowId);
+    if (ended.outcome !== VERB_OUTCOME.DONE) return;
+    await this.withdraw(a, jobs.filter((_, i) => replies[i]?.status !== REPLY_STATUS.REFUSED && replies[i]?.status !== REPLY_STATUS.FAILED));
+  }
+
+  private check(rowId: string, verb: string, result: VerbResult): void {
+    if (result.outcome === VERB_OUTCOME.INVALID) this.d.log.error(GATEWAY_LOG.VERB_INVALID, { action: verb, row: rowId, detail: result.detail });
+  }
+
+  /** Cancel jobs the machine accepted or may still receive; replies are only logged. */
+  private async withdraw(a: DispatchAction, jobs: DispatchJob[]): Promise<void> {
+    await Promise.all(jobs.map((job) => this.command({
+      kind: 'command', machineId: a.machineId, op: OP.CANCEL, cmdId: `${cancelCommandId(a.rowId)}${job.suffix}`, args: { jobId: job.jobId },
+    })));
+  }
+}

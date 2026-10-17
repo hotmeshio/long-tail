@@ -60,6 +60,10 @@ export class Recorder {
     return this.of(machineId, 'cmd').map((e) => e.body).filter((b) => !op || b.op === op);
   }
 
+  replies(machineId: string): Record<string, any>[] {
+    return this.of(machineId, 'reply').map((e) => e.body);
+  }
+
   violations(): string[] {
     return this.seen.flatMap((s) => s.violations.map((v) => `${s.topic}: ${v}`));
   }

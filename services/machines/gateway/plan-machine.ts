@@ -17,6 +17,7 @@ import { DISPOSITION } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action, type Plan } from './actions';
 import { dispatchAction } from './plan-escalation';
 import { failHandoff } from './plan-shared';
+import { dispatchJobs } from './jobs';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
@@ -71,7 +72,7 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     if (!row) return missing(state, unitId, toHere);
     const expected = row.units.find((u) => u.unitId === unitId)?.carrierId;
     if (expected && b.carrierId && expected !== b.carrierId) {
-      return ack(failHandoff(row, m, {
+      return ack(failHandoff(state, row, m, {
         received: false, unitId, errorCode: HANDOFF_ERROR.CARRIER_MISMATCH, detail: `${m} read carrier ${b.carrierId}, expected ${expected}`,
       }));
     }
@@ -88,8 +89,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     if (!row) return missing(state, unitId, fromHere);
     const released: Action = { kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(unitId), payload: b };
     if (b.result === JOB_RESULT.OK) return ack([released]);
-    return ack([released, ...failHandoff(row, m, {
-      received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, reason: b.reason ?? null, detail: `${m} finished ${unitId}: ${b.result}`,
+    return ack([released, ...failHandoff(state, row, m, {
+      received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, reason: b.reason ?? null, detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
     })]);
   }
 
@@ -97,13 +98,13 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     const either = (r: HandoffRow) => toHere(r) || fromHere(r);
     const row = state.openFor(unitId, either);
     if (!row) return missing(state, unitId, either);
-    return ack(failHandoff(row, m, { received: false, unitId, errorCode: b.failure, detail: `${m} reported ${b.failure}` }));
+    return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: b.failure, detail: `${m} reported ${b.failure}` }));
   }
 
   if (b.event === JOB_EVENT.WITHDRAWN) {
     const row = state.openFor(unitId, toHere);
     if (!row) return ack();
-    return ack(failHandoff(row, m, { received: false, unitId, errorCode: HANDOFF_ERROR.WITHDRAWN, detail: `${m} gave up ${b.jobId}` }));
+    return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: HANDOFF_ERROR.WITHDRAWN, detail: `${m} gave up ${b.jobId}` }));
   }
 
   return ack();
@@ -122,9 +123,14 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
       payload: { decision: DECISION.CLEARED, clearedBy: b.clearedBy ?? null, note: `cleared at ${m}${b.clearedBy ? ` by ${b.clearedBy}` : ''}` },
     }]);
   }
-  if (!STOPPING_LEVELS.includes(b.level) || state.alarms.has(key)) return ack();
-  state.alarms.set(key, { machineId: m, alarmId, open: true });
-  return ack([{
+  if (!STOPPING_LEVELS.includes(b.level)) return ack();
+  const known = state.alarms.get(key);
+  if (known && (!known.raisedAt || !b.raisedAt || known.raisedAt === b.raisedAt)) return ack();
+  const superseded: Action[] = known?.rowId && known.open
+    ? [{ kind: 'resolve', as: CONTROLLER, rowId: known.rowId, payload: { decision: DECISION.CLEARED, note: `${m} raised ${alarmId} again; this one ended` } }]
+    : [];
+  state.alarms.set(key, { machineId: m, alarmId, raisedAt: b.raisedAt, open: true });
+  return ack([...superseded, {
     kind: 'createAlarmRow', machineId: m, alarmId,
     row: {
       type: ROW_TYPE.ALARM, subtype: b.level, role: LINE_ROLE.OPERATOR, priority: b.level === LEVEL.EMERGENCY ? 1 : 2,
@@ -168,6 +174,7 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   link.bootId = b.bootId;
   if (!previous || previous === b.bootId) return ack();
   const held = new Set((b.jobs ?? []).map((j: any) => j.jobId));
-  const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && !held.has(r.jobId));
+  const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
+  const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
   return ack(lost.map((r) => dispatchAction(r, m, ttl)));
 }

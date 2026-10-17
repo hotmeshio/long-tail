@@ -29,7 +29,8 @@ interface Expectation { receiver: MockMachine; job: Job; announced: boolean; sta
 interface Holding { sender: MockMachine | null; job: Job; unitId: string; carrierId: string | null }
 
 export class Floor {
-  private expects = new Map<string, Expectation>();
+  /** Every station expecting a unit: the next hop may be dispatched before the unit reaches the current one. */
+  private expects = new Map<string, Expectation[]>();
   private holds = new Map<string, Holding>();
   private armed = new Map<string, TransferFault[]>();
   private blocked = new Set<string>();
@@ -45,13 +46,17 @@ export class Floor {
   expect(receiver: MockMachine, job: Job, unitId: string, carrierId: string | null): void {
     const moving = this.transit.get(unitId);
     if (moving?.receiver === receiver && moving.job === job) return;
-    this.expects.set(unitId, { receiver, job, announced: false, stalled: false });
+    const others = (this.expects.get(unitId) ?? []).filter((e) => e.receiver !== receiver);
+    this.expects.set(unitId, [...others, { receiver, job, announced: false, stalled: false }]);
     if (!job.from && !this.holds.has(unitId)) this.holds.set(unitId, { sender: null, job, unitId, carrierId });
     this.poke();
   }
 
-  unexpect(unitId: string): void {
-    this.expects.delete(unitId);
+  /** The station no longer expects the unit. */
+  unexpect(unitId: string, receiver: MockMachine): void {
+    const left = (this.expects.get(unitId) ?? []).filter((e) => e.receiver !== receiver);
+    if (left.length) this.expects.set(unitId, left);
+    else this.expects.delete(unitId);
   }
 
   /** A finished unit waits at its station for the next one. */
@@ -97,7 +102,7 @@ export class Floor {
   async arrive(receiver: MockMachine, unitId: string, carrierId: string | null): Promise<boolean> {
     this.holds.delete(unitId);
     const ok = await receiver.cell.receive(unitId, carrierId, null);
-    if (ok) this.expects.delete(unitId);
+    if (ok) this.unexpect(unitId, receiver);
     return ok;
   }
 
@@ -118,18 +123,23 @@ export class Floor {
     return machine ? this.armed.get(machine.def.machineId)?.shift() : undefined;
   }
 
+  /** Each expecting station that can take the unit says READY; the one the unit is waiting for gets it. */
   private async attempt(unitId: string): Promise<void> {
-    const e = this.expects.get(unitId);
-    if (!e || e.stalled) return;
-    const { receiver, job } = e;
-    const rid = receiver.def.machineId;
-    if (!receiver.cell.canTake(job) || this.inbound.has(rid) || !receiver.canProduce()) return;
-    if (!e.announced) {
-      e.announced = true;
-      await receiver.cell.announceReady(job, unitId);
-    }
     const h = this.holds.get(unitId);
-    if (!h) return;
+    for (const e of [...(this.expects.get(unitId) ?? [])]) {
+      const rid = e.receiver.def.machineId;
+      if (e.stalled || !e.receiver.cell.canTake(e.job) || this.inbound.has(rid) || !e.receiver.canProduce()) continue;
+      if (!e.announced) {
+        e.announced = true;
+        await e.receiver.cell.announceReady(e.job, unitId);
+      }
+      if (h && serves(h, e)) return this.move(unitId, e, h);
+    }
+  }
+
+  private async move(unitId: string, e: Expectation, h: Holding): Promise<void> {
+    const { receiver } = e;
+    const rid = receiver.def.machineId;
     if (!h.sender) {
       if (!this.settings.autoArriveAtEntry) return;
       this.depart(unitId, e, rid);
@@ -169,7 +179,7 @@ export class Floor {
 
   private depart(unitId: string, e: Expectation, receiverId: string): void {
     this.transit.set(unitId, e);
-    this.expects.delete(unitId);
+    this.unexpect(unitId, e.receiver);
     this.holds.delete(unitId);
     this.inbound.add(receiverId);
   }
@@ -209,4 +219,9 @@ export class Floor {
     this.holds.set(h.unitId, h);
     this.poke();
   }
+}
+
+/** A unit at line entry goes to the job that took it in; a finished unit goes to the station expecting it from its sender. */
+function serves(h: Holding, e: Expectation): boolean {
+  return h.sender ? e.job.from === h.sender.def.machineId : e.job === h.job;
 }

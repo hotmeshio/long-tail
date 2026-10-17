@@ -38,7 +38,7 @@ async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, out
     priority: 1,
     workflowType: UNIT_ROUTE_WORKFLOW,
     metadata: { ...hopFacets(input, hop, attempt), errorCode: outcome.errorCode, detail: outcome.detail ?? null } as Record<string, unknown>,
-    timeout: OPERATOR_TIMEOUT,
+    timeout: input.operatorTimeout ?? OPERATOR_TIMEOUT,
   });
   return decision || { decision: DECISION.SCRAP, note: 'no decision before the timeout' };
 }

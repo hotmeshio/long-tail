@@ -28,6 +28,12 @@ describe('generic codec', () => {
     expect(codec.decode(topic('job'), job('finished')).map((s) => s.body?.body.event)).toEqual(['finished']);
   });
 
+  it('can take the receiver\'s carrier bind as its receipt', () => {
+    const codec = genericCodec({ root: 'line/v1', receiptFrom: RECEIPT_FROM.BOUND });
+    expect(codec.decode(topic('job'), job('bound')).map((s) => s.body?.body.event)).toEqual(['arrived', 'bound']);
+    expect(codec.decode(topic('job'), job('started')).map((s) => s.body?.body.event)).toEqual(['started']);
+  });
+
   it('declares its channels and dispatch size', () => {
     const codec = genericCodec({ root: 'line/v1', unitsPerDispatch: 1 });
     expect(codec.channels.events).toContain('alarm/+');

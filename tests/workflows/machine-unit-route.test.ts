@@ -106,9 +106,9 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     await disconnectTelemetry();
   }, 20_000);
 
-  async function start(routeKey: string, units: string[]) {
+  async function start(routeKey: string, units: string[], extra: Record<string, unknown> = {}) {
     return client.workflow.start({
-      args: [{ data: { siteId: LINE.siteId, lineId: LINE.lineId, routeKey, orderRef: `ORD-${routeKey}`, units: units.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), steps: STEPS } }],
+      args: [{ data: { siteId: LINE.siteId, lineId: LINE.lineId, routeKey, orderRef: `ORD-${routeKey}`, units: units.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), steps: STEPS, ...extra } }],
       taskQueue: TASK_QUEUE,
       workflowName: 'machineUnitRoute',
       workflowId: `mur-${routeKey}`,
@@ -144,5 +144,44 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     const final = await handle.result() as { data: { status: string; history: any[] } };
     expect(final.data.status).toBe('complete');
     expect(final.data.history.filter((h) => h.to === 'cut-01').map((h) => [h.attempt, h.received, h.errorCode])).toEqual([[1, false, 'jam'], [2, true, undefined]]);
+  }, 90_000);
+
+  it('manual after a jam: a person takes the units from where they stopped', async () => {
+    const routeKey = `R${Durable.guid().slice(0, 8)}`;
+    line.line.armTransfer('press-01', { fault: 'jam' });
+    const handle = await start(routeKey, ['M1']);
+    const decide = await rowBySignal(signalKeys.handoffError(routeKey, 1, 1));
+    const alarm = line.line.machine('press-01').alarms.list()[0];
+    await line.line.clearAlarm('press-01', { alarmId: alarm.alarmId, by: 'tech-1' });
+    expect((await escalationApi.resolveEscalation({ id: decide.id, resolverPayload: { decision: 'manual', note: 'hand carry' } }, { userId: personId })).status).toBe(200);
+    const exit = await rowBySignal(signalKeys.handoff(routeKey, STEPS.length + 1, 1));
+    expect(exit).toMatchObject({ role: 'line-exit' });
+    expect((exit.metadata as any).fromMachine).toBe('press-01');
+    await line.line.unload('press-01', { unitId: 'M1' });
+    expect((await escalationApi.resolveEscalation({ id: exit.id, resolverPayload: { received: true, receiver: 'person' } }, { userId: personId })).status).toBe(200);
+    const final = await handle.result() as { data: Record<string, any> };
+    expect(final.data).toMatchObject({ status: 'manual', at: 'press-01', received: true });
+  }, 90_000);
+
+  it('scrap after a reject ends the route', async () => {
+    const routeKey = `R${Durable.guid().slice(0, 8)}`;
+    line.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
+    const handle = await start(routeKey, ['S1']);
+    const decide = await rowBySignal(signalKeys.handoffError(routeKey, 1, 1));
+    expect(decide).toMatchObject({ subtype: 'sender-rejected' });
+    await line.line.unload('press-01', { unitId: 'S1' });
+    expect((await escalationApi.resolveEscalation({ id: decide.id, resolverPayload: { decision: 'scrap', note: 'weak bond' } }, { userId: personId })).status).toBe(200);
+    const final = await handle.result() as { data: Record<string, any> };
+    expect(final.data).toMatchObject({ status: 'scrapped', at: 'press-01', note: 'weak bond' });
+  }, 90_000);
+
+  it('no operator decision before the timeout scraps the units', async () => {
+    const routeKey = `R${Durable.guid().slice(0, 8)}`;
+    line.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
+    const handle = await start(routeKey, ['T1'], { operatorTimeout: '3s' });
+    await rowBySignal(signalKeys.handoffError(routeKey, 1, 1));
+    await line.line.unload('press-01', { unitId: 'T1' });
+    const final = await handle.result() as { data: Record<string, any> };
+    expect(final.data).toMatchObject({ status: 'scrapped', note: 'no decision before the timeout' });
   }, 90_000);
 });

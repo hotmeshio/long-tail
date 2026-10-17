@@ -48,7 +48,7 @@ export function facetsFor(units: string | string[], from: string | null, to: str
 }
 
 export async function startRig(
-  mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: Pick<GatewayDeps, 'rows' | 'codec'> = {},
+  mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: Pick<GatewayDeps, 'rows' | 'codec' | 'log'> = {},
 ): Promise<LineRig> {
   const base = await startHarness(mock, line);
   const feed = new MemoryEscalationFeed(base.broker);
@@ -58,7 +58,7 @@ export async function startRig(
   const startGateway = async () => {
     const gateway = new MachineGateway({
       bus: new MemoryMachineBus(base.broker, lineFilter(ROOT, line.siteId, line.lineId)),
-      feed, lt, line, settings, log: silentLog, ...seams,
+      feed, lt, line, settings, ...seams, log: seams.log ?? silentLog,
     });
     await gateway.start();
     return gateway;

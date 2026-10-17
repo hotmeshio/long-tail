@@ -40,6 +40,8 @@ export interface ArmedResult {
 export type Reply = { status: ReplyStatus; reason: string };
 
 export const CANCELLED_REASON = 'cancelled';
+/** Modes in which a machine takes no new work. */
+const REFUSING_MODES: string[] = [MODE.MAINTENANCE, MODE.EMERGENCY_STOP];
 
 export class Cell {
   readonly jobs = new Map<string, Job>();
@@ -63,6 +65,7 @@ export class Cell {
     const missing = ['jobId', 'orderRef', 'recipe'].filter((k) => !a[k]);
     if (!Array.isArray(a.units) || a.units.length === 0) missing.push('units');
     if (missing.length) return { status: REPLY_STATUS.REFUSED, reason: `missing ${missing.join(', ')}` };
+    if (REFUSING_MODES.includes(this.m.mode)) return { status: REPLY_STATUS.REFUSED, reason: `${this.m.def.machineId} is in ${this.m.mode}` };
     const { id: recipeId, version } = a.recipe;
     if (!this.m.recipes[recipeId]?.includes(String(version))) {
       return { status: REPLY_STATUS.REFUSED, reason: `recipe ${recipeId} v${version} is not held` };
@@ -103,7 +106,7 @@ export class Cell {
   /** The job leaves the queue (cancelled, or given up by the machine). */
   async withdraw(job: Job): Promise<void> {
     this.jobs.delete(job.jobId);
-    for (const u of job.units) this.m.floor.unexpect(u.unitId);
+    for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m);
     if (this.station === job) this.station = null;
     for (const u of job.units) await this.publishJob(JOB_EVENT.WITHDRAWN, job, u);
     this.m.floor.poke();
@@ -236,7 +239,7 @@ export class Cell {
   forget(): void {
     this.m.timers.cancel(this.cycleTimer);
     this.m.timers.cancel(this.progressTimer);
-    for (const job of this.jobs.values()) for (const u of job.units) this.m.floor.unexpect(u.unitId);
+    for (const job of this.jobs.values()) for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m);
     this.jobs.clear();
     this.station = null;
   }

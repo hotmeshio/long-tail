@@ -1,7 +1,8 @@
 /**
  * The line protocol as JSON Schema plus the rules a schema cannot express.
- * Bodies are closed objects, so an unknown field is a violation. The gateway
- * checks every inbound message; the tests check everything the mock sends.
+ * Known fields are checked; unknown fields are allowed, so a machine on a
+ * newer minor version can add fields without breaking older gateways. The
+ * gateway checks every inbound message; the tests check everything the mock sends.
  */
 
 import Ajv, { type ValidateFunction } from 'ajv';
@@ -25,46 +26,47 @@ const UUID = { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 
 const oneOf = (o: Record<string, string>, nullable = false): Schema => ({ enum: nullable ? [...Object.values(o), null] : Object.values(o) });
 
-function closed(props: Schema, optional: string[] = []): Schema {
-  return { type: 'object', properties: props, required: Object.keys(props).filter((k) => !optional.includes(k)), additionalProperties: false };
+function shape(props: Schema, optional: string[] = []): Schema {
+  return { type: 'object', properties: props, required: Object.keys(props).filter((k) => !optional.includes(k)) };
 }
 
-const ENVELOPE = closed({
+const ENVELOPE = shape({
   v: { type: 'string', pattern: '^1(\\.\\d+)?$' },
   id: UUID,
   at: TS,
-  source: closed({ site: STR, line: STR, machine: STR }),
+  source: shape({ site: STR, line: STR, machine: STR }),
   body: { type: 'object' },
 });
 
-const RECIPE = { anyOf: [closed({ id: STR, version: STR }), { type: 'null' }] };
+const RECIPE = { anyOf: [shape({ id: STR, version: STR }), { type: 'null' }] };
 
 const BODY: Record<MessageKind, Schema> = {
-  [MESSAGE_KIND.PRESENCE]: closed({ online: BOOL, software: STR }, ['software']),
-  [MESSAGE_KIND.SNAPSHOT]: closed({
+  [MESSAGE_KIND.PRESENCE]: shape({ online: BOOL, software: STR }, ['software']),
+  [MESSAGE_KIND.SNAPSHOT]: shape({
     bootId: STR, software: STR, mode: oneOf(MODE), enabled: BOOL, recipe: RECIPE,
-    jobs: { type: 'array', items: closed({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
+    jobs: { type: 'array', items: shape({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
     alarms: { type: 'array', items: STR },
     cycles: INT0,
   }),
-  [MESSAGE_KIND.JOB]: closed({
+  [MESSAGE_KIND.JOB]: shape({
     event: oneOf(JOB_EVENT), jobId: STR, unitId: STR, orderRef: STR, recipe: RECIPE, carrierId: STR_N, peer: STR_N,
     result: oneOf(JOB_RESULT), reason: STR_N,
     measurements: {
       type: 'array',
-      items: closed({ name: STR, value: NUM, unit: STR_N, min: { type: ['number', 'null'] }, max: { type: ['number', 'null'] }, ok: BOOL }),
+      items: shape({ name: STR, value: NUM, unit: STR_N, min: { type: ['number', 'null'] }, max: { type: ['number', 'null'] }, ok: BOOL }),
     },
-    materials: { type: 'array', items: closed({ material: STR, lot: STR }) },
+    materials: { type: 'array', items: shape({ material: STR, lot: STR }) },
     startedAt: TS, endedAt: TS, durationMs: INT0, failure: oneOf(TRANSFER_FAILURE),
   }, ['peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure']),
-  [MESSAGE_KIND.ALARM]: closed({
+  [MESSAGE_KIND.ALARM]: shape({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
     raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,
     zone: STR_N, autoClears: BOOL, action: STR_N, jobId: STR_N,
   }),
-  [MESSAGE_KIND.TELEMETRY]: closed({ readings: { type: 'object', additionalProperties: NUM } }),
-  [MESSAGE_KIND.CMD]: closed({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
-  [MESSAGE_KIND.REPLY]: closed({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR }),
+  [MESSAGE_KIND.TELEMETRY]: shape({ readings: { type: 'object', additionalProperties: NUM } }),
+  [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
+  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR }),
+  [MESSAGE_KIND.REPORT]: { type: 'object' },
 };
 
 const ajv = new Ajv({ allErrors: true, strict: false });

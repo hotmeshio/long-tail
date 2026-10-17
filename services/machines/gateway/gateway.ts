@@ -6,8 +6,11 @@
  */
 
 import { standardRows, type HandoffRowAdapter } from '../rows';
+import { DECISION } from '../contracts';
+import { CONTROLLER } from './actions';
+import { alarmsClearedMeanwhile, restoreLineRows } from './reconcile';
 import type { LineDef } from '../../../lib/machines/line';
-import { genericCodec, type Envelope, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
@@ -53,6 +56,7 @@ export class MachineGateway {
     this.log = deps.log ?? consoleLog;
     this.rows = deps.rows ?? standardRows;
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot });
+    this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.executor = new Executor({
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
@@ -86,8 +90,20 @@ export class MachineGateway {
     return this.executor.idle();
   }
 
-  /** Open handoff rows at boot, so a dispatch interrupted by a restart is sent again (same cmdId). */
+  /**
+   * On taking the line: open handoff rows (a dispatch interrupted by a restart
+   * is sent again with the same cmdId), the gateway's own alarm, offline and
+   * quiet rows, then the machines' retained state to catch what changed while
+   * no gateway was listening.
+   */
   private async reconcile(): Promise<void> {
+    const handoffs = await this.reconcileHandoffs();
+    const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
+    await this.resync();
+    this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, ...restored });
+  }
+
+  private async reconcileHandoffs(): Promise<number> {
     let handoffs = 0;
     for (const query of this.rows.openRows(this.deps.line)) {
       for (const data of await this.deps.lt.listOpen(query)) {
@@ -97,7 +113,23 @@ export class MachineGateway {
         await this.executor.apply(actions);
       }
     }
-    this.log.info(GATEWAY_LOG.RECONCILED, { handoffs });
+    return handoffs;
+  }
+
+  private async resync(): Promise<void> {
+    const { line } = this.deps;
+    const active = new Set<string>();
+    for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
+      for (const seen of this.codec.decode(msg.topic, msg.payload, true)) {
+        if (!seen.parsed) continue;
+        if (seen.parsed.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed.ident.machineId, seen.parsed.key!));
+        await this.applyMachine(msg.topic, seen.parsed, seen.body);
+      }
+    }
+    for (const gone of alarmsClearedMeanwhile(this.state, active)) {
+      this.state.alarms.delete(gone.key);
+      await this.executor.apply([{ kind: 'resolve', as: CONTROLLER, rowId: gone.rowId, payload: { decision: DECISION.CLEARED, note: `cleared at ${gone.machineId} while the gateway was away` } }]);
+    }
   }
 
   private async onEscalation(event: EscalationEvent): Promise<Disposition> {

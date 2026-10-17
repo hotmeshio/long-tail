@@ -18,7 +18,7 @@ export const QOS = { BEST_EFFORT: 0, RELIABLE: 1 } as const;
 
 /** A command with no reply inside this window counts as refused. */
 export const REPLY_DEADLINE_MS = 5_000;
-export const MAX_PAYLOAD_BYTES = 128 * 1024;
+export const MAX_PAYLOAD_BYTES = 256 * 1024;
 export const PRESENCE_HEARTBEAT_SEC = 30;
 export const SNAPSHOT_HEARTBEAT_SEC = 60;
 
@@ -30,6 +30,8 @@ export const CHANNEL = {
   TELEMETRY: 'telemetry',
   CMD: 'cmd',
   REPLY: 'cmd/reply',
+  /** report/<name>: production, availability, inventory and other reporting, kept in the event stream. */
+  REPORT: 'report',
 } as const;
 
 export const MODE = {
@@ -59,6 +61,8 @@ export const JOB_EVENT = {
   QUEUED: 'queued',
   READY: 'ready',
   ARRIVED: 'arrived',
+  /** The receiver put the unit on its carrier; some machines report this instead of an arrival. */
+  BOUND: 'bound',
   STARTED: 'started',
   PROGRESS: 'progress',
   FINISHED: 'finished',
@@ -68,7 +72,7 @@ export const JOB_EVENT = {
 } as const;
 export type JobEvent = typeof JOB_EVENT[keyof typeof JOB_EVENT];
 
-export const JOB_RESULT = { OK: 'ok', REJECT: 'reject', HOLD: 'hold' } as const;
+export const JOB_RESULT = { OK: 'ok', REJECT: 'reject', HOLD: 'hold', SCRAP: 'scrap', REWORK: 'rework' } as const;
 export type JobResult = typeof JOB_RESULT[keyof typeof JOB_RESULT];
 
 export const TRANSFER_FAILURE = {

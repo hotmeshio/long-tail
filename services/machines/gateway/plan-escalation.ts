@@ -27,6 +27,7 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
     orderRef: row.orderRef,
     recipe: { id: row.recipeId, version: row.recipeVersion },
     units: row.units,
+    process: row.process,
     from: row.fromMachine,
     expiresAt: isoTs(expiresAt),
     ...(row.artifactUrl ? { artifact: { url: row.artifactUrl, sha256: row.artifactSha256 } } : {}),
@@ -85,11 +86,11 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
   }
   if (event.verb === VERB.CANCELLED) {
     const row = state.close(id, ROW_END.CANCELLED);
-    return row ? [...cancelDispatch(row), ...cancelSender(row)] : [];
+    return row ? [...cancelDispatch(state, row), ...cancelSender(state, row)] : [];
   }
   if (event.verb === VERB.EXPIRED) {
     const row = state.close(id, ROW_END.EXPIRED);
-    return row ? cancelDispatch(row) : [];
+    return row ? cancelDispatch(state, row) : [];
   }
   if (event.verb === VERB.RESOLVED) state.close(id);
   return [];

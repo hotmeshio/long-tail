@@ -1,19 +1,20 @@
 /**
  * Runs the planner's actions: escalation verbs through LineEscalations,
- * commands onto the machine bus, the dispatch request/reply cycle, and the
- * offline debounce. A verb that fails for real throws, so the message that
+ * dispatches and commands through the Dispatcher, alarm and machine rows,
+ * and the offline debounce. A verb that fails for real throws, so the message that
  * caused it is delivered again.
  */
 
-import { DECISION, HANDOFF_ERROR, ROW_TYPE } from '../contracts';
-import { identOf, operatorRole, type LineDef } from '../../../lib/machines/line';
-import { OP, REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
+import { DECISION, ROW_TYPE } from '../contracts';
+import { operatorRole, type LineDef } from '../../../lib/machines/line';
+import type { LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
-import { DISPATCH_STATE, type GatewayState } from './state';
+import { Dispatcher } from './dispatcher';
+import type { GatewayState } from './state';
 
 export interface ExecutorDeps {
   bus: MachineBus;
@@ -29,18 +30,24 @@ export interface ExecutorDeps {
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
+type CommandAction = Extract<Action, { kind: 'command' }>;
 
 export class Executor {
   private inflight = new Set<Promise<void>>();
   private quietPending = new Set<string>();
   private timers = new Set<NodeJS.Timeout>();
 
-  constructor(private readonly d: ExecutorDeps) {}
+  private readonly dispatcher: Dispatcher;
 
-  /** Dispatches run detached so one slow reply never holds up the feed. */
+  constructor(private readonly d: ExecutorDeps) {
+    this.dispatcher = new Dispatcher(d);
+  }
+
+  /** Dispatches and commands run detached so one slow reply never holds up the feed. */
   async apply(actions: Action[]): Promise<void> {
     for (const action of actions) {
-      if (action.kind === 'dispatch') this.track(this.dispatch(action));
+      if (action.kind === 'dispatch') this.track(this.dispatcher.dispatch(action));
+      else if (action.kind === 'command') this.track(this.dispatcher.command(action));
       else await this.run(action);
     }
   }
@@ -56,23 +63,15 @@ export class Executor {
     this.d.replies.cancelAll();
   }
 
-  async publishCommand(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<void> {
-    for (const wire of this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args })) {
-      await this.d.bus.publish(wire.topic, wire.payload);
-    }
-  }
-
   private track(work: Promise<void>): void {
     const tracked = work.catch((err) => this.d.log.error(GATEWAY_LOG.VERB_FAILED, { error: String(err?.message ?? err) }))
       .finally(() => this.inflight.delete(tracked));
     this.inflight.add(tracked);
   }
 
-  private async run(a: Exclude<Action, DispatchAction>): Promise<void> {
+  private async run(a: Exclude<Action, DispatchAction | CommandAction>): Promise<void> {
     const { lt, state, replies } = this.d;
     switch (a.kind) {
-      case 'command':
-        return this.publishCommand(a.machineId, a.op, a.cmdId, a.args);
       case 'claim':
         return this.check(a, await lt.claim(a.as, a.rowId));
       case 'accumulate':
@@ -106,30 +105,6 @@ export class Executor {
     if (result.outcome === VERB_OUTCOME.INVALID) {
       this.d.log.error(GATEWAY_LOG.VERB_INVALID, { action: a.kind, row: (a as any).rowId, detail: result.detail });
     }
-  }
-
-  private async dispatch(a: DispatchAction): Promise<void> {
-    const { replies, lt, state, log } = this.d;
-    let reply = null;
-    for (let attempt = 1; attempt <= this.d.dispatchAttempts && !reply; attempt++) {
-      const waiting = replies.wait(a.cmdId, this.d.replyTimeoutMs);
-      await this.publishCommand(a.machineId, OP.DISPATCH, a.cmdId, a.args);
-      reply = await waiting;
-    }
-    const row = state.get(a.rowId);
-    if (reply?.status === REPLY_STATUS.ACCEPTED) {
-      if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
-      log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: reply.reason });
-      this.check(a, await lt.claim(a.machineId, a.rowId));
-      return;
-    }
-    if (row) row.dispatch = DISPATCH_STATE.REFUSED;
-    const resolution = reply
-      ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${reply.status}: ${reply.reason}` }
-      : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts` };
-    log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { row: a.rowId, machine: a.machineId, ...resolution });
-    this.check(a, await lt.resolve(reply ? a.machineId : CONTROLLER, a.rowId, resolution));
-    state.close(a.rowId);
   }
 
   private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<void> {

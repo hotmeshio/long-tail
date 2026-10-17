@@ -23,6 +23,8 @@ export interface HandoffRow extends HandoffFacets {
 export interface AlarmTrack {
   machineId: string;
   alarmId: string;
+  /** When the machine raised it; a reused alarm id with a new time is a new alarm. */
+  raisedAt?: string;
   rowId?: string;
   /** Created and not yet resolved by anyone. */
   open: boolean;
@@ -42,6 +44,8 @@ export interface LinkTrack {
 const CLOSED_LIMIT = 2_000;
 
 export class GatewayState {
+  /** Units one dispatch may carry, from the codec; null when any number may. */
+  unitsPerDispatch: number | null = null;
   private openRows = new Map<string, HandoffRow>();
   private closedRows = new Map<string, HandoffRow>();
   readonly alarms = new Map<string, AlarmTrack>();

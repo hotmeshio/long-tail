@@ -20,13 +20,31 @@ describe('contract: envelope and topics', () => {
     expect(inspectMessage(ROOT, topic, msg({ online: true }), false).violations).toContain('presence not retained');
   });
 
-  it('flags an unknown topic, non-JSON, a mismatched source and unknown fields', () => {
+  it('flags an unknown topic, non-JSON and a mismatched source', () => {
     expect(inspectMessage(ROOT, `${ROOT}/site-1/line-1/press-01/bogus`, msg({})).violations).toEqual(['unknown topic']);
     const presence = machineTopic(ROOT, ident, CHANNEL.PRESENCE);
     expect(inspectMessage(ROOT, presence, 'nope').violations).toContain('not a JSON object');
     const other = JSON.stringify(buildEnvelope({ ...ident, machineId: 'cut-01' }, { online: true }));
     expect(inspectMessage(ROOT, presence, other).violations).toContain('source disagrees with the topic');
-    expect(inspectMessage(ROOT, presence, msg({ online: true, extra: 1 })).violations.some((v) => v.includes('additional properties'))).toBe(true);
+  });
+
+  it('accepts fields it does not know, still checking the ones it does', () => {
+    const presence = machineTopic(ROOT, ident, CHANNEL.PRESENCE);
+    expect(inspectMessage(ROOT, presence, msg({ online: true, firmwareBuild: 'b17' }), true).violations).toEqual([]);
+    expect(inspectMessage(ROOT, presence, msg({ online: 'yes', firmwareBuild: 'b17' }), true).violations.join()).toMatch(/online/);
+  });
+
+  it('allows payloads up to 256 KB', () => {
+    const topic = machineTopic(ROOT, ident, CHANNEL.TELEMETRY);
+    const big = msg({ readings: { a: 1 }, pad: 'x'.repeat(200 * 1024) });
+    expect(inspectMessage(ROOT, topic, big).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg({ readings: {}, pad: 'x'.repeat(260 * 1024) })).violations.join()).toMatch(/exceeds/);
+  });
+
+  it('reads reports under report/<name> as their own kind', () => {
+    const [seen] = [inspectMessage(ROOT, `${ROOT}/site-1/line-1/press-01/report/production`, msg({ good: 40, scrap: 2 }))];
+    expect(seen.parsed).toMatchObject({ kind: 'report', key: 'production' });
+    expect(seen.violations).toEqual([]);
   });
 });
 

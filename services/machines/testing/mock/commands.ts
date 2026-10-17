@@ -1,7 +1,7 @@
 /**
- * Commands: dedupe by cmdId, discard commands past their expiry, run the op,
- * reply on .../cmd/reply. A repeated cmdId gets the first reply again and is
- * never run twice.
+ * Commands: one at a time in arrival order, deduped by cmdId, discarded past
+ * their expiry, replied on .../cmd/reply. A repeated cmdId gets the first
+ * reply again and is never run twice.
  */
 
 import { OP, REPLY_STATUS, type Envelope } from '../../../../lib/machines/protocol';
@@ -15,10 +15,17 @@ export class CommandHandler {
   private done = new Map<string, Reply>();
   replyMode: ReplyMode = REPLY_MODE.NORMAL;
   replyDelayMs = 0;
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(private readonly m: MockMachine) {}
 
-  async handle(env: Envelope | null): Promise<void> {
+  handle(env: Envelope | null): Promise<void> {
+    const next = this.queue.then(() => this.handleOne(env));
+    this.queue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async handleOne(env: Envelope | null): Promise<void> {
     const body = env?.body as Record<string, any> | undefined;
     const cmdId = body?.cmdId;
     if (!body || typeof cmdId !== 'string') return;

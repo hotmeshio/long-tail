@@ -15,13 +15,14 @@ export const MESSAGE_KIND = {
   TELEMETRY: 'telemetry',
   CMD: 'cmd',
   REPLY: 'reply',
+  REPORT: 'report',
 } as const;
 export type MessageKind = typeof MESSAGE_KIND[keyof typeof MESSAGE_KIND];
 
 export interface ParsedTopic {
   ident: MachineIdent;
   kind: MessageKind;
-  /** The alarm id on alarm topics. */
+  /** The alarm id on alarm topics; the report name on report topics. */
   key?: string;
 }
 
@@ -73,5 +74,6 @@ export function parseTopic(root: string, topic: string): ParsedTopic | null {
   const kind = CHANNEL_KIND[rest.join('/')];
   if (kind) return { ident, kind };
   if (rest.length === 2 && rest[0] === CHANNEL.ALARM) return { ident, kind: MESSAGE_KIND.ALARM, key: rest[1] };
+  if (rest.length >= 2 && rest[0] === CHANNEL.REPORT) return { ident, kind: MESSAGE_KIND.REPORT, key: rest.slice(1).join('/') };
   return null;
 }

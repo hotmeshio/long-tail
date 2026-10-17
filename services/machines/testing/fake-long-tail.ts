@@ -31,6 +31,19 @@ export class FakeLongTail implements LineEscalations {
   readonly rows = new Map<string, FakeRow>();
   readonly calls: Call[] = [];
   private seq = 0;
+  private failing = new Map<string, number>();
+
+  /** The next `times` calls of `verb` fail as a Long Tail outage would (5xx). */
+  failNext(verb: 'claim' | 'accumulate' | 'resolve' | 'create', times = 1): void {
+    this.failing.set(verb, times);
+  }
+
+  private outage(verb: string): void {
+    const left = this.failing.get(verb) ?? 0;
+    if (left <= 0) return;
+    this.failing.set(verb, left - 1);
+    throw new Error(`Long Tail unavailable (${verb})`);
+  }
 
   constructor(private readonly feed: MemoryEscalationFeed) {}
 
@@ -82,6 +95,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   async claim(as: Actor, id: string): Promise<VerbResult> {
+    this.outage('claim');
     this.calls.push({ verb: 'claim', as, id });
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
@@ -91,6 +105,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   async accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>): Promise<VerbResult> {
+    this.outage('accumulate');
     this.calls.push({ verb: 'accumulate', as, id, payload: { itemKey, ...payload } });
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
@@ -100,6 +115,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   async resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult> {
+    this.outage('resolve');
     this.calls.push({ verb: 'resolve', as, id, payload });
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return { outcome: VERB_OUTCOME.ALREADY };
@@ -113,6 +129,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   async create(_as: Actor, input: CreateRowInput): Promise<{ id: string }> {
+    this.outage('create');
     return { id: this.add({ ...input }).id };
   }
 

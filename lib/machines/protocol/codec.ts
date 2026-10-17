@@ -41,18 +41,18 @@ export interface LineCodec {
 }
 
 /** Which job event counts as the receiver's receipt. */
-export const RECEIPT_FROM = { ARRIVED: 'arrived', STARTED: 'started' } as const;
+export const RECEIPT_FROM = { ARRIVED: 'arrived', BOUND: 'bound', STARTED: 'started' } as const;
 export type ReceiptFrom = typeof RECEIPT_FROM[keyof typeof RECEIPT_FROM];
 
 export interface GenericCodecOptions {
   root: string;
-  /** For machines that report no arrival: treat the receiver's job start as the receipt. */
+  /** For machines that report no arrival: treat the receiver's carrier bind or job start as the receipt. */
   receiptFrom?: ReceiptFrom;
   unitsPerDispatch?: number | null;
 }
 
 export const GENERIC_CHANNELS: CodecChannels = {
-  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY],
+  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`],
   telemetry: [CHANNEL.TELEMETRY],
 };
 
@@ -61,12 +61,12 @@ function withEvent(seen: Inspection, event: string): Inspection {
   return { ...seen, body: { ...body, body: { ...body.body, event } } };
 }
 
-/** A receiver's start as its receipt: the arrival first, then the start; reported arrivals are dropped. */
-function inferReceipt(seen: Inspection): Inspection[] {
+/** Another event as the receipt: the arrival first, then that event; reported arrivals are dropped. */
+function inferReceipt(seen: Inspection, from: ReceiptFrom): Inspection[] {
   if (seen.parsed?.kind !== MESSAGE_KIND.JOB || !seen.body) return [seen];
   const event = seen.body.body?.event;
   if (event === JOB_EVENT.ARRIVED) return [];
-  if (event === JOB_EVENT.STARTED) return [withEvent(seen, JOB_EVENT.ARRIVED), seen];
+  if (event === from) return [withEvent(seen, JOB_EVENT.ARRIVED), seen];
   return [seen];
 }
 
@@ -79,7 +79,7 @@ export function genericCodec(opts: GenericCodecOptions): LineCodec {
     decode(topic, payload, retained) {
       const seen = inspectMessage(opts.root, topic, payload, retained);
       if (!seen.parsed) return [];
-      return receiptFrom === RECEIPT_FROM.STARTED ? inferReceipt(seen) : [seen];
+      return receiptFrom === RECEIPT_FROM.ARRIVED ? [seen] : inferReceipt(seen, receiptFrom);
     },
     encode(ident, command) {
       return [{ topic: machineTopic(opts.root, ident, CHANNEL.CMD), payload: JSON.stringify(buildEnvelope(ident, command)) }];

@@ -25,6 +25,8 @@ export interface UnitRouteInput {
   artifact?: { url: string; sha256: string };
   /** How long a handoff waits for its receipt before a person is asked. */
   handoffTimeout?: string;
+  /** How long a failed handoff waits for the operator's decision before the units are scrapped. */
+  operatorTimeout?: string;
 }
 
 /** Every machine on the line in order, each on its first recipe at the newest version. */
