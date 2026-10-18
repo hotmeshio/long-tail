@@ -78,6 +78,27 @@ describe('planner: arrivals and sender records', () => {
     expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' }), 1).actions[0])
       .toMatchObject({ kind: 'accumulate', rowId: 'e2', itemKey: 'released:U1', as: 'press-01' });
   });
+
+  it('writes a sender record that came before its row ahead of the arrival that resolves the row', () => {
+    const state = new GatewayState();
+    expect(planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok', lot: 'L-1' }), 1).disposition).toBe('nak');
+    created(state, 'e2', 'press-01', 'cut-01');
+    state.get('e2')!.dispatch = 'accepted';
+    const arrived = planMachineMessage(state, ...job('cut-01', { event: 'arrived' }), 1).actions;
+    expect(arrived.map((a: any) => [a.as, a.itemKey])).toEqual([['press-01', 'released:U1'], ['cut-01', 'arrived:U1']]);
+    expect(planMachineMessage(state, ...job('cut-01', { event: 'arrived' }), 1).actions.map((a: any) => a.itemKey)).toEqual(['arrived:U1']);
+  });
+
+  it('an early record from another sender job, or one that is not ok, is left to the sender message itself', () => {
+    const state = new GatewayState();
+    planMachineMessage(state, ...job('press-01', { event: 'finished', jobId: 'U1-press-01', result: 'ok' }), 1);
+    created(state, 'e3', 'press-01', 'cut-01', { senderJobId: 'U1-press-01-a2' });
+    expect(planMachineMessage(state, ...job('cut-01', { event: 'arrived' }), 1).actions.map((a: any) => a.itemKey)).toEqual(['arrived:U1']);
+    const rejected = new GatewayState();
+    planMachineMessage(rejected, ...job('press-01', { event: 'finished', result: 'reject' }), 1);
+    created(rejected, 'e4', 'press-01', 'cut-01');
+    expect(planMachineMessage(rejected, ...job('cut-01', { event: 'arrived' }), 1).actions.map((a: any) => a.itemKey)).toEqual(['arrived:U1']);
+  });
 });
 
 describe('planner: attempts and restarts', () => {

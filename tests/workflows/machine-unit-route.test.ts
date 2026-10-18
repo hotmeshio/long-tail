@@ -22,7 +22,7 @@ import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import { lineFilter } from '../../lib/machines/protocol';
 import { CallbackEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
 import { ApiLineEscalations } from '../../services/machines/gateway/api-escalations';
-import { ROOT, startHarness, type Harness } from '../helpers/machine-line-fixtures';
+import { ROOT, startHarness, REAL_ORCHESTRATOR_BROKER, type Harness } from '../helpers/machine-line-fixtures';
 import type { LTEscalationRecord } from '../../types';
 
 const { Connection, Client, Worker } = Durable;
@@ -72,7 +72,7 @@ describe('machine unit route (workflow + gateway + mock line)', () => {
     const person = await userService.createUser({ external_id: `line-person-${stamp}`, roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }, { role: 'line-finisher', type: 'member' }] });
     personId = person.id;
 
-    line = await startHarness({ msPerSec: 2 }, LINE);
+    line = await startHarness({ msPerSec: 2 }, LINE, REAL_ORCHESTRATOR_BROKER);
     const callbacks = new CallbackEventAdapter();
     eventRegistry.register(callbacks);
     await eventRegistry.connect();

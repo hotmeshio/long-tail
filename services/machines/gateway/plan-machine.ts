@@ -87,9 +87,10 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     // The unit is at the receiver now, and off the sender.
     const job = dispatchJobs(row.jobId, row.units, state.unitsPerDispatch).find((j) => j.units.some((u) => u.unitId === unitId));
     if (job) state.hold(m, unitId, job.jobId);
+    const early = row.fromMachine ? releasedEarly(state, row, unitId) : [];
     if (row.fromMachine) state.letGo(row.fromMachine, unitId);
     const units = row.units.map((u) => u.unitId);
-    return ack([{
+    return ack([...early, {
       kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.arrived(unitId),
       payload: { unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: at ?? new Date().toISOString() },
       complete: { keys: units.map(itemKeys.arrived), payload: { received: true, receiver: m, units } },
@@ -98,11 +99,12 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
 
   if (b.event === JOB_EVENT.FINISHED) {
     const row = state.openFor(unitId, fromHere);
-    if (!row) return missing(state, unitId, fromHere);
-    row.trace = mergeTrace(row.trace, [traceEntry(m, b)]);
-    const released: Action = {
-      kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(unitId), payload: b, metadata: traceFacets(row.trace),
-    };
+    if (!row) {
+      if (!state.closedFor(unitId, fromHere)) state.rememberFinish(m, unitId, b);
+      return missing(state, unitId, fromHere);
+    }
+    state.takeFinish(m, unitId);
+    const released = releasedAction(row, m, b);
     if (b.result === JOB_RESULT.OK) return ack([released]);
     return ack([released, ...failHandoff(state, row, m, {
       received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, reason: b.reason ?? null, detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
@@ -129,6 +131,18 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
   }
 
   return ack();
+}
+
+function releasedAction(row: HandoffRow, m: string, b: Record<string, any>): Action {
+  row.trace = mergeTrace(row.trace, [traceEntry(m, b)]);
+  return { kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(b.unitId), payload: b, metadata: traceFacets(row.trace) };
+}
+
+/** The sender's finished record that came before the row, written ahead of the arrival that may resolve it. */
+function releasedEarly(state: GatewayState, row: HandoffRow, unitId: string): Action[] {
+  const b = state.takeFinish(row.fromMachine!, unitId);
+  if (!b || b.result !== JOB_RESULT.OK || !ownsJob(state, row, row.senderJobId, b.jobId)) return [];
+  return [releasedAction(row, row.fromMachine!, b)];
 }
 
 function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, env: Envelope | null): Plan {

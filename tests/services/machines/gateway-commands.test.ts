@@ -62,6 +62,7 @@ describe('machine-command rows', () => {
     const ended = await rig.lt.ended(ask(OP.STOP).id);
     expect(ended.resolved_by).toBe(CONTROLLER);
     expect(ended.resolver_payload).toMatchObject({ accepted: false, status: 'no-reply' });
+    expect(Date.parse(rig.recorder.commands('press-01', OP.STOP)[0].args.expiresAt)).toBeLessThan(Date.now());
     await rig.gateway.idle();
     await rig.line.network('press-01', { mode: 'restore' });
     await until(() => rig.recorder.replies('press-01').some((r) => /expired/.test(r.reason)), 2_000);

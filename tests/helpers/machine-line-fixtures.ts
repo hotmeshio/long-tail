@@ -13,7 +13,7 @@ import { DEFAULT_MOCK_SETTINGS, MockLine, type MockSettings } from '../../servic
 import {
   CHANNEL, buildEnvelope, inspectMessage, lineFilter, machineTopic, type Envelope, type Inspection,
 } from '../../lib/machines/protocol';
-import { MemoryBroker, MemoryMachineLink } from '../../lib/machines/transport';
+import { MemoryBroker, MemoryMachineLink, type MemoryBrokerOptions } from '../../lib/machines/transport';
 
 export const ROOT = 'line/v1';
 
@@ -77,8 +77,12 @@ export interface Harness {
   stop(): Promise<void>;
 }
 
-export async function startHarness(settings: Partial<MockSettings> = {}, lineDef: LineDef = DEFAULT_LINE): Promise<Harness> {
-  const broker = new MemoryBroker({ redeliverMs: 5 });
+/** Redelivery for tests on the real orchestrator: a message racing its row is offered for several seconds, as JetStream would. */
+export const REAL_ORCHESTRATOR_BROKER: MemoryBrokerOptions = { redeliverMs: 200 };
+
+/** A line on the memory broker. A redelivery of 5ms suits a fake Long Tail; the real orchestrator needs a longer one. */
+export async function startHarness(settings: Partial<MockSettings> = {}, lineDef: LineDef = DEFAULT_LINE, brokerOpts: MemoryBrokerOptions = { redeliverMs: 5 }): Promise<Harness> {
+  const broker = new MemoryBroker(brokerOpts);
   const recorder = new Recorder(broker, lineDef);
   await recorder.start();
   const line = new MockLine(lineDef, { ...FAST, ...settings }, () => new MemoryMachineLink(broker));

@@ -8,6 +8,8 @@
  * reply. Other commands are tracked for their reply and logged.
  */
 
+import { setTimeout as sleep } from 'timers/promises';
+
 import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, type CommandResolution } from '../contracts';
 import { identOf, type LineDef } from '../../../lib/machines/line';
 import { OP, REPLY_STATUS, isoTs, type LineCodec } from '../../../lib/machines/protocol';
@@ -69,8 +71,10 @@ export class Dispatcher {
    * reaches a machine after its row resolved no-reply is refused, never run.
    */
   async control(a: ControlAction): Promise<void> {
-    const expiresAt = isoTs(Date.now() + this.d.replyTimeoutMs * this.d.dispatchAttempts);
-    const reply = await this.ask(a.machineId, a.op, a.cmdId, { ...a.args, expiresAt });
+    const expiresAt = Date.now() + this.d.replyTimeoutMs * this.d.dispatchAttempts;
+    const reply = await this.ask(a.machineId, a.op, a.cmdId, { ...a.args, expiresAt: isoTs(expiresAt) });
+    // Timers may fire a little early; the command must have expired before the row says no-reply.
+    if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1);
     const outcome: CommandResolution = reply
       ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason }
       : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };

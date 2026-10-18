@@ -57,6 +57,8 @@ export class GatewayState {
   private openRows = new Map<string, HandoffRow>();
   private closedRows = new Map<string, HandoffRow>();
   readonly alarms = new Map<string, AlarmTrack>();
+  /** Finished records that came before their row: machine/unit → job body. */
+  private earlyFinishes = new Map<string, Record<string, any>>();
   private openCommands = new Set<string>();
   private endedCommands = new Set<string>();
   readonly links = new Map<string, LinkTrack>();
@@ -120,6 +122,22 @@ export class GatewayState {
     const units = this.held.get(machineId);
     if (!units) return;
     for (const [unitId, jobId] of units) if (!jobIds.has(jobId)) units.delete(unitId);
+  }
+
+  /** Keep a sender's finished record until its row is known, so an arrival cannot close the row without it. */
+  rememberFinish(machineId: string, unitId: string, body: Record<string, any>): void {
+    this.earlyFinishes.delete(`${machineId}/${unitId}`);
+    this.earlyFinishes.set(`${machineId}/${unitId}`, body);
+    if (this.earlyFinishes.size > CLOSED_LIMIT) {
+      const oldest = this.earlyFinishes.keys().next().value;
+      if (oldest) this.earlyFinishes.delete(oldest);
+    }
+  }
+
+  takeFinish(machineId: string, unitId: string): Record<string, any> | undefined {
+    const body = this.earlyFinishes.get(`${machineId}/${unitId}`);
+    this.earlyFinishes.delete(`${machineId}/${unitId}`);
+    return body;
   }
 
   /** Track a machine-command row; false when it is already tracked or has ended. */

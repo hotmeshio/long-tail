@@ -19,7 +19,7 @@ import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import { MODE, lineFilter } from '../../lib/machines/protocol';
 import { CallbackEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
 import { ApiLineEscalations } from '../../services/machines/gateway/api-escalations';
-import { ROOT, startHarness, until, type Harness } from '../helpers/machine-line-fixtures';
+import { ROOT, startHarness, until, REAL_ORCHESTRATOR_BROKER, type Harness } from '../helpers/machine-line-fixtures';
 
 const { Connection, Client, Worker } = Durable;
 const TASK_QUEUE = 'test-machine-command';
@@ -41,7 +41,7 @@ describe('machine command (workflow + gateway + mock line)', () => {
     await migrate();
     for (const [actor, id] of await ensureLineBots(LINE)) users.set(actor, id);
 
-    line = await startHarness({ msPerSec: 2 }, LINE);
+    line = await startHarness({ msPerSec: 2 }, LINE, REAL_ORCHESTRATOR_BROKER);
     const callbacks = new CallbackEventAdapter();
     eventRegistry.register(callbacks);
     await eventRegistry.connect();
