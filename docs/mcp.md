@@ -207,6 +207,8 @@ Allow as me appears only when it grants more than read-only: when you can write 
 
 Access tokens last 5 minutes; the client refreshes them silently with a refresh token that rotates on each use and lasts 30 days. Every request reads the grant: a client acts with your roles as they are now, and a disconnected app, a revoked token or a deactivated account stops working on the next request. Disconnect a client under **Connected apps** in the user menu; the same happens when the client revokes its token.
 
+The server keeps its tables bounded on its own. Each process sweeps them on an OAuth write, at most once every `OAUTH_SWEEP_SECONDS` (default 600), deleting rows dead for longer than `OAUTH_RETENTION_DAYS` (default 7): spent and expired codes and refresh tokens, revoked or unused grants, and clients registered but never consented to. A live grant and its current refresh token are kept, and so is any client someone has consented to.
+
 **Enable it** with `auth.oauthServer` in `start()`, or `LT_OAUTH_ISSUER` in the environment:
 
 ```typescript
