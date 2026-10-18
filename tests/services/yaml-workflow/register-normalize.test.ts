@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
-const mockCallServerTool = vi.fn().mockResolvedValue({ ok: true });
-const mockDispatchBuiltinTool = vi.fn().mockResolvedValue(null);
+const mockCallStepTool = vi.fn().mockResolvedValue({ ok: true });
 const mockHotMeshInit = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@hotmeshio/hotmesh', () => ({
@@ -30,12 +29,8 @@ vi.mock('../../../services/iam/ephemeral', () => ({
   exchangeTokensInArgs: vi.fn(async (args: any) => args),
 }));
 
-vi.mock('../../../services/mcp/client', () => ({
-  callServerTool: (...args: any[]) => mockCallServerTool(...args),
-}));
-
-vi.mock('../../../services/mcp/client/connection', () => ({
-  dispatchBuiltinTool: (...args: any[]) => mockDispatchBuiltinTool(...args),
+vi.mock('../../../services/yaml-workflow/workers/step-tool', () => ({
+  callStepTool: (...args: any[]) => mockCallStepTool(...args),
 }));
 
 vi.mock('../../../services/yaml-workflow/db', () => ({
@@ -92,7 +87,7 @@ beforeEach(() => {
 
 describe('register.ts — read-time tool name normalization', () => {
   describe('db tool source', () => {
-    it('strips slug__ prefix from mcp_tool_name when calling callServerTool', async () => {
+    it('strips slug__ prefix from mcp_tool_name when calling the step tool', async () => {
       const workflow = makeWorkflow([
         {
           type: 'worker',
@@ -111,12 +106,12 @@ describe('register.ts — read-time tool name normalization', () => {
       const worker = initCall.workers[0];
       expect(worker.topic).toBe('topic_a1');
 
-      // Invoke the callback to verify the tool name passed to callServerTool
+      // Invoke the callback to verify the tool name passed to the step tool
       await worker.callback(makeStreamData({ field: 'value' }));
 
-      expect(mockCallServerTool).toHaveBeenCalledOnce();
-      expect(mockCallServerTool.mock.calls[0][0]).toBe('long-tail-db');
-      expect(mockCallServerTool.mock.calls[0][1]).toBe('query_records');
+      expect(mockCallStepTool).toHaveBeenCalledOnce();
+      expect(mockCallStepTool.mock.calls[0][0]).toBe('long-tail-db');
+      expect(mockCallStepTool.mock.calls[0][1]).toBe('query_records');
     });
 
     it('leaves short tool names unchanged for db tools', async () => {
@@ -136,12 +131,12 @@ describe('register.ts — read-time tool name normalization', () => {
       const initCall = mockHotMeshInit.mock.calls[0][0];
       await initCall.workers[0].callback(makeStreamData({}));
 
-      expect(mockCallServerTool.mock.calls[0][1]).toBe('query_records');
+      expect(mockCallStepTool.mock.calls[0][1]).toBe('query_records');
     });
   });
 
   describe('mcp tool source', () => {
-    it('strips slug__ prefix from mcp_tool_name when calling dispatchBuiltinTool and callServerTool', async () => {
+    it('strips slug__ prefix from mcp_tool_name when calling the step tool', async () => {
       const workflow = makeWorkflow([
         {
           type: 'worker',
@@ -158,17 +153,14 @@ describe('register.ts — read-time tool name normalization', () => {
       const initCall = mockHotMeshInit.mock.calls[0][0];
       await initCall.workers[0].callback(makeStreamData({ url: 'https://example.com' }));
 
-      // dispatchBuiltinTool is tried first with the short name
-      expect(mockDispatchBuiltinTool).toHaveBeenCalledOnce();
-      expect(mockDispatchBuiltinTool.mock.calls[0][1]).toBe('capture_page');
-
-      // Falls through to callServerTool since dispatchBuiltinTool returned null
-      expect(mockCallServerTool).toHaveBeenCalledOnce();
-      expect(mockCallServerTool.mock.calls[0][1]).toBe('capture_page');
+      expect(mockCallStepTool).toHaveBeenCalledOnce();
+      expect(mockCallStepTool.mock.calls[0][0]).toBe('long-tail-playwright-cli');
+      expect(mockCallStepTool.mock.calls[0][1]).toBe('capture_page');
+      expect(mockCallStepTool.mock.calls[0][2]).toEqual({ url: 'https://example.com' });
     });
 
-    it('uses short name when dispatchBuiltinTool finds a builtin', async () => {
-      mockDispatchBuiltinTool.mockResolvedValueOnce({ result: { screenshot: 'base64...' } });
+    it('returns the step tool result as the activity data', async () => {
+      mockCallStepTool.mockResolvedValueOnce({ screenshot: 'base64...' });
 
       const workflow = makeWorkflow([
         {
@@ -184,11 +176,10 @@ describe('register.ts — read-time tool name normalization', () => {
       await registerWorkersForWorkflow(workflow);
 
       const initCall = mockHotMeshInit.mock.calls[0][0];
-      await initCall.workers[0].callback(makeStreamData({}));
+      const out = await initCall.workers[0].callback(makeStreamData({}));
 
-      expect(mockDispatchBuiltinTool.mock.calls[0][1]).toBe('take_screenshot');
-      // callServerTool should NOT be called when builtin dispatches
-      expect(mockCallServerTool).not.toHaveBeenCalled();
+      expect(mockCallStepTool.mock.calls[0][1]).toBe('take_screenshot');
+      expect(out.data).toEqual({ screenshot: 'base64...' });
     });
 
     it('leaves short tool names unchanged for mcp tools', async () => {
@@ -208,7 +199,7 @@ describe('register.ts — read-time tool name normalization', () => {
       const initCall = mockHotMeshInit.mock.calls[0][0];
       await initCall.workers[0].callback(makeStreamData({}));
 
-      expect(mockDispatchBuiltinTool.mock.calls[0][1]).toBe('capture_page');
+      expect(mockCallStepTool.mock.calls[0][1]).toBe('capture_page');
     });
   });
 });

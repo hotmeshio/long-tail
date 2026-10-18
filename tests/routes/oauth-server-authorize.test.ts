@@ -13,6 +13,7 @@ import routes from '../../routes';
 import { config } from '../../modules/config';
 import { signToken } from '../../modules/auth';
 import { setOAuthServerConfig, clearOAuthServerConfig } from '../../modules/oauth-server';
+import { setSSOConfig, clearSSOConfig } from '../../modules/sso';
 import { exchangeAuthorizationCode } from '../../services/auth/oauth-server';
 import { REDIRECT_URI, pkcePair, createGrantFixture, removeGrantFixture } from '../helpers/oauth-server-fixtures';
 
@@ -117,6 +118,18 @@ describe('POST /api/oauth/authorize and /deny', () => {
   it('needs a person\'s session: none gets 401, a bot key gets 403', async () => {
     expect((await post('/authorize', { ...request(), preset: 'just_me' }, null)).status).toBe(401);
     expect((await post('/authorize', { ...request(), preset: 'just_me' }, 'lt_bot_probe')).status).toBe(403);
+  });
+
+  it("a host session cookie alone never approves or denies: only the dashboard's bearer credential", async () => {
+    const resolve = vi.fn(() => ({ externalId: `sso-${STAMP}` }));
+    setSSOConfig({ resolve } as any);
+    try {
+      expect((await post('/authorize', { ...request(), preset: 'read_only' }, null)).status).toBe(401);
+      expect((await post('/deny', { client_id: fixture.clientId, redirect_uri: REDIRECT_URI }, null)).status).toBe(401);
+      expect(resolve).not.toHaveBeenCalled();
+    } finally {
+      clearSSOConfig();
+    }
   });
 
   it('re-validates the request and the preset', async () => {

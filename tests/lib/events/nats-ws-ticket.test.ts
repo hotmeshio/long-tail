@@ -1,9 +1,19 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import jwt from 'jsonwebtoken';
 
+const spent = new Set<string>();
 vi.mock('../../../modules/sso', () => ({ getSSOConfig: () => null }));
+vi.mock('../../../lib/db', () => ({
+  getPool: () => ({
+    query: async (_sql: string, [jti]: [string]) => {
+      if (spent.has(jti)) return { rowCount: 0, rows: [] };
+      spent.add(jti);
+      return { rowCount: 1, rows: [{ jti }] };
+    },
+  }),
+}));
 
-import { signNatsWsTicket, verifyNatsWsTicket } from '../../../lib/events/nats-ws-ticket';
+import { signNatsWsTicket, spendNatsWsTicket, verifyNatsWsTicket } from '../../../lib/events/nats-ws-ticket';
 import { config } from '../../../modules/config';
 import { requireAuth, signToken } from '../../../modules/auth';
 
@@ -15,8 +25,25 @@ beforeAll(() => { savedSecret = config.JWT_SECRET; (config as any).JWT_SECRET = 
 afterAll(() => { (config as any).JWT_SECRET = savedSecret; });
 
 describe('NATS WebSocket ticket', () => {
-  it('names the person it was issued to', () => {
-    expect(verifyNatsWsTicket(signNatsWsTicket(USER))).toBe(USER);
+  it('names the person it was issued to, with a ticket id of its own', () => {
+    const first = verifyNatsWsTicket(signNatsWsTicket(USER));
+    const second = verifyNatsWsTicket(signNatsWsTicket(USER));
+    expect(first?.userId).toBe(USER);
+    expect(first?.jti).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first?.jti).not.toBe(second?.jti);
+  });
+
+  it('is spent by its first use and refused after', async () => {
+    const ticket = verifyNatsWsTicket(signNatsWsTicket(USER))!;
+    expect(await spendNatsWsTicket(ticket)).toBe(true);
+    expect(await spendNatsWsTicket(ticket)).toBe(false);
+  });
+
+  it('a ticket without an id is refused', () => {
+    const noId = jwt.sign({}, 'ticket-secret', {
+      algorithm: 'HS256', header: { alg: 'HS256', typ: 'nats-ws+jwt' }, subject: USER, expiresIn: 60,
+    });
+    expect(verifyNatsWsTicket(noId)).toBeNull();
   });
 
   it('lives as long as NATS_WS_TICKET_TTL_SECONDS, five minutes by default', () => {
@@ -27,7 +54,7 @@ describe('NATS WebSocket ticket', () => {
 
   it('an expired ticket is refused', () => {
     const expired = jwt.sign({}, 'ticket-secret', {
-      algorithm: 'HS256', header: { alg: 'HS256', typ: 'nats-ws+jwt' }, subject: USER, expiresIn: -1,
+      algorithm: 'HS256', header: { alg: 'HS256', typ: 'nats-ws+jwt' }, subject: USER, jwtid: 'j1', expiresIn: -1,
     });
     expect(verifyNatsWsTicket(expired)).toBeNull();
   });

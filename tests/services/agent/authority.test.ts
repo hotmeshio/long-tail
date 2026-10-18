@@ -6,12 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isSuperAdmin: vi.fn(async () => false),
   assertMayActAs: vi.fn(async () => undefined),
+  checkInvocationRoles: vi.fn(async () => undefined),
   getAgent: vi.fn(),
   getSubscription: vi.fn(),
 }));
 vi.mock('../../../services/user', () => ({ isSuperAdmin: mocks.isSuperAdmin }));
 vi.mock('../../../services/workflow-invocation', async (io) => ({
-  ...(await io<any>()), assertMayActAs: mocks.assertMayActAs,
+  ...(await io<any>()), assertMayActAs: mocks.assertMayActAs, checkInvocationRoles: mocks.checkInvocationRoles,
 }));
 vi.mock('../../../services/agent/index', () => ({ getAgent: mocks.getAgent }));
 vi.mock('../../../services/agent/subscriptions', () => ({ getSubscription: mocks.getSubscription }));
@@ -83,5 +84,23 @@ describe('assertMayConfigureSubscription', () => {
     mocks.getSubscription.mockResolvedValue({ id: 's1', agent_id: 'a1', reaction_type: 'capability' });
     await expect(assertMayConfigureSubscription(ME, { agentId: 'a1', subscriptionId: 's1', execute_as: 'bot' }))
       .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("a durable subscription's workflow must be one the caller may start", async () => {
+    await assertMayConfigureSubscription(ME, { agentId: 'a1', reaction_type: 'durable', workflow_type: 'refundOrder', execute_as: 'bot' });
+    expect(mocks.checkInvocationRoles).toHaveBeenCalledWith('refundOrder', ME);
+  });
+
+  it('a durable subscription to a system-authority workflow is refused', async () => {
+    mocks.checkInvocationRoles.mockRejectedValueOnce(Object.assign(new Error('Insufficient role for invocation'), { statusCode: 403 }));
+    await expect(assertMayConfigureSubscription(ME, {
+      agentId: 'a1', reaction_type: 'durable', workflow_type: 'capabilityInvoke', execute_as: 'bot',
+    })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('an update keeps the stored workflow type in view', async () => {
+    mocks.getSubscription.mockResolvedValue({ id: 's1', agent_id: 'a1', reaction_type: 'durable', workflow_type: 'capabilityInvoke' });
+    await assertMayConfigureSubscription(ME, { agentId: 'a1', subscriptionId: 's1', execute_as: 'bot' });
+    expect(mocks.checkInvocationRoles).toHaveBeenCalledWith('capabilityInvoke', ME);
   });
 });

@@ -4,22 +4,19 @@ import * as yamlWorkers from '../../services/yaml-workflow/workers';
 import { invokeYamlWorkflow as invokeYamlWorkflowService } from '../../services/yaml-workflow/invoke';
 import { assertMayActAs, InvocationError } from '../../services/workflow-invocation';
 import { capabilityAccess } from '../../modules/capabilities';
+import * as userService from '../../services/user';
+import { isUuid } from '../../lib/uuid';
 import { builtinServerFor, builtinToolGate } from '../mcp/tools';
 import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 
 /**
- * A compiled workflow's tool steps run with lt-system authority. Deploying or
- * activating one needs the caller to be able to call every built-in tool it
- * uses: automation never does more than its author may. Null when allowed;
- * without a caller (in-process), allowed.
+ * A refusal when the person cannot call every built-in tool these workflows'
+ * steps use; null when they can. Steps run as the invoker under each tool's
+ * gate, so this answers up front what the run would refuse step by step.
  */
-export async function deployRefusal(wf: LTYamlWorkflowRecord, auth: LTApiAuth | undefined): Promise<LTApiResult | null> {
-  if (!auth?.userId) return null;
-  const access = capabilityAccess({ userId: auth.userId });
-  // A deploy publishes every workflow sharing the app id, so every one is checked.
-  const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
-  const steps = [wf, ...siblings.filter((w) => w.id !== wf.id)].flatMap((w) => w.activity_manifest ?? []);
-  for (const step of steps) {
+async function toolStepRefusal(workflows: LTYamlWorkflowRecord[], userId: string): Promise<LTApiResult | null> {
+  const access = capabilityAccess({ userId });
+  for (const step of workflows.flatMap((w) => w.activity_manifest ?? [])) {
     if (step.tool_source !== 'mcp' || !step.mcp_server_id || !step.mcp_tool_name) continue;
     const builtin = await builtinServerFor(step.mcp_server_id);
     if (builtin && !(await access(builtinToolGate(builtin, step.mcp_tool_name)))) {
@@ -27,6 +24,35 @@ export async function deployRefusal(wf: LTYamlWorkflowRecord, auth: LTApiAuth | 
     }
   }
   return null;
+}
+
+/**
+ * Deploying or activating a compiled workflow needs the caller to be able to
+ * call every built-in tool it uses: automation never does more than its
+ * author may. Null when allowed; without a caller (in-process), allowed.
+ */
+export async function deployRefusal(wf: LTYamlWorkflowRecord, auth: LTApiAuth | undefined): Promise<LTApiResult | null> {
+  if (!auth?.userId) return null;
+  // A deploy publishes every workflow sharing the app id, so every one is checked.
+  const siblings = await yamlDb.listYamlWorkflowsByAppId(wf.app_id);
+  return toolStepRefusal([wf, ...siblings.filter((w) => w.id !== wf.id)], auth.userId);
+}
+
+/**
+ * Invoking or scheduling a compiled workflow needs the identity it runs as
+ * (execute_as, else the caller) to be able to call every built-in tool it
+ * uses. Without a caller (in-process), allowed.
+ */
+export async function invokeRefusal(
+  wf: LTYamlWorkflowRecord,
+  auth: LTApiAuth | undefined,
+  executeAs?: string,
+): Promise<LTApiResult | null> {
+  if (!auth?.userId) return null;
+  if (!executeAs) return toolStepRefusal([wf], auth.userId);
+  const runAs = isUuid(executeAs) ? await userService.getUser(executeAs) : await userService.getUserByExternalId(executeAs);
+  if (!runAs) return { status: 404, error: `execute_as principal "${executeAs}" not found` };
+  return toolStepRefusal([wf], runAs.id);
 }
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import { isNotFoundError } from './helpers';
@@ -165,6 +191,8 @@ export async function invokeYamlWorkflow(input: {
       if (!auth?.userId) return { status: 403, error: 'execute_as requires an authenticated caller' };
       await assertMayActAs(auth.userId, input.execute_as);
     }
+    const refused = await invokeRefusal(wf, auth, input.execute_as);
+    if (refused) return refused;
 
     const result = await invokeYamlWorkflowService(wf, {
       data: input.data,

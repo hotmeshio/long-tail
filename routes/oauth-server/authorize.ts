@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from '../../lib/http';
-import { requireAuth } from '../../modules/auth';
+import { requireAuth, requireCredentialAuth } from '../../modules/auth';
 import { getOAuthServerSettings } from '../../modules/oauth-server';
 import { OAUTH_CODE_TTL_SECONDS } from '../../modules/defaults';
 import { getClient, issueAuthorizationCode, PRESET_SCOPE } from '../../services/auth/oauth-server';
@@ -52,9 +52,11 @@ function refuseBots(req: Request, res: Response): boolean {
  * POST /api/oauth/authorize
  * The person approves. Body: the authorization request plus
  * { preset: 'read_only' | 'just_me' }. Returns { redirect } for the consent
- * page to navigate to, carrying the code.
+ * page to navigate to, carrying the code. Only the dashboard's own bearer
+ * credential approves: a host session cookie, which any same-site script
+ * could send, does not.
  */
-router.post('/authorize', requireAuth, async (req, res) => {
+router.post('/authorize', requireCredentialAuth, async (req, res) => {
   if (refuseBots(req, res)) return;
   const settings = getOAuthServerSettings()!;
   const check = await checkAuthorizationRequest(req.body ?? {}, settings);
@@ -79,9 +81,9 @@ router.post('/authorize', requireAuth, async (req, res) => {
 /**
  * POST /api/oauth/deny
  * The person declines. Body: { client_id, redirect_uri, state? }. Returns
- * { redirect } carrying error=access_denied.
+ * { redirect } carrying error=access_denied. Bearer credential only, as authorize.
  */
-router.post('/deny', requireAuth, async (req, res) => {
+router.post('/deny', requireCredentialAuth, async (req, res) => {
   const settings = getOAuthServerSettings()!;
   const clientId = typeof req.body?.client_id === 'string' ? req.body.client_id : '';
   const client = clientId ? await getClient(clientId) : null;

@@ -2,8 +2,8 @@
  * A single maintenance rule describing what to prune and when.
  */
 export interface LTMaintenanceRule {
-  /** Which resource to target */
-  target: 'streams' | 'jobs' | 'escalations';
+  /** Which resource to target. 'oauth' is the /mcp authorization server's clients, grants, codes and refresh tokens. */
+  target: 'streams' | 'jobs' | 'escalations' | 'oauth';
   /** delete = hard-delete rows; prune = strip execution artifacts */
   action: 'delete' | 'prune';
   /** Postgres interval for the retention window, e.g. '7 days', '90 days' */

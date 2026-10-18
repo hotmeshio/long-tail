@@ -2,6 +2,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createServer, type Server } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 
+vi.mock('../../../lib/db', async () => {
+  const { ticketPool } = await import('../../helpers/nats-ws-proxy-fixtures');
+  return { getPool: () => ticketPool };
+});
+vi.mock('../../../lib/events/browser-view', async (io) => ({
+  ...(await io<typeof import('../../../lib/events/browser-view')>()),
+  holderView: (await import('../../helpers/nats-ws-proxy-fixtures')).holderViewFixture,
+}));
+
 import { attachNatsWsProxy } from '../../../lib/events/nats-ws-proxy';
 import { signNatsWsTicket } from '../../../lib/events/nats-ws-ticket';
 import { config } from '../../../modules/config';

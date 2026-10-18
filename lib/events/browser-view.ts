@@ -1,4 +1,5 @@
 import type { LTEvent } from '../../types';
+import type { LTUserStatus } from '../../types/user';
 
 /**
  * What a browser receives of an event. Builders receive events whole. Anyone
@@ -11,6 +12,7 @@ import type { LTEvent } from '../../types';
  */
 
 const ESCALATION_SUBJECT = 'system.escalation.';
+const ACTIVE_ACCOUNT: LTUserStatus = 'active';
 
 /** Escalation event fields a browser needs to route a refresh and follow a claim. */
 export const BROWSER_ESCALATION_FIELDS = [
@@ -63,4 +65,18 @@ export async function viewerFor(userId: string | null | undefined): Promise<Brow
   } catch {
     return { builder: false };
   }
+}
+
+/**
+ * How a connection holder sees events, or null when the account is gone or
+ * not active. Looked up lazily to keep lib free of an import cycle.
+ */
+export async function holderView(userId: string): Promise<BrowserViewer | null> {
+  const [{ getUser, getUserByExternalId }, { isUuid }] = await Promise.all([
+    import('../../services/user'),
+    import('../uuid'),
+  ]);
+  const user = isUuid(userId) ? await getUser(userId) : await getUserByExternalId(userId);
+  if (!user || user.status !== ACTIVE_ACCOUNT) return null;
+  return viewerFor(user.id);
 }

@@ -11,7 +11,7 @@ import * as yamlDb from '../../../services/yaml-workflow/db';
 import * as yamlGenerator from '../../../services/yaml-workflow/generator';
 import * as yamlDeployer from '../../../services/yaml-workflow/deployer';
 import * as yamlWorkers from '../../../services/yaml-workflow/workers';
-import { deployRefusal } from '../../../api/yaml-workflows/deploy';
+import { deployRefusal, invokeYamlWorkflow as invokeYamlWorkflowApi } from '../../../api/yaml-workflows/deploy';
 import { externalCaller, type ToolCallExtra } from '../caller-auth';
 import { getTaskByWorkflowId } from '../../../services/task';
 import {
@@ -232,36 +232,19 @@ export function registerYamlWorkflowTools(server: McpServer): void {
         'just direct tool-to-tool data piping. Set sync=true to wait for result.',
       inputSchema: invokeYamlWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeYamlWorkflowSchema>) => {
-      const wf = await yamlDb.getYamlWorkflow(args.id);
-      if (!wf) {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'YAML workflow not found' }) }],
-          isError: true,
-        };
-      }
-      if (wf.status !== 'active') {
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Workflow must be active to invoke' }) }],
-          isError: true,
-        };
-      }
-
-      if (args.sync) {
-        const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
-          wf.app_id, wf.graph_topic, args.data, args.timeout, wf.graph_topic,
-        );
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ job_id, result }) }],
-        };
-      }
-
-      const jobId = await yamlDeployer.invokeYamlWorkflow(
-        wf.app_id, wf.graph_topic, args.data, wf.graph_topic,
+    async (args: z.infer<typeof invokeYamlWorkflowSchema>, extra?: ToolCallExtra) => {
+      // Runs as the /mcp caller, under each step tool's gate.
+      const result = await invokeYamlWorkflowApi(
+        { id: args.id, data: args.data, sync: args.sync, timeout: args.timeout },
+        externalCaller(extra),
       );
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ job_id: jobId }) }],
-      };
+      if (result.error) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }],
+          isError: true,
+        };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] };
     },
   );
 }

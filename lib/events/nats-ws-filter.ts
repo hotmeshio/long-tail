@@ -5,21 +5,33 @@
  *
  * - CONNECT is rewritten to carry the server's credential (the browser is
  *   never given it), keeping the client's other options.
- * - PUB and HPUB are dropped with their payloads.
- * - SUB, UNSUB, PING and PONG pass through unchanged.
+ * - SUB, UNSUB, PING and PONG are forwarded, rebuilt from their parsed fields.
+ * - Any other operation, PUB and HPUB included, marks the stream malformed
+ *   and the proxy closes the connection.
  *
- * The NATS client protocol is line-oriented (`OP args\r\n`), and a publish is
- * followed by a payload of a declared size. Operations can span WebSocket
- * frames, so the filter keeps whatever it has not yet seen whole.
+ * The filter reads lines as nats-server does: fields split on spaces or tabs,
+ * and a line ends at LF with or without a preceding CR. Operations can span
+ * WebSocket frames, so the filter keeps whatever it has not yet seen whole.
  */
 
-const CRLF = Buffer.from('\r\n');
+const LF = 0x0a;
 const MAX_LINE = 64 * 1024;
+const FIELD_DELIMITER = /[ \t]+/;
+/** The operation name and its argument text. */
+const OPERATION = /^[ \t]*([^ \t]+)[ \t]*(.*)$/s;
+/** Control characters other than tab never appear inside a client line. */
+const CONTROL_CHARACTER = /[\x00-\x08\x0a-\x1f\x7f]/;
+
+/** Client operations forwarded, with the number of fields each takes. */
+const ALLOWED_OPS: Record<string, { min: number; max: number }> = {
+  SUB: { min: 2, max: 3 },
+  UNSUB: { min: 1, max: 2 },
+  PING: { min: 0, max: 0 },
+  PONG: { min: 0, max: 0 },
+};
 
 export class NatsClientFilter {
   private pending: Buffer = Buffer.alloc(0);
-  /** Payload bytes (plus the trailing CRLF) of a dropped publish still to skip. */
-  private skip = 0;
   private failed = false;
 
   constructor(private readonly authToken: string | null) {}
@@ -36,44 +48,45 @@ export class NatsClientFilter {
     const out: Buffer[] = [];
 
     for (;;) {
-      if (this.skip > 0) {
-        const n = Math.min(this.skip, this.pending.length);
-        this.pending = this.pending.subarray(n);
-        this.skip -= n;
-        if (this.skip > 0) break;
-      }
-      const end = this.pending.indexOf(CRLF);
+      const end = this.pending.indexOf(LF);
       if (end === -1) {
-        if (this.pending.length > MAX_LINE) this.failed = true;
+        if (this.pending.length > MAX_LINE) return this.fail();
         break;
       }
-      const line = this.pending.subarray(0, end).toString('utf8');
-      this.pending = this.pending.subarray(end + CRLF.length);
-      const forwarded = this.filterLine(line);
+      const raw = this.pending.subarray(0, end > 0 && this.pending[end - 1] === 0x0d ? end - 1 : end);
+      this.pending = this.pending.subarray(end + 1);
+      const forwarded = this.filterLine(raw.toString('utf8'));
       if (this.failed) return Buffer.alloc(0);
       if (forwarded !== null) out.push(Buffer.from(`${forwarded}\r\n`, 'utf8'));
     }
     return Buffer.concat(out);
   }
 
-  /** The line to forward, or null to drop it. */
-  private filterLine(line: string): string | null {
-    const space = line.indexOf(' ');
-    const op = (space === -1 ? line : line.slice(0, space)).toUpperCase();
-    const args = space === -1 ? '' : line.slice(space + 1);
+  private fail(): Buffer {
+    this.failed = true;
+    this.pending = Buffer.alloc(0);
+    return Buffer.alloc(0);
+  }
 
-    if (op === 'CONNECT') return this.rewriteConnect(args);
-    if (op === 'PUB' || op === 'HPUB') {
-      // PUB <subject> [reply] <size>; HPUB <subject> [reply] <header size> <total size>
-      const size = Number(args.trim().split(/\s+/).pop());
-      if (!Number.isInteger(size) || size < 0) {
-        this.failed = true;
-        return null;
-      }
-      this.skip = size + CRLF.length;
+  /** The line to forward, or null to forward nothing. */
+  private filterLine(line: string): string | null {
+    if (CONTROL_CHARACTER.test(line)) {
+      this.failed = true;
       return null;
     }
-    return line;
+    const match = OPERATION.exec(line);
+    if (!match) return null;
+    const op = match[1].toUpperCase();
+    const rest = match[2];
+
+    if (op === 'CONNECT') return this.rewriteConnect(rest);
+    const shape = ALLOWED_OPS[op];
+    const fields = rest === '' ? [] : rest.split(FIELD_DELIMITER).filter(Boolean);
+    if (!shape || fields.length < shape.min || fields.length > shape.max) {
+      this.failed = true;
+      return null;
+    }
+    return [op, ...fields].join(' ');
   }
 
   private rewriteConnect(json: string): string | null {
@@ -81,6 +94,10 @@ export class NatsClientFilter {
     try {
       options = JSON.parse(json);
     } catch {
+      this.failed = true;
+      return null;
+    }
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
       this.failed = true;
       return null;
     }

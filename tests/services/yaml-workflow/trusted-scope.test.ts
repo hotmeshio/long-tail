@@ -46,4 +46,11 @@ describe('invokeYamlWorkflow scope', () => {
     await invokeYamlWorkflow(wf, { data: { _scope: forged } });
     expect(asyncInvokeMock.mock.calls[0][5]).toBeUndefined();
   });
+
+  it('an invoker or execute_as that does not resolve is refused, never run with no scope', async () => {
+    resolvePrincipalMock.mockResolvedValue(null);
+    await expect(invokeYamlWorkflow(wf, { data: {}, userId: 'gone' })).rejects.toMatchObject({ statusCode: 403 });
+    await expect(invokeYamlWorkflow(wf, { data: {}, execute_as: 'gone-bot' })).rejects.toMatchObject({ statusCode: 404 });
+    expect(asyncInvokeMock).not.toHaveBeenCalled();
+  });
 });

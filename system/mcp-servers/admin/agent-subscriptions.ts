@@ -60,7 +60,8 @@ export function registerAgentSubscriptionTools(server: McpServer): void {
       const caller = externalCaller(extra);
       const refused = caller
         ? await refusal(() => assertMayConfigureSubscription(caller.userId, {
-          agentId: agent_id, reaction_type: (body as any).reaction_type, execute_as: (body as any).execute_as,
+          agentId: agent_id, reaction_type: (body as any).reaction_type,
+          workflow_type: (body as any).workflow_type, execute_as: (body as any).execute_as,
         }))
         : null;
       if (refused) return refused;

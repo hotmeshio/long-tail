@@ -107,6 +107,17 @@ export const REVOKE_ON_REFRESH_REUSE = `
     AND g.id = t.grant_id AND g.revoked_at IS NULL
   RETURNING g.id AS grant_id, g.user_id`;
 
+/**
+ * Revoke the grant of an authorization code presented again after it was
+ * exchanged: the code has leaked (RFC 6749 §4.1.2).
+ */
+export const REVOKE_ON_CODE_REUSE = `
+  UPDATE lt_oauth_grants g SET revoked_at = NOW()
+  FROM lt_oauth_codes c
+  WHERE c.code_hash = $1 AND c.used_at IS NOT NULL
+    AND g.id = c.grant_id AND g.revoked_at IS NULL
+  RETURNING g.id AS grant_id, g.user_id`;
+
 /** Revoke the grant a refresh token belongs to, for the client presenting it. */
 export const REVOKE_BY_REFRESH_TOKEN = `
   UPDATE lt_oauth_grants g SET revoked_at = NOW()
@@ -129,3 +140,31 @@ export const LIST_GRANTS = `
   WHERE g.user_id = $1 AND g.revoked_at IS NULL
     AND EXISTS (SELECT 1 FROM lt_oauth_refresh_tokens t WHERE t.grant_id = g.id)
   ORDER BY g.created_at DESC`;
+
+// ── Maintenance: each statement takes the retention window as $1 (an interval) ──
+
+/** Refresh tokens past expiry, or rotated out, longer ago than the window. */
+export const PRUNE_REFRESH_TOKENS = `
+  DELETE FROM lt_oauth_refresh_tokens
+  WHERE expires_at < NOW() - $1::interval OR used_at < NOW() - $1::interval`;
+
+/** Authorization codes past expiry longer ago than the window, exchanged or not. */
+export const PRUNE_CODES = `
+  DELETE FROM lt_oauth_codes WHERE expires_at < NOW() - $1::interval`;
+
+/**
+ * Grants revoked longer ago than the window, and grants older than the window
+ * left with no refresh token and no code: never exchanged, or long unused.
+ */
+export const PRUNE_GRANTS = `
+  DELETE FROM lt_oauth_grants g
+  WHERE g.revoked_at < NOW() - $1::interval
+     OR (g.created_at < NOW() - $1::interval
+         AND NOT EXISTS (SELECT 1 FROM lt_oauth_refresh_tokens t WHERE t.grant_id = g.id)
+         AND NOT EXISTS (SELECT 1 FROM lt_oauth_codes c WHERE c.grant_id = g.id))`;
+
+/** Clients registered longer ago than the window with no live grant. */
+export const PRUNE_CLIENTS = `
+  DELETE FROM lt_oauth_clients c
+  WHERE c.created_at < NOW() - $1::interval
+    AND NOT EXISTS (SELECT 1 FROM lt_oauth_grants g WHERE g.client_id = c.client_id AND g.revoked_at IS NULL)`;

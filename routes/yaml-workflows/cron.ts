@@ -25,7 +25,7 @@ router.put('/:id/cron', requireBuilder, async (req, res) => {
     cron_schedule: req.body.cron_schedule,
     cron_envelope: req.body.cron_envelope,
     execute_as: req.body.execute_as,
-  });
+  }, req.auth);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

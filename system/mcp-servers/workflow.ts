@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { QUERY_LIMIT_MAX } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
 import * as yamlDb from '../../services/yaml-workflow/db';
-import * as yamlDeployer from '../../services/yaml-workflow/deployer';
+import { invokeYamlWorkflow as invokeYamlWorkflowApi } from '../../api/yaml-workflows/deploy';
+import { externalCaller, type ToolCallExtra } from './caller-auth';
 
 let server: McpServer | null = null;
 
@@ -149,7 +150,7 @@ export async function createWorkflowServer(options?: {
         'Set async=true for fire-and-forget (returns job ID), or leave false to wait for the result.',
       inputSchema: invokeWorkflowSchema,
     },
-    async (args: z.infer<typeof invokeWorkflowSchema>) => {
+    async (args: z.infer<typeof invokeWorkflowSchema>, extra?: ToolCallExtra) => {
       const wf = await yamlDb.getYamlWorkflowByName(args.workflow_name);
       if (!wf) {
         return {
@@ -172,44 +173,22 @@ export async function createWorkflowServer(options?: {
         };
       }
 
-      if (args.async) {
-        const jobId = await yamlDeployer.invokeYamlWorkflow(
-          wf.app_id,
-          wf.graph_topic,
-          args.input || {},
-          wf.graph_topic,
-        );
+      // Runs as the /mcp caller, under each step tool's gate.
+      const invoked = await invokeYamlWorkflowApi(
+        { id: wf.id, data: args.input || {}, sync: !args.async, timeout: args.timeout },
+        externalCaller(extra),
+      );
+      if (invoked.error) {
         return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({
-              job_id: jobId,
-              workflow: wf.name,
-              status: 'started',
-            }),
-          }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: invoked.error }) }],
+          isError: true,
         };
       }
-
-      const { job_id, result } = await yamlDeployer.invokeYamlWorkflowSync(
-        wf.app_id,
-        wf.graph_topic,
-        args.input || {},
-        args.timeout,
-        wf.graph_topic,
-      );
-      return {
-        content: [{
-          type: 'text' as const,
-          text: JSON.stringify({
-            job_id,
-            namespace: wf.app_id,
-            workflow: wf.name,
-            status: 'completed',
-            result,
-          }),
-        }],
-      };
+      const { job_id, result } = invoked.data as { job_id: string; result?: unknown };
+      const outcome = args.async
+        ? { job_id, workflow: wf.name, status: 'started' }
+        : { job_id, namespace: wf.app_id, workflow: wf.name, status: 'completed', result };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(outcome) }] };
     },
   );
 
