@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
 import { migrate } from '../../../../lib/db/migrate';
 import { getPool } from '../../../../lib/db';
@@ -28,6 +28,8 @@ const exchanged = async (f: { userId: string; clientId: string }) => {
   });
   return { grantId, refreshToken: result!.refreshToken };
 };
+
+const SWEEP_DUE = 24 * 60 * 60 * 1000;
 
 const age = (sql: string, id: string) => getPool().query(sql.replaceAll('$AGO', LONG_AGO), [id]);
 const exists = async (table: string, column: string, id: string) =>
@@ -64,14 +66,21 @@ describe('pruneOAuthServer', () => {
     expect(tokens.rows).toEqual([{ used_at: null }]);
   });
 
-  it('drops a grant revoked long ago, and then its client, which has no live grant', async () => {
+  it('drops a grant revoked long ago, and keeps its client, which someone consented to', async () => {
     const f = await fixture('revoked');
     const { grantId } = await exchanged(f);
     await revokeGrant(grantId);
     await age('UPDATE lt_oauth_grants SET revoked_at = $AGO WHERE id = $1', grantId);
-    await age('UPDATE lt_oauth_clients SET created_at = $AGO WHERE client_id = $1', f.clientId);
+    await age('UPDATE lt_oauth_clients SET created_at = $AGO, last_consent_at = $AGO WHERE client_id = $1', f.clientId);
     await pruneOAuthServer(WINDOW);
     expect(await exists('lt_oauth_grants', 'id', grantId)).toBe(false);
+    expect(await exists('lt_oauth_clients', 'client_id', f.clientId)).toBe(true);
+  });
+
+  it('drops a client registered long ago that no one consented to', async () => {
+    const f = await fixture('never-consented');
+    await age('UPDATE lt_oauth_clients SET created_at = $AGO WHERE client_id = $1', f.clientId);
+    await pruneOAuthServer(WINDOW);
     expect(await exists('lt_oauth_clients', 'client_id', f.clientId)).toBe(false);
   });
 
@@ -79,5 +88,23 @@ describe('pruneOAuthServer', () => {
     const f = await fixture('fresh-client');
     await pruneOAuthServer(WINDOW);
     expect(await exists('lt_oauth_clients', 'client_id', f.clientId)).toBe(true);
+  });
+});
+
+describe('an OAuth write', () => {
+  it('sweeps rows past the retention window, with no maintenance schedule', async () => {
+    const f = await fixture('swept');
+    const { grantId } = await exchanged(f);
+    await revokeGrant(grantId);
+    await age('UPDATE lt_oauth_grants SET revoked_at = $AGO WHERE id = $1', grantId);
+
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + SWEEP_DUE);
+    try {
+      await fixture('writer');
+      await vi.waitFor(async () => expect(await exists('lt_oauth_grants', 'id', grantId)).toBe(false));
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });

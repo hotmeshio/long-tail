@@ -101,3 +101,18 @@ describe('OAuth store: clients and authorization codes', () => {
     expect(await exchange(code, verifier)).toBeNull();
   });
 });
+
+describe('OAuth store: consent', () => {
+  it('stamps the client when a person consents, and leaves it unstamped until then', async () => {
+    const consentOf = async (clientId: string) =>
+      (await getPool().query('SELECT last_consent_at FROM lt_oauth_clients WHERE client_id = $1', [clientId])).rows[0].last_consent_at;
+    const fresh = await createGrantFixture(`${STAMP}-consent`, ROLE);
+    try {
+      expect(await consentOf(fresh.clientId)).toBeNull();
+      await issueCode(fresh);
+      expect(await consentOf(fresh.clientId)).toBeInstanceOf(Date);
+    } finally {
+      await removeGrantFixture(fresh);
+    }
+  });
+});

@@ -80,7 +80,7 @@ async function executeRule(appId: string, rule: LTMaintenanceRule): Promise<void
     }
 
     // Drop the authorization server's dead rows: spent or expired tokens and
-    // codes, grants with neither left or long revoked, clients with no live grant.
+    // codes, grants with neither left or long revoked, clients never consented to.
     case rule.target === 'oauth' && rule.action === 'delete': {
       const { pruneOAuthServer } = await import('../auth/oauth-server');
       const counts = await pruneOAuthServer(rule.olderThan);

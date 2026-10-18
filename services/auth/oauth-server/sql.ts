@@ -18,12 +18,15 @@ export const GET_CLIENT = `
   SELECT client_id, client_name, redirect_uris, created_at
   FROM lt_oauth_clients WHERE client_id = $1`;
 
-/** Create the grant and its authorization code together. */
+/** Create the grant and its authorization code together, and stamp the client's consent. */
 export const ISSUE_CODE = `
   WITH g AS (
     INSERT INTO lt_oauth_grants (user_id, client_id, policy, scope)
     VALUES ($1, $2, $3, $4)
     RETURNING id
+  ),
+  consented AS (
+    UPDATE lt_oauth_clients SET last_consent_at = NOW() WHERE client_id = $2
   )
   INSERT INTO lt_oauth_codes (code_hash, grant_id, redirect_uri, code_challenge, resource, expires_at)
   SELECT $5, g.id, $6, $7, $8, NOW() + make_interval(secs => $9) FROM g
@@ -163,8 +166,11 @@ export const PRUNE_GRANTS = `
          AND NOT EXISTS (SELECT 1 FROM lt_oauth_refresh_tokens t WHERE t.grant_id = g.id)
          AND NOT EXISTS (SELECT 1 FROM lt_oauth_codes c WHERE c.grant_id = g.id))`;
 
-/** Clients registered longer ago than the window with no live grant. */
+/**
+ * Clients registered longer ago than the window that no one ever consented to.
+ * A client with a consent is kept: the app holds its client id to reconnect.
+ */
 export const PRUNE_CLIENTS = `
   DELETE FROM lt_oauth_clients c
-  WHERE c.created_at < NOW() - $1::interval
-    AND NOT EXISTS (SELECT 1 FROM lt_oauth_grants g WHERE g.client_id = c.client_id AND g.revoked_at IS NULL)`;
+  WHERE c.last_consent_at IS NULL AND c.created_at < NOW() - $1::interval
+    AND NOT EXISTS (SELECT 1 FROM lt_oauth_grants g WHERE g.client_id = c.client_id)`;
