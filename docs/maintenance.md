@@ -62,7 +62,7 @@ Six categories of data are subject to maintenance:
 | **Entity jobs** | Job rows where `entity` is set. These represent actual workflow instances -- the rows that back `Durable.Client.workflow.search()` calls and execution exports. Deleting them removes the workflow record entirely. |
 | **Pruned jobs** | Entity jobs that have already had their execution artifacts stripped (the `pruned_at` column is not `NULL`). These retain core data but no longer carry execution scaffolding. They can be hard-deleted after a longer retention window. |
 | **Terminal escalations** | Escalation rows in a terminal status (`resolved`, `cancelled`, `expired`). Terminal rows are inert audit records -- every engine state transition guards on `status = 'pending'`, so aging them out is safe for live waiters, claims, and signal delivery. The engine-owned prune deletes in atomic batches until the retention horizon is drained. Pending rows are never touched. |
-| **OAuth server rows** | The `/mcp` authorization server's records. Refresh tokens and authorization codes past expiry, or rotated out, longer ago than the window; then grants left with neither, or revoked longer ago than the window; then clients registered longer ago than the window with no live grant. A client still holding a live refresh token keeps its grant and its registration. |
+| **OAuth server rows** | The `/mcp` authorization server's records. Refresh tokens and authorization codes past expiry, or rotated out, longer ago than the window; then grants left with neither, or revoked longer ago than the window; then clients registered longer ago than the window that no one ever consented to. A client still holding a live refresh token keeps its grant, and a client anyone has consented to keeps its registration, so the app can reconnect with the client id it holds. |
 
 ## Prune vs. delete
 
@@ -97,9 +97,9 @@ The default configuration (`modules/maintenance.ts`, enabled with `maintenance: 
 | 2. Delete transient jobs older than 30 days | Removes activity-level bookkeeping rows that have no associated workflow entity. |
 | 3. Prune entity jobs older than 30 days | Strips execution artifacts from workflow instances while preserving core data. Exports and search remain functional. |
 | 4. Delete pruned jobs older than 180 days | Hard-deletes workflow instances that were pruned at least 180 days ago. This is the final removal. |
-| 5. Delete OAuth server rows older than 7 days | Removes expired codes and tokens, unused or revoked grants, and clients with no live grant. |
+| 5. Delete OAuth server rows older than 7 days | Removes expired codes and tokens, unused or revoked grants, and clients never consented to. |
 
-A custom `rules` list replaces the defaults, so include the `oauth` rule when the OAuth server is enabled.
+A custom `rules` list replaces the defaults. The `oauth` rule is optional: the OAuth server sweeps its own tables as it is used (see [Connect with OAuth](mcp.md#connect-with-oauth)), and the rule adds a sweep on this schedule with its own window.
 
 Rules execute sequentially. If one fails, the remaining rules still run; failures are logged and do not halt the cycle.
 

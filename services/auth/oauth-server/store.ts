@@ -1,6 +1,8 @@
 import * as crypto from 'crypto';
 
 import { getPool } from '../../../lib/db';
+import { loggerRegistry } from '../../../lib/logger';
+import { config } from '../../../modules/config';
 import { isUuid } from '../../../lib/uuid';
 import type { LTGrantPolicy, LTGrantSnapshot, LTGrantSummary, LTOAuthClient } from '../../../types/oauth-server';
 import {
@@ -48,6 +50,7 @@ export async function registerClient(input: { clientName?: string; redirectUris:
   const { rows } = await getPool().query(INSERT_CLIENT, [
     `ltc_${createSecret()}`, input.clientName ?? null, input.redirectUris,
   ]);
+  void sweepOAuthServer();
   return rows[0];
 }
 
@@ -78,6 +81,7 @@ export async function issueAuthorizationCode(input: {
     input.userId, input.clientId, input.policy, input.scope,
     hashSecret(code), input.redirectUri, input.codeChallenge, input.resource ?? null, input.ttlSeconds,
   ]);
+  void sweepOAuthServer();
   return { code, grantId: rows[0].grant_id };
 }
 
@@ -105,6 +109,7 @@ export async function exchangeAuthorizationCode(input: {
     await pool.query(REVOKE_ON_CODE_REUSE, [codeHash]);
     return null;
   }
+  void sweepOAuthServer();
   const { resource, ...snapshot } = rows[0];
   return { snapshot, resource, refreshToken };
 }
@@ -124,7 +129,10 @@ export async function rotateRefreshToken(input: {
   const next = createSecret();
   const oldHash = hashSecret(input.refreshToken);
   const { rows } = await pool.query(ROTATE_REFRESH_TOKEN, [oldHash, hashSecret(next), input.refreshTtlSeconds, input.clientId]);
-  if (rows[0]) return { snapshot: rows[0], refreshToken: next };
+  if (rows[0]) {
+    void sweepOAuthServer();
+    return { snapshot: rows[0], refreshToken: next };
+  }
   const reuse = await pool.query(REVOKE_ON_REFRESH_REUSE, [oldHash, REFRESH_REUSE_GRACE_SECONDS]);
   return { snapshot: null, revoked: reuse.rows[0] ?? null };
 }
@@ -166,7 +174,7 @@ export interface OAuthPruneCounts {
 /**
  * Delete what the authorization server no longer needs, older than the
  * window (a Postgres interval): spent and expired refresh tokens and codes,
- * then grants with neither left or revoked, then clients with no live grant.
+ * then grants with neither left or revoked, then clients never consented to.
  * Each step reads what the one before it left.
  */
 export async function pruneOAuthServer(olderThan: string): Promise<OAuthPruneCounts> {
@@ -176,4 +184,24 @@ export async function pruneOAuthServer(olderThan: string): Promise<OAuthPruneCou
   const grants = (await pool.query(PRUNE_GRANTS, [olderThan])).rowCount ?? 0;
   const clients = (await pool.query(PRUNE_CLIENTS, [olderThan])).rowCount ?? 0;
   return { refreshTokens, codes, grants, clients };
+}
+
+let nextSweepAt = 0;
+
+/**
+ * Delete what the server no longer needs, older than OAUTH_RETENTION_DAYS.
+ * Each OAuth write calls it, and it runs at most once per OAUTH_SWEEP_SECONDS
+ * in a process, so the tables stay bounded with or without a maintenance
+ * schedule. A failed sweep is logged and never fails the write.
+ */
+export async function sweepOAuthServer(): Promise<void> {
+  const now = Date.now();
+  if (now < nextSweepAt) return;
+  nextSweepAt = now + config.OAUTH_SWEEP_SECONDS * 1000;
+  try {
+    const counts = await pruneOAuthServer(`${config.OAUTH_RETENTION_DAYS} days`);
+    if (Object.values(counts).some(Boolean)) loggerRegistry.info(`[lt-oauth] swept: ${JSON.stringify(counts)}`);
+  } catch (err: any) {
+    loggerRegistry.warn(`[lt-oauth] sweep failed: ${err?.message}`);
+  }
 }

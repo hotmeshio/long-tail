@@ -13,6 +13,7 @@ export {
   revokeGrant,
   listGrants,
   pruneOAuthServer,
+  sweepOAuthServer,
   type RevokedGrant,
   type OAuthPruneCounts,
 } from './store';

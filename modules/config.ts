@@ -48,6 +48,10 @@ export const config = {
 
   // Enables the OAuth authorization server for /mcp when start() passes no auth.oauthServer.
   LT_OAUTH_ISSUER: process.env.LT_OAUTH_ISSUER || '',
+  /** Spent, expired and revoked OAuth rows are deleted once older than this many days. */
+  OAUTH_RETENTION_DAYS: positiveInt('OAUTH_RETENTION_DAYS', 7),
+  /** Least time between one process's OAuth sweeps. A sweep runs on an OAuth write. */
+  OAUTH_SWEEP_SECONDS: positiveInt('OAUTH_SWEEP_SECONDS', 600),
 
   HONEYCOMB_API_KEY: process.env.HONEYCOMB_API_KEY || '',
 
