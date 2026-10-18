@@ -28,6 +28,8 @@ export interface CodecChannels {
   events: string[];
   /** Readings that only prove a machine is alive; read live. */
   telemetry: string[];
+  /** Where a machine reads its commands; only the line controller writes them. */
+  commands: string[];
 }
 
 export interface LineCodec {
@@ -37,6 +39,7 @@ export interface LineCodec {
   readonly unitsPerDispatch: number | null;
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
+  /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];
 }
 
@@ -54,6 +57,7 @@ export interface GenericCodecOptions {
 export const GENERIC_CHANNELS: CodecChannels = {
   events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`],
   telemetry: [CHANNEL.TELEMETRY],
+  commands: [CHANNEL.CMD],
 };
 
 function withEvent(seen: Inspection, event: string): Inspection {

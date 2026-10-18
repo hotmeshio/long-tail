@@ -13,7 +13,7 @@ import { lineFilter } from '../../lib/machines/protocol';
 import { MemoryEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
 import { FakeLongTail, type FakeRow } from '../../services/machines/testing/fake-long-tail';
 import { ROOT, startHarness, type Harness } from './machine-line-fixtures';
-import type { MockSettings } from '../../services/machines/testing/mock';
+import type { MockSettings } from '../../examples/workflows/machine-line/mock';
 
 export const GATEWAY_SETTINGS: GatewaySettings = {
   topicRoot: ROOT,

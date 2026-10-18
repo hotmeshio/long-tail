@@ -5,7 +5,8 @@
  * dispatch ends without that, the row is resolved with the error and every
  * job is cancelled, so a dispatch still queued for a machine that was away
  * never runs later. A machine-command row is resolved with its command's
- * reply. Other commands are tracked for their reply and logged.
+ * reply. Other commands are tracked for their reply and logged. A command the
+ * codec has no message for is unsupported: nothing is sent or awaited.
  */
 
 import { setTimeout as sleep } from 'timers/promises';
@@ -37,20 +38,28 @@ type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
 type CommandAction = Extract<Action, { kind: 'command' }>;
 type ControlAction = Extract<Action, { kind: 'control' }>;
 
+/** A reply the machine sent, as opposed to none or an unsupported command. */
+function fromMachine(reply: CommandReply | null): reply is CommandReply {
+  return !!reply && reply.status !== COMMAND_STATUS.UNSUPPORTED;
+}
+
 export class Dispatcher {
   constructor(private readonly d: DispatcherDeps) {}
 
-  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<void> {
-    for (const wire of this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args })) {
-      await this.d.bus.publish(wire.topic, wire.payload);
-    }
+  /** False when the codec has no message for the command. */
+  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<boolean> {
+    const wires = this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args });
+    for (const wire of wires) await this.d.bus.publish(wire.topic, wire.payload);
+    return wires.length > 0;
   }
 
   /** Publish and wait for the reply, asking again with the same id; null when none came. */
   async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<CommandReply | null> {
     for (let attempt = 1; attempt <= this.d.dispatchAttempts; attempt++) {
       const waiting = this.d.replies.wait(cmdId, this.d.replyTimeoutMs);
-      await this.publish(machineId, op, cmdId, args);
+      if (!await this.publish(machineId, op, cmdId, args)) {
+        this.d.replies.settle({ cmdId, status: COMMAND_STATUS.UNSUPPORTED, reason: `the line's codec has no ${op} command` });
+      }
       const reply = await waiting;
       if (reply) return reply;
     }
@@ -60,6 +69,7 @@ export class Dispatcher {
   async command(a: CommandAction): Promise<void> {
     const reply = await this.ask(a.machineId, a.op, a.cmdId, a.args);
     if (!reply) this.d.log.warn(GATEWAY_LOG.COMMAND_UNANSWERED, { machine: a.machineId, op: a.op, cmdId: a.cmdId });
+    else if (reply.status === COMMAND_STATUS.UNSUPPORTED) this.d.log.info(GATEWAY_LOG.COMMAND_UNSUPPORTED, { machine: a.machineId, op: a.op });
     else if (reply.status !== REPLY_STATUS.ACCEPTED) {
       this.d.log.warn(GATEWAY_LOG.COMMAND_REFUSED, { machine: a.machineId, op: a.op, cmdId: a.cmdId, status: reply.status, reason: reply.reason });
     }
@@ -80,8 +90,8 @@ export class Dispatcher {
       : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };
     const context = { row: a.rowId, machine: a.machineId, op: a.op, status: outcome.status, reason: outcome.reason };
     if (outcome.accepted) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
-    else this.d.log.warn(reply ? GATEWAY_LOG.COMMAND_REFUSED : GATEWAY_LOG.COMMAND_UNANSWERED, context);
-    this.check(a.rowId, 'resolve', await this.d.lt.resolve(reply ? a.machineId : CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
+    else this.d.log.warn(!reply ? GATEWAY_LOG.COMMAND_UNANSWERED : fromMachine(reply) ? GATEWAY_LOG.COMMAND_REFUSED : GATEWAY_LOG.COMMAND_UNSUPPORTED, context);
+    this.check(a.rowId, 'resolve', await this.d.lt.resolve(fromMachine(reply) ? a.machineId : CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
   }
 
   async dispatch(a: DispatchAction): Promise<void> {
@@ -103,11 +113,11 @@ export class Dispatcher {
       ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${refused.status}: ${refused.reason}` }
       : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts` };
     log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { row: a.rowId, machine: a.machineId, ...resolution });
-    const ended = await lt.resolve(refused ? a.machineId : CONTROLLER, a.rowId, resolution);
+    const ended = await lt.resolve(fromMachine(refused ?? null) ? a.machineId : CONTROLLER, a.rowId, resolution);
     this.check(a.rowId, 'resolve', ended);
     state.close(a.rowId);
     if (ended.outcome !== VERB_OUTCOME.DONE) return;
-    await this.withdraw(a, jobs.filter((_, i) => replies[i]?.status !== REPLY_STATUS.REFUSED && replies[i]?.status !== REPLY_STATUS.FAILED));
+    await this.withdraw(a, jobs.filter((_, i) => !replies[i] || replies[i]!.status === REPLY_STATUS.ACCEPTED));
   }
 
   private check(rowId: string, verb: string, result: VerbResult): void {

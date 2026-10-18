@@ -65,6 +65,8 @@ export interface MachineDef {
    * handoffs wait in its role queue until it has room. Unset: no limit.
    */
   queueDepth?: number;
+  /** Refuse a handoff whose row has no artifact (url and sha256) before anything is sent. */
+  requireArtifact?: boolean;
 }
 
 export interface LineDef {

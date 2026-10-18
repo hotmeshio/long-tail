@@ -45,6 +45,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
 | `machines[].allowedSoftware` | Versions the line accepts. A machine reporting another version is refused before any dispatch |
 | `machines[].queueDepth` | Most jobs the machine is sent or holds at once. Unset: no limit. See [Pacing](#pacing) |
+| `machines[].requireArtifact` | The machine needs a job file. A handoff whose row has no `artifactUrl` and `artifactSha256` is refused before anything is sent |
 
 `start({ machines })` declares the station, exit and operator roles unless `roles` already declares them; set `declareRoles: false` to own them all.
 
@@ -72,7 +73,7 @@ When the handoff ends without a receipt, the row resolves `{ received: false, er
 
 | `errorCode` | Cause |
 |---|---|
-| `dispatch-refused` | The machine refused or failed the dispatch (mode, recipe, queue, artifact). The reason is in `detail` |
+| `dispatch-refused` | The machine refused or failed the dispatch (mode, recipe, queue, artifact), or the machine requires an artifact and the row has none. The reason is in `detail` |
 | `no-reply` | No reply after every attempt with the same command id. The dispatch is then cancelled, so a copy still queued for an absent machine never runs |
 | `software-unsupported` | The machine runs a version the line does not allow |
 | `sender-rejected` | The sender finished a unit as reject, hold, scrap or rework. Its reason is in `reason` and `detail` |
@@ -140,7 +141,7 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `accepted` | The machine took the command |
 | `refused`, `failed` | The machine said no; its reason is in `reason` (a changeover to a version it does not hold is refused) |
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
-| `unsupported` | Not a command a row may ask for, or not a machine on this line; nothing was sent |
+| `unsupported` | Not a command a row may ask for, not a machine on this line, or a command the line's codec has no message for; nothing was sent |
 
 The example's `machineCommand` workflow is this one step.
 
@@ -151,16 +152,17 @@ The gateway works in the generic line protocol. A codec translates:
 ```typescript
 interface LineCodec {
   root: string;
-  channels: { events: string[]; telemetry: string[] };   // MQTT filters under each machine
+  channels: { events: string[]; telemetry: string[]; commands: string[] };   // MQTT filters under each machine
   unitsPerDispatch: number | null;                        // 1: one dispatch per unit
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
-  encode(ident: MachineIdent, command: MachineCommand): WireMessage[];
+  encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
 }
 ```
 
 - `decode` may return several events for one message. That is how a codec infers a receipt from a different event when the machines report no arrival. `Machines.genericCodec({ root, receiptFrom: 'started' | 'bound' })` does this for the generic protocol.
 - With `unitsPerDispatch: 1` the gateway sends one job per unit, claims the row once every job is accepted, and cancels the accepted jobs if any is refused.
-- Event channels go to the durable stream and telemetry channels are read live. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
+- Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
+- When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.
 
@@ -200,7 +202,7 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role.
-- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl` render the configuration from the line.
+- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
 
 ## Configuration
 
@@ -221,10 +223,35 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 
 ## Testing a codec or adapter
 
-`@hotmeshio/long-tail/build/services/machines/testing` provides the testing kit:
-- an in-memory broker with retained messages, wills, offline queues and a durable log;
-- a mock line of machines speaking the generic protocol, with drills for jams, refusals, outages and restarts;
-- an in-memory Long Tail with claim rules and simulated outages;
-- a recording log.
+A host proves its codec and row adapter against the real gateway in memory. The package provides the in-memory transports (`Machines.MemoryBroker`, `MemoryMachineBus`, `MemoryEscalationFeed`), and `@hotmeshio/long-tail/build/services/machines/testing` provides an in-memory Long Tail (`FakeLongTail`, with claim rules and simulated outages), a recording log and `until`. The test plays the machine: it answers the commands the gateway sends and publishes the messages a machine would, for example ones captured from a real machine or a simulator.
 
-A host can drive its codec and row adapter against the gateway entirely in memory.
+```typescript
+import { Machines } from '@hotmeshio/long-tail';
+import { FakeLongTail, until } from '@hotmeshio/long-tail/build/services/machines/testing';
+
+const line = Machines.loadLine('./line.json');
+const codec = myCodec;
+
+// 1. Broker, escalation feed, Long Tail and the gateway, all in memory
+const broker = new Machines.MemoryBroker({ redeliverMs: 5 });
+const feed = new Machines.MemoryEscalationFeed(broker);
+const lt = new FakeLongTail(feed);
+const gateway = new Machines.MachineGateway({
+  bus: new Machines.MemoryMachineBus(broker, Machines.lineFilter(codec.root, line.siteId, line.lineId)),
+  feed, lt, line, codec, rows: myRows,
+  settings: { topicRoot: codec.root, replyTimeoutMs: 50, dispatchAttempts: 2, offlineDebounceMs: 10, dispatchTtlMs: 60_000, quietMs: 0 },
+});
+await gateway.start();
+
+// 2. Play the machine: see what the gateway sends, answer as the machine would
+broker.connect('bond-cell-1');
+broker.subscribe('bond-cell-1', myCommandTopic('bond-cell-1'), (msg) => broker.publish(myReplyTopic, myAcceptedReply(msg)));
+
+// 3. Park a row the way a workflow step would, publish the machine's report, read the outcome
+const row = lt.parkRow({ type: 'station-step', role: 'bond-cell', metadata: { /* the host's own facets */ } });
+await until(() => lt.rows.get(row.id)?.assigned_to === 'bond-cell-1', 2_000);
+broker.publish(capturedArrival.topic, capturedArrival.payload);
+expect((await lt.ended(row.id)).resolver_payload).toMatchObject({ received: true, receiver: 'bond-cell-1' });
+```
+
+The same rig covers the unhappy paths: drop the machine's replies for `no-reply`, answer with a refusal for `dispatch-refused`, publish a not-ok finish for `sender-rejected`, or stop and start the gateway to prove a takeover reads its rows back.

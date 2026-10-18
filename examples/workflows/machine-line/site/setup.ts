@@ -17,6 +17,7 @@ import { clientIds, controllerId } from '../../../../lib/machines/line';
 import { loadLine } from '../line';
 import { bridgeId, renderSiteConf } from '../../../../lib/machines/site/site-conf';
 import { renderMosquittoAcl, renderMosquittoConf } from '../../../../lib/machines/site/mosquitto-conf';
+import { genericCodec } from '../../../../lib/machines/protocol/codec';
 
 const DAYS = '825';
 const NATS_NAMES = ['site-nats', 'localhost'];
@@ -65,7 +66,7 @@ function main(): void {
   writeFileSync(join(brokerDir, 'mosquitto.conf'), renderMosquittoConf(line, {
     root: config.topicRoot, certDir: '/certs', siteNats: process.env.MACHINE_SITE_NATS_MQTT ?? 'site-nats:8883', aclFile: '/mosquitto/config/acl',
   }));
-  writeFileSync(join(brokerDir, 'acl'), renderMosquittoAcl(line, config.topicRoot));
+  writeFileSync(join(brokerDir, 'acl'), renderMosquittoAcl(line, genericCodec({ root: config.topicRoot })));
   console.log(JSON.stringify({ level: 'info', event: 'machine_site.ready', dir, identities: clientIds(line).length + 2 }));
 }
 

@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { renderMosquittoAcl, renderMosquittoConf } from '../../../lib/machines/site/mosquitto-conf';
+import { genericCodec } from '../../../lib/machines/protocol/codec';
 
 const conf = renderMosquittoConf(DEFAULT_LINE, { root: 'line/v1', certDir: '/certs', siteNats: 'site-nats:8883', aclFile: '/mosquitto/config/acl' });
-const acl = renderMosquittoAcl(DEFAULT_LINE, 'line/v1');
+const acl = renderMosquittoAcl(DEFAULT_LINE, genericCodec({ root: 'line/v1' }));
 
 describe('machine broker config', () => {
   it('requires a client certificate and takes its CN as the username', () => {
@@ -36,5 +37,19 @@ describe('machine broker ACL', () => {
     const ctl = acl.split('\n\n').find((b) => b.includes('user line-controller-site-1-line-1'))!;
     expect(ctl).toContain('topic write line/v1/site-1/line-1/+/cmd');
     expect(ctl).toContain('topic read line/v1/site-1/line-1/#');
+  });
+
+  it('takes its topics from the codec, so another protocol gets its own ACL', () => {
+    const other = renderMosquittoAcl(DEFAULT_LINE, {
+      root: 'cell/v2', channels: { events: ['state', 'unit/+'], telemetry: ['readings/#'], commands: ['control'] },
+    });
+    const press = other.split('\n\n').find((b) => b.includes('user site-1-line-1-press-01'))!;
+    expect(press).toContain('topic write cell/v2/site-1/line-1/press-01/state');
+    expect(press).toContain('topic write cell/v2/site-1/line-1/press-01/unit/+');
+    expect(press).toContain('topic write cell/v2/site-1/line-1/press-01/readings/#');
+    expect(press).toContain('topic read cell/v2/site-1/line-1/press-01/control');
+    expect(press).not.toContain('/job');
+    const ctl = other.split('\n\n').find((b) => b.includes('user line-controller-site-1-line-1'))!;
+    expect(ctl).toContain('topic write cell/v2/site-1/line-1/+/control');
   });
 });

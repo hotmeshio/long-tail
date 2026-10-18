@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { JOB_EVENT, OP, genericCodec } from '../../../lib/machines/protocol';
+import { CONTROLLER } from '../../../services/machines/gateway/actions';
 import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
 import { RecordingLog } from '../../../services/machines/testing/recording-log';
 import { facetsFor, startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
@@ -114,3 +115,15 @@ describe('commands: replies are tracked', () => {
     await until(() => log.of(GATEWAY_LOG.COMMAND_UNANSWERED).some((c) => c.op === OP.ACKNOWLEDGE_ALARM), 2_000);
   });
 });
+
+describe('dispatch: a machine that requires an artifact', () => {
+  it('a row without one is refused by the controller and nothing reaches the machine', async () => {
+    const line = { ...DEFAULT_LINE, machines: DEFAULT_LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
+    rig = await startRig({}, {}, line);
+    const ended = await rig.handoff('U1', null, 'press-01');
+    expect(ended.resolved_by).toBe(CONTROLLER);
+    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'dispatch-refused' });
+    expect(rig.recorder.commands('press-01', OP.DISPATCH)).toEqual([]);
+  });
+});
+

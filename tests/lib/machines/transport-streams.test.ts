@@ -52,7 +52,7 @@ describe('channels from a codec', () => {
   });
 
   it('builds the streams and the consumer from the codec\'s own channels', () => {
-    const channels = { events: ['state', 'work', 'events/alert/+'], telemetry: ['readings/raw'] };
+    const channels = { events: ['state', 'work', 'events/alert/+'], telemetry: ['readings/raw'], commands: ['control'] };
     const [events, telemetry] = lineStreamConfigs('acme/v1', channels);
     expect(events.subjects).toEqual(['acme.v1.*.*.*.state', 'acme.v1.*.*.*.work', 'acme.v1.*.*.*.events.alert.*']);
     expect(telemetry.subjects).toEqual(['acme.v1.*.*.*.readings.raw']);

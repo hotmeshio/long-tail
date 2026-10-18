@@ -72,9 +72,10 @@ The driver mints routes from either manifest and plays the people:
 | [`route-manifests.json`](route-manifests.json), [`manifests.ts`](manifests.ts) | The two manifests, the roles people work, the even percentage split |
 | [`workflows/`](workflows/) | `machineUnitRoute` and its pure route planning (machine and person steps); `machineCommand`, one step that asks a machine to start, stop, pause, resume or change over |
 | [`site/setup.ts`](site/setup.ts) | Certificates and broker configuration for the compose run |
-| [`mock/main.ts`](mock/main.ts), [`gateway/main.ts`](gateway/main.ts) | Process entries for the mock line and the standalone gateway |
+| [`mock/`](mock/) | The simulated line: machines speaking the generic protocol, with drills for jams, refusals, outages and restarts; [`mock/main.ts`](mock/main.ts) runs it as a process |
+| [`gateway/main.ts`](gateway/main.ts) | The standalone gateway as a process |
 
-The machinery itself ships in the package: `lib/machines` (protocol, codec, transports, streams, broker configuration) and `services/machines` (gateway, rows, roles, identities, the in-process surface, and the testing kit).
+The machinery itself ships in the package: `lib/machines` (protocol, codec, transports, streams, broker configuration) and `services/machines` (gateway, rows, roles, identities, the in-process surface, and an in-memory Long Tail for tests). The simulated line stays here, with the example.
 
 Tests:
 - unit tests in `tests/lib/machines/`, `tests/services/machines/` and `tests/examples/machine-line/`;

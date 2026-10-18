@@ -9,9 +9,9 @@
 import { loadMachineLineConfig } from '../../../../services/machines/config';
 import { loadLine } from '../line';
 import { createLinkFactory } from '../../../../services/machines/select';
-import { startDrillServer } from '../../../../services/machines/testing/mock/drills';
-import { MockLine } from '../../../../services/machines/testing/mock/mock-line';
-import { mockSettingsFromEnv } from '../../../../services/machines/testing/mock/settings';
+import { startDrillServer } from './drills';
+import { MockLine } from './mock-line';
+import { mockSettingsFromEnv } from './settings';
 
 async function main(): Promise<void> {
   // 1. Config, line and links

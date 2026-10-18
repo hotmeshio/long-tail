@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { MODE, OP } from '../../../lib/machines/protocol';
+import { MODE, OP, genericCodec, type LineCodec } from '../../../lib/machines/protocol';
 import { commandRow, commandTarget } from '../../../services/machines/commands';
 import { CONTROLLER } from '../../../services/machines/gateway/actions';
+import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
+import { RecordingLog } from '../../../services/machines/testing/recording-log';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
-import { sleep, until } from '../../helpers/machine-line-fixtures';
+import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 
 let rig: LineRig;
@@ -79,5 +81,34 @@ describe('machine-command rows', () => {
     const ended = await rig.lt.ended(row.id);
     expect(ended.resolver_payload).toMatchObject({ accepted: true, op: 'pause' });
     expect(rig.lt.calls.filter((c) => c.verb === 'resolve' && c.id === row.id)).toHaveLength(1);
+  });
+});
+
+/** The generic protocol, less the commands in `missing`, as a host's machines might lack them. */
+function codecWithout(...missing: string[]): LineCodec {
+  const generic = genericCodec({ root: ROOT });
+  return { ...generic, encode: (ident, command) => (missing.includes(command.op) ? [] : generic.encode(ident, command)) };
+}
+
+describe('commands the codec has no message for', () => {
+  it('a command row resolves unsupported at once, by the controller, and nothing is sent', async () => {
+    rig = await startRig({}, { replyTimeoutMs: 5_000 }, DEFAULT_LINE, { codec: codecWithout(OP.PAUSE) });
+    const started = Date.now();
+    const ended = await rig.lt.ended(ask(OP.PAUSE).id);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(ended.resolved_by).toBe(CONTROLLER);
+    expect(ended.resolver_payload).toMatchObject({ accepted: false, op: 'pause', status: 'unsupported' });
+    expect(rig.recorder.commands('press-01', OP.PAUSE)).toEqual([]);
+    expect(press().enabled).toBe(true);
+  });
+
+  it('a cancel the codec cannot send is logged as unsupported, never as unanswered', async () => {
+    const log = new RecordingLog();
+    rig = await startRig({}, { replyTimeoutMs: 20 }, DEFAULT_LINE, { codec: codecWithout(OP.CANCEL), log });
+    await rig.line.network('press-01', { mode: 'drop' });
+    expect((await rig.handoff('U1', null, 'press-01')).resolver_payload).toMatchObject({ errorCode: 'no-reply' });
+    await until(() => log.of(GATEWAY_LOG.COMMAND_UNSUPPORTED).length, 2_000);
+    expect(log.of(GATEWAY_LOG.COMMAND_UNSUPPORTED)[0]).toMatchObject({ machine: 'press-01', op: OP.CANCEL });
+    expect(log.of(GATEWAY_LOG.COMMAND_UNANSWERED).filter((c) => c.op === OP.CANCEL)).toEqual([]);
   });
 });

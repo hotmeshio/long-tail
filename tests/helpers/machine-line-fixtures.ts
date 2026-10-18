@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 
 import { identOf, machineById, type LineDef } from '../../lib/machines/line';
 import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
-import { DEFAULT_MOCK_SETTINGS, MockLine, type MockSettings } from '../../services/machines/testing/mock';
+import { DEFAULT_MOCK_SETTINGS, MockLine, type MockSettings } from '../../examples/workflows/machine-line/mock';
 import {
   CHANNEL, buildEnvelope, inspectMessage, lineFilter, machineTopic, type Envelope, type Inspection,
 } from '../../lib/machines/protocol';

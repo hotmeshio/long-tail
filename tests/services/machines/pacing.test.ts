@@ -92,4 +92,22 @@ describe('planPacing', () => {
     const [action] = planPacing(state, line, 60_000);
     expect(action).toMatchObject({ kind: 'resolve', payload: { errorCode: 'software-unsupported' } });
   });
+
+  it('a machine that requires an artifact refuses a row without one, before anything is sent', () => {
+    const line = { ...LINE, machines: LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
+    const bare = row('b', 'U2', null, 'press-01', DISPATCH_STATE.WAITING);
+    const urlOnly = { ...row('c', 'U3', null, 'press-01', DISPATCH_STATE.WAITING), artifactUrl: 'https://files/job.bin' };
+    const [a, b] = planPacing(stateWith(bare, urlOnly), line, 60_000);
+    expect(a).toMatchObject({ kind: 'resolve', rowId: 'b', payload: { received: false, errorCode: 'dispatch-refused' } });
+    expect((a as any).payload.detail).toMatch(/press-01 requires an artifact/);
+    expect(b).toMatchObject({ kind: 'resolve', rowId: 'c', payload: { errorCode: 'dispatch-refused' } });
+  });
+
+  it('a row with its artifact goes to a machine that requires one', () => {
+    const line = { ...LINE, machines: LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
+    const full = { ...row('b', 'U2', null, 'press-01', DISPATCH_STATE.WAITING), artifactUrl: 'https://files/job.bin', artifactSha256: 'ab'.repeat(32) };
+    const [action] = planPacing(stateWith(full), line, 60_000);
+    expect(action).toMatchObject({ kind: 'dispatch', args: { artifact: { url: 'https://files/job.bin', sha256: 'ab'.repeat(32) } } });
+  });
 });
+

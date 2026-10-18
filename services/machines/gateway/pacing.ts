@@ -40,6 +40,12 @@ export function softwareRefusal(state: GatewayState, line: LineDef, machineId: s
   return `${machineId} runs ${software}; allowed: ${allowed.join(', ')}`;
 }
 
+/** A machine that requires an artifact is never sent a handoff without one. */
+export function artifactRefusal(line: LineDef, row: HandoffRow): string | null {
+  if (!machineById(line, row.toMachine!).requireArtifact || (row.artifactUrl && row.artifactSha256)) return null;
+  return `${row.toMachine} requires an artifact (url and sha256); the row has none`;
+}
+
 const SENT: readonly DispatchState[] = [DISPATCH_STATE.PENDING, DISPATCH_STATE.ACCEPTED];
 
 const jobIdsOf = (state: GatewayState, jobId: string, row: HandoffRow) =>
@@ -65,12 +71,14 @@ export function hasRoom(state: GatewayState, line: LineDef, row: HandoffRow): bo
   return fits(line, row, machineLoad(state, row.toMachine!), state);
 }
 
-/** Send a handoff to its machine now, or refuse it for the machine's software. */
+/** Send a handoff to its machine now, or refuse it for the machine's software or a missing artifact. */
 export function admit(state: GatewayState, line: LineDef, row: HandoffRow, dispatchTtlMs: number): Action[] {
-  const refusal = softwareRefusal(state, line, row.toMachine!);
-  if (refusal) {
+  const software = softwareRefusal(state, line, row.toMachine!);
+  const artifact = software ? null : artifactRefusal(line, row);
+  if (software || artifact) {
     row.dispatch = DISPATCH_STATE.REFUSED;
-    return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode: HANDOFF_ERROR.SOFTWARE_UNSUPPORTED, detail: refusal } }];
+    const errorCode = software ? HANDOFF_ERROR.SOFTWARE_UNSUPPORTED : HANDOFF_ERROR.DISPATCH_REFUSED;
+    return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode, detail: software ?? artifact } }];
   }
   row.dispatch = DISPATCH_STATE.PENDING;
   return [dispatchAction(row, row.toMachine!, dispatchTtlMs)];

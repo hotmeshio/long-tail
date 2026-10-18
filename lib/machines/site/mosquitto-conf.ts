@@ -8,7 +8,7 @@
  */
 
 import { clientIdOf } from '../protocol/envelope';
-import { CHANNEL } from '../protocol/constants';
+import type { LineCodec } from '../protocol/codec';
 import { controllerId, identOf, type LineDef } from '../line';
 import { bridgeId } from './site-conf';
 
@@ -21,11 +21,6 @@ export interface MosquittoConfOptions {
   aclFile: string;
   maxPacketBytes?: number;
 }
-
-/** What a machine may publish: its own channels and nothing it does not own. */
-const MACHINE_WRITES = [
-  CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.TELEMETRY, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`,
-];
 
 export function renderMosquittoConf(line: LineDef, opts: MosquittoConfOptions): string {
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.
@@ -59,16 +54,20 @@ topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
 `;
 }
 
-export function renderMosquittoAcl(line: LineDef, root: string): string {
-  const base = `${root}/${line.siteId}/${line.lineId}`;
+/** The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands. */
+export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels'>): string {
+  const base = `${codec.root}/${line.siteId}/${line.lineId}`;
+  const { events, telemetry, commands } = codec.channels;
   const machines = line.machines.map((m) => {
     const own = `${base}/${m.machineId}`;
     return [
       `user ${clientIdOf(identOf(line, m.machineId))}`,
-      ...MACHINE_WRITES.map((c) => `topic write ${own}/${c}`),
-      `topic read ${own}/${CHANNEL.CMD}`,
+      ...[...events, ...telemetry].map((c) => `topic write ${own}/${c}`),
+      ...commands.map((c) => `topic read ${own}/${c}`),
     ].join('\n');
   });
-  const controller = [`user ${controllerId(line)}`, `topic write ${base}/+/${CHANNEL.CMD}`, `topic read ${base}/#`].join('\n');
+  const controller = [
+    `user ${controllerId(line)}`, ...commands.map((c) => `topic write ${base}/+/${c}`), `topic read ${base}/#`,
+  ].join('\n');
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...machines, controller].join('\n\n')}\n`;
 }

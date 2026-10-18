@@ -15,6 +15,7 @@ export const GATEWAY_LOG = {
   COMMANDED: 'machine_gateway.command.accepted',
   COMMAND_REFUSED: 'machine_gateway.command.refused',
   COMMAND_UNANSWERED: 'machine_gateway.command.unanswered',
+  COMMAND_UNSUPPORTED: 'machine_gateway.command.unsupported',
   LEADING: 'machine_gateway.line.leading',
   STANDBY: 'machine_gateway.line.standby',
   LEADERSHIP_LOST: 'machine_gateway.line.leadership_lost',
