@@ -7,16 +7,29 @@
  * Requires: docker compose up -d --build (flagship printer seed + scheme 10/11)
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { ApiClient, log, poll } from './helpers';
 
-const OBJECT_SCAN = '10:4:PRN-006'; // scheme 10, category 4 (Work Item), a seeded printer
+// Printers of this file's own, so the seeded fleet other suites measure stays as seeded.
+const STAMP = Date.now().toString(36);
+const WORK_SERIAL = `PRN-SCAN-${STAMP}`;
+const AUTO_SERIAL = `PRN-AUTO-${STAMP}`;
+const OBJECT_SCAN = `10:4:${WORK_SERIAL}`; // scheme 10, category 4 (Work Item)
 const BADGE_SCAN = '11:0:BADGE-REVIEWER-7431'; // the seeded associate badge
 
 let station: ApiClient;
 let admin: ApiClient;
 let reviewerId: string;
 let stationId: string;
+const ownRows: string[] = [];
+
+async function parkPrinter(serialNumber: string): Promise<void> {
+  const { data } = await admin.post('/api/escalations', {
+    type: 'fleet', subtype: 'idle', role: 'printer-fleet', description: `Station test printer ${serialNumber}`,
+    metadata: { serialNumber, model: 'p1s', facility: 'north' },
+  });
+  ownRows.push(data.id);
+}
 
 beforeAll(async () => {
   admin = new ApiClient();
@@ -42,14 +55,23 @@ beforeAll(async () => {
     // The flagship seed is ~100 engine calls behind every other seeder — a
     // cold multi-container boot can take a few minutes to finish it.
   }, 240_000);
+  await parkPrinter(WORK_SERIAL);
+  await parkPrinter(AUTO_SERIAL);
   log('setup', 'station + associate ready');
 }, 300_000);
+
+afterAll(async () => {
+  for (const id of ownRows) {
+    const { data: row } = await admin.get(`/api/escalations/${id}`);
+    if (row.status === 'pending') await admin.post(`/api/escalations/${id}/cancel`, {});
+  }
+});
 
 describe('the read-only station', () => {
   it('an object scan presents reality with mutating choices withheld', async () => {
     const { data } = await station.post('/api/scan-codes/execute', { code: OBJECT_SCAN });
     expect(data.outcome).toBe('choices');
-    expect(data.escalation.metadata.serialNumber).toBe('PRN-006');
+    expect(data.escalation.metadata.serialNumber).toBe(WORK_SERIAL);
 
     const byLabel = new Map(data.choices.map((c: any) => [c.label, c]));
     expect((byLabel.get('Claim & Start') as any).withheld).toBe(true);
@@ -116,9 +138,11 @@ describe('the badge layer', () => {
 
   it('continuity: the work surface honors the grant — resolve rides the header as the person', async () => {
     // The badged person claimed by scan; now they submit from the escalation
-    // detail page. The station session sends the grant as a header and the
-    // resolve attributes to the person, exactly like a self-claim.
-    station.setHeader('x-lt-acting-token', actingToken);
+    // detail page. The claim spent the single-use grant, so they badge again;
+    // the station sends the new grant as a header and the resolve attributes
+    // to the person, exactly like a self-claim.
+    const { data: badged } = await station.post('/api/scan-codes/execute', { code: BADGE_SCAN });
+    station.setHeader('x-lt-acting-token', badged.actingToken);
     try {
       const { data } = await station.post(`/api/escalations/${escalationId}/resolve`, {
         resolverPayload: { outcome: 'complete', detail: 'submitted at the station' },
@@ -164,14 +188,14 @@ describe('the badge layer', () => {
 
   it('auto-select: an unprimed scan stops over; a primed scan is one action', async () => {
     // Category 5 (Claim & Work) holds a single auto-selecting claim choice.
-    const unprimed = await station.post('/api/scan-codes/execute', { code: '10:5:PRN-001' });
+    const unprimed = await station.post('/api/scan-codes/execute', { code: `10:5:${AUTO_SERIAL}` });
     expect(unprimed.data.outcome).toBe('choices');
     expect(unprimed.data.autoSelect).toBe(true); // would have executed — identity stopped it
     expect(unprimed.data.choices[0].withheld).toBe(true);
 
     const { data: primed } = await station.post('/api/scan-codes/execute', { code: BADGE_SCAN });
     const { data } = await station.post('/api/scan-codes/execute', {
-      code: '10:5:PRN-001', actingToken: primed.actingToken,
+      code: `10:5:${AUTO_SERIAL}`, actingToken: primed.actingToken,
     });
     expect(data.outcome).toBe('executed');
     expect(data.verb).toBe('claim-show-detail');
