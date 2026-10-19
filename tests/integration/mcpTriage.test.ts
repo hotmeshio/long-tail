@@ -15,9 +15,9 @@
  *   - LLM API key set (ANTHROPIC_API_KEY or OPENAI_API_KEY)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
-import { ApiClient, NatsWaiter, log, poll } from './helpers';
+import { ApiClient, log, poll } from './helpers';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,6 @@ const hasLLMKey = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
 
 describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
   let api: ApiClient;
-  let nats: NatsWaiter;
 
   // Tokens per role (separate logins for RBAC)
   let reviewerToken: string;
@@ -44,7 +43,6 @@ describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
 
   beforeAll(async () => {
     api = new ApiClient();
-    nats = await NatsWaiter.create();
 
     // Login as each role
     reviewerToken = await api.login('reviewer', PASSWORD);
@@ -61,11 +59,6 @@ describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
     log('setup', 'Logged in as engineer');
   }, 60_000);
 
-  afterAll(async () => {
-    await nats.close();
-    log('cleanup', 'NATS closed');
-  });
-
   // ── Phase 1: Find the seeded escalation ────────────────────────────────
 
   it('finds Process 3 escalation (wrong_language)', async () => {
@@ -79,6 +72,7 @@ describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
         const { escalations } = await api.getAvailableEscalations({
           role: 'reviewer',
           limit: '50',
+          include: 'envelope',
         });
 
         return escalations.find((e: any) => {
@@ -199,40 +193,22 @@ describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
   it('waits for triage workflow completion', async () => {
     expect(triageWorkflowId).toBeTruthy();
 
-    log('triage', 'Waiting for triage completion via NATS...');
+    log('triage', 'Waiting for the triage task to complete...');
 
-    // The triage workflow is mcpTriageRouter which spawns child workflows.
-    // Wait for any workflow.completed event containing the triage workflow ID.
-    try {
-      await nats.waitForEvent(
-        (e) =>
-          e.type === 'workflow.completed' &&
-          (e.workflowId === triageWorkflowId ||
-            e.workflowId?.includes(triageWorkflowId) ||
-            e.originId === originId),
-        270_000,
-      );
-      log('triage', 'NATS: triage workflow completed');
-    } catch {
-      log('triage', 'NATS timeout — falling back to process polling');
-
-      // Fallback: poll the process tasks for a completed triage task
-      api.useToken(engineerToken);
-      await poll(
-        'triage task completion',
-        async () => {
-          const detail = await api.getProcessTasks(originId);
-          const tasks = detail.tasks || [];
-          const triageTask = tasks.find((t: any) =>
-            (t.workflow_type === 'mcpTriage' || t.workflow_type === 'mcpTriageRouter') &&
-            t.status === 'completed',
-          );
-          return triageTask ?? null;
-        },
-        270_000,
-        5_000,
-      );
-    }
+    api.useToken(engineerToken);
+    await poll(
+      'triage task completion',
+      async () => {
+        const detail = await api.getProcessTasks(originId);
+        const tasks = detail.tasks || [];
+        return tasks.find((t: any) =>
+          (t.workflow_type === 'mcpTriage' || t.workflow_type === 'mcpTriageRouter') &&
+          t.status === 'completed',
+        ) ?? null;
+      },
+      270_000,
+      3_000,
+    );
 
     const elapsed = ((Date.now() - triageStartTime) / 1000).toFixed(1);
     log('triage', `Triage completed in ${elapsed}s`);
@@ -311,24 +287,11 @@ describe.skipIf(!hasLLMKey)('mcpTriage lifecycle', () => {
 
   // ── Summary ────────────────────────────────────────────────────────────
 
-  it('logs event timeline for the process', async () => {
-    // Collect all NATS events we observed for this process
-    const events = nats.getEventsForWorkflow(originId);
-    const allEvents = events.length > 0 ? events : [];
-
-    // Also check for events from child workflows
-    if (triageWorkflowId) {
-      const triageEvents = nats.getEventsForWorkflow(triageWorkflowId);
-      allEvents.push(...triageEvents);
-    }
-
-    if (allEvents.length > 0) {
-      log('timeline', `Captured ${allEvents.length} NATS events:`);
-      for (const e of allEvents) {
-        log('timeline', `  ${e.type} — ${e.workflowName || e.workflowId} (${e.status || ''})`);
-      }
-    } else {
-      log('timeline', 'No NATS events captured for this process (events may predate subscription)');
+  it('logs the process timeline', async () => {
+    api.useToken(engineerToken);
+    const detail = await api.getProcessTasks(originId);
+    for (const t of detail.tasks || []) {
+      log('timeline', `  ${t.workflow_type}: ${t.status} (${t.created_at})`);
     }
 
     // Final summary
