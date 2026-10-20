@@ -9,6 +9,7 @@ import type { LTOAuthStartConfig } from './oauth';
 import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
+import type { DomainDictionary } from './domain-manifest';
 import type { LTLoggerAdapter } from './logger';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
@@ -642,7 +643,13 @@ export interface LTStartConfig {
      */
     domainDictionaryPath?: string;
     /**
-     * Ownership override for the domain dictionary. `true` → the file is
+     * The DomainDictionary declared inline, the same document a
+     * `domainDictionaryPath` file holds. Seeded and applied exactly as the
+     * file is. Declare one of the two; both set is a startup error.
+     */
+    domainDictionary?: DomainDictionary;
+    /**
+     * Ownership override for the domain dictionary. `true` → the document is
      * compared and applied on every boot (a changed document bumps the
      * dictionary version, exactly like a PUT); `false` → the DB owns the
      * document after first insert. Omitted → follows `configSource`.

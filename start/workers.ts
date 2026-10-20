@@ -22,6 +22,7 @@ import {
 } from './apply-report';
 
 import type { LTStartConfig, LTWorkerConfig } from '../types/startup';
+import type { DomainDictionary } from '../types/domain-manifest';
 import { assertLookupRefs } from '../types/escalation';
 import { describeMissingLookupRefs } from '../services/knowledge/lookup-refs';
 
@@ -50,6 +51,15 @@ function createNoOpWorkflow(name: string): (...args: any[]) => any {
  */
 export function buildConnection(): { class: unknown; options: Record<string, unknown> } {
   return getConnection();
+}
+
+/** The declared domain dictionary: the inline document or its file path. Both set is a startup error. */
+export function domainDictionarySource(startConfig: LTStartConfig): string | DomainDictionary | undefined {
+  const { domainDictionary, domainDictionaryPath } = startConfig.mcp ?? {};
+  if (domainDictionary && domainDictionaryPath) {
+    throw new Error('mcp.domainDictionary and mcp.domainDictionaryPath are exclusive: declare the dictionary once');
+  }
+  return domainDictionary ?? domainDictionaryPath;
 }
 
 /**
@@ -393,15 +403,13 @@ export async function startWorkers(
     }
   }
 
-  // Seed the domain dictionary (every container, workers or not). Db-owned:
-  // insert-if-absent, the DB row is runtime truth. Code-owned: the file is
-  // compared and applied, bumping the version once per changed document.
-  if (startConfig.mcp?.domainDictionaryPath) {
+  // Seed the domain dictionary (every container, workers or not), declared
+  // inline or by file. Db-owned: insert-if-absent, the DB row is runtime
+  // truth. Code-owned: compared and applied, one version bump per change.
+  const domainSource = domainDictionarySource(startConfig);
+  if (domainSource) {
     const { seedDomainDictionary } = await import('../services/domain');
-    await seedDomainDictionary(
-      startConfig.mcp.domainDictionaryPath,
-      startConfig.mcp.domainDictionaryReset ?? codeOwnedBoot,
-    );
+    await seedDomainDictionary(domainSource, startConfig.mcp?.domainDictionaryReset ?? codeOwnedBoot);
   }
 
   // Seed example topics when examples are enabled

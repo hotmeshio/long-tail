@@ -75,4 +75,27 @@ describe('domain dictionary — startup apply', () => {
     expect(record?.version).toBe(1);
     expect(record?.doc.overview).toBe('db owns this');
   });
+
+  it('an inline document from the start config seeds and applies like a file', async () => {
+    await seedDomainDictionary(doc('inline first'), true);
+    expect((await getDomainDictionary())?.doc.overview).toBe('inline first');
+
+    await seedDomainDictionary(doc('inline first'), true);
+    domainCache.invalidate();
+    expect((await getDomainDictionary())?.version).toBe(1);
+
+    await seedDomainDictionary(doc('inline second'), true);
+    domainCache.invalidate();
+    const record = await getDomainDictionary();
+    expect(record?.version).toBe(2);
+    expect(record?.doc.overview).toBe('inline second');
+  });
+
+  it('an inline document is never written over a db-owned row without the apply flag', async () => {
+    await seedDomainDictionary(doc('db owns this'));
+    await seedDomainDictionary(doc('code moved on'));
+    domainCache.invalidate();
+    expect((await getDomainDictionary())?.doc.overview).toBe('db owns this');
+  });
 });
+

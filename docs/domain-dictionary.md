@@ -78,14 +78,30 @@ same `PATCH /api/roles/:role` that manages every other role dial:
 
 ## Registration and editing
 
-Seed at boot by pointing the start config at a JSON file:
+Declare the dictionary in the start config, inline like roles and topics:
+
+```typescript
+mcp: {
+  domainDictionary: {
+    name: 'floor',
+    version: '3',
+    overview: 'Orders move from print to ship; each station is a role.',
+    terms: [ { term: 'bin', kind: 'entity', maps_to: { role: 'binning' }, guidance: '...' } ],
+  },
+}
+```
+
+or point it at a JSON file holding the same document:
 
 ```typescript
 mcp: { domainDictionaryPath: 'src/longtail/domain.json' }
 ```
 
-Seeding is insert-if-absent: the DB row is runtime truth, and a name/version
-mismatch between file and DB logs a drift warning. Edit live with
+Declare one of the two; both at once stops startup with an error. Under
+`configSource: 'code'` (or `mcp.domainDictionaryReset: true`) the declared
+document is compared and applied on every boot, one version bump per change.
+Otherwise seeding is insert-if-absent: the DB row is runtime truth, and a
+name/version mismatch between the declaration and the DB logs a drift warning. Edit live with
 `PUT /api/domain` (admin) — the body is `{ doc, expected_version? }`;
 `expected_version` arms optimistic concurrency (409 on conflict). Writes
 validate references against the live registries: unknown roles and workflows
