@@ -10,12 +10,18 @@
  * live in localStorage keyed by userId (one key, whole map) so a shared
  * device remembers its station's scope, kiosk-store style. View convenience
  * only — RBAC still governs what any query can see.
+ *
+ * `{lt:me}` is built in: it always reads the signed-in user's id, so one pin
+ * means "mine" for whoever is signed in. A role cannot declare or bind it.
  */
 
 import { useSyncExternalStore } from 'react';
 
 /** Whole-value placeholder: `{lt:name}` with the facet-key charset. */
 export const LINK_VAR_RE = /^\{lt:([A-Za-z0-9_]+)\}$/;
+
+/** The built-in variable naming the signed-in user. */
+export const ME_LINK_VAR = 'me';
 
 export function makePlaceholder(name: string): string {
   return `{lt:${name}}`;
@@ -111,7 +117,7 @@ export function useLinkVarValues(userId: string | null): Record<string, string> 
 
 /**
  * Substitute link-variable placeholders inside a URL's `facets` param.
- * Resolution per variable: device value → declared default → drop the facet.
+ * Resolution per variable: built-in → device value → declared default → drop the facet.
  * Non-facets params, literal values, and unparseable URLs pass through
  * untouched; an emptied facets object removes the param entirely.
  */
@@ -119,6 +125,7 @@ export function substituteLinkVars(
   url: string,
   values: Record<string, string>,
   defaults: Record<string, string>,
+  builtins: Record<string, string> = {},
 ): string {
   let parsed: URL;
   try {
@@ -142,7 +149,7 @@ export function substituteLinkVars(
     if (typeof v !== 'string') continue;
     const m = LINK_VAR_RE.exec(v);
     if (!m) continue;
-    const bound = values[m[1]] ?? defaults[m[1]];
+    const bound = builtins[m[1]] ?? values[m[1]] ?? defaults[m[1]];
     if (typeof bound === 'string' && bound !== '') facets[key] = bound;
     else delete facets[key];
     changed = true;

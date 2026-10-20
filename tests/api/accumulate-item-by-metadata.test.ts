@@ -176,6 +176,8 @@ describe('removeItemByMetadata (api)', () => {
     mockByMeta.mockResolvedValue({ outcome: 'accepted', count: 1, remaining: 1, escalation: makeBin() });
     await accumulateItemByMetadata({ key: 'binKey', value: 'b-1', itemKey: 'o-1', reciprocal: { key: 'orderId', value: 'o-1' } }, AUTH);
     expect(mockSearch.mock.calls[0][0]).toMatchObject({ facets: { orderId: 'o-1' }, status: 'pending', exists: ['accumulate_count'] });
-    expect(mockByMeta.mock.calls[0][2].reciprocal).toEqual({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', payload: undefined });
+    expect(mockByMeta.mock.calls[0][2].reciprocal).toEqual({
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', payload: undefined, metadata: { resolved_by: AUTH.userId },
+    });
   });
 });

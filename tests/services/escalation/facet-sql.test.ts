@@ -61,6 +61,10 @@ describe('buildFacetOrder', () => {
     expect(order).toBe("priority ASC, (metadata->>'dueDate') ASC NULLS LAST, (metadata->>'size')::numeric DESC NULLS LAST");
   });
 
+  it('orders by completion time with pending rows last', () => {
+    expect(buildFacetOrder([{ field: 'resolved_at', direction: 'desc' }])).toBe('resolved_at DESC NULLS LAST');
+  });
+
   it('skips unknown/invalid fields and falls back to the default', () => {
     expect(buildFacetOrder([{ field: 'evil; DROP' }])).toBe('priority ASC, created_at ASC');
     expect(buildFacetOrder([])).toBe('priority ASC, created_at ASC');

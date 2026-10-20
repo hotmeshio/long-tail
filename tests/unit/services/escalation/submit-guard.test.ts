@@ -50,4 +50,28 @@ describe('checkSubmitGuard', () => {
     expect(violation).toBeNull();
     expect(mockSearch).not.toHaveBeenCalled();
   });
+
+  describe('a roster guard', () => {
+    const counts = (outstanding: number) => ({ expected: 3, in: 3 - outstanding, flagged: 0, waiting: outstanding, outstanding });
+
+    it('rejects while entries are outstanding, with the outstanding count', async () => {
+      const violation = await checkSubmitGuard(
+        schemaWith({ roster: 'orders', message: '{{count}} orders unaccounted for' }),
+        { ...CTX, roster: { orders: counts(2) } },
+        'u1',
+      );
+      expect(violation).toEqual({ field: '_submitGuard', message: '2 orders unaccounted for' });
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+
+    it('clears once every entry is in or flagged', async () => {
+      expect(await checkSubmitGuard(schemaWith({ roster: 'orders' }), { ...CTX, roster: { orders: counts(0) } }, 'u1')).toBeNull();
+    });
+
+    it('rejects when the form declares no such roster', async () => {
+      const violation = await checkSubmitGuard(schemaWith({ roster: 'orders' }), CTX, 'u1');
+      expect(violation?.message).toContain('roster "orders"');
+    });
+  });
 });
+

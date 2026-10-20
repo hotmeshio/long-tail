@@ -14,6 +14,8 @@ vi.mock('../../services/escalation', () => ({
   aggregateRelatedQuery: vi.fn(),
   listRelatedItems: vi.fn(),
   listRelatedQueryRows: vi.fn(),
+  extremeRelatedItems: vi.fn(),
+  extremeRelatedQuery: vi.fn(),
 }));
 
 import * as roleService from '../../services/role';
@@ -97,6 +99,35 @@ describe('getRelatedAggregates', () => {
   it('answers a stored schema that no longer validates with a 422', async () => {
     vi.mocked(roleService.getRoleListSchema).mockResolvedValue({ version: 1, list_schema: { 'x-lt-related': {} } } as any);
     expect((await getRelatedAggregates({ role: 'bin', ids: [H1] }, auth)).status).toBe(422);
+  });
+});
+
+describe('getRelatedAggregates min and max', () => {
+  it('runs one statement per min or max value, keyed beside the counts', async () => {
+    vi.mocked(roleService.getRoleListSchema).mockResolvedValue({ version: 1, list_schema: {
+      'x-lt-related': schema['x-lt-related'],
+      'x-lt-columns': [
+        { label: 'Total', related: 'contents', display: { '0': 'Ready', default: 'Waiting on {n}' } },
+        { label: 'Earliest', related: 'contents', aggregate: 'min', value: '{{item.payload.commitBy}}', format: 'date' },
+        { label: 'Earliest again', related: 'contents', aggregate: 'min', value: '{{item.payload.commitBy}}' },
+        { label: 'Latest due', related: 'coming', aggregate: 'max', value: '{{metadata.due}}' },
+      ],
+    } } as any);
+    vi.mocked(escalationService.extremeRelatedItems).mockResolvedValue({ [H1]: { count: 2, value: '2026-10-09' } });
+    vi.mocked(escalationService.extremeRelatedQuery).mockResolvedValue({ [H1]: { count: 1, value: 30 } });
+    const result = await getRelatedAggregates({ role: 'bin', ids: [H1, H2] }, auth);
+    expect(result.status).toBe(200);
+    expect(vi.mocked(escalationService.aggregateRelatedItems).mock.calls.map((c) => c[0].splitBy)).toEqual([undefined]);
+    expect(escalationService.extremeRelatedItems).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(escalationService.extremeRelatedItems).mock.calls[0][0]).toMatchObject({ fold: 'min', path: 'payload.commitBy' });
+    expect(vi.mocked(escalationService.extremeRelatedQuery).mock.calls[0][0]).toMatchObject({
+      fold: 'max', path: 'metadata.due', roles: ['prep', 'check'], status: 'pending',
+    });
+    expect(escalationService.aggregateRelatedQuery).not.toHaveBeenCalled();
+    expect(result.data.sets.contents.aggregates['min:payload.commitBy'][H1]).toEqual({ count: 2, value: '2026-10-09' });
+    expect(result.data.sets.coming.aggregates['max:metadata.due']).toEqual({
+      [H1]: { count: 1, value: 30 }, [H2]: { count: 0, unresolved: true },
+    });
   });
 });
 

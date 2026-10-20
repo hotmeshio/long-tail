@@ -9,6 +9,7 @@ export const DISPLAY_ONLY_WIDGET_NAMES = {
   ESCALATION: 'escalation',
   ESCALATION_LIST: 'escalation-list',
   INVOKE: 'invoke',
+  ROSTER: 'roster',
 } as const;
 
 export const DISPLAY_ONLY_WIDGETS: ReadonlySet<string> = new Set(Object.values(DISPLAY_ONLY_WIDGET_NAMES));

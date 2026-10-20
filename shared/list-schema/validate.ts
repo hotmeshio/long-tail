@@ -3,6 +3,7 @@ import {
   GROUP_FOLDS,
   LIST_SCHEMA_KEYS,
   RELATED_AGGREGATES,
+  RELATED_DISPLAY_DEFAULT,
   RELATED_LIMITS,
   RELATED_SOURCES,
   SPLIT_PATHS,
@@ -11,11 +12,13 @@ import {
   type RelatedSetDecl,
   type RowDetailSectionDecl,
 } from './types';
+import { isExtremeAggregate, relatedValuePath } from './aggregate';
 
 /** A metadata key: interpolated as a JSON path, so strictly validated. */
 export const METADATA_KEY = /^[a-zA-Z0-9_]+$/;
 const SET_NAME = /^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/;
 const PATH_SEGMENT = /^[a-zA-Z0-9_]+$/;
+const COUNT_KEY = /^(0|[1-9][0-9]*)$/;
 
 type Obj = Record<string, unknown>;
 
@@ -103,7 +106,28 @@ function readSet(name: string, raw: unknown): RelatedSetDecl {
 function readRelatedColumn(raw: Obj, sets: Record<string, RelatedSetDecl>, at: string): RelatedColumnDecl {
   const name = raw.related;
   if (!isNonEmptyString(name) || !sets[name]) fail(`${at}.related must name a set declared in x-lt-related`);
-  if (raw.aggregate !== undefined && raw.aggregate !== RELATED_AGGREGATES.COUNT) fail(`${at}.aggregate must be "count"`);
+  if (raw.aggregate !== undefined && raw.aggregate !== RELATED_AGGREGATES.COUNT && !isExtremeAggregate(raw.aggregate)) {
+    fail(`${at}.aggregate must be "count", "min" or "max"`);
+  }
+  const source = sets[name].source;
+  if (isExtremeAggregate(raw.aggregate)) {
+    if (!relatedValuePath(source, raw.value)) {
+      fail(source === RELATED_SOURCES.ITEMS
+        ? `${at}.value must be "{{item.payload.<path>}}" on an items set`
+        : `${at}.value must be "{{metadata.<key>}}" on a query set`);
+    }
+    if (raw.splitBy !== undefined) fail(`${at}: a ${raw.aggregate} column takes no splitBy`);
+    if (raw.display !== undefined) fail(`${at}: display applies to a count column`);
+  } else if (raw.value !== undefined) {
+    fail(`${at}.value applies to a min or max column`);
+  }
+  if (raw.format !== undefined && typeof raw.format !== 'string') fail(`${at}.format must be a format name`);
+  if (raw.display !== undefined) {
+    if (!isObj(raw.display) || Object.keys(raw.display).length === 0
+      || !Object.entries(raw.display).every(([k, v]) => (k === RELATED_DISPLAY_DEFAULT || COUNT_KEY.test(k)) && typeof v === 'string')) {
+      fail(`${at}.display must map counts (or "default") to display text`);
+    }
+  }
   if (raw.splitBy !== undefined) {
     if (!isNonEmptyString(raw.splitBy)) fail(`${at}.splitBy must be a path`);
     const err = splitPathError(sets[name].source, raw.splitBy);
