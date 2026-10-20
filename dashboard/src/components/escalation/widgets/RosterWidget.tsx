@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
 import { RosterEntryRow, type RosterActionDef } from './RosterEntryRow';
+import { useEmbedWrite } from './embed-write';
 import { useRosters } from '../../../hooks/useRosters';
 import { useResolveEscalation } from '../../../api/escalations';
 import { getDeep } from '../../../lib/x-lt-bind';
@@ -11,6 +12,7 @@ import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import type { WidgetProps } from './index';
 
 const DEFAULT_COLUMNS: EmbedColumnDef[] = [{ label: 'Item', value: '{{item.itemKey}}' }];
+const EMBED_WRITE_VERB = 'continue';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
@@ -60,13 +62,13 @@ export function RosterWidget({ fieldKey, schema, escalationContext }: WidgetProp
   const helperText = schema?.description as string | undefined;
 
   const resolve = useResolveEscalation();
+  const guard = useEmbedWrite();
   const [confirming, setConfirming] = useState<{ key: string; action: RosterActionDef } | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fire = async (entry: RosterEntry, action: RosterActionDef) => {
     if (!entry.row) return;
-    setConfirming(null);
     setPendingKey(entry.key);
     setErrors((prev) => ({ ...prev, [entry.key]: '' }));
     try {
@@ -81,9 +83,14 @@ export function RosterWidget({ fieldKey, schema, escalationContext }: WidgetProp
     }
   };
 
+  const act = (entry: RosterEntry, action: RosterActionDef) => {
+    setConfirming(null);
+    guard(EMBED_WRITE_VERB, () => fire(entry, action));
+  };
+
   const request = (entry: RosterEntry, action: RosterActionDef) => {
     if (action.confirm) setConfirming({ key: entry.key, action });
-    else void fire(entry, action);
+    else act(entry, action);
   };
 
   return (
@@ -115,7 +122,7 @@ export function RosterWidget({ fieldKey, schema, escalationContext }: WidgetProp
               pending={pendingKey === entry.key}
               error={errors[entry.key] || undefined}
               onAction={(action) => request(entry, action)}
-              onConfirm={() => confirming && void fire(entry, confirming.action)}
+              onConfirm={() => confirming && act(entry, confirming.action)}
               onCancel={() => setConfirming(null)}
             />
           ))}

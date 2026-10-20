@@ -91,6 +91,16 @@ describe('computeRoster', () => {
     expect(computeRoster(QUERY_DEF, host(), rows).entries.map((e) => e.key)).toEqual(['o-9']);
   });
 
+  it('reads the newest of several rows sharing a key, so state and actions follow the live row', () => {
+    const older = member('m-old', 'o-7', { status: 'resolved', created_at: '2026-10-20T10:00:00Z', resolver_payload: { outcome: 'missing' } });
+    const newer = member('m-new', 'o-7', { created_at: '2026-10-20T11:00:00Z' });
+    for (const rows of [[older, newer], [newer, older]]) {
+      const [entry] = computeRoster(QUERY_DEF, host(), rows).entries;
+      expect(entry.state).toBe('waiting');
+      expect(entry.row?.escalation.id).toBe('m-new');
+    }
+  });
+
   it('defaults the key to the member row id and the in source to the held items', () => {
     const def: RosterDef = { expected: { query: { role: 'packing' } } };
     const result = computeRoster(def, { metadata: { accumulate_keys: ['m1'] } }, [member('m1', 'x'), member('m2', 'y')]);

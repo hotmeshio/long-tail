@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { OpenDetailButton } from './OpenDetailButton';
 import { InlineConfirm } from './InlineConfirm';
+import { useEmbedWrite } from './embed-write';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { rowContext } from '../EscalationListView';
 import { useEscalations, useResolveEscalation } from '../../../api/escalations';
@@ -16,6 +17,8 @@ import {
 } from '../../../lib/embed-row';
 import type { WidgetProps } from './index';
 import type { LTEscalationRecord } from '../../../api/types';
+
+const EMBED_WRITE_VERB = 'continue';
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
   { label: 'Description', value: '{{escalation.description}}' },
@@ -94,14 +97,19 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
   const [pendingRow, setPendingRow] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<{ id: string; action: ActionDef } | null>(null);
 
+  const guard = useEmbedWrite();
+  const act = (esc: LTEscalationRecord, action: ActionDef) => {
+    setConfirming(null);
+    guard(EMBED_WRITE_VERB, () => fireAction(esc, action));
+  };
+
   const requestAction = (esc: LTEscalationRecord, action: ActionDef) => {
     if (action.confirm) setConfirming({ id: esc.id, action });
-    else void fireAction(esc, action);
+    else act(esc, action);
   };
 
   const fireAction = async (esc: LTEscalationRecord, action: ActionDef) => {
     const rowCtx = rowContext(esc);
-    setConfirming(null);
     setPendingRow(esc.id);
     setRowErrors((prev) => ({ ...prev, [esc.id]: '' }));
     try {
@@ -131,7 +139,7 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
             actions={actions}
             onAction={requestAction}
             confirming={confirming}
-            onConfirm={(esc) => confirming && void fireAction(esc, confirming.action)}
+            onConfirm={(esc) => confirming && act(esc, confirming.action)}
             onCancel={() => setConfirming(null)}
             pendingRow={pendingRow}
             rowErrors={rowErrors}

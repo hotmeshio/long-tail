@@ -49,6 +49,20 @@ describe('isDictionaryField', () => {
     };
     expect(isDictionaryField(schema, null, 'a')).toBe(false);
   });
+
+  it('embed widgets keep their block rendering on a dictionary form', () => {
+    const schema = {
+      'x-lt-display': 'dictionary',
+      properties: {
+        orders: { readOnly: true, 'x-lt-widget': 'roster' },
+        related: { readOnly: true, 'x-lt-widget': 'escalation-list' },
+        po: { type: 'string', readOnly: true },
+      },
+    };
+    expect(isDictionaryField(schema, null, 'orders')).toBe(false);
+    expect(isDictionaryField(schema, null, 'related')).toBe(false);
+    expect(isDictionaryField(schema, null, 'po')).toBe(true);
+  });
 });
 
 describe('partitionCells', () => {

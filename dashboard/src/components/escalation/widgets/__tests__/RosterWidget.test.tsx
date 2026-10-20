@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RosterWidget } from '../RosterWidget';
+import { EmbedWriteContext } from '../embed-write';
 
 const mockFetch = vi.fn();
 const mockMutateAsync = vi.fn();
@@ -95,6 +96,29 @@ describe('RosterWidget', () => {
     }));
     expect(confirmSpy).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it('holds an action for the page’s write gate, then resolves when the gate runs it', async () => {
+    mockMutateAsync.mockResolvedValue({});
+    let held: (() => Promise<void>) | null = null;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const ctx = { escalation: { id: 'box-1' }, metadata: { accumulate_keys: ['o-1'] }, envelope: null, resolver: {} };
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <EmbedWriteContext.Provider value={(_verb, run) => { held = run; }}>
+            <RosterWidget
+              fieldKey="orders" value="" onChange={vi.fn()} escalationContext={ctx}
+              schema={{ ...SCHEMA, 'x-lt-actions': [{ label: 'Missing', resolverPayload: { outcome: 'missing' } }] }}
+            />
+          </EmbedWriteContext.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId('roster-action-o-2'));
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    await held!();
+    expect(mockMutateAsync).toHaveBeenCalledWith({ id: 'm-o-2', resolverPayload: { outcome: 'missing' } });
   });
 
   it('shows a refused action on its entry', async () => {
