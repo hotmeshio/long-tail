@@ -566,6 +566,10 @@ to continue. The badge scan primes the session and the pending action
 completes on its own. With a live grant the stop-over never appears — the
 identity layer is invisible when all is well.
 
+While a grant is live, the shell header shows the badged person and the
+minutes left on every page, so a person working a list or a form sees when
+to badge again. It clears when the grant lapses or is used up.
+
 A field can take a scan while the form is open: with
 [`x-lt-scan`](hitl/x-lt-scan.md), scanning a container into a claimed form
 fills its container field (checked against what the record expects), and

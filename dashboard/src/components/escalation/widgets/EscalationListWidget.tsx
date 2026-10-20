@@ -1,62 +1,27 @@
 import { useState } from 'react';
 import { OpenDetailButton } from './OpenDetailButton';
+import { InlineConfirm } from './InlineConfirm';
 import { interpolateHelp } from '../../../lib/x-lt-help';
-import { formatAgoCompact } from '../../../lib/format';
 import { rowContext } from '../EscalationListView';
 import { useEscalations, useResolveEscalation } from '../../../api/escalations';
 import { useAuth } from '../../../hooks/useAuth';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
 import { resolveScopedQuery, type EmbedQuery } from '../../../lib/x-lt-query';
 import { schemaNeedsEnvelope } from '../../../lib/schema-needs-envelope';
+import {
+  interpolatePayload,
+  renderEmbedValue as renderValue,
+  type EmbedActionDef as ActionDef,
+  type EmbedColumnDef as ColumnDef,
+} from '../../../lib/embed-row';
 import type { WidgetProps } from './index';
-import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import type { LTEscalationRecord } from '../../../api/types';
-
-interface ColumnDef { label: string; value: string; format?: string }
-
-/**
- * An inline row action: fires a canned resolve against the row through the
- * standard resolve endpoint — RBAC and enforce_schema validation apply
- * server-side exactly as a full-form resolve. String leaves inside
- * `resolverPayload` (and `confirm`) interpolate `{{domain.path}}` tokens
- * against the row's own context; booleans and numbers pass through typed.
- */
-interface ActionDef {
-  label: string;
-  resolverPayload: Record<string, unknown>;
-  /** Optional confirm prompt shown before firing; tokens interpolate per row. */
-  confirm?: string;
-}
 
 const DEFAULT_COLUMNS: ColumnDef[] = [
   { label: 'Description', value: '{{escalation.description}}' },
   { label: 'Role', value: '{{escalation.role}}' },
   { label: 'Age', value: '{{escalation.created_at}}', format: 'age' },
 ];
-
-const EM_DASH = '—';
-
-function renderValue(raw: string, format?: string): string {
-  if (!raw || raw === EM_DASH) return EM_DASH;
-  if (format === 'age') {
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? raw : formatAgoCompact(raw);
-  }
-  return raw;
-}
-
-/** Deep-walk a payload template: string leaves interpolate `{{domain.path}}`
- *  tokens against the row context; every other type passes through typed. */
-function interpolatePayload(value: unknown, ctx: ShowIfContext): unknown {
-  if (typeof value === 'string') return interpolateHelp(value, ctx);
-  if (Array.isArray(value)) return value.map((v) => interpolatePayload(v, ctx));
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, interpolatePayload(v, ctx)]),
-    );
-  }
-  return value;
-}
 
 /**
  * Escalation list widget — embeds a compact list of escalations inline in the
@@ -127,10 +92,16 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
   const resolve = useResolveEscalation();
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [pendingRow, setPendingRow] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ id: string; action: ActionDef } | null>(null);
+
+  const requestAction = (esc: LTEscalationRecord, action: ActionDef) => {
+    if (action.confirm) setConfirming({ id: esc.id, action });
+    else void fireAction(esc, action);
+  };
 
   const fireAction = async (esc: LTEscalationRecord, action: ActionDef) => {
     const rowCtx = rowContext(esc);
-    if (action.confirm && !window.confirm(interpolateHelp(action.confirm, rowCtx))) return;
+    setConfirming(null);
     setPendingRow(esc.id);
     setRowErrors((prev) => ({ ...prev, [esc.id]: '' }));
     try {
@@ -158,7 +129,10 @@ export function EscalationListWidget({ fieldKey, schema, escalationContext }: Wi
             columns={columns}
             fieldKey={fieldKey}
             actions={actions}
-            onAction={fireAction}
+            onAction={requestAction}
+            confirming={confirming}
+            onConfirm={(esc) => confirming && void fireAction(esc, confirming.action)}
+            onCancel={() => setConfirming(null)}
             pendingRow={pendingRow}
             rowErrors={rowErrors}
           />
@@ -174,6 +148,9 @@ function EmbedTable({
   fieldKey,
   actions,
   onAction,
+  confirming,
+  onConfirm,
+  onCancel,
   pendingRow,
   rowErrors,
 }: {
@@ -182,6 +159,9 @@ function EmbedTable({
   fieldKey: string;
   actions: ActionDef[];
   onAction: (esc: LTEscalationRecord, action: ActionDef) => void;
+  confirming: { id: string; action: ActionDef } | null;
+  onConfirm: (esc: LTEscalationRecord) => void;
+  onCancel: () => void;
   pendingRow: string | null;
   rowErrors: Record<string, string>;
 }) {
@@ -229,7 +209,14 @@ function EmbedTable({
               })}
               {actions.length > 0 && (
                 <td className="py-1 pr-2 align-top whitespace-nowrap">
-                  {actions.map((action) => (
+                  {confirming?.id === esc.id ? (
+                    <InlineConfirm
+                      message={interpolateHelp(confirming.action.confirm ?? '', ctx)}
+                      onConfirm={() => onConfirm(esc)}
+                      onCancel={onCancel}
+                      testId={`escalation-list-confirm-${esc.id}`}
+                    />
+                  ) : actions.map((action) => (
                     <button
                       key={action.label}
                       type="button"

@@ -151,8 +151,8 @@ export function useFacetValues(key: string | null | undefined) {
   });
 }
 
-export function useEscalations(filters: EscalationFilters) {
-  const { enabled = true, staleTime, ...rest } = filters;
+/** The list endpoint's query string for a set of filters. */
+export function escalationListParams(rest: Omit<EscalationFilters, 'enabled' | 'staleTime'>): URLSearchParams {
   const params = new URLSearchParams();
   if (rest.status) params.set('status', rest.status);
   if (rest.role) params.set('role', rest.role);
@@ -168,10 +168,21 @@ export function useEscalations(filters: EscalationFilters) {
   if (rest.order) params.set('order', rest.order);
   if (rest.search) params.set('search', rest.search);
   appendFacetParams(params, rest);
+  return params;
+}
 
+/** One list read: the query key and fetch every list surface shares, so reads dedupe and refresh together. */
+export function escalationListQuery(rest: Omit<EscalationFilters, 'enabled' | 'staleTime'>) {
+  return {
+    queryKey: ['escalations', rest] as const,
+    queryFn: () => apiFetch<EscalationListResponse>(`/escalations?${escalationListParams(rest)}`),
+  };
+}
+
+export function useEscalations(filters: EscalationFilters) {
+  const { enabled = true, staleTime, ...rest } = filters;
   return useQuery<EscalationListResponse>({
-    queryKey: ['escalations', rest],
-    queryFn: () => apiFetch(`/escalations?${params}`),
+    ...escalationListQuery(rest),
     enabled,
     ...(staleTime !== undefined ? { staleTime } : {}),
   });

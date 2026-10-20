@@ -32,3 +32,4 @@ export {
   readRelatedHosts,
 } from './related';
 export type { RelatedQueryHost } from './related';
+export { extremeRelatedItems, extremeRelatedQuery } from './related-extremes';

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useRoleDetails } from '../api/roles';
 import {
+  ME_LINK_VAR,
   substituteLinkVars,
   setLinkVarValue,
   useLinkVarValues,
@@ -49,7 +50,7 @@ export function useLinkVariables(): {
       if (!Array.isArray(declared)) continue;
       for (const d of declared) {
         const name = (d as { name?: unknown })?.name;
-        if (typeof name !== 'string' || name === '' || seen.has(name)) continue;
+        if (typeof name !== 'string' || name === '' || name === ME_LINK_VAR || seen.has(name)) continue;
         seen.add(name);
         const label = (d as { label?: unknown }).label;
         const dflt = (d as { default?: unknown }).default;
@@ -73,8 +74,8 @@ export function useLinkVariables(): {
   }, [declarations]);
 
   const resolveUrl = useCallback(
-    (url: string) => substituteLinkVars(url, values, defaults),
-    [values, defaults],
+    (url: string) => substituteLinkVars(url, values, defaults, userId ? { [ME_LINK_VAR]: userId } : {}),
+    [values, defaults, userId],
   );
 
   const setValue = useCallback(

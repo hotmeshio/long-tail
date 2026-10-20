@@ -10,6 +10,7 @@ import { useRelatedSetEvents } from '../../../hooks/useEventHooks';
 import { metadataFacetsUrl } from '../../../lib/facet-url';
 import {
   readListSchemaRelations,
+  relatedAggregateKey,
   resolveRelatedFacets,
   rowTemplateContext,
   type GroupFold,
@@ -133,7 +134,8 @@ function FacetTableBody({ schema, rows, groups, role, version, onRowClick, onAdd
     const query = relations?.sets[name]?.query;
     // Members that share a facet match read the same related rows: count them once.
     const counted = query?.facets ? distinctByMatch(members, query.facets, query.narrow) : members;
-    const agg = mergeAggregates(counted.map((m) => set?.aggregates[col.splitBy ?? '']?.[m.id]));
+    const key = relatedAggregateKey(col as RelatedColumnDecl, relations?.sets[name]?.source ?? '');
+    const agg = mergeAggregates(counted.map((m) => set?.aggregates[key]?.[m.id]), (col as RelatedColumnDecl).aggregate);
     const drillUrl = query?.facets && members.length === 1
       ? (relatedRole: string) => {
           const match = resolveRelatedFacets(query.facets!, rowTemplateContext(members[0] as unknown as Record<string, unknown>), query.narrow);

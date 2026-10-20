@@ -26,6 +26,9 @@ export type RelatedSource = (typeof RELATED_SOURCES)[keyof typeof RELATED_SOURCE
 
 export const RELATED_AGGREGATES = {
   COUNT: 'count',
+  /** The least item or row value: numbers as numbers, everything else as text. */
+  MIN: 'min',
+  MAX: 'max',
 } as const;
 export type RelatedAggregate = (typeof RELATED_AGGREGATES)[keyof typeof RELATED_AGGREGATES];
 
@@ -83,10 +86,19 @@ export interface RelatedSetDecl {
   query?: RelatedQueryDecl;
 }
 
+/** A count column's text keyed by count; `default` covers the rest, `{n}` reads the count. */
+export const RELATED_DISPLAY_DEFAULT = 'default';
+
 export interface RelatedColumnDecl {
   label: string;
   related: string;
   aggregate?: RelatedAggregate;
+  /** min/max: `{{item.payload.<path>}}` on an items set, `{{metadata.<key>}}` on a query set. */
+  value?: string;
+  /** min/max: how the value renders, as on any facet-table column. */
+  format?: string;
+  /** count: text by count, e.g. `{ "0": "Ready", "default": "Waiting on {n}" }`. */
+  display?: Record<string, string>;
   splitBy?: string;
   labels?: Record<string, string>;
   priority?: 1 | 2 | 3;
@@ -117,9 +129,11 @@ export interface ListSchemaRelations {
   groupKey: string | null;
 }
 
-/** Per-host aggregate for one (set, splitBy) pair. */
+/** Per-host aggregate for one (set, splitBy) pair, or one (set, min/max, value) triple. */
 export interface RelatedHostAggregate {
   count: number;
+  /** min/max: the extreme value among `count` values; absent when none carries one. */
+  value?: string | number;
   /** Split value to count; a null value is keyed by the empty string. */
   splits?: Record<string, number>;
   /** Items whose reciprocal row the viewer cannot read. */
@@ -140,7 +154,7 @@ export interface RelatedSetResult {
   roleLabels?: Record<string, string>;
   /** Query sets: declared roles outside the viewer's full read scope. */
   restricted?: string[];
-  /** Keyed by splitBy ('' when unsplit), then host id. */
+  /** Keyed by relatedAggregateKey (the splitBy, '' when unsplit, or `min:<path>`), then host id. */
   aggregates: Record<string, Record<string, RelatedHostAggregate>>;
 }
 

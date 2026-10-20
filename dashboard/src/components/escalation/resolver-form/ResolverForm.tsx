@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { LockedFormFrame } from './LockedFormFrame';
 import { HelpCircle } from 'lucide-react';
-import { evaluateShowIf, isHiddenIfEmpty, type ShowIfContext } from '../../../lib/x-lt-show-if';
+import { evaluateShowIf, isHiddenField, isHiddenIfEmpty, type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateField } from '../../../lib/field-validator';
 import { FieldRow } from './FieldRow';
 import { SectionGroup } from './SectionGroup';
@@ -116,9 +116,11 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   // reacts to live edits — the parent context only carries the saved row state.
   const liveCtx: ShowIfContext = { ...(escalationContext ?? {}), resolver: data as Record<string, unknown>, input: data as Record<string, unknown> };
 
-  // Conditional visibility via x-lt-showIf and x-lt-hide-if-empty
+  // Visibility via x-lt-hidden, x-lt-showIf and x-lt-hide-if-empty; a hidden
+  // field keeps its value in the payload.
   const entries = ordered.filter(([key, val]) => {
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
+    if (isHiddenField(fieldSchema)) return false;
     if (!evaluateShowIf(fieldSchema?.['x-lt-showIf'], liveCtx)) return false;
     return !isHiddenIfEmpty(fieldSchema, val);
   });

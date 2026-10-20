@@ -83,6 +83,19 @@ describe('substituteLinkVars', () => {
   });
 });
 
+describe('built-in variables', () => {
+  const url = '/escalations?status=resolved&facets=' + encodeURIComponent(JSON.stringify({ resolved_by: '{lt:me}' }));
+
+  it('read ahead of a device binding or a declared default', () => {
+    const out = substituteLinkVars(url, { me: 'device' }, { me: 'default' }, { me: 'user-1' });
+    expect(JSON.parse(new URL(out, 'http://x').searchParams.get('facets')!)).toEqual({ resolved_by: 'user-1' });
+  });
+
+  it('drop the facet when unset, like any variable', () => {
+    expect(new URL(substituteLinkVars(url, {}, {}), 'http://x').searchParams.get('facets')).toBeNull();
+  });
+});
+
 describe('extractLinkVarNames', () => {
   it('collects unique referenced names', () => {
     const url = facetsUrl({ a: '{lt:facility}', b: '{lt:facility}', c: '{lt:bench}', d: 'lit' });

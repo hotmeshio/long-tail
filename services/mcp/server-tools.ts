@@ -232,7 +232,7 @@ export function registerHumanQueueTools(server: McpServer): void {
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
-        args.metadata,
+        { ...args.metadata, resolved_by: args.resolver_id },
       );
       if (!resolved) {
         return {

@@ -19,6 +19,7 @@ import { portalPath, portalsOf } from '../../lib/portal-path';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { LinkVariablesModal } from './LinkVariablesModal';
 import { SearchCommandBar } from './SearchCommandBar';
+import { BadgeGrantIndicator } from './BadgeGrantIndicator';
 import { useRoleDetails } from '../../api/roles';
 import { displayRoleTitle } from '../../lib/role-display';
 
@@ -190,6 +191,8 @@ export function Header({ onToggleEventFeed, onToggleDocs, onToggleNav }: { onTog
         )}
 
         <div className="flex items-center gap-5 shrink-0">
+          <BadgeGrantIndicator />
+
           {/* Escalations: all */}
           <Link
             to="/escalations/available"

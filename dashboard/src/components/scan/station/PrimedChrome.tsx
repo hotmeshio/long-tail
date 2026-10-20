@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { BadgeCheck } from 'lucide-react';
 import { useActingIdentity } from '../../../hooks/useActingIdentity';
+import { useActingCountdown } from '../../../hooks/useActingCountdown';
 
 function formatMmSs(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -11,18 +11,11 @@ function formatMmSs(totalSeconds: number): string {
 /**
  * Slim persistent strip while an acting identity is primed: the greeting and
  * a mm:ss countdown to the grant's expiry. The context clears itself at the
- * expiry instant — this chrome only renders. The per-second tick is a visible
- * wall clock, not data polling; it runs only while a grant is live.
+ * expiry instant; this chrome only renders.
  */
 export function PrimedChrome() {
-  const { identity, remainingSeconds } = useActingIdentity();
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    if (!identity?.expiresAt) return;
-    const interval = setInterval(() => setTick((t) => t + 1), 1_000);
-    return () => clearInterval(interval);
-  }, [identity]);
+  const { identity } = useActingIdentity();
+  const seconds = useActingCountdown();
 
   if (!identity) return null;
 
@@ -32,7 +25,7 @@ export function PrimedChrome() {
       <span className="text-sm font-medium text-text-primary">Hi {identity.displayName}</span>
       {identity.expiresAt && (
         <span className="ml-auto text-sm font-mono tabular-nums text-text-tertiary">
-          {formatMmSs(remainingSeconds())}
+          {formatMmSs(seconds)}
         </span>
       )}
     </div>

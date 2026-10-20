@@ -4,11 +4,15 @@ import { isUuid } from '../../lib/uuid';
 import {
   RELATED_LIMITS,
   RELATED_SOURCES,
+  isExtremeAggregate,
   readListSchemaRelations,
+  relatedAggregateKey,
+  relatedValuePath,
   resolveRelatedFacets,
   rowTemplateContext,
   type ListSchemaRelations,
   type RelatedAggregatesResponse,
+  type RelatedExtreme,
   type RelatedQueryDecl,
   type RelatedRowsResponse,
   type RelatedSetResult,
@@ -68,16 +72,30 @@ async function resolveQueryRoles(query: RelatedQueryDecl, readScope: EscalationR
   return { roles, roleLabels, restricted };
 }
 
-/** The split paths the declared columns ask of one set ('' when unsplit). */
-function splitsFor(relations: ListSchemaRelations, set: string): string[] {
-  const splits = new Set(relations.columns.filter((c) => c.related === set).map((c) => c.splitBy ?? ''));
-  if (!splits.size) splits.add('');
-  return [...splits];
+/** One aggregate a set's columns ask for: a count by split, or a min/max over a value. */
+interface AggregateAsk {
+  key: string;
+  splitBy?: string;
+  extreme?: { fold: RelatedExtreme; path: string };
+}
+
+/** The distinct aggregates the declared columns ask of one set; an unsplit count when none does. */
+function asksFor(relations: ListSchemaRelations, set: string, source: string): AggregateAsk[] {
+  const asks = new Map<string, AggregateAsk>();
+  for (const col of relations.columns.filter((c) => c.related === set)) {
+    const key = relatedAggregateKey(col, source);
+    if (asks.has(key)) continue;
+    asks.set(key, isExtremeAggregate(col.aggregate)
+      ? { key, extreme: { fold: col.aggregate, path: relatedValuePath(source, col.value)! } }
+      : { key, ...(col.splitBy ? { splitBy: col.splitBy } : {}) });
+  }
+  if (!asks.size) asks.set('', { key: '' });
+  return [...asks.values()];
 }
 
 /**
  * Aggregate every related set the role's list schema declares, for one page
- * of host rows. One statement per (set, split) pair, whatever the page size.
+ * of host rows. One statement per (set, aggregate) pair, whatever the page size.
  */
 export async function getRelatedAggregates(
   input: { role: string; ids: string[]; version?: number },
@@ -104,11 +122,13 @@ export async function getRelatedAggregates(
       const result: RelatedSetResult = { source: decl.source, aggregates: {} };
       if (decl.source === RELATED_SOURCES.ITEMS) {
         const roles = new Set<string>();
-        for (const splitBy of splitsFor(relations, name)) {
-          const read = await escalationService.aggregateRelatedItems({
-            hostIds, scope, splitBy: splitBy || undefined,
-          });
-          result.aggregates[splitBy] = read.aggregates;
+        for (const ask of asksFor(relations, name, decl.source)) {
+          if (ask.extreme) {
+            result.aggregates[ask.key] = await escalationService.extremeRelatedItems({ hostIds, scope, ...ask.extreme });
+            continue;
+          }
+          const read = await escalationService.aggregateRelatedItems({ hostIds, scope, splitBy: ask.splitBy });
+          result.aggregates[ask.key] = read.aggregates;
           read.roles.forEach((r) => roles.add(r));
         }
         if (roles.size) result.roles = [...roles].sort();
@@ -123,13 +143,13 @@ export async function getRelatedAggregates(
           if (match) matched.push({ hostId: host.id as string, match });
           else unresolved.push(host.id as string);
         }
-        for (const splitBy of splitsFor(relations, name)) {
-          const agg = await escalationService.aggregateRelatedQuery({
-            hosts: matched, roles: resolved.roles, status: decl.query!.status ?? DEFAULT_STATUS, scope,
-            splitBy: splitBy || undefined,
-          });
+        for (const ask of asksFor(relations, name, decl.source)) {
+          const query = { hosts: matched, roles: resolved.roles, status: decl.query!.status ?? DEFAULT_STATUS, scope };
+          const agg = ask.extreme
+            ? await escalationService.extremeRelatedQuery({ ...query, ...ask.extreme })
+            : await escalationService.aggregateRelatedQuery({ ...query, splitBy: ask.splitBy });
           for (const id of unresolved) agg[id] = { count: 0, unresolved: true };
-          result.aggregates[splitBy] = agg;
+          result.aggregates[ask.key] = agg;
         }
       }
       data.sets[name] = result;

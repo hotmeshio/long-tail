@@ -1,5 +1,5 @@
 import { interpolateHelp } from '../../../lib/x-lt-help';
-import { GROUP_FOLDS, type GroupFold, type RelatedHostAggregate } from '../../../lib/list-schema';
+import { GROUP_FOLDS, foldExtreme, isExtremeAggregate, type GroupFold, type RelatedAggregate, type RelatedHostAggregate } from '../../../lib/list-schema';
 import { EM_DASH } from '../../common/display/FormattedValue';
 import { rowContext, type ColumnDef } from './row-parts';
 import type { LTEscalationRecord } from '../../../api/types';
@@ -77,8 +77,11 @@ export function foldColumnText(col: ColumnDef & { group?: GroupFold }, rows: LTE
   return fold === GROUP_FOLDS.MIN ? sorted[0] : sorted[sorted.length - 1];
 }
 
-/** One aggregate across several host rows: counts and splits sum. */
-export function mergeAggregates(aggs: Array<RelatedHostAggregate | undefined>): RelatedHostAggregate | undefined {
+/** One aggregate across several host rows: counts and splits sum; a min or max folds its values. */
+export function mergeAggregates(
+  aggs: Array<RelatedHostAggregate | undefined>,
+  aggregate?: RelatedAggregate,
+): RelatedHostAggregate | undefined {
   const present = aggs.filter((a): a is RelatedHostAggregate => !!a);
   if (!present.length) return undefined;
   if (present.every((a) => a.unresolved)) return { count: 0, unresolved: true };
@@ -91,6 +94,10 @@ export function mergeAggregates(aggs: Array<RelatedHostAggregate | undefined>): 
       out.splits ??= {};
       for (const [k, n] of Object.entries(a.splits)) out.splits[k] = (out.splits[k] ?? 0) + n;
     }
+  }
+  if (isExtremeAggregate(aggregate)) {
+    const value = foldExtreme(aggregate, present.flatMap((a) => (a.value === undefined ? [] : [a.value])));
+    if (value !== undefined) out.value = value;
   }
   return out;
 }

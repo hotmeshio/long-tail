@@ -46,6 +46,11 @@ specific first:
 A role that enforces but declares no schema has no contract to enforce, and
 its resolves proceed unchanged.
 
+The same opt-in enforces a form's [submit guard](hitl/x-lt-embed.md#submit-guard-x-lt-submit-guard).
+A form with a [roster](hitl/x-lt-roster.md) has its roster counts computed
+at resolve from the same shared code the dashboard renders with, so
+`roster.*` showIf conditions and a roster guard hold on every surface.
+
 ## The rejection shape
 
 Every surface reports violations with one canonical body

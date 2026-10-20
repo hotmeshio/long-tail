@@ -188,9 +188,10 @@ export async function resolveByMetadata(
     // writing; the payload validates here, then a second asserted pass claims
     // + resolves the same row with pending re-checked inside the statement.
     const enforcing = await getEnforcingRoles();
+    const outcome = { ...input.metadata, resolved_by: auth.userId };
     let result = await escalationService.resolveByMetadataAtomic(
       input.key, input.value, resolveUserId,
-      input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
+      input.resolverPayload, outcome, writeAllRoles, writeSelfRoles,
       enforcing.size > 0 ? [...enforcing] : null,
       input.assertId ?? null, input.extraFacets, input.availability,
     );
@@ -200,7 +201,7 @@ export async function resolveByMetadata(
       if (report) return validationFailure(report);
       result = await escalationService.resolveByMetadataAtomic(
         input.key, input.value, resolveUserId,
-        input.resolverPayload, input.metadata, writeAllRoles, writeSelfRoles,
+        input.resolverPayload, outcome, writeAllRoles, writeSelfRoles,
         null, result.row.id, input.extraFacets, input.availability,
       );
       // The asserted row left pending between the two passes — a concurrent
@@ -225,7 +226,7 @@ export async function resolveByMetadata(
     // Atomic conditional escalation (signal_key set) — SDK resolve atomically marks
     // resolved AND delivers the signal to the waiting condition(), resuming the workflow.
     if (result.signalKey) {
-      const resolved = await escalationService.resolveEscalation(result.escalationId!, input.resolverPayload);
+      const resolved = await escalationService.resolveEscalation(result.escalationId!, input.resolverPayload, outcome);
       if (!resolved) {
         return { status: 409, error: 'Escalation not available for resolution' };
       }
