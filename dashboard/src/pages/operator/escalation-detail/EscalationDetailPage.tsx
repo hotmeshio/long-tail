@@ -39,7 +39,7 @@ import type { FieldError } from '../../../lib/field-validator';
 import { validateResolverForm } from '../../../lib/field-validator';
 import { EscalationContextBlocks, EscalationFormSection, buildShowIfContext } from './EscalationDetailSections';
 import { VIEWPORT_STAGES, expandViewportSrc, readViewport } from '../../../lib/x-lt-viewport';
-import { isReadOnlyLogin } from '../../../lib/station-login';
+import { embedWriteRunsNow, isReadOnlyLogin } from '../../../lib/station-login';
 import { useMyRoles } from '../../../api/users';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
@@ -51,6 +51,7 @@ import { readFooterLabels } from '../../../lib/x-lt-labels';
 import { readSubmitGuard } from '../../../lib/x-lt-submit-guard';
 import { useSubmitGuard } from '../../../hooks/useSubmitGuard';
 import { useRosters, rosterContext } from '../../../hooks/useRosters';
+import { EmbedWriteContext, type EmbedWriteGuard } from '../../../components/escalation/widgets/embed-write';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
@@ -199,6 +200,8 @@ function EscalationDetailView({ id }: { id: string }) {
   const scanSubmitRef = useRef<(json: string) => void>(() => {});
 
   const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
+  // An embedded row action (roster, list) waiting on a badge at a shared station.
+  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void> } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -385,6 +388,15 @@ function EscalationDetailView({ id }: { id: string }) {
     }
   }, [acting, pendingWrite, esc?.assigned_to, clearActing]);
 
+  // An embedded action resolves another row, so it runs for whoever badges
+  // in and that row's RBAC judges them; then the badge retires as above.
+  useEffect(() => {
+    if (!pendingEmbedWrite || !acting) return;
+    const { run } = pendingEmbedWrite;
+    setPendingEmbedWrite(null);
+    void run().finally(() => clearActing());
+  }, [acting, pendingEmbedWrite, clearActing]);
+
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
   // An open, editable form takes scans its x-lt-scan fields accept.
@@ -565,6 +577,16 @@ function EscalationDetailView({ id }: { id: string }) {
     void Promise.resolve().then(run).catch((err) => {
       if (err instanceof ApiError && err.status === 401) setPendingWrite({ verb, run });
     });
+  };
+
+  // A read-only station login acts only through a badge.
+  const guardEmbedWrite: EmbedWriteGuard = (verb, run) => {
+    if (embedWriteRunsNow(myRoles, scanEnabled, acting)) {
+      void run();
+      return;
+    }
+    clearActing();
+    setPendingEmbedWrite({ verb, run });
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
@@ -788,6 +810,7 @@ function EscalationDetailView({ id }: { id: string }) {
               )}
 
               <FieldNoticeProvider value={editable && fieldNotice ? fieldNotice : null}>
+              <EmbedWriteContext.Provider value={guardEmbedWrite}>
               <EscalationFormSection
                 esc={esc}
                 resolverPayload={resolverPayload}
@@ -818,6 +841,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 onDisabledClick={() => setClaimNudge((n) => n + 1)}
                 disabledHint={lockedFormHint}
               />
+              </EmbedWriteContext.Provider>
               </FieldNoticeProvider>
 
               <div className="h-10" />
@@ -912,6 +936,13 @@ function EscalationDetailView({ id }: { id: string }) {
       {/* Scan hand-off: a scanned confirm-step lands here with the pending
           action in route state; the modal asks the rule's prompt. */}
       <ScanConfirmModal escalationId={id} />
+
+      <StationWriteChallenge
+        open={!!pendingEmbedWrite}
+        verb={pendingEmbedWrite?.verb ?? 'continue'}
+        anyBadge
+        onCancel={() => setPendingEmbedWrite(null)}
+      />
 
       <StationWriteChallenge
         open={!!pendingWrite}

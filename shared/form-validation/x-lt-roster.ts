@@ -214,7 +214,18 @@ function flagFor(def: RosterDef, row: RosterRow | undefined): string | undefined
   return undefined;
 }
 
-/** The expected keys in order, each with its member row (query) or label (batch). */
+/** A row's creation instant in ms; 0 when absent or unreadable. */
+function createdAt(row: RosterRow): number {
+  const raw = row.escalation.created_at;
+  const ms = raw instanceof Date ? raw.getTime() : typeof raw === 'string' ? Date.parse(raw) : NaN;
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+/**
+ * The expected keys in order, each with its member row (query) or label
+ * (batch). Several rows sharing a key (a member that parked again) read as
+ * one entry on the newest row, so its state and actions follow the live row.
+ */
 function expectedEntries(
   def: RosterDef,
   ctx: HelpTokenContext,
@@ -230,7 +241,16 @@ function expectedEntries(
   const e = def.expected;
   if ('query' in e) {
     const template = def.key ?? DEFAULT_KEY;
-    for (const row of rows) push(interpolateHelp(template, row), { row });
+    const newest = new Map<string, RosterRow>();
+    for (const row of rows) {
+      const key = interpolateHelp(template, row);
+      const held = newest.get(key);
+      if (!held || createdAt(row) > createdAt(held)) newest.set(key, row);
+    }
+    for (const row of rows) {
+      const key = interpolateHelp(template, row);
+      push(key, { row: newest.get(key) });
+    }
   } else if ('list' in e) {
     strings(resolveCtxPath(e.list, ctx as Record<string, unknown>)).forEach((k) => push(k));
   } else {

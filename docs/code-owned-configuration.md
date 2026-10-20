@@ -50,7 +50,7 @@ topics: [
 ],
 ```
 
-The domain dictionary's override lives beside its path:
+The domain dictionary's override lives beside its declaration:
 `mcp.domainDictionaryReset`.
 
 ## Per-surface semantics
@@ -64,7 +64,7 @@ The domain dictionary's override lives beside its path:
 | Agents | `agents[]` | description, status, goals, rules, domain, schedules | capabilities, metadata, run history |
 | Agent subscriptions | `agents[].subscriptions` | reaction fields on (agent, topic) | `enabled` — the admin kill-switch |
 | Scan schemes | `scanSchemes[]` | whole scheme + its rules (one ownership unit; `enabled` is declarative here) | — |
-| Domain dictionary | `mcp.domainDictionaryPath` | whole document (version bumps once per change) | — |
+| Domain dictionary | `mcp.domainDictionary` (inline) or `mcp.domainDictionaryPath` | whole document (version bumps once per change) | — |
 | Graph workflows | `graphWorkflows[]` | always compare-and-apply: description/schema sync, redeploy on YAML version bump | run history |
 
 `certified` on a workflow profile is explicit-only under code ownership: an

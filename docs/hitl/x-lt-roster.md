@@ -47,7 +47,7 @@ Like the other [embed widgets](x-lt-embed.md), a roster is display-only: declare
 
 | Set | Shape | Entries |
 |-----|-------|---------|
-| `query` | `{ "role": "...", "roles": [...], "facets": {...}, "status": "..." }` | Member rows matching the role(s) and facets. Facet values are `{{domain.path}}` templates over the host row. Every status is read unless `status` names one, so a member resolved as missing stays on the roster. Up to 200 rows. |
+| `query` | `{ "role": "...", "roles": [...], "facets": {...}, "status": "..." }` | Member rows matching the role(s) and facets. Facet values are `{{domain.path}}` templates over the host row. Every status is read unless `status` names one, so a member resolved as missing stays on the roster. Up to 200 rows. When several rows share a key (a member that parked again), the entry reads the newest. |
 | `list` | `"metadata.members"` | The keys in an array on the host row. |
 | `batch` | `true`, with optional `"labels": "envelope.boxLabels"` | The row's batch keys; a batch key is in once filled. `labels` names a per-key map whose entry each column reads as `{{item.label.*}}`. |
 
@@ -80,7 +80,7 @@ Without `x-lt-columns`, each entry shows its key.
 | `when` | The entry state(s) that offer the action: `"waiting"` (default), `"in"`, `"flagged"`, or an array |
 | `confirm` | A confirmation asked in place, beside the entry, before firing |
 
-An entry with no member row (a `list` or `batch` set) offers no actions.
+An entry with no member row (a `list` or `batch` set) offers no actions. On a read-only station login, an action runs as the badged person while a badge grant is live, and asks for a badge otherwise; the action then runs as whoever badges in, under that person's RBAC on the member row.
 
 Moving work to another person is a resolve with an outcome. "Send to a manager" above resolves the member row with `outcome: "needs-manager"`; the member's workflow opens a row in the manager's role, where only a manager can resolve it, and the manager's confirm adds the bag to the box.
 

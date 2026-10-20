@@ -10,7 +10,7 @@ Read-only facts — order numbers, quantities, product names — render as a den
 | Section | `x-lt-section-options` at the schema root | read-only fields in that section |
 | Schema | at the schema root | every read-only field |
 
-Only read-only fields (`readOnly: true`) render as dictionary rows. Editable fields keep their inputs, and content widgets (`markdown`, `attachment`, `image`) keep their block rendering regardless of display settings.
+Only read-only fields (`readOnly: true`) render as dictionary rows. Editable fields keep their inputs, and content widgets (`markdown`, `attachment`, `image`) and embed widgets (`link`, `escalation`, `escalation-list`, `invoke`, `roster`) keep their block rendering regardless of display settings.
 
 ```json
 {

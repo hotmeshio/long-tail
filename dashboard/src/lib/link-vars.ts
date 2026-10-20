@@ -11,8 +11,10 @@
  * device remembers its station's scope, kiosk-store style. View convenience
  * only — RBAC still governs what any query can see.
  *
- * `{lt:me}` is built in: it always reads the signed-in user's id, so one pin
- * means "mine" for whoever is signed in. A role cannot declare or bind it.
+ * `{lt:me}` is built in: it reads the person acting (the badged person while
+ * a badge grant is live, the signed-in user otherwise), so one pin means
+ * "mine" on a shared station and on a personal login. A role cannot declare
+ * or bind it.
  */
 
 import { useSyncExternalStore } from 'react';

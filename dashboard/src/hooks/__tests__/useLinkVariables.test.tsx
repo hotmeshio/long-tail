@@ -3,6 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 
 vi.mock('../useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../../api/roles', () => ({ useRoleDetails: vi.fn() }));
+const mockActing = vi.fn();
+vi.mock('../useActingIdentity', () => ({ useActingIdentityOptional: () => mockActing() }));
 
 import { useAuth } from '../useAuth';
 import { useRoleDetails } from '../../api/roles';
@@ -26,6 +28,7 @@ function roleData(roles: Array<{ role: string; properties?: Record<string, unkno
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockActing.mockReturnValue(null);
   localStorage.clear();
   mockAuth.mockReturnValue(auth(['gluer']));
   mockRoleDetails.mockReturnValue(roleData([
@@ -99,4 +102,21 @@ describe('useLinkVariables', () => {
     act(() => setLinkVarValue('u1', 'facility', 'east'));
     expect(result.current.values).toEqual({ facility: 'east' });
   });
+
+  describe('{lt:me}', () => {
+    const url = '/escalations/available?facets=' + encodeURIComponent(JSON.stringify({ resolved_by: '{lt:me}' }));
+    const meOf = (resolved: string) => JSON.parse(new URL(resolved, 'http://x').searchParams.get('facets')!).resolved_by;
+
+    it('reads the signed-in user', () => {
+      const { result } = renderHook(() => useLinkVariables());
+      expect(meOf(result.current.resolveUrl(url))).toBe('u1');
+    });
+
+    it('reads the badged person while a grant is live', () => {
+      mockActing.mockReturnValue({ actorId: 'badged-1', subjectScoped: false });
+      const { result } = renderHook(() => useLinkVariables());
+      expect(meOf(result.current.resolveUrl(url))).toBe('badged-1');
+    });
+  });
 });
+

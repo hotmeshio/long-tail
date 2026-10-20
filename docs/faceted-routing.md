@@ -123,14 +123,15 @@ Values are strings — jsonb containment is type-sensitive, so numeric facets
 are not templatable. Link variables are a view convenience: RBAC read scope
 still governs what any query can return.
 
-`{lt:me}` is built in: it always reads the signed-in user's id, so one pin
-means "mine" for whoever signs in on a shared station. Every completing
+`{lt:me}` is built in: it reads the person acting, the badged person while a
+badge grant is live and the signed-in user otherwise, so one pin means "mine"
+on a shared station and on a personal login. Every completing
 resolve records its completer in the row's `metadata.resolved_by` (resolves,
 batch fills, both rows of an accumulate add, scan acts), so a role can pin a
 "My recent work" list, newest first:
 
 ```
-/escalations?status=resolved&facets={"resolved_by":"{lt:me}"}&orderBy=[{"field":"resolved_at","direction":"desc"}]
+/escalations/available?status=resolved&facets={"resolved_by":"{lt:me}"}&orderBy=[{"field":"resolved_at","direction":"desc"}]
 ```
 
 `resolved_at` sorts with rows that have no completion time last, in either

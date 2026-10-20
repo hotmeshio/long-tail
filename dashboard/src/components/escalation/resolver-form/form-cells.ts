@@ -11,6 +11,8 @@
  * - `field` — everything else, one input per cell
  */
 
+import { isDisplayOnlyWidget } from '../../../lib/display-only-widgets';
+
 export type JsonValue =
   | string
   | number
@@ -47,7 +49,7 @@ export type FormCell =
 
 const DICTIONARY = 'dictionary';
 
-/** Widgets that render content blocks even when readOnly — never dictionary rows. */
+/** Content widgets render blocks even when readOnly; embed widgets (lists, rosters, links) do too. */
 const CONTENT_WIDGETS = new Set(['markdown', 'attachment', 'image']);
 
 export function sectionOptionsFor(
@@ -62,7 +64,7 @@ export function sectionOptionsFor(
 
 /**
  * A field renders as a dictionary row when it is read-only, is not a content
- * widget, and dictionary display is requested at the nearest level:
+ * or embed widget, and dictionary display is requested at the nearest level:
  * field `x-lt-display` > section options > schema-root `x-lt-display`.
  */
 export function isDictionaryField(
@@ -73,7 +75,7 @@ export function isDictionaryField(
   const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
   if (fieldSchema?.readOnly !== true) return false;
   const widget = fieldSchema?.['x-lt-widget'];
-  if (typeof widget === 'string' && CONTENT_WIDGETS.has(widget)) return false;
+  if (typeof widget === 'string' && (CONTENT_WIDGETS.has(widget) || isDisplayOnlyWidget(widget))) return false;
 
   const fieldDisplay = fieldSchema?.['x-lt-display'];
   if (typeof fieldDisplay === 'string') return fieldDisplay === DICTIONARY;
