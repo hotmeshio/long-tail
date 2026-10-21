@@ -209,6 +209,8 @@ On success the row updates in place through the standard query invalidation — 
 
 Declare one action for the happy path and leave the exception path to the form. A batch of N sibling items collapses from N navigations to N clicks on one page.
 
+An action limited to roles (`roles`) belongs on a [roster](x-lt-roster.md#actions), whose actions run on the server where the limit is checked. The escalation list does not offer an action that declares `roles`.
+
 ### Empty and loading states
 
 - **Loading** — three skeleton rows are displayed.

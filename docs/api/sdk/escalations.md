@@ -453,7 +453,7 @@ if (bin === null) return cancelled();
 ship(bin.$accumulated.map((item) => item.itemKey), bin.$trigger);
 ```
 
-Requires hotmesh 0.29.0+. `conditional` accepts the same `accumulate` field and returns `T | false | null`; `partialOnTimeout: true` on a `batch` wait likewise makes the timer deliver the filled items with `$trigger: 'timeout'`. See [Creating Escalations](../../hitl/escalation.md#open-accumulation--items-arrive-over-time).
+Requires hotmesh 0.29.0+. `conditional` accepts the same `accumulate` field and returns `T | false | null`; `partialOnTimeout: true` on a `batch` wait likewise makes the timer deliver the filled items with `$trigger: 'timeout'`, and `wakeOnFlag: true` makes a flag on a pending key deliver them with `$flags` and `$trigger: 'flag'` (hotmesh 0.31.3+). See [Creating Escalations](../../hitl/escalation.md#open-accumulation--items-arrive-over-time).
 
 ### Two-step form
 
@@ -856,6 +856,31 @@ await lt.escalations.resolveBatchItemByMetadata({ key, value, itemKey, resolverP
 ```
 
 **Returns:** `LTApiResult<{ outcome, remaining, escalationId, signaled?, workflowId? }>`. 409 on a duplicate item, 400 on an undeclared key or a non-batch row. Each fill records the caller under `envelope.batch_filled_by[itemKey]`.
+
+**Auth:** Required
+
+## flagBatchItem / unflagBatchItem
+
+Flag ONE pending key of a batch escalation (for example, `Missing`), or clear its flag. The flag lands in `envelope.batch_flags[itemKey]` with the caller as its actor; the key stays pending and still fills. A wait declared with `wakeOnFlag: true` ends on the flag, and the workflow wakes with the items so far, `$flags` and `$trigger: 'flag'`.
+
+```typescript
+await lt.escalations.flagBatchItem({ id, itemKey: '00812999000011#1', label: 'Missing', payload: { note: 'not on the pallet' } });
+await lt.escalations.unflagBatchItem({ id, itemKey: '00812999000011#1' });
+```
+
+**Returns:** `LTApiResult<{ outcome: 'flagged' | 'completed' | 'unflagged', itemKey, escalationId, workflowId? }>`. 409 for a key already filled, a key without a flag, or a row no longer pending; 400 for an undeclared key or a non-batch row.
+
+**Auth:** Required
+
+## runRosterAction
+
+Run one action a [roster](../../hitl/x-lt-roster.md#actions) entry offers on a row's form, by pointer: the roster field, the action's index, the entry key, and a key-in's entered code. The server re-reads the action, checks the entry and any `roles` limit, and runs the act as the caller (or as the badged person with `actingToken`).
+
+```typescript
+await lt.escalations.runRosterAction({ id: matchingRowId, field: 'shoes', action: 2, entry: '00812999000011#1', code: '812999000011' });
+```
+
+**Returns:** the act's own result, or a refusal with `outcome` `needs_badge`, `role_refused`, `not_primed` or `code_mismatch`.
 
 **Auth:** Required
 

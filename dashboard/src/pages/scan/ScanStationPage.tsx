@@ -56,10 +56,11 @@ interface StationNotice {
   markdown?: string;
 }
 
-/** A choice waiting on a badge, and where Cancel returns. */
+/** A choice waiting on a badge, where Cancel returns, and why the last badge did not run it. */
 interface PendingBadge {
   choice: ScanPresentedChoice;
   returnTo: 'choices' | 'idle';
+  message?: string;
 }
 
 /**
@@ -169,11 +170,25 @@ export function ScanStationPage() {
           });
           break;
         case SCAN_OUTCOMES.NOT_PRIMED:
-          // The grant died between render and tap — reflect that, then park
-          // the choice in the stop-over; the next badge scan satisfies it.
+          // The grant died between render and tap, or the choice needs a role
+          // the person acting lacks: park it; the next badge scan satisfies it.
           clear();
           setNotice(null);
-          setPendingBadge((prev) => ({ choice, returnTo: prev?.returnTo ?? 'choices' }));
+          setPendingBadge((prev) => ({
+            choice,
+            returnTo: prev?.returnTo ?? 'choices',
+            ...(choice.roles?.length && result.error ? { message: result.error } : {}),
+          }));
+          break;
+        case SCAN_OUTCOMES.REFUSED:
+          // A badge without the choice's role: drop it and wait for one that has it.
+          clear();
+          setNotice(null);
+          setPendingBadge((prev) => ({
+            choice,
+            returnTo: prev?.returnTo ?? 'choices',
+            message: result.refusal?.markdown ?? result.error ?? 'That badge cannot do this.',
+          }));
           break;
         default:
           setNotice({
@@ -214,6 +229,7 @@ export function ScanStationPage() {
         <BadgePrompt
           choice={pendingBadge.choice}
           notPrimedMarkdown={screen.notPrimed?.markdown}
+          message={pendingBadge.message}
           primed={!!identity}
           busy={busy}
           onExecute={executeChoice}
@@ -225,7 +241,7 @@ export function ScanStationPage() {
           notPrimedMarkdown={bench?.notPrimed?.markdown}
           onCancel={dropPendingScan}
         />
-      ) : refusal ? (
+      ) : refusal && !subject?.show ? (
         <RefusalPanel
           markdown={refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.'}
           expected={refusal.refusal?.expected}
@@ -237,6 +253,8 @@ export function ScanStationPage() {
           progress={progress}
           progressLabel={executedBench?.verb === SCAN_VERBS.ACCUMULATE ? 'added' : 'checked off'}
           note={subject && executedBench ? executedBench.done?.markdown ?? null : null}
+          refusal={refusal ? { markdown: refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.', expected: refusal.refusal?.expected } : null}
+          refreshKey={benchAt}
           onRelease={dropSubject}
         />
       ) : doneMarkdown ? (

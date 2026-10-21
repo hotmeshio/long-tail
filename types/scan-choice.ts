@@ -18,6 +18,13 @@ export interface ScanChoice {
   confirm?: { prompt: string };
   /** The choice executes only under a real acting identity (badge or a write-capable login). */
   requireActingIdentity?: boolean;
+  /**
+   * The choice runs only for a person holding one of these roles. Anyone
+   * else is asked for a badge, and a badge without the role is refused.
+   */
+  roles?: string[];
+  /** What a badge without the roles is told. */
+  refuse?: string;
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
 }
@@ -43,6 +50,8 @@ export interface ScanPresentedChoice {
   verb: ScanVerb;
   confirm?: { prompt: string };
   requireActingIdentity?: boolean;
+  /** The roles the choice is limited to. */
+  roles?: string[];
   code?: string;
   /** True = the identity requirement is unsatisfied; render the notPrimed affordance. */
   withheld: boolean;

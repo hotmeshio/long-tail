@@ -1,6 +1,11 @@
 import { CircleX } from 'lucide-react';
 import { SimpleMarkdown } from '../../common/display/SimpleMarkdown';
 
+/** The expected entries as one line: codes comma-joined, labels (which carry commas) semicolon-joined. */
+export function expectedLine(expected: string[]): string {
+  return expected.join(expected.some((e) => e.includes(',')) ? '; ' : ', ');
+}
+
 /**
  * A refused scan, with nothing written. The words name what is wrong and,
  * when the rule knows it, where the item goes instead. It stays until the
@@ -25,7 +30,7 @@ export function RefusalPanel({
       </div>
       {expected && expected.length > 0 && (
         <p className="text-base text-text-secondary mt-6">
-          Expected <span className="font-mono text-text-primary">{expected.join(', ')}</span>
+          Expected <span className="font-mono text-text-primary">{expectedLine(expected)}</span>
         </p>
       )}
       <div className="w-16 border-t border-surface-border my-8" />

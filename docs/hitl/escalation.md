@@ -106,6 +106,15 @@ Items are submitted via `POST /api/escalations/:id/resolve-batch-item`, `POST /a
 
 `timeout` and cancellation keep their standard semantics (`false` / `null`); a plain resolve on a batch row remains an admin override that resolves the whole row with the payload given. Add `partialOnTimeout: true` (hotmesh 0.29.0+) and the timer instead resumes the wait with the items filled so far plus `$trigger: 'timeout'`, the same value the expired row stores as `resolver_payload`.
 
+A pending key can be flagged (`flagBatchItem`, or a [roster](x-lt-roster.md#actions) action): the flag is stored in `envelope.batch_flags[itemKey]` and the key stays pending. Add `wakeOnFlag: true` (hotmesh 0.31.3+) and a flag ends the wait instead: it resumes with the items filled so far, `$flags` (each flag's `label`, `payload`, `actor` and `at`) and `$trigger: 'flag'`, so the workflow can route the order, for example to a manager.
+
+```typescript
+const result = await conditional<Record<string, unknown>>(signalId, {
+  role: 'matching', metadata: { orderId }, batch: shoeKeys, wakeOnFlag: true,
+});
+if (result && result.$trigger === 'flag') return sendToManager(orderId, result.$flags);
+```
+
 Entries already satisfied before the wait begins go in `filled` (hotmesh 0.31.0+), keyed by item key with their `payload`, the `at` they were satisfied (from the source of record, never a clock read in the workflow), and an optional `actor`. The row starts with that progress: those keys are left out of `batch_pending`, their payloads, times, and actors are written beside the rest, and the completing wake delivers them with the collection. Every key in `filled` must be declared in `batch`, and at least one must stay open; a `filled` that covers every key throws, so skip the wait instead.
 
 ```typescript

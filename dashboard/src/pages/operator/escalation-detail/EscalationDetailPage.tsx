@@ -201,7 +201,7 @@ function EscalationDetailView({ id }: { id: string }) {
 
   const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
   // An embedded row action (roster, list) waiting on a badge at a shared station.
-  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void> } | null>(null);
+  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void>; message?: string } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -579,8 +579,14 @@ function EscalationDetailView({ id }: { id: string }) {
     });
   };
 
-  // A read-only station login acts only through a badge.
-  const guardEmbedWrite: EmbedWriteGuard = (verb, run) => {
+  // A read-only station login acts only through a badge, and so does an
+  // action limited to a role the person acting lacks.
+  const guardEmbedWrite: EmbedWriteGuard = (verb, run, options) => {
+    if (options?.badge) {
+      clearActing();
+      if (scanEnabled) setPendingEmbedWrite({ verb, run, message: options.badge });
+      return;
+    }
     if (embedWriteRunsNow(myRoles, scanEnabled, acting)) {
       void run();
       return;
@@ -940,6 +946,7 @@ function EscalationDetailView({ id }: { id: string }) {
       <StationWriteChallenge
         open={!!pendingEmbedWrite}
         verb={pendingEmbedWrite?.verb ?? 'continue'}
+        message={pendingEmbedWrite?.message}
         anyBadge
         onCancel={() => setPendingEmbedWrite(null)}
       />

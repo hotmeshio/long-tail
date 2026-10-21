@@ -10,7 +10,8 @@ const mockMutateAsync = vi.fn();
 
 vi.mock('../../../../api/escalations', () => ({
   escalationListQuery: (filters: unknown) => ({ queryKey: ['escalations', filters], queryFn: () => mockFetch(filters) }),
-  useResolveEscalation: () => ({ mutateAsync: mockMutateAsync }),
+  useRosterAction: () => ({ mutateAsync: mockMutateAsync }),
+  ROSTER_ACTION_OUTCOMES: { NEEDS_BADGE: 'needs_badge', ROLE_REFUSED: 'role_refused' },
 }));
 
 const member = (orderId: string, resolver: unknown = null) => ({
@@ -84,7 +85,7 @@ describe('RosterWidget', () => {
     expect(screen.queryByTestId('roster-action-o-3')).toBeNull();
   });
 
-  it('confirms in place, then resolves the member row with the interpolated payload', async () => {
+  it('confirms in place, then runs the action on the server by pointer', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     mockMutateAsync.mockResolvedValue({});
     renderWidget();
@@ -92,13 +93,13 @@ describe('RosterWidget', () => {
     expect(screen.getByTestId('roster-confirm-o-2')).toHaveTextContent('Mark o-2 missing?');
     fireEvent.click(screen.getByTestId('roster-confirm-o-2-yes'));
     await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({
-      id: 'm-o-2', resolverPayload: { outcome: 'missing', order: 'o-2' },
+      id: 'box-1', field: 'orders', action: 0, entry: 'o-2', code: undefined,
     }));
     expect(confirmSpy).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 
-  it('holds an action for the page’s write gate, then resolves when the gate runs it', async () => {
+  it('holds an action for the page’s write gate, then runs it when the gate does', async () => {
     mockMutateAsync.mockResolvedValue({});
     let held: (() => Promise<void>) | null = null;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -118,7 +119,7 @@ describe('RosterWidget', () => {
     fireEvent.click(await screen.findByTestId('roster-action-o-2'));
     expect(mockMutateAsync).not.toHaveBeenCalled();
     await held!();
-    expect(mockMutateAsync).toHaveBeenCalledWith({ id: 'm-o-2', resolverPayload: { outcome: 'missing' } });
+    expect(mockMutateAsync).toHaveBeenCalledWith({ id: 'box-1', field: 'orders', action: 0, entry: 'o-2', code: undefined });
   });
 
   it('shows a refused action on its entry', async () => {

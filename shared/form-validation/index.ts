@@ -24,3 +24,4 @@ export * from './display-only-widgets';
 export * from './x-lt-invoke';
 export * from './x-lt-scan';
 export * from './x-lt-roster';
+export * from './x-lt-actions';

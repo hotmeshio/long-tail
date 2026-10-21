@@ -67,7 +67,11 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 export function EscalationListWidget({ fieldKey, schema, escalationContext }: WidgetProps) {
   const rawQuery = (schema?.['x-lt-query'] as EmbedQuery | undefined) ?? {};
   const columns = (schema?.['x-lt-columns'] as ColumnDef[] | undefined) ?? DEFAULT_COLUMNS;
-  const actions = (schema?.['x-lt-actions'] as ActionDef[] | undefined) ?? [];
+  // A role limit is enforced only on roster actions, which run on the server;
+  // this widget resolves rows directly, so an action that declares roles is
+  // never offered here.
+  const actions = ((schema?.['x-lt-actions'] as Array<ActionDef & { roles?: unknown }> | undefined) ?? [])
+    .filter((action) => !(Array.isArray(action.roles) && action.roles.length > 0));
   const label = (schema?.title as string | undefined) ?? 'Related items';
   const helperText = schema?.description as string | undefined;
 

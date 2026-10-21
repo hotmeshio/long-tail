@@ -124,6 +124,11 @@ export interface ScanHoldParams {
   subline?: string;
   /** The scan the station expects next, and the words that ask for it. */
   expect?: { schemes: number[]; prompt?: string };
+  /**
+   * A roster field of the held row's form, shown under the hold card while
+   * the row is held: each fill ticks its entry in without leaving the motion.
+   */
+  show?: string;
 }
 
 export interface ScanFillParams {
@@ -133,6 +138,18 @@ export interface ScanFillParams {
   separator?: string;
   /** Batch resolver payload (template). Default `{ scannedCode: '{scan.code}' }`. */
   payload?: Record<string, any>;
+  /**
+   * A per-key map on the batch row naming each entry (`envelope.shoe_labels`).
+   * With it, `{fill.pending}` lists the open entries by label, `{fill.next}`
+   * names the next one, and a refusal's expected list reads the labels.
+   */
+  labels?: string;
+  /**
+   * How one entry reads: `{label.<path>}` reads the entry's map value and
+   * `{code}` its printed code. Absent, a text map value is the label. An
+   * entry the map does not name reads as its code.
+   */
+  label?: string;
 }
 
 /** A step that acts on the held subject runs only while one is held. */

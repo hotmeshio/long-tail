@@ -8,6 +8,7 @@ import {
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
 import { actingIdentitySatisfied } from './identity';
+import { holdsChoiceRole } from './choice-roles';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
 import { templateContext, type StepContext } from './context';
@@ -54,9 +55,13 @@ export async function presentStep(
   // configured — presenting a one-button screen would be a pointless tap. An
   // unsatisfied identity requirement still presents (the client's badge
   // stop-over), never a silent or misattributed execution.
+  // A choice limited to roles is withheld from a person without one of them,
+  // so the station asks for a badge of that role.
+  const roleHeld = await Promise.all((step.choices ?? []).map((choice) => holdsChoiceRole(choice, ctx.auth.userId)));
+
   const only = step.choices?.length === 1 ? step.choices[0] : undefined;
   const autoSelect = step.autoSelectSingle === true && only !== undefined && !only.confirm;
-  if (autoSelect && (!only.requireActingIdentity || satisfied)) {
+  if (autoSelect && (!only.requireActingIdentity || satisfied) && roleHeld[0]) {
     return dispatchChoiceVerb(
       { query: step.query, verb: only.verb, params: only.params },
       ctx,
@@ -70,8 +75,9 @@ export async function presentStep(
     verb: choice.verb,
     ...(choice.confirm ? { confirm: choice.confirm } : {}),
     ...(choice.requireActingIdentity ? { requireActingIdentity: true } : {}),
+    ...(choice.roles?.length ? { roles: choice.roles } : {}),
     ...(choice.code ? { code: choice.code } : {}),
-    withheld: !!choice.requireActingIdentity && !satisfied,
+    withheld: (!!choice.requireActingIdentity && !satisfied) || !roleHeld[index],
   }));
 
   return {

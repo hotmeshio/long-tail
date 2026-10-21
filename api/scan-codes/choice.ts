@@ -12,7 +12,9 @@ import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 import { actingIdentitySatisfied } from './identity';
 import { peekGrant, settleGrant } from './grant';
 import { assertReadAccess } from '../escalations/helpers';
-import { conflict, notPrimed, type StepContext } from './context';
+import { conflict, notPrimed, refused, type StepContext } from './context';
+import { holdsChoiceRole } from './choice-roles';
+import { actionRefusal } from '../../shared/form-validation/x-lt-actions';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
 
@@ -62,6 +64,17 @@ export async function executeScanChoice(
       }
       effectiveAuth = peeked.auth;
       grant = peeked.grant;
+    }
+
+    // 2b. A choice limited to roles runs only for a person holding one: with
+    // no badge it parks for one, and a badge without the role is refused
+    // without spending it.
+    if (choice.roles?.length && !(await holdsChoiceRole(choice, effectiveAuth.userId))) {
+      return stampPointer(
+        grant ? refused(actionRefusal(choice)) : notPrimed({ rule } as StepContext, actionRefusal(choice)),
+        rule,
+        input,
+      );
     }
 
     // 3. With no live grant, a choice that needs a badge parks for the next

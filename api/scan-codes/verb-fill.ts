@@ -3,7 +3,6 @@ import * as escalationService from '../../services/escalation';
 import { resolveBatchItem } from '../escalations/resolve-batch';
 import { ESCALATION_BATCH_KEYS } from '../../types/escalation';
 import {
-  SCAN_ENCODINGS,
   SCAN_FILL_SEPARATOR_DEFAULT,
   SCAN_OUTCOMES,
   type LTEscalationRecord,
@@ -12,6 +11,7 @@ import {
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
 import { conflict, forbidden, provenance, refused, templateContext, withDone, type StepContext } from './context';
+import { entryLabeler, pendingLabels, printedCode, type EntryLabeler } from './fill-labels';
 import { identityGate, spendGrant } from './grant';
 import { locateForStep } from './locate';
 import { claimedByOther } from './subject';
@@ -51,6 +51,24 @@ function keysFor(keys: string[], target: string, separator: string): string[] {
   return keys.filter((k) => codeOf(k, separator) === target);
 }
 
+/** Labeled pending entries read as one line; labels may carry commas. */
+const LABEL_JOIN = '; ';
+
+/** The `{fill.pending}` and `{fill.next}` values for the open keys. */
+function pendingCopy(
+  pending: string[],
+  separator: string,
+  labeler: EntryLabeler | null,
+): { pending: string[] | string; next?: string } {
+  const code = (key: string) => codeOf(key, separator);
+  if (!labeler) {
+    const codes = [...new Set(pending.map(code))];
+    return { pending: codes, ...(codes.length ? { next: codes[0] } : {}) };
+  }
+  const labels = pendingLabels(pending, code, labeler);
+  return { pending: labels.join(LABEL_JOIN), ...(labels.length ? { next: labels[0] } : {}) };
+}
+
 function progress(batch: Batch, filledNow: number): ScanExecuteResponse['progress'] {
   const remaining = Math.max(0, batch.pending.length - filledNow);
   return { filled: batch.keys.length - remaining, total: batch.keys.length, remaining };
@@ -73,10 +91,12 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
   if (!batch) return conflict('the held row is not a batch');
 
   // 2. Which open slot this scan fills, or why none
+  const labeler = entryLabeler(options, row, ctx.scheme);
+  const open = pendingCopy(batch.pending, separator, labeler);
   const tpl = {
     ...templateContext(ctx),
     fill: {
-      pending: [...new Set(batch.pending.map((k) => codeOf(k, separator)))],
+      ...open,
       total: batch.keys.length,
       filled: batch.keys.length - batch.pending.length,
     },
@@ -87,9 +107,10 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
     const markdown = declared.length
       ? `All ${declared.length} of these are already checked off.`
       : scanCodeService.renderScanCopy(step.refuse?.markdown ?? STOCK_UNEXPECTED, tpl);
-    const expected = ctx.scheme.encoding === SCAN_ENCODINGS.GTIN
-      ? tpl.fill.pending.map((code) => scanCodeService.displayGtin(code))
-      : tpl.fill.pending;
+    const codes = [...new Set(batch.pending.map((k) => codeOf(k, separator)))];
+    const expected = labeler
+      ? pendingLabels(batch.pending, (k) => codeOf(k, separator), labeler)
+      : codes.map((code) => printedCode(code, ctx.scheme));
     return refused(markdown, {
       refusal: { markdown, expected },
       progress: progress(batch, 0),
@@ -114,6 +135,7 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
       const data = result.data as { outcome: string; remaining?: number };
       const done = data.outcome === 'completed';
       const filled = progress(batch, batch.pending.length - (done ? 0 : (data.remaining ?? 0)));
+      const next = pendingCopy(batch.pending.filter((k) => k !== itemKey), separator, labeler).next;
       return withDone({
         status: 200,
         data: {
@@ -123,7 +145,7 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
           progress: filled,
           ...(done ? { clearSubject: true } : {}),
         },
-      }, step, { ...tpl, fill: { ...tpl.fill, ...filled } });
+      }, step, { ...tpl, fill: { ...tpl.fill, ...filled, next } });
     }
     const outcome = (result.data as { outcome?: string } | undefined)?.outcome;
     if (outcome === 'duplicate-item') continue;

@@ -131,6 +131,9 @@ export function createClient(options: LTClientOptions = {}) {
       resolveBatchItem: bindAuth(escalationsApi.resolveBatchItem, auth),
       resolveBatchItemBySignalKey: bindAuth(escalationsApi.resolveBatchItemBySignalKey, auth),
       resolveBatchItemByMetadata: bindAuth(escalationsApi.resolveBatchItemByMetadata, auth),
+      flagBatchItem: bindAuth(escalationsApi.flagBatchItem, auth),
+      unflagBatchItem: bindAuth(escalationsApi.unflagBatchItem, auth),
+      runRosterAction: bindAuth(escalationsApi.runRosterAction, auth),
       // Open accumulation: add and remove held items, read the ordered collection.
       accumulate: bindAuth(escalationsApi.accumulateItem, auth),
       accumulateBySignalKey: bindAuth(escalationsApi.accumulateItemBySignalKey, auth),

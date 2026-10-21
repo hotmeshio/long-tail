@@ -278,6 +278,19 @@ duration, form on screen. An unsatisfied identity requirement never
 auto-fires as the wrong actor — the scan stops over at the badge screen and
 completes on its own once a badge primes.
 
+**Choices limited to a role.** A choice may declare `roles`: it shows to
+everyone and runs only for a person holding one of them (superadmin always
+does). A station without a badge of that role sees the choice withheld and is
+asked for one; a badge without the role is refused with the choice's `refuse`
+copy, and the badge is not spent. The manager walks over, badges, and the
+choice runs as the manager.
+
+```jsonc
+{ "label": "Add without scan", "verb": "resolve", "roles": ["manager"],
+  "refuse": "A manager's badge is needed to add a bag without its scan.",
+  "params": { "resolverPayload": { "outcome": "added-by-manager" } } }
+```
+
 ## Holding an item: the bench motion
 
 At a bench where items go into containers, every act is one item going into
@@ -312,6 +325,19 @@ reads. A fill or an into-subject add that leaves slots open shows its done
 copy under the hold; without done copy the station shows the count ("2 of 5
 checked off" for a fill, "2 of 5 added" for an add).
 
+**The held row's list on screen.** `hold.show` names a [roster](hitl/x-lt-roster.md)
+field of the held row's form. The station renders that roster, with its columns
+and heading, under the hold card for as long as the row is held, refreshed on
+the row's own events and after each scan. Each fill ticks its entry in while the
+motion continues, and a refused scan reads on the hold card with the list
+unchanged.
+
+```jsonc
+"params": { "hold": { "ttlSeconds": 300, "label": "{item.orderId}",
+  "expect": { "schemes": [16], "prompt": "Scan each shoe box." },
+  "show": "shoes" } }
+```
+
 The server trusts nothing about the subject. Each request re-parses its
 code, re-reads the row under the station's read scope, requires the row to
 still carry the code's target and to be pending. A subject that fails is
@@ -328,14 +354,30 @@ row.
 | `accumulate` with `accumulate.into: "subject"` | The held row collects the scanned code (`itemKey` defaults to `{scan.target}`). Use it when the container has no row yet: the first item for a container tells the workflow which container was scanned. With `accumulate.item`, the scanned code's own pending row is written as the reciprocal in the same statement (see below). On a bounded accumulator the answer carries `progress` and the subject stays held while slots remain. |
 | `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. On a `gtin` scheme a refusal's `expected` lists codes as the package prints them (EAN-13, or EAN-8), not the stored 14-digit form. `fill.into: "scanned"` fills the row the scan itself names. |
 
+**Naming what a fill still expects.** Codes alone do not tell a person which
+box to take. `fill.labels` names a per-key map on the batch row (the map a batch
+roster's `labels` names, e.g. `envelope.shoe_labels`), and `fill.label` how one
+entry reads: `{label.<path>}` reads the entry's map value and `{code}` its
+printed code. With them, `{fill.pending}` lists the open entries by label,
+`{fill.next}` names the next one (in done copy, the one after this fill), and a
+refusal's `expected` reads the labels. An entry the map does not name reads as
+its code; without `fill.labels`, both tokens read codes.
+
+```jsonc
+"refuse": { "markdown": "Not one of this order's shoes. Still to match: {fill.pending}." },
+"done": { "markdown": "Matched. Next: {fill.next}" },
+"params": { "fill": { "into": "subject", "labels": "envelope.shoe_labels",
+  "label": "{label.model}, {label.size} (UPC {code})" } }
+```
+
 **`match` and `refuse`** check the pairing before anything is written.
 `match.target` lists templates the scanned target must equal (e.g.
 `["{subject.containerCode}"]`); `match.facets` lists facets the located container
 must share with the held row (e.g. `["containerKey"]`). A miss answers `refused`
 with `refuse.markdown` rendered, and nothing is written. The copy may read
-`{container.<facet>}` (the container the scan named) and `{fill.pending}`
-(what a fill still expects), so the station says what is wrong and where the
-item goes: "That's Acme West's container. This one goes in **C-12**." When the
+`{container.<facet>}` (the container the scan named), `{fill.pending}`
+(what a fill still expects) and `{fill.next}` (the next open entry), so the
+station says what is wrong and where the item goes: "That's Acme West's container. This one goes in **C-12**." When the
 write itself loses a race (the container closed, another bench took the free
 container), the answer is `refused` with `refuse.conflict`, and a step that
 declares `refuse.conflict` also clears the subject so the next item scan
