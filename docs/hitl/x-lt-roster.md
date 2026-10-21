@@ -1,6 +1,6 @@
 # Roster (`x-lt-widget: "roster"`)
 
-A roster lists every member a container row expects, each marked **waiting**, **in**, or **flagged**, with the count in its heading ("3 of 5 in · 1 Missing"). The person works from it: a member that arrives ticks in, an action on a member resolves its row in place, and the rest of the form can wait until every member is accounted for.
+A roster lists every member a container row expects, each marked **waiting**, **in**, or **flagged**, with the count in its heading ("3 of 5 in · 1 Missing"). The person works from it: a member that arrives ticks in, an action on an entry acts in place, and the rest of the form can wait until every member is accounted for.
 
 Like the other [embed widgets](x-lt-embed.md), a roster is display-only: declare it `readOnly`, keep it out of `required`, and it contributes nothing to the resolver payload.
 
@@ -42,6 +42,7 @@ Like the other [embed widgets](x-lt-embed.md), a roster is display-only: declare
 | `key` | For a `query` set: a template naming each member row's entry. Default `{{escalation.id}}`. |
 | `in` | Where arrivals are read. `items` reads the row's held keys (its accumulated items, or a batch's filled keys); any other entry is a `domain.path` naming a string or an array, such as a scan field in the live form (`resolver.bags`, a field the form declares). Default `["items"]`. |
 | `flagged` | Rules over each member row's own context: `when` is an [`x-lt-showIf`](x-lt-show-if.md) condition (or an array of them), `label` is the text the entry shows. The first matching rule wins. |
+| `countedBy` | The separator of counted keys (`"#"` for `<code>#1`, `<code>#2`). The nth occurrence of a code in an `in` source then ticks `<code>#n`, so two scans of one code into a form field tick both of its keys. |
 
 ### Expected sets
 
@@ -55,7 +56,7 @@ Stamp the container's id on each member row when the container opens (`packingBo
 
 ### State
 
-An entry is **in** when its key is held or appears in an `in` source, **flagged** when its member row matches a `flagged` rule, and **waiting** otherwise. In reads before flagged: a member a manager confirms into the box reads in, even though its own row was resolved as "needs a manager".
+An entry is **in** when its key is held or appears in an `in` source, **flagged** when its member row matches a `flagged` rule (on a `batch` set, when its key carries a flag), and **waiting** otherwise. In reads before flagged: a member a manager confirms into the box reads in, even though its own row was resolved as "needs a manager".
 
 ## Columns
 
@@ -65,22 +66,45 @@ An entry is **in** when its key is held or appears in an `in` source, **flagged*
 |-------|-------|
 | `{{item.itemKey}}` | The entry key |
 | `{{item.label.*}}` | The entry's value in a batch `labels` map |
-| `{{item.payload.*}}`, `{{item.actor}}`, `{{item.at}}` | The held item, once it is in |
+| `{{item.payload.*}}`, `{{item.actor}}`, `{{item.at}}` | The item once it is in: its payload, who filled it, and when. A batch entry reads them from `batch_items`, `batch_filled_by` and `batch_filled_at`, whether the key was filled by a scan, the API, or `conditional`'s `filled`. |
+
+`format: "date"` renders a time and `format: "user"` a person's name: `{ "label": "Received", "value": "{{item.at}}", "format": "date" }`, `{ "label": "By", "value": "{{item.actor}}", "format": "user" }`.
 
 Without `x-lt-columns`, each entry shows its key.
 
 ## Actions
 
-`x-lt-actions` resolve the entry's member row through the standard resolve endpoint, as the [escalation list's actions](x-lt-embed.md#x-lt-actions-optional) do: RBAC and `enforce_schema` apply, the resolve records the viewer in the row's `metadata.resolved_by`, and a refused action shows the server's reason on the entry.
+Each `x-lt-actions` entry is one act on the entry:
+
+| Act | Shape | Offered by default | What it does |
+|-----|-------|--------------------|--------------|
+| Resolve | `"resolverPayload": { ... }` | `waiting` | Resolves the entry's member row (a `query` set). String leaves interpolate against the member row. |
+| Fill | `"fill": { "payload": { ... }, "enterCode": true }` | `waiting`, `flagged` | Fills the entry's batch key, as a scan would. With `enterCode`, the person types the code from the label and the server checks it against the key (a UPC-A matches its GTIN-14 key); the payload records it as `enteredCode`. |
+| Flag | `"flag": { "label": "Missing", "payload": { ... } }` | `waiting` | Flags the entry's batch key. The key stays pending and still fills; the entry reads flagged under the label and counts in `roster.<field>.flagged`. |
+| Unflag | `"unflag": true` | `flagged` | Clears the entry's flag while the row is pending ("Found it"). |
 
 | Field | Description |
 |-------|-------------|
 | `label` | Button text |
-| `resolverPayload` | The canned payload; string leaves interpolate against the member row |
-| `when` | The entry state(s) that offer the action: `"waiting"` (default), `"in"`, `"flagged"`, or an array |
+| `when` | The entry state(s) that offer the action: `"waiting"`, `"in"`, `"flagged"`, or an array |
 | `confirm` | A confirmation asked in place, beside the entry, before firing |
+| `roles` | The action runs only for a person holding one of these roles |
+| `refuse` | What a person without the roles is told |
 
-An entry with no member row (a `list` or `batch` set) offers no actions. On a read-only station login, an action runs as the badged person while a badge grant is live, and asks for a badge otherwise; the action then runs as whoever badges in, under that person's RBAC on the member row.
+```json
+"x-lt-actions": [
+  { "label": "Missing", "flag": { "label": "Missing" }, "confirm": "Mark this shoe missing?" },
+  { "label": "Found it", "unflag": true },
+  { "label": "Key in (manager)", "fill": { "payload": { "source": "key-in" }, "enterCode": true },
+    "roles": ["manager"], "refuse": "A manager's badge is needed to key a box in." }
+]
+```
+
+**Actions run on the server.** The dashboard sends only which action and which entry (`POST /api/escalations/:id/roster-action`). The server re-reads the action from the row's pinned form schema, confirms the entry is on the roster it computes, builds the payload from the declaration, and checks `roles` against the person acting. The act then runs through its own endpoint (resolve, batch fill, flag, unflag) under that person's RBAC and `enforce_schema`, records them as the resolver, filler or flagger, and shows a refusal's reason on the entry.
+
+**Roles and badges.** An action with `roles` shows to everyone. A person without one of the roles is asked for a badge, and the action runs as whoever badges in; a badge without the roles is refused with `refuse`, and the badge is not spent. On a read-only station login every action runs through a badge, as before. A role limit is an act control layered on RBAC: the person must also be allowed to write the row.
+
+On a wait declared with `wakeOnFlag`, a flag ends the wait: the workflow wakes with the items filled so far, `$flags`, and `$trigger: "flag"`, and can route the order (for example, to a manager). Without it, the flag is recorded and the wait continues.
 
 Moving work to another person is a resolve with an outcome. "Send to a manager" above resolves the member row with `outcome: "needs-manager"`; the member's workflow opens a row in the manager's role, where only a manager can resolve it, and the manager's confirm adds the bag to the box.
 

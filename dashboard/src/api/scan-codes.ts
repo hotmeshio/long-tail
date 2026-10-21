@@ -132,9 +132,19 @@ export interface ScanStepParams {
     /** The line under the headline. Template. */
     subline?: string;
     expect?: { schemes: number[]; prompt?: string };
+    /** A roster field of the held row's form, shown under the hold card while it is held. */
+    show?: string;
   };
   /** Fill verb options. */
-  fill?: { into: 'subject' | 'scanned'; separator?: string; payload?: Record<string, unknown> };
+  fill?: {
+    into: 'subject' | 'scanned';
+    separator?: string;
+    payload?: Record<string, unknown>;
+    /** A per-key map on the batch row naming each entry. */
+    labels?: string;
+    /** How one entry reads: `{label.<path>}` and `{code}`. */
+    label?: string;
+  };
 }
 
 /** The station's pointer to the item it is holding. */
@@ -151,6 +161,8 @@ export interface ScanHeldSubject extends ScanSubjectRef {
   expiresAt: string;
   expect?: { schemes: number[]; prompt?: string };
   claimedBy?: { id: string; displayName: string };
+  /** A roster field of the held row's form to show under the hold card. */
+  show?: string;
 }
 
 /** One labeled choice on a PRESENT step. */
@@ -160,6 +172,10 @@ export interface ScanChoice {
   params?: ScanStepParams;
   confirm?: { prompt: string };
   requireActingIdentity?: boolean;
+  /** The choice runs only for a person holding one of these roles. */
+  roles?: string[];
+  /** What a badge without the roles is told. */
+  refuse?: string;
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
 }
@@ -171,6 +187,8 @@ export interface ScanPresentedChoice {
   verb: ScanVerb;
   confirm?: { prompt: string };
   requireActingIdentity?: boolean;
+  /** The roles the choice is limited to. */
+  roles?: string[];
   code?: string;
   /** True = the identity requirement is unsatisfied; render the notPrimed affordance. */
   withheld: boolean;

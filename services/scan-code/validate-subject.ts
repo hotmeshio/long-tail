@@ -17,6 +17,12 @@ function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === 'string' && v);
 }
 
+/** A form field name, as `hold.show` names one. */
+const HOLD_SHOW_FIELD = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+
+/** A fill's label map lives on the batch row: `envelope.<path>` or `metadata.<path>`. */
+const FILL_LABELS_PATH = /^(envelope|metadata)\.[A-Za-z0-9_.-]+$/;
+
 function isPlainObject(value: unknown): boolean {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -165,6 +171,9 @@ function assertValidHold(step: ScanStep, at: string): void {
       throw new Error(`${at}: params.hold.expect.prompt must be markdown`);
     }
   }
+  if (hold.show !== undefined && (typeof hold.show !== 'string' || !HOLD_SHOW_FIELD.test(hold.show))) {
+    throw new Error(`${at}: params.hold.show must name a roster field of the held row's form`);
+  }
 }
 
 function assertValidFill(step: ScanStep, at: string): void {
@@ -179,6 +188,15 @@ function assertValidFill(step: ScanStep, at: string): void {
   }
   if (fill.payload !== undefined && !isPlainObject(fill.payload)) {
     throw new Error(`${at}: params.fill.payload must be an object`);
+  }
+  if (fill.labels !== undefined && (typeof fill.labels !== 'string' || !FILL_LABELS_PATH.test(fill.labels))) {
+    throw new Error(`${at}: params.fill.labels must name a map on the row, e.g. "envelope.labels"`);
+  }
+  if (fill.label !== undefined && (typeof fill.label !== 'string' || !fill.label.trim())) {
+    throw new Error(`${at}: params.fill.label must be a non-empty template`);
+  }
+  if (fill.label !== undefined && fill.labels === undefined) {
+    throw new Error(`${at}: params.fill.label requires params.fill.labels`);
   }
   if (step.confirm) throw new Error(`${at}: fill cannot carry confirm`);
 }

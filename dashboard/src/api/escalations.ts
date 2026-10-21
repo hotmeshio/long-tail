@@ -303,6 +303,46 @@ export function useResolveEscalation() {
   });
 }
 
+/** Outcomes a roster action refuses with before its act runs. */
+export const ROSTER_ACTION_OUTCOMES = {
+  NEEDS_BADGE: 'needs_badge',
+  ROLE_REFUSED: 'role_refused',
+  NOT_PRIMED: 'not_primed',
+  CODE_MISMATCH: 'code_mismatch',
+} as const;
+
+export interface RosterActionRequest {
+  /** The host row whose form declares the roster. */
+  id: string;
+  field: string;
+  /** The action's index among the field's actions. */
+  action: number;
+  /** The entry's key. */
+  entry: string;
+  /** A key-in's entered code. */
+  code?: string;
+}
+
+/**
+ * Run one roster entry's action on the server: it re-reads the action from
+ * the row's form, checks the entry and any role limit, and acts as the
+ * person acting (a live badge rides the request as every write does).
+ */
+export function useRosterAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: RosterActionRequest) =>
+      apiFetch<{ outcome: string }>(`/escalations/${id}/roster-action`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'] });
+    },
+  });
+}
+
 export interface AccumulateItemResponse {
   outcome: 'accepted' | 'completed';
   count: number;

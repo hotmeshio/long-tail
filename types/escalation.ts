@@ -33,6 +33,24 @@ export type AccumulateConfig = Types.AccumulateConfig;
 export type BatchFilledEntry = Types.BatchFilledEntry;
 
 /**
+ * One flag on a pending batch key (`envelope.batch_flags[itemKey]`): its
+ * `label`, optional `payload` and `actor`, and the database `at`. A flagged
+ * key stays pending and still fills. Re-exported from the HotMesh SDK.
+ */
+export type BatchItemFlag = Types.BatchItemFlag;
+
+/**
+ * Outcome vocabulary for `flagBatchItem`: `flagged` (stored, the wait
+ * continues) or `completed` (the wait declared `wakeOnFlag`: the row
+ * resolved and the workflow woke with the items so far, `$flags` and
+ * `$trigger: 'flag'`), or why nothing was written. Re-exported from the SDK.
+ */
+export type FlagBatchItemOutcome = Types.FlagBatchItemOutcome;
+
+/** Outcome vocabulary for `unflagBatchItem`. Re-exported from the HotMesh SDK. */
+export type UnflagBatchItemOutcome = Types.UnflagBatchItemOutcome;
+
+/**
  * What an accumulator wait resolves with on every terminal path except
  * cancel: the ordered `$accumulated` collection and the `$trigger` that
  * ended the wait (`count` | `timeout` | `resolve`). `P` types each item's
@@ -79,6 +97,10 @@ export const ESCALATION_BATCH_KEYS = {
   FILLED_BY: 'batch_filled_by',
   /** Envelope: set by `partialOnTimeout`; the timer delivers the filled items. */
   PARTIAL_ON_TIMEOUT: 'batch_partial_on_timeout',
+  /** Envelope: `Record<itemKey, BatchItemFlag>`, the flags on pending keys. */
+  FLAGS: 'batch_flags',
+  /** Envelope: set by `wakeOnFlag`; a flag ends the wait. */
+  WAKE_ON_FLAG: 'batch_wake_on_flag',
 } as const;
 
 /**

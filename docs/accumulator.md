@@ -53,7 +53,7 @@ Written by the fold at creation, inside the row's Leg1 commit, and maintained by
 | `envelope` | `accumulate_items` | `Record<itemKey, { payload?, at, actor?, reciprocalId? }>` |
 | `envelope` | `accumulate_config` | the folded `{ unique, resolveAtMax }` |
 
-A batch row records each fill's time and actor under `envelope.batch_filled_at` and `envelope.batch_filled_by`, and may start with entries already satisfied through `filled` (see [Creating Escalations](hitl/escalation.md)). A batch wait may add `partialOnTimeout: true`; it stores `envelope.batch_partial_on_timeout` and its timer delivers `{ ...filledItems, $trigger: 'timeout' }` instead of `false`.
+A batch row records each fill's time and actor under `envelope.batch_filled_at` and `envelope.batch_filled_by`, and may start with entries already satisfied through `filled` (see [Creating Escalations](hitl/escalation.md)). A batch wait may add `partialOnTimeout: true`; it stores `envelope.batch_partial_on_timeout` and its timer delivers `{ ...filledItems, $trigger: 'timeout' }` instead of `false`. A pending key may carry a flag in `envelope.batch_flags` (it stays pending and still fills); a wait that adds `wakeOnFlag: true` ends on the first flag and delivers `{ ...filledItems, $flags, $trigger: 'flag' }`.
 
 ## Operations
 

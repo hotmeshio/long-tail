@@ -18,8 +18,13 @@
  * An entry is `in` when its key is held by the host row (`items`: the
  * accumulated keys, or a batch's filled keys) or appears in a named context
  * value (`resolver.<field>`, a string or an array). It is `flagged` when its
- * member row matches a `flagged` rule, and `waiting` otherwise. In wins over
+ * member row matches a `flagged` rule (or, on a batch set, when its key
+ * carries a flag in `envelope.batch_flags`), and `waiting` otherwise. In wins over
  * flagged, so a member flagged on its own row and then added reads in.
+ *
+ * `countedBy` names the separator of counted keys (`<code>#1`, `<code>#2`):
+ * the nth occurrence of a code in a named context value ticks `<code>#n`,
+ * so two scans of one code tick both of its keys.
  *
  * Isomorphic: the dashboard renders the widget and the form's `roster.*`
  * context from it, and the API layer computes the same counts to evaluate
@@ -68,6 +73,8 @@ export interface RosterDef {
   key?: string;
   in?: string[];
   flagged?: RosterFlagRule[];
+  /** The separator of counted keys: the nth occurrence of a code ticks `<code><sep>n`. */
+  countedBy?: string;
 }
 
 /** One member row's token context (the row's own domains). */
@@ -102,6 +109,7 @@ const DEFAULT_KEY = '{{escalation.id}}';
 const MISSING = '—';
 const BATCH_KEYS = 'batch_keys';
 const BATCH_PENDING = 'batch_pending';
+const BATCH_FLAGS = 'batch_flags';
 const ACCUMULATE_KEYS = 'accumulate_keys';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -193,15 +201,34 @@ function heldKeys(ctx: HelpTokenContext): Set<string> {
   return new Set();
 }
 
+/** Each value as given, and with `countedBy` its nth occurrence also as `<value><sep>n`. */
+function countedKeys(values: string[], separator: string | undefined): string[] {
+  if (!separator) return values;
+  const seen = new Map<string, number>();
+  return values.flatMap((v) => {
+    const n = (seen.get(v) ?? 0) + 1;
+    seen.set(v, n);
+    return [v, `${v}${separator}${n}`];
+  });
+}
+
 function arrivedKeys(def: RosterDef, ctx: HelpTokenContext): Set<string> {
   const arrived = new Set<string>();
+  const separator = typeof def.countedBy === 'string' && def.countedBy ? def.countedBy : undefined;
   for (const source of def.in ?? [ROSTER_ITEMS_SOURCE]) {
     const keys = source === ROSTER_ITEMS_SOURCE
       ? [...heldKeys(ctx)]
-      : strings(resolveCtxPath(source, ctx as Record<string, unknown>));
+      : countedKeys(strings(resolveCtxPath(source, ctx as Record<string, unknown>)), separator);
     keys.forEach((k) => arrived.add(k));
   }
   return arrived;
+}
+
+/** A batch key's flag label, from `envelope.batch_flags[key].label`. */
+function batchFlagLabel(ctx: HelpTokenContext, key: string): string | undefined {
+  const flags = getDeep(ctx.envelope, BATCH_FLAGS);
+  const flag = isRecord(flags) ? flags[key] : undefined;
+  return isRecord(flag) && typeof flag.label === 'string' && flag.label ? flag.label : undefined;
 }
 
 function flagFor(def: RosterDef, row: RosterRow | undefined): string | undefined {
@@ -269,9 +296,10 @@ function expectedEntries(
  */
 export function computeRoster(def: RosterDef, ctx: HelpTokenContext, rows: RosterRow[] = []): RosterResult {
   const arrived = arrivedKeys(def, ctx);
+  const batch = 'batch' in def.expected;
   const entries: RosterEntry[] = expectedEntries(def, ctx, rows).map((e) => {
     if (arrived.has(e.key)) return { ...e, state: ROSTER_STATES.IN };
-    const flag = flagFor(def, e.row);
+    const flag = batch ? batchFlagLabel(ctx, e.key) : flagFor(def, e.row);
     return flag ? { ...e, state: ROSTER_STATES.FLAGGED, flag } : { ...e, state: ROSTER_STATES.WAITING };
   });
   const count = (s: RosterState) => entries.filter((e) => e.state === s).length;

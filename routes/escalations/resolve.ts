@@ -1,7 +1,7 @@
 import { Router } from '../../lib/http';
 
 import * as api from '../../api/escalations';
-import { effectiveWorkAuth } from './acting';
+import { ACTING_TOKEN_HEADER, effectiveWorkAuth } from './acting';
 
 export function registerResolveRoutes(router: Router): void {
   /**
@@ -108,6 +108,58 @@ export function registerResolveRoutes(router: Router): void {
         assertClaim: req.body?.assertClaim,
       },
       auth,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
+   * POST /api/escalations/:id/flag-batch-item
+   * Flag ONE pending key of a batch escalation (e.g. `Missing`). The key stays
+   * pending and still fills; a wait declared with `wakeOnFlag` ends on the flag.
+   * Body: { itemKey: string, label: string, payload?: Record<string, any> }
+   */
+  router.post('/:id/flag-batch-item', async (req, res) => {
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
+    const result = await api.flagBatchItem(
+      { id: req.params.id, itemKey: req.body?.itemKey, label: req.body?.label, payload: req.body?.payload },
+      auth,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
+   * POST /api/escalations/:id/unflag-batch-item
+   * Clear ONE key's flag while the batch escalation is pending.
+   * Body: { itemKey: string }
+   */
+  router.post('/:id/unflag-batch-item', async (req, res) => {
+    const auth = await effectiveWorkAuth(req, res);
+    if (!auth) return;
+    const result = await api.unflagBatchItem({ id: req.params.id, itemKey: req.body?.itemKey }, auth);
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
+   * POST /api/escalations/:id/roster-action
+   * Run one action a roster entry offers on this row's form. The server
+   * re-reads the action from the row's form schema, checks the entry and any
+   * role limit, and runs the act as the person acting: the badged person when
+   * X-LT-Acting-Token rides the request (spent only when the act runs).
+   * Body: { field: string, action: number, entry: string, code?: string }
+   */
+  router.post('/:id/roster-action', async (req, res) => {
+    const token = req.headers[ACTING_TOKEN_HEADER];
+    const result = await api.runRosterAction(
+      {
+        id: req.params.id,
+        field: req.body?.field,
+        action: req.body?.action,
+        entry: req.body?.entry,
+        code: req.body?.code,
+        actingToken: typeof token === 'string' && token ? token : undefined,
+      },
+      req.auth!,
     );
     res.status(result.status).json(result.data ?? { error: result.error });
   });

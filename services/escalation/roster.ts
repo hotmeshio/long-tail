@@ -15,6 +15,8 @@ import {
   rosterQueryOf,
   rosterRowContext,
   type RosterCounts,
+  type RosterDef,
+  type RosterResult,
   type RosterRow,
   type ShowIfContext,
 } from '../../shared/form-validation';
@@ -28,15 +30,17 @@ export async function loadRosterCounts(
   const defs = readRosterDefs(schema);
   const counts: Record<string, RosterCounts> = {};
   for (const [field, def] of Object.entries(defs)) {
-    counts[field] = computeRoster(def, ctx, await readMemberRows(def, ctx)).counts;
+    counts[field] = (await loadRoster(def, ctx)).counts;
   }
   return counts;
 }
 
-async function readMemberRows(
-  def: Parameters<typeof rosterQueryOf>[0],
-  ctx: ShowIfContext,
-): Promise<RosterRow[]> {
+/** One roster's entries and counts, read the way the widget reads them. */
+export async function loadRoster(def: RosterDef, ctx: ShowIfContext): Promise<RosterResult> {
+  return computeRoster(def, ctx, await readMemberRows(def, ctx));
+}
+
+async function readMemberRows(def: RosterDef, ctx: ShowIfContext): Promise<RosterRow[]> {
   const query = rosterQueryOf(def);
   const scoped = query ? resolveRosterQuery(query, ctx) : null;
   if (!scoped) return [];

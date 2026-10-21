@@ -13,6 +13,7 @@ export function StationWriteChallenge({
   claimantId,
   wrongBadgeName,
   anyBadge,
+  message,
   onCancel,
 }: {
   open: boolean;
@@ -21,6 +22,8 @@ export function StationWriteChallenge({
   wrongBadgeName?: string | null;
   /** Any badge answers: the write acts as whoever badges in. */
   anyBadge?: boolean;
+  /** Why this badge is asked for, or why the last one was refused. */
+  message?: string;
   onCancel: () => void;
 }) {
   if (!open) return null;
@@ -41,6 +44,9 @@ export function StationWriteChallenge({
             </>
           )}
         </p>
+        {message && (
+          <p className="text-sm text-status-warning mt-3" data-testid="badge-message">{message}</p>
+        )}
         {wrongBadgeName && (
           <p className="text-sm text-status-error mt-3" data-testid="wrong-badge">
             That badge is {wrongBadgeName}'s — scan the claimant's badge to {verb}.

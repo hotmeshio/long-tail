@@ -56,6 +56,7 @@ async function heldSubject(step: ScanStep, ctx: StepContext, row: LTEscalationRe
       },
     } : {}),
     ...(claimant ? { claimedBy: claimant } : {}),
+    ...(hold.show ? { show: hold.show } : {}),
   };
 }
 
