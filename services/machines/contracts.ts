@@ -66,6 +66,8 @@ export const itemKeys = {
 
 export const HANDOFF_ERROR = {
   DISPATCH_REFUSED: 'dispatch-refused',
+  /** Accepted, then the machine could not prepare the job (artifact, recipe). */
+  DISPATCH_FAILED: 'dispatch-failed',
   NO_REPLY: 'no-reply',
   SENDER_REJECTED: 'sender-rejected',
   HANDOFF_TIMEOUT: 'handoff-timeout',

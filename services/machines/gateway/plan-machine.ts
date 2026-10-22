@@ -205,12 +205,14 @@ function planPresence(state: GatewayState, m: string, b: Record<string, any>): P
 function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, ttl: number): Plan {
   const link = state.link(m);
   if (b.software) link.software = b.software;
-  if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(b.jobs.map((j: any) => j?.jobId)));
+  const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
+  if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(jobIds));
+  const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
   const previous = link.bootId;
   link.bootId = b.bootId;
-  if (!previous || previous === b.bootId) return ack();
+  if (!previous || previous === b.bootId) return ack([answer]);
   const held = new Set((b.jobs ?? []).map((j: any) => j.jobId));
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
   const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
-  return ack(lost.map((r) => dispatchAction(r, m, ttl)));
+  return ack([answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
 }

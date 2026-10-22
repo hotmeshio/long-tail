@@ -1,6 +1,7 @@
 /**
- * Command replies by cmdId. A wait registers before the command is published
- * and resolves with the reply, or null at the deadline.
+ * Command replies by cmdId, and machine snapshots by machine. A wait registers
+ * before the command is published and resolves with the reply, or null at the
+ * deadline.
  */
 
 export interface CommandReply {
@@ -9,27 +10,29 @@ export interface CommandReply {
   reason: string;
 }
 
-export class ReplyWaiter {
-  private waiting = new Map<string, { resolve: (reply: CommandReply | null) => void; timer: NodeJS.Timeout }>();
+/** The jobs a machine reports holding, queued or in work. */
+export type HeldJobs = Set<string>;
 
-  wait(cmdId: string, timeoutMs: number): Promise<CommandReply | null> {
-    this.waiting.get(cmdId)?.resolve(null);
+class Waits<T> {
+  private waiting = new Map<string, { resolve: (value: T | null) => void; timer: NodeJS.Timeout }>();
+
+  wait(key: string, timeoutMs: number): Promise<T | null> {
+    this.waiting.get(key)?.resolve(null);
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
-        this.waiting.delete(cmdId);
+        this.waiting.delete(key);
         resolve(null);
       }, timeoutMs);
-      this.waiting.set(cmdId, { resolve, timer });
+      this.waiting.set(key, { resolve, timer });
     });
   }
 
-  /** True when a waiter took the reply. */
-  settle(reply: CommandReply): boolean {
-    const w = this.waiting.get(reply.cmdId);
+  settle(key: string, value: T | null): boolean {
+    const w = this.waiting.get(key);
     if (!w) return false;
     clearTimeout(w.timer);
-    this.waiting.delete(reply.cmdId);
-    w.resolve(reply);
+    this.waiting.delete(key);
+    w.resolve(value);
     return true;
   }
 
@@ -39,5 +42,34 @@ export class ReplyWaiter {
       w.resolve(null);
     }
     this.waiting.clear();
+  }
+}
+
+export class ReplyWaiter {
+  private replies = new Waits<CommandReply>();
+  private snapshots = new Waits<HeldJobs>();
+
+  wait(cmdId: string, timeoutMs: number): Promise<CommandReply | null> {
+    return this.replies.wait(cmdId, timeoutMs);
+  }
+
+  /** True when a waiter took the reply. */
+  settle(reply: CommandReply): boolean {
+    return this.replies.settle(reply.cmdId, reply);
+  }
+
+  /** The next snapshot from `machineId`, or null at the deadline. */
+  waitSnapshot(machineId: string, timeoutMs: number): Promise<HeldJobs | null> {
+    return this.snapshots.wait(machineId, timeoutMs);
+  }
+
+  /** Answer a status query in flight; null when there is nothing to wait for. */
+  settleSnapshot(machineId: string, jobs: HeldJobs | null): void {
+    this.snapshots.settle(machineId, jobs);
+  }
+
+  cancelAll(): void {
+    this.replies.cancelAll();
+    this.snapshots.cancelAll();
   }
 }

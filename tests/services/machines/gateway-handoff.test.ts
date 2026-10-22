@@ -54,10 +54,9 @@ describe('gateway: error roads', () => {
     expect(ended.resolved_by).toBe('press-01');
   });
 
-  it('no reply with no work done resolves no-reply after the retries, all with one cmdId', async () => {
+  it('no reply from a machine that cannot be reached resolves no-reply after the retries, all with one cmdId', async () => {
     rig = await startRig();
-    rig.line.config('press-01', { replyMode: 'drop' });
-    await rig.line.machine('press-01').enable(false);
+    await rig.line.network('press-01', { mode: 'drop' });
     const ended = await rig.handoff('U1', null, 'press-01');
     expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'no-reply' });
     const sent = rig.recorder.commands('press-01', OP.DISPATCH);

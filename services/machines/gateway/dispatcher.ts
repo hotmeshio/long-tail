@@ -1,10 +1,11 @@
 /**
  * Commands to machines and their replies. A dispatch becomes one command per
  * job (gateway/jobs.ts); missing replies are asked for again with the same
- * command ids, and the row is claimed once every job is accepted. When a
- * dispatch ends without that, the row is resolved with the error and every
- * job is cancelled, so a dispatch still queued for a machine that was away
- * never runs later. A machine-command row is resolved with its command's
+ * command ids, and the row is claimed once every job is accepted. Silence is
+ * not a refusal: the gateway asks the machine what it holds, and a job it
+ * holds counts as accepted. When a dispatch ends without that, the row is
+ * resolved with the error and every job is cancelled, so a dispatch still
+ * queued for a machine that was away never runs later. A machine-command row is resolved with its command's
  * reply. Other commands are tracked for their reply and logged. A command the
  * codec has no message for is unsupported: nothing is sent or awaited.
  */
@@ -19,7 +20,7 @@ import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { dispatchJobs, type DispatchJob } from './jobs';
 import { GATEWAY_LOG, type GatewayLog } from './log';
-import type { CommandReply, ReplyWaiter } from './reply-waiter';
+import type { CommandReply, HeldJobs, ReplyWaiter } from './reply-waiter';
 import { DISPATCH_STATE, type GatewayState } from './state';
 
 export interface DispatcherDeps {
@@ -41,6 +42,11 @@ type ControlAction = Extract<Action, { kind: 'control' }>;
 /** A reply the machine sent, as opposed to none or an unsupported command. */
 function fromMachine(reply: CommandReply | null): reply is CommandReply {
   return !!reply && reply.status !== COMMAND_STATUS.UNSUPPORTED;
+}
+
+/** The machine took the work: recorded it, or already has it ready. */
+function took(reply: CommandReply | null): boolean {
+  return reply?.status === REPLY_STATUS.ACCEPTED || reply?.status === REPLY_STATUS.COMPLETED;
 }
 
 export class Dispatcher {
@@ -97,27 +103,41 @@ export class Dispatcher {
   async dispatch(a: DispatchAction): Promise<void> {
     const { lt, state, log } = this.d;
     const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
+    // Known before any reply, so a failure that follows an acceptance finds its row.
+    for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
     const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units })));
+    const refused = replies.find((r) => r && !took(r));
+    const silent = jobs.filter((_, i) => !replies[i]);
+    const held = !refused && silent.length ? await this.heldJobs(a.machineId, a.cmdId) : null;
+    const reconciled = !!held && silent.every((j) => held.has(j.jobId));
     const row = state.get(a.rowId);
-    if (replies.every((r) => r?.status === REPLY_STATUS.ACCEPTED)) {
+    if (!refused && (!silent.length || reconciled)) {
       if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
-      log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r!.reason).join('; ') });
+      if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
+      log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
       this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
       return;
     }
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
     if (!row) return;
     row.dispatch = DISPATCH_STATE.REFUSED;
-    const refused = replies.find((r) => r && r.status !== REPLY_STATUS.ACCEPTED);
+    const unanswered = `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts`;
     const resolution = refused
       ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${refused.status}: ${refused.reason}` }
-      : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts` };
+      : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: held ? `${unanswered} and does not hold the job` : `${unanswered}; its state is unknown` };
     log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { row: a.rowId, machine: a.machineId, ...resolution });
     const ended = await lt.resolve(fromMachine(refused ?? null) ? a.machineId : CONTROLLER, a.rowId, resolution);
     this.check(a.rowId, 'resolve', ended);
     state.close(a.rowId);
     if (ended.outcome !== VERB_OUTCOME.DONE) return;
-    await this.withdraw(a, jobs.filter((_, i) => !replies[i] || replies[i]!.status === REPLY_STATUS.ACCEPTED));
+    await this.withdraw(a, jobs.filter((_, i) => !replies[i] || took(replies[i])));
+  }
+
+  /** Ask a silent machine what it holds; null when it cannot say or does not answer in time. */
+  private async heldJobs(machineId: string, cmdId: string): Promise<HeldJobs | null> {
+    const waiting = this.d.replies.waitSnapshot(machineId, this.d.replyTimeoutMs);
+    if (!await this.publish(machineId, OP.SNAPSHOT, `${cmdId}:status`, {})) this.d.replies.settleSnapshot(machineId, null);
+    return waiting;
   }
 
   private check(rowId: string, verb: string, result: VerbResult): void {

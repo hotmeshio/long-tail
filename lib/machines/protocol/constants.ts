@@ -105,5 +105,9 @@ export type Op = typeof OP[keyof typeof OP];
 /** Commands a host may ask of a machine through a machine-command row. */
 export const CONTROL_OPS: readonly Op[] = [OP.START, OP.STOP, OP.PAUSE, OP.RESUME, OP.CHANGEOVER];
 
-export const REPLY_STATUS = { ACCEPTED: 'accepted', REFUSED: 'refused', FAILED: 'failed' } as const;
+/**
+ * A command's reply. `accepted` means recorded; a machine that prepares the work first (fetch, verify)
+ * may later send `completed` (ready) or `failed` under the same cmdId.
+ */
+export const REPLY_STATUS = { ACCEPTED: 'accepted', COMPLETED: 'completed', REFUSED: 'refused', FAILED: 'failed' } as const;
 export type ReplyStatus = typeof REPLY_STATUS[keyof typeof REPLY_STATUS];

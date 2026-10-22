@@ -5,15 +5,16 @@
  * caused it is delivered again.
  */
 
-import { DECISION, ROW_TYPE } from '../contracts';
+import { DECISION, HANDOFF_ERROR, ROW_TYPE } from '../contracts';
 import { operatorRole, type LineDef } from '../../../lib/machines/line';
-import type { LineCodec } from '../../../lib/machines/protocol';
+import { REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher } from './dispatcher';
+import { failHandoff } from './plan-shared';
 import type { GatewayState } from './state';
 
 const NOT_FOUND = 404;
@@ -89,8 +90,24 @@ export class Executor {
       case 'watchOffline':
         return this.watchOffline(a.machineId);
       case 'settleReply':
-        replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason });
+        if (!replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason })) await this.lateReply(a);
+        return;
+      case 'settleSnapshot':
+        replies.settleSnapshot(a.machineId, new Set(a.jobIds));
     }
+  }
+
+  /** A dispatch's second reply: ready, or a failure to prepare that ends the handoff. */
+  private async lateReply(a: Extract<Action, { kind: 'settleReply' }>): Promise<void> {
+    const row = this.d.state.rowForDispatch(a.cmdId);
+    if (!row?.toMachine) return;
+    const context = { row: row.id, machine: row.toMachine, cmdId: a.cmdId, reason: a.reason };
+    if (a.status === REPLY_STATUS.COMPLETED) return this.d.log.info(GATEWAY_LOG.DISPATCH_READY, context);
+    if (a.status !== REPLY_STATUS.FAILED) return;
+    this.d.log.warn(GATEWAY_LOG.DISPATCH_FAILED, context);
+    await this.apply(failHandoff(this.d.state, row, row.toMachine, {
+      received: false, errorCode: HANDOFF_ERROR.DISPATCH_FAILED, detail: `${row.toMachine} could not prepare the job: ${a.reason}`,
+    }));
   }
 
   /** Add the item; when the row then holds every key the action waits for, resolve it. */

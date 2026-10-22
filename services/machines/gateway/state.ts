@@ -60,6 +60,8 @@ export class GatewayState {
   /** Finished records that came before their row: machine/unit → job body. */
   private earlyFinishes = new Map<string, Record<string, any>>();
   private openCommands = new Set<string>();
+  /** Accepted dispatch command ids → their row, so a later failure finds the row. */
+  private dispatches = new Map<string, string>();
   private endedCommands = new Set<string>();
   readonly links = new Map<string, LinkTrack>();
 
@@ -138,6 +140,20 @@ export class GatewayState {
     const body = this.earlyFinishes.get(`${machineId}/${unitId}`);
     this.earlyFinishes.delete(`${machineId}/${unitId}`);
     return body;
+  }
+
+  rememberDispatch(cmdId: string, rowId: string): void {
+    this.dispatches.set(cmdId, rowId);
+    if (this.dispatches.size > CLOSED_LIMIT) {
+      const oldest = this.dispatches.keys().next().value;
+      if (oldest) this.dispatches.delete(oldest);
+    }
+  }
+
+  /** The open row an accepted dispatch command belongs to. */
+  rowForDispatch(cmdId: string): HandoffRow | undefined {
+    const rowId = this.dispatches.get(cmdId);
+    return rowId ? this.openRows.get(rowId) : undefined;
   }
 
   /** Track a machine-command row; false when it is already tracked or has ended. */

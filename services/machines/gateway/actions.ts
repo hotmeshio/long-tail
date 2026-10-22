@@ -28,7 +28,9 @@ export type Action =
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
   | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
-  | { kind: 'settleReply'; cmdId: string; status: string; reason: string };
+  | { kind: 'settleReply'; cmdId: string; status: string; reason: string }
+  /** A machine reported the jobs it holds: answers a status query in flight. */
+  | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] };
 
 /** Resolve the row with `payload` once it holds every one of `keys`. */
 export interface Completion {
