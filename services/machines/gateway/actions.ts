@@ -18,7 +18,8 @@ export interface CreateRowInput {
 }
 
 export type Action =
-  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any> }
+  /** `receivedOnAccept`: the units are already at the machine, so its acceptance completes the handoff. */
+  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; receivedOnAccept?: boolean }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   /** A host's machine-command row: send the command, resolve the row with the reply. */
   | { kind: 'control'; rowId: string; machineId: string; op: string; cmdId: string; args: Record<string, any> }
@@ -32,10 +33,11 @@ export type Action =
   /** A machine reported the jobs it holds: answers a status query in flight. */
   | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] };
 
-/** Resolve the row with `payload` once it holds every one of `keys`. */
+/** Once the row holds every one of `keys`: resolve it with `payload`, or run `then` instead. */
 export interface Completion {
   keys: string[];
-  payload: Record<string, any>;
+  payload?: Record<string, any>;
+  then?: Action[];
 }
 
 export interface Plan {

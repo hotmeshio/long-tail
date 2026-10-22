@@ -118,7 +118,8 @@ export class Executor {
     if (!a.complete || result.outcome === VERB_OUTCOME.INVALID) return;
     const held = new Set(result.itemKeys ?? await lt.itemKeys(a.rowId));
     if (!a.complete.keys.every((k) => held.has(k))) return;
-    this.check(a, await lt.resolve(a.as, a.rowId, a.complete.payload));
+    if (a.complete.then) return this.apply(a.complete.then);
+    this.check(a, await lt.resolve(a.as, a.rowId, a.complete.payload ?? {}));
     state.close(a.rowId);
   }
 

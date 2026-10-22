@@ -9,7 +9,7 @@
 import { isUuid } from '../../../lib/uuid';
 import type { OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 
 export class LtHttpError extends Error {
   readonly cause?: unknown;
@@ -82,8 +82,14 @@ export class HttpLineEscalations implements LineEscalations {
   }
 
   async itemKeys(id: string): Promise<string[]> {
-    const view = await this.http.request<{ items: { itemKey: string }[] }>('GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER));
-    return view.items.map((i) => i.itemKey);
+    return (await this.items(id)).map((i) => i.itemKey);
+  }
+
+  async items(id: string): Promise<RowItem[]> {
+    const view = await this.http.request<{ items: { itemKey: string; payload?: Record<string, any> }[] }>(
+      'GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER),
+    );
+    return view.items.map((i) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
   }
 
   async get(id: string): Promise<Record<string, any> | null> {

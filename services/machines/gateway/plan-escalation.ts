@@ -13,7 +13,7 @@ import { machineById, machineRole, receiverRoles, type LineDef } from '../../../
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
-import { admit, hasRoom, softwareRefusal } from './pacing';
+import { admit, hasRoom, refuseUnfit, softwareRefusal } from './pacing';
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { standardRows, type HandoffRowAdapter } from '../rows';
@@ -113,6 +113,11 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
     if (event.data?.assigned_to) {
       row.dispatch = DISPATCH_STATE.ACCEPTED;
       return [];
+    }
+    if (state.dispatchOnArrival) {
+      const refused = refuseUnfit(state, line, row);
+      if (!refused.length) row.dispatch = DISPATCH_STATE.ARRIVING;
+      return refused;
     }
     const refused = !!softwareRefusal(state, line, row.toMachine);
     if (state.holdDispatch || (!refused && !hasRoom(state, line, row))) {

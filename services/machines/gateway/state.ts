@@ -8,8 +8,13 @@
 import type { HandoffFacets, TraceEntry } from '../contracts';
 import { mergeTrace } from './trace';
 
-/** WAITING: the machine has no room yet (pacing.ts); the row waits in its role queue. */
-export const DISPATCH_STATE = { NONE: 'none', WAITING: 'waiting', PENDING: 'pending', ACCEPTED: 'accepted', REFUSED: 'refused' } as const;
+/**
+ * WAITING: the machine has no room yet (pacing.ts); the row waits in its role queue.
+ * ARRIVING: the job goes out once its units arrive at the receiver (codec `dispatchOn: arrival`).
+ */
+export const DISPATCH_STATE = {
+  NONE: 'none', WAITING: 'waiting', ARRIVING: 'arriving', PENDING: 'pending', ACCEPTED: 'accepted', REFUSED: 'refused',
+} as const;
 export type DispatchState = typeof DISPATCH_STATE[keyof typeof DISPATCH_STATE];
 
 export const ROW_END = { RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
@@ -22,6 +27,8 @@ export interface HandoffRow extends HandoffFacets {
   ended?: RowEnd;
   /** Finished-unit records already on the row's metadata (trace.ts). */
   trace?: TraceEntry[];
+  /** Each unit's arrival event, as its receiver reported it (dispatch on arrival). */
+  arrivals?: Record<string, Record<string, any>>;
 }
 
 export interface AlarmTrack {
@@ -50,6 +57,8 @@ const CLOSED_LIMIT = 2_000;
 export class GatewayState {
   /** Units one dispatch may carry, from the codec; null when any number may. */
   unitsPerDispatch: number | null = null;
+  /** Jobs go to a receiver once its units arrive there, from the codec. */
+  dispatchOnArrival = false;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
   /** Units at each machine that arrived and have not left: machine → unit → job. */
@@ -69,7 +78,9 @@ export class GatewayState {
     if (this.closedRows.has(row.id)) return;
     const existing = this.openRows.get(row.id);
     // An event may carry metadata older than what the gateway already wrote: keep both traces.
-    this.openRows.set(row.id, existing ? { ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace) } : row);
+    this.openRows.set(row.id, existing
+      ? { ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals }
+      : row);
   }
 
   get(id: string): HandoffRow | undefined {

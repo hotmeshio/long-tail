@@ -6,7 +6,7 @@
  */
 
 import { CONTROLLER, type Actor, type CreateRowInput } from '../gateway/actions';
-import { VERB_OUTCOME, type LineEscalations, type VerbResult } from '../gateway/escalations';
+import { VERB_OUTCOME, type LineEscalations, type RowItem, type VerbResult } from '../gateway/escalations';
 import { ROW_TYPE, type HandoffFacets } from '../contracts';
 import type { MemoryEscalationFeed } from '../../../lib/machines/transport';
 import { until } from './wait';
@@ -145,6 +145,10 @@ export class FakeLongTail implements LineEscalations {
 
   async itemKeys(id: string): Promise<string[]> {
     return (this.rows.get(id)?.items ?? []).map((i) => i.itemKey);
+  }
+
+  async items(id: string): Promise<RowItem[]> {
+    return (this.rows.get(id)?.items ?? []).map((i) => ({ itemKey: i.itemKey, payload: i.payload }));
   }
 
   async get(id: string): Promise<Record<string, any> | null> {

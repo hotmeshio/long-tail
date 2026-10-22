@@ -52,6 +52,12 @@ export interface LineCodec {
   topicFor?(scope: TopicScope, channel: string): string;
   /** Most units one dispatch may carry; the gateway sends one dispatch per unit when 1. Null: any. */
   readonly unitsPerDispatch: number | null;
+  /**
+   * When a handoff's job goes to its receiver: as soon as the row exists (the default), or once every
+   * unit has arrived there, for machines that take work only for units they have scanned in. Each
+   * dispatched unit then carries the arrival event its receiver reported.
+   */
+  readonly dispatchOn?: DispatchOn;
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
@@ -62,6 +68,9 @@ export interface LineCodec {
    */
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];
 }
+
+export const DISPATCH_ON = { CREATED: 'created', ARRIVAL: 'arrival' } as const;
+export type DispatchOn = typeof DISPATCH_ON[keyof typeof DISPATCH_ON];
 
 /** Which job event counts as the receiver's receipt. */
 export const RECEIPT_FROM = { ARRIVED: 'arrived', BOUND: 'bound', STARTED: 'started' } as const;
@@ -74,6 +83,7 @@ export interface GenericCodecOptions {
   /** For machines that report no arrival: treat the receiver's carrier bind or job start as the receipt. */
   receiptFrom?: ReceiptFrom;
   unitsPerDispatch?: number | null;
+  dispatchOn?: DispatchOn;
 }
 
 export const GENERIC_CHANNELS: CodecChannels = {
@@ -123,6 +133,7 @@ export function genericCodec(opts: GenericCodecOptions): LineCodec {
     root: opts.root,
     channels: GENERIC_CHANNELS,
     unitsPerDispatch: opts.unitsPerDispatch ?? null,
+    dispatchOn: opts.dispatchOn ?? DISPATCH_ON.CREATED,
     decode(topic, payload, retained) {
       const seen = atMachine(inspectMessage(opts.root, topic, payload, retained), ids);
       if (!seen.parsed) return [];

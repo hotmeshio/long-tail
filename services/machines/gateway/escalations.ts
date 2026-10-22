@@ -26,6 +26,11 @@ export interface VerbResult {
   itemKeys?: string[];
 }
 
+export interface RowItem {
+  itemKey: string;
+  payload: Record<string, any>;
+}
+
 export interface LineEscalations {
   claim(as: Actor, id: string): Promise<VerbResult>;
   /** `metadata` is merged (shallow) into the row's metadata in the same statement as the item. */
@@ -34,6 +39,8 @@ export interface LineEscalations {
   create(as: Actor, input: CreateRowInput): Promise<{ id: string }>;
   /** The item keys an accumulator row holds. */
   itemKeys(id: string): Promise<string[]>;
+  /** The items an accumulator row holds, with their payloads. */
+  items(id: string): Promise<RowItem[]>;
   /** The stored row, as the controller sees it; null when it does not exist or the controller may not read it. */
   get(id: string): Promise<Record<string, any> | null>;
   /** Every pending row matching each given field, oldest first, in the projection escalation events carry. */

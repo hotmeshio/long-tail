@@ -20,7 +20,7 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
     jobId: row.jobId,
     orderRef: row.orderRef,
     recipe: { id: row.recipeId, version: row.recipeVersion },
-    units: row.units,
+    units: row.arrivals ? row.units.map((u) => ({ ...u, arrival: row.arrivals?.[u.unitId] ?? null })) : row.units,
     process: row.process,
     from: row.fromMachine,
     expiresAt: isoTs(expiresAt),
@@ -29,7 +29,10 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
 }
 
 export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
-  return { kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs) };
+  return {
+    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs),
+    ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { receivedOnAccept: true } : {}),
+  };
 }
 
 /** A machine on a version the line does not allow is refused before any dispatch. */
@@ -71,15 +74,20 @@ export function hasRoom(state: GatewayState, line: LineDef, row: HandoffRow): bo
   return fits(line, row, machineLoad(state, row.toMachine!), state);
 }
 
-/** Send a handoff to its machine now, or refuse it for the machine's software or a missing artifact. */
-export function admit(state: GatewayState, line: LineDef, row: HandoffRow, dispatchTtlMs: number): Action[] {
+/** The resolution refusing a handoff for the machine's software or a missing artifact; empty when it may go. */
+export function refuseUnfit(state: GatewayState, line: LineDef, row: HandoffRow): Action[] {
   const software = softwareRefusal(state, line, row.toMachine!);
   const artifact = software ? null : artifactRefusal(line, row);
-  if (software || artifact) {
-    row.dispatch = DISPATCH_STATE.REFUSED;
-    const errorCode = software ? HANDOFF_ERROR.SOFTWARE_UNSUPPORTED : HANDOFF_ERROR.DISPATCH_REFUSED;
-    return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode, detail: software ?? artifact } }];
-  }
+  if (!software && !artifact) return [];
+  row.dispatch = DISPATCH_STATE.REFUSED;
+  const errorCode = software ? HANDOFF_ERROR.SOFTWARE_UNSUPPORTED : HANDOFF_ERROR.DISPATCH_REFUSED;
+  return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode, detail: software ?? artifact } }];
+}
+
+/** Send a handoff to its machine now, or refuse it for the machine's software or a missing artifact. */
+export function admit(state: GatewayState, line: LineDef, row: HandoffRow, dispatchTtlMs: number): Action[] {
+  const refused = refuseUnfit(state, line, row);
+  if (refused.length) return refused;
   row.dispatch = DISPATCH_STATE.PENDING;
   return [dispatchAction(row, row.toMachine!, dispatchTtlMs)];
 }

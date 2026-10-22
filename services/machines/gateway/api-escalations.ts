@@ -6,7 +6,7 @@
 import * as escalationApi from '../../../api/escalations';
 import { isUuid } from '../../../lib/uuid';
 import type { Actor, CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
 import type { OpenRowQuery } from '../rows';
@@ -43,9 +43,13 @@ export class ApiLineEscalations implements LineEscalations {
   }
 
   async itemKeys(id: string): Promise<string[]> {
+    return (await this.items(id)).map((i) => i.itemKey);
+  }
+
+  async items(id: string): Promise<RowItem[]> {
     const result = await escalationApi.getEscalationItems({ id }, this.auth(CONTROLLER));
     if (result.status >= 300) throw new Error(`items failed ${result.status}: ${result.error}`);
-    return (result.data as any).items.map((i: any) => i.itemKey);
+    return (result.data as any).items.map((i: any) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
   }
 
   async get(id: string): Promise<Record<string, any> | null> {

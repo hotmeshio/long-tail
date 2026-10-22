@@ -36,7 +36,7 @@ function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: En
     case MESSAGE_KIND.REPLY:
       return ack([{ kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason }]);
     case MESSAGE_KIND.JOB:
-      return planJob(state, m, b, env?.at);
+      return planJob(state, m, b, env?.at, ttl);
     case MESSAGE_KIND.ALARM:
       return planAlarm(state, parsed, parsed.key ?? b.alarmId, env);
     case MESSAGE_KIND.PRESENCE:
@@ -69,7 +69,13 @@ function ownsJob(state: GatewayState, r: HandoffRow, jobId: string | null, repor
   return dispatchJobs(jobId, r.units, state.unitsPerDispatch).some((j) => j.jobId === reported);
 }
 
-function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: string): Plan {
+/** Keep the receiver's arrival event for the unit, to go out with its dispatch. */
+function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>): HandoffRow {
+  row.arrivals = { ...row.arrivals, [unitId]: b };
+  return row;
+}
+
+function planJob(state: GatewayState, m: string, b: Record<string, any>, at: string | undefined, ttl: number): Plan {
   const unitId = b.unitId;
   // An event from an earlier attempt's job never touches a later attempt's row.
   const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(state, r, r.jobId, b.jobId);
@@ -90,10 +96,16 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at?: st
     const early = row.fromMachine ? releasedEarly(state, row, unitId) : [];
     if (row.fromMachine) state.letGo(row.fromMachine, unitId);
     const units = row.units.map((u) => u.unitId);
+    const complete = row.dispatch === DISPATCH_STATE.ARRIVING
+      ? { keys: units.map(itemKeys.arrived), then: [dispatchAction(withArrival(row, unitId, b), m, ttl)] }
+      : { keys: units.map(itemKeys.arrived), payload: { received: true, receiver: m, units } };
     return ack([...early, {
       kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.arrived(unitId),
-      payload: { unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: at ?? new Date().toISOString() },
-      complete: { keys: units.map(itemKeys.arrived), payload: { received: true, receiver: m, units } },
+      payload: {
+        unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: at ?? new Date().toISOString(),
+        ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { arrival: b } : {}),
+      },
+      complete,
     }]);
   }
 

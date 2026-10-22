@@ -6,20 +6,20 @@
  */
 
 import { standardRows, type HandoffRowAdapter } from '../rows';
-import { DECISION, ROW_TYPE } from '../contracts';
+import { DECISION, ROW_TYPE, itemKeys } from '../contracts';
 import { CONTROLLER } from './actions';
 import { alarmsClearedMeanwhile, restoreLineRows } from './reconcile';
 import type { LineDef } from '../../../lib/machines/line';
-import { MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
 import { Executor } from './executor';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './log';
 import { concernsLine, planEscalationEvent, statusFits } from './plan-escalation';
-import { planPacing } from './pacing';
+import { dispatchAction, planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
-import { GatewayState } from './state';
+import { DISPATCH_STATE, GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
 
 export interface GatewaySettings {
@@ -62,6 +62,7 @@ export class MachineGateway {
     this.rows = deps.rows ?? standardRows;
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
+    this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
     this.executor = new Executor({
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
@@ -108,6 +109,7 @@ export class MachineGateway {
     this.state.holdDispatch = true;
     try {
       const handoffs = await this.reconcileHandoffs();
+      if (this.state.dispatchOnArrival) await this.resumeArrivals();
       const commands = await this.reconcileCommands();
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();
@@ -145,6 +147,26 @@ export class MachineGateway {
       }
     }
     return handoffs;
+  }
+
+  /**
+   * Rows whose units arrived while no gateway was listening: send the job with
+   * the arrivals the row holds, or complete a row whose job was already accepted.
+   */
+  private async resumeArrivals(): Promise<void> {
+    for (const row of this.state.open()) {
+      if (!row.toMachine || (row.dispatch !== DISPATCH_STATE.ARRIVING && row.dispatch !== DISPATCH_STATE.ACCEPTED)) continue;
+      const items = await this.deps.lt.items(row.id);
+      const units = row.units.map((u) => u.unitId);
+      const arrived = new Map(items.filter((i) => i.itemKey.startsWith(itemKeys.arrived(''))).map((i) => [i.payload.unitId, i.payload]));
+      if (!units.every((u) => arrived.has(u))) continue;
+      if (row.dispatch === DISPATCH_STATE.ACCEPTED) {
+        await this.executor.apply([{ kind: 'resolve', as: row.toMachine, rowId: row.id, payload: { received: true, receiver: row.toMachine, units } }]);
+        continue;
+      }
+      row.arrivals = Object.fromEntries(units.map((u) => [u, arrived.get(u)?.arrival ?? { unitId: u, carrierId: arrived.get(u)?.carrierId ?? null }]));
+      await this.executor.apply([dispatchAction(row, row.toMachine, this.deps.settings.dispatchTtlMs)]);
+    }
   }
 
   private async resync(): Promise<void> {

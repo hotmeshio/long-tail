@@ -102,6 +102,12 @@ export class Dispatcher {
 
   async dispatch(a: DispatchAction): Promise<void> {
     const { lt, state, log } = this.d;
+    if (a.receivedOnAccept) {
+      // An arrival may be delivered again after the job went out; send it once.
+      const row = state.get(a.rowId);
+      if (row?.dispatch !== DISPATCH_STATE.ARRIVING) return;
+      row.dispatch = DISPATCH_STATE.PENDING;
+    }
     const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
     // Known before any reply, so a failure that follows an acceptance finds its row.
     for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
@@ -116,6 +122,7 @@ export class Dispatcher {
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
       this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
+      if (a.receivedOnAccept) await this.received(a);
       return;
     }
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
@@ -131,6 +138,13 @@ export class Dispatcher {
     state.close(a.rowId);
     if (ended.outcome !== VERB_OUTCOME.DONE) return;
     await this.withdraw(a, jobs.filter((_, i) => !replies[i] || took(replies[i])));
+  }
+
+  /** The units were already at the machine: its acceptance completes the handoff. */
+  private async received(a: DispatchAction): Promise<void> {
+    const units = (a.args.units as { unitId: string }[]).map((u) => u.unitId);
+    this.check(a.rowId, 'resolve', await this.d.lt.resolve(a.machineId, a.rowId, { received: true, receiver: a.machineId, units }));
+    this.d.state.close(a.rowId);
   }
 
   /** Ask a silent machine what it holds; null when it cannot say or does not answer in time. */
