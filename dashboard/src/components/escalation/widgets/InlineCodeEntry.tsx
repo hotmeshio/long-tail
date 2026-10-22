@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { SCAN_CAPTURE_ATTR, SCAN_CAPTURE_OFF } from '../../../lib/scan-sources/types';
 
 /**
  * A code typed in place, beside the control that asked for it: a key-in for
  * an item whose barcode will not scan. The server checks the code against
- * the entry; Enter confirms.
+ * the entry; Enter confirms. The field keeps its keys, so a code typed or
+ * scanned into it is never also run as a scan.
  */
 export function InlineCodeEntry({ label, onConfirm, onCancel, testId }: {
   label: string;
@@ -14,7 +16,13 @@ export function InlineCodeEntry({ label, onConfirm, onCancel, testId }: {
   const [code, setCode] = useState('');
   const submit = () => { if (code.trim()) onConfirm(code.trim()); };
   return (
-    <span className="inline-flex flex-wrap items-center gap-2" role="group" aria-label={label} data-testid={testId}>
+    <span
+      className="inline-flex flex-wrap items-center gap-2"
+      role="group"
+      aria-label={label}
+      data-testid={testId}
+      {...{ [SCAN_CAPTURE_ATTR]: SCAN_CAPTURE_OFF }}
+    >
       <input
         type="text"
         inputMode="numeric"

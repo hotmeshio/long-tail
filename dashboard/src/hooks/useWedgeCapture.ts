@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createWedgeMachine, type TailShape, type WedgeConfig } from '../lib/scan-sources/keyboard-wedge';
 import { removeFromActiveEditable } from '../lib/scan-sources/editable-repair';
+import { ownsItsKeys } from '../lib/scan-sources/types';
 
 /** One observed keydown, as the capture machine saw it. */
 export interface ScanKeyDiag {
@@ -80,6 +81,11 @@ export function useWedgeCapture({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (ownsItsKeys(e.target)) {
+        machine.reset();
+        clearAutoFire();
+        return;
+      }
       const bufferBefore = machine.snapshot().buffer;
       const { suppress, emit, consumedLength } = machine.step({
         key: e.key,
