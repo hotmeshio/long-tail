@@ -79,6 +79,8 @@ export interface Inspection {
   parsed: ParsedTopic | null;
   body: Envelope | null;
   violations: string[];
+  /** Set by a codec whose machines await a receipt: the id to confirm once the gateway is done with the message. */
+  receiptId?: string;
 }
 
 const errorsOf = (prefix: string, fn: ValidateFunction) =>

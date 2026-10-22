@@ -83,6 +83,7 @@ class LineRun {
       settings: {
         topicRoot: config.topicRoot, replyTimeoutMs: config.replyTimeoutMs, dispatchAttempts: config.dispatchAttempts,
         offlineDebounceMs: config.offlineDebounceMs, dispatchTtlMs: config.dispatchTtlMs, quietMs: config.quietMs,
+        receiptDelayMs: config.receiptDelayMs,
       },
     });
     await this.gateway.start();

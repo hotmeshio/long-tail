@@ -33,6 +33,8 @@ export interface MachineLineConfig {
   quietMs: number;
   /** How long a dispatch stays valid at the machine. */
   dispatchTtlMs: number;
+  /** How long confirmed message ids gather before a receipt goes out. */
+  receiptDelayMs: number;
   ltBaseUrl: string;
 }
 
@@ -93,6 +95,7 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     offlineDebounceMs: int(env, 'MACHINE_OFFLINE_DEBOUNCE_MS', 15_000),
     quietMs: int(env, 'MACHINE_QUIET_MS', 90_000),
     dispatchTtlMs: int(env, 'MACHINE_DISPATCH_TTL_MS', 600_000),
+    receiptDelayMs: int(env, 'MACHINE_RECEIPT_DELAY_MS', 250),
     ltBaseUrl: env.LT_BASE_URL ?? 'http://localhost:3000',
   };
   if (transport === MACHINE_TRANSPORT.NATS) {

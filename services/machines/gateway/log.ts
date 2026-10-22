@@ -9,6 +9,7 @@ export const GATEWAY_LOG = {
   ROW_CLAIMED_ELSEWHERE: 'machine_gateway.verb.row_claimed_elsewhere',
   UNMATCHED: 'machine_gateway.message.unmatched',
   CONTRACT_VIOLATION: 'machine_gateway.contract.violation',
+  RECEIPT_FAILED: 'machine_gateway.receipt.failed',
   ALARM_ROW: 'machine_gateway.alarm.row_created',
   OFFLINE_ROW: 'machine_gateway.offline.row_created',
   QUIET_ROW: 'machine_gateway.quiet.row_created',

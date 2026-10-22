@@ -56,6 +56,11 @@ export interface LineCodec {
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];
+  /**
+   * The receipt confirming messages the gateway is done with (each decoded with a `receiptId`), for
+   * machines that keep an outbox until confirmed. Absent: no receipts are sent.
+   */
+  receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];
 }
 
 /** Which job event counts as the receiver's receipt. */

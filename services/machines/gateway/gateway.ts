@@ -10,7 +10,7 @@ import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER } from './actions';
 import { alarmsClearedMeanwhile, restoreLineRows } from './reconcile';
 import type { LineDef } from '../../../lib/machines/line';
-import { MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
@@ -20,6 +20,7 @@ import { concernsLine, planEscalationEvent, statusFits } from './plan-escalation
 import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
+import { ReceiptBatcher } from './receipts';
 
 export interface GatewaySettings {
   topicRoot: string;
@@ -30,6 +31,8 @@ export interface GatewaySettings {
   dispatchTtlMs: number;
   /** A connected machine silent this long gets a quiet row; 0 turns the check off. */
   quietMs: number;
+  /** How long confirmed message ids gather before a receipt goes out (codecs with receipts). */
+  receiptDelayMs?: number;
 }
 
 export interface GatewayDeps {
@@ -50,6 +53,7 @@ export class MachineGateway {
   private readonly rows: HandoffRowAdapter;
   private readonly codec: LineCodec;
   private readonly executor: Executor;
+  private readonly receipts: ReceiptBatcher;
   private readonly log: GatewayLog;
   private quietTimer?: NodeJS.Timeout;
 
@@ -63,6 +67,7 @@ export class MachineGateway {
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
+    this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log });
   }
 
   async start(): Promise<void> {
@@ -82,6 +87,7 @@ export class MachineGateway {
   async stop(): Promise<void> {
     if (this.quietTimer) clearInterval(this.quietTimer);
     this.executor.stop();
+    await this.receipts.flush();
     await this.deps.feed.close();
     await this.deps.bus.close();
   }
@@ -197,9 +203,20 @@ export class MachineGateway {
     // No row has claimed it after this many tries, so it is not racing its row: stop. A failed verb always retries.
     if (outcome === DISPOSITION.NAK && !failed && msg.deliveries >= MAX_DELIVERIES) {
       this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries });
-      return DISPOSITION.TERM;
+      outcome = DISPOSITION.TERM;
     }
+    if (outcome !== DISPOSITION.NAK) this.confirm(decoded);
     return outcome;
+  }
+
+  /** Done with the message: confirm each id its codec asked to confirm. */
+  private confirm(decoded: Inspection[]): void {
+    const seen = new Set<string>();
+    for (const { parsed, receiptId } of decoded) {
+      if (!parsed || !receiptId || seen.has(receiptId)) continue;
+      seen.add(receiptId);
+      this.receipts.add(parsed.ident, receiptId);
+    }
   }
 
   private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<{ disposition: Disposition; failed: boolean }> {
@@ -216,6 +233,7 @@ export class MachineGateway {
 }
 
 const MAX_DELIVERIES = 30;
+const DEFAULT_RECEIPT_DELAY_MS = 250;
 
 const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };
 
