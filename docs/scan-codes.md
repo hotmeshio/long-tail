@@ -692,6 +692,11 @@ code never starts inside a longer run of digits.
 - On a match, the terminator is swallowed, the code's characters are
   stripped back out of whatever editable held focus (byte-exact, at the
   cursor), and the code executes. Cursor focus never diverts a scan.
+- **A field that takes a code as its own answer keeps its keys.** Keys typed
+  inside an element marked `data-lt-scan-capture="off"` reach only that
+  field, at any speed, with or without Enter. A roster's key-in field is
+  marked, so a code typed or scanned into it is the key-in and never also a
+  scan.
 - Scanner pacing is irrelevant: slow Bluetooth HID links, Shift-chorded
   capitals and colons, and mid-burst stalls all capture, because nothing has
   to be recognized mid-flight. The one tunable is the **key gap limit**

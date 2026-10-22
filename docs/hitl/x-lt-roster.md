@@ -79,7 +79,7 @@ Each `x-lt-actions` entry is one act on the entry:
 | Act | Shape | Offered by default | What it does |
 |-----|-------|--------------------|--------------|
 | Resolve | `"resolverPayload": { ... }` | `waiting` | Resolves the entry's member row (a `query` set). String leaves interpolate against the member row. |
-| Fill | `"fill": { "payload": { ... }, "enterCode": true }` | `waiting`, `flagged` | Fills the entry's batch key, as a scan would. With `enterCode`, the person types the code from the label and the server checks it against the key (a UPC-A matches its GTIN-14 key); the payload records it as `enteredCode`. |
+| Fill | `"fill": { "payload": { ... }, "enterCode": true }` | `waiting`, `flagged` | Fills the entry's batch key, as a scan would. With `enterCode`, the person types the code from the label and the server checks it against the key (a UPC-A matches its GTIN-14 key); the payload records it as `enteredCode`. The key-in field takes keys and scans as its own answer; they never also run as a scan. |
 | Flag | `"flag": { "label": "Missing", "payload": { ... } }` | `waiting` | Flags the entry's batch key. The key stays pending and still fills; the entry reads flagged under the label and counts in `roster.<field>.flagged`. |
 | Unflag | `"unflag": true` | `flagged` | Clears the entry's flag while the row is pending ("Found it"). |
 
