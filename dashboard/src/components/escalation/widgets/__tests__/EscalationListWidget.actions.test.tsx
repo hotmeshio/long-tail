@@ -106,29 +106,31 @@ describe('EscalationListWidget — x-lt-actions', () => {
     });
   });
 
-  it('gates on confirm — declined confirm never fires', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('asks in place before firing, and Cancel never fires', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
     renderWidget({
       title: 'Walk',
       'x-lt-query': { role: 'harvester' },
       'x-lt-actions': [{ ...BAGGED_ACTION, confirm: 'Bag {{metadata.orderId}}?' }],
     });
     fireEvent.click(screen.getByTestId('escalation-list-action-ORD-1'));
-    expect(confirmSpy).toHaveBeenCalledWith('Bag ORD-1?');
+    expect(screen.getByTestId('escalation-list-confirm-ORD-1')).toHaveTextContent('Bag ORD-1?');
+    fireEvent.click(screen.getByTestId('escalation-list-confirm-ORD-1-no'));
+    expect(screen.queryByTestId('escalation-list-confirm-ORD-1')).toBeNull();
     expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 
-  it('accepted confirm fires the resolve', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('Confirm fires the resolve', async () => {
     renderWidget({
       title: 'Walk',
       'x-lt-query': { role: 'harvester' },
       'x-lt-actions': [{ ...BAGGED_ACTION, confirm: 'Bag it?' }],
     });
     fireEvent.click(screen.getByTestId('escalation-list-action-ORD-1'));
+    fireEvent.click(screen.getByTestId('escalation-list-confirm-ORD-1-yes'));
     await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(1));
-    confirmSpy.mockRestore();
   });
 
   it('surfaces a rejected resolve inline and keeps the detail link', async () => {

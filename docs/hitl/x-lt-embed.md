@@ -8,6 +8,8 @@ Three display-only widgets that surface related information inside an escalation
 | `"escalation"` | `x-lt-source`, `x-lt-fields` | A single embedded escalation record, with a flexible facts panel |
 | `"escalation-list"` | `x-lt-query`, `x-lt-columns` | A compact in-form list of escalations driven by a facet query |
 
+A [roster](x-lt-roster.md) (`x-lt-widget: "roster"`) follows the same rules: every member a container row expects, each marked waiting, in, or flagged.
+
 ---
 
 ## Link widget (`x-lt-widget: "link"`)
@@ -201,11 +203,13 @@ Inline row actions: each row gains a button that fires a canned resolve against 
 |-------|------|-------------|
 | `label` | `string` | Button text |
 | `resolverPayload` | `object` | The canned payload. String leaves interpolate `{{domain.path}}` tokens against the row's own context; booleans and numbers pass through typed |
-| `confirm` | `string` | Optional confirm prompt shown before firing; tokens interpolate per row |
+| `confirm` | `string` | Optional confirmation asked in place, beside the row, before firing; tokens interpolate per row |
 
 On success the row updates in place through the standard query invalidation — no navigation. A rejected resolve (validation failure, lost claim) shows the server's message inline in the row; the detail link stays available, so the full form remains the path for rejects and anything the canned payload can't express.
 
 Declare one action for the happy path and leave the exception path to the form. A batch of N sibling items collapses from N navigations to N clicks on one page.
+
+An action limited to roles (`roles`) belongs on a [roster](x-lt-roster.md#actions), whose actions run on the server where the limit is checked. The escalation list does not offer an action that declares `roles`.
 
 ### Empty and loading states
 
@@ -241,6 +245,7 @@ A top-level form_schema token (a peer of `x-lt-help`) that keeps the resolve but
 | `mustBeEmpty` | `boolean` | The gate condition (default `true`) |
 | `message` | `string` | Shown beside the disabled submit; `{{count}}` carries the live row count, `{{domain.path}}` tokens also interpolate |
 | `autoResolveWhenEmpty` | `boolean` | Auto-submit the claimed parent the moment the query is confirmed empty |
+| `roster` | `string` | In place of `query`: a [roster](x-lt-roster.md#completeness-roster-and-the-roster-guard) field whose outstanding entries hold the submit; `{{count}}` is the outstanding count |
 
 The guard and an escalation-list embed declaring the same query resolve through one shared mapping — the count and the visible rows always agree, whatever the scope. Pair it with an `escalation-list` embed on the same query so the operator sees exactly which rows are holding the gate.
 

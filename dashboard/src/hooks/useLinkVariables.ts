@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useRoleDetails } from '../api/roles';
+import { useActingIdentityOptional } from './useActingIdentity';
 import {
+  ME_LINK_VAR,
   substituteLinkVars,
   setLinkVarValue,
   useLinkVarValues,
@@ -39,6 +41,9 @@ export function useLinkVariables(): {
   );
   const { data: roleData } = useRoleDetails({ enabled: globalViewer || memberRoles.size > 0 });
   const values = useLinkVarValues(userId);
+  // {lt:me} is the person acting: the badged person while a grant is live, so
+  // one "mine" pin works on a shared station and on a personal login.
+  const actorId = useActingIdentityOptional()?.actorId ?? userId;
 
   const declarations = useMemo(() => {
     const out: DeclaredLinkVariable[] = [];
@@ -49,7 +54,7 @@ export function useLinkVariables(): {
       if (!Array.isArray(declared)) continue;
       for (const d of declared) {
         const name = (d as { name?: unknown })?.name;
-        if (typeof name !== 'string' || name === '' || seen.has(name)) continue;
+        if (typeof name !== 'string' || name === '' || name === ME_LINK_VAR || seen.has(name)) continue;
         seen.add(name);
         const label = (d as { label?: unknown }).label;
         const dflt = (d as { default?: unknown }).default;
@@ -73,8 +78,8 @@ export function useLinkVariables(): {
   }, [declarations]);
 
   const resolveUrl = useCallback(
-    (url: string) => substituteLinkVars(url, values, defaults),
-    [values, defaults],
+    (url: string) => substituteLinkVars(url, values, defaults, actorId ? { [ME_LINK_VAR]: actorId } : {}),
+    [values, defaults, actorId],
   );
 
   const setValue = useCallback(

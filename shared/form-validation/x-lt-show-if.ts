@@ -17,6 +17,7 @@
  *   envelope   — the workflow-sent input envelope
  *   escalation — top-level escalation row fields
  *   resolver   — the submitted resolver payload
+ *   roster     (each roster field's counts: `roster.orders.outstanding=0`)
  *
  * A missing or non-string condition always shows the field (opt-in, safe default).
  */
@@ -88,4 +89,16 @@ export function evaluateShowIf(condition: unknown, ctx: ShowIfContext | null | u
 export function isHiddenIfEmpty(fieldSchema: Record<string, unknown> | undefined, value: unknown): boolean {
   if (fieldSchema?.['x-lt-hide-if-empty'] !== true) return false;
   return value === null || value === undefined || value === '' || value === false || value === 0;
+}
+
+/**
+ * `x-lt-hidden: true`: the field never renders. A value set by the caller
+ * (a workflow default, an API submitter) passes through to the payload and
+ * is checked against the field's type and enum; the field is never required,
+ * since no one on the form can answer it.
+ */
+export const X_LT_HIDDEN = 'x-lt-hidden';
+
+export function isHiddenField(fieldSchema: Record<string, unknown> | undefined): boolean {
+  return fieldSchema?.[X_LT_HIDDEN] === true;
 }

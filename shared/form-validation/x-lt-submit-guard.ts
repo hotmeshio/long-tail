@@ -23,13 +23,25 @@
  * `autoResolveWhenEmpty` closes the loop: the moment the query is confirmed
  * empty, the claimed parent auto-submits — checked on page-load and after each
  * inline child-resolve — so a set of escalations completes with no extra click.
+ *
+ * A guard may name a roster field instead of a query: the resolve waits while
+ * that roster has outstanding entries (x-lt-roster.ts), so the list the person
+ * works from and the rule that holds the submit are one computation.
+ *
+ *   "x-lt-submit-guard": { "roster": "orders",
+ *                          "message": "{{count}} orders are still unaccounted for" }
+ *
+ * `{{count}}` is the outstanding count. A roster guard never auto-submits.
  */
 import type { EmbedQuery } from './x-lt-query';
 
 export const X_LT_SUBMIT_GUARD = 'x-lt-submit-guard';
 
 export interface SubmitGuardDef {
-  query: EmbedQuery;
+  /** The embedded query that must be empty; absent for a roster guard. */
+  query?: EmbedQuery;
+  /** A roster field whose outstanding entries hold the resolve. */
+  roster?: string;
   /** The gate condition; defaults to true (the only supported mode today). */
   mustBeEmpty?: boolean;
   /** Shown beside the disabled submit. `{{count}}` and `{{domain.path}}` tokens interpolate. */
@@ -39,6 +51,7 @@ export interface SubmitGuardDef {
 }
 
 export const SUBMIT_GUARD_DEFAULT_MESSAGE = '{{count}} related items are still pending';
+export const ROSTER_GUARD_DEFAULT_MESSAGE = '{{count}} expected items are still outstanding';
 
 /** The schema's submit-guard, or undefined when it declares none. */
 export function readSubmitGuard(
@@ -47,6 +60,7 @@ export function readSubmitGuard(
   const raw = schema?.[X_LT_SUBMIT_GUARD];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const guard = raw as SubmitGuardDef;
+  if (typeof guard.roster === 'string' && guard.roster) return guard;
   if (!guard.query || typeof guard.query !== 'object') return undefined;
   return guard;
 }

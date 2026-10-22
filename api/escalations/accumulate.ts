@@ -176,6 +176,11 @@ async function gateReciprocal(
   return { reciprocal: { id: row.id, payload: input.payload } };
 }
 
+/** The reciprocal of an add, stamped with who added it, as the container is. */
+function completedBy(reciprocal: AccumulateReciprocal | undefined, userId: string): AccumulateReciprocal | undefined {
+  return reciprocal ? { ...reciprocal, metadata: { resolved_by: userId } } : undefined;
+}
+
 /** Validates the item payload against the container's versioned role form. */
 async function gatePayload(
   escalation: LTEscalationRecord,
@@ -247,7 +252,7 @@ export async function accumulateItem(
       actor: initiator.actor,
       assertClaim: input.assertClaim ? auth.userId : undefined,
       resolvedBy: await resolverIdentity(auth),
-      reciprocal: reciprocal.reciprocal,
+      reciprocal: completedBy(reciprocal.reciprocal, auth.userId),
     });
     return accumulateOutcomeResult(result, itemKey, escalation.workflow_id);
   } catch (err: any) {
@@ -291,7 +296,7 @@ export async function accumulateItemBySignalKey(
       metadata: { ...metadata, resolved_by: auth.userId },
       actor: initiator.actor,
       resolvedBy: await resolverIdentity(auth),
-      reciprocal: reciprocal.reciprocal,
+      reciprocal: completedBy(reciprocal.reciprocal, auth.userId),
     });
     return accumulateOutcomeResult(result, itemKey, escalation.workflow_id);
   } catch (err: any) {
@@ -348,7 +353,7 @@ export async function accumulateItemByMetadata(
         actor: initiator.actor,
         resolvedBy,
         roles: allowedRoles ?? undefined,
-        reciprocal: reciprocal.reciprocal,
+        reciprocal: completedBy(reciprocal.reciprocal, auth.userId),
       });
       if (result.outcome === 'not-found') return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
       return accumulateOutcomeResult(result, itemKey, result.escalation?.workflow_id ?? null);
@@ -366,7 +371,7 @@ export async function accumulateItemByMetadata(
       metadata: outcome,
       actor: initiator.actor,
       resolvedBy,
-      reciprocal: reciprocal.reciprocal,
+      reciprocal: completedBy(reciprocal.reciprocal, auth.userId),
     });
     if (result.outcome === 'not-found') {
       return { status: 409, error: 'A concurrent change is already in progress for this escalation' };

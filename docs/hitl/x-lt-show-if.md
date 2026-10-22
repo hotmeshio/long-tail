@@ -41,6 +41,7 @@ Each entry uses the same grammar as a single condition. A hidden field is skippe
 | `escalation` | Top-level escalation row fields (`role`, `status`, `priority`, …) |
 | `resolver` | The submitted resolver payload — **live**: reacts in real time as the user edits the form |
 | `input` | The same live form values under the invoke form's name (see [invoke-form.md](invoke-form.md)) |
+| `roster` | Each [roster](x-lt-roster.md) field's counts — **live**: `roster.orders.outstanding=0` shows a field once every member is accounted for |
 
 Conditions based on `metadata`, `payload`, `envelope`, and `escalation` are static (read from the stored row). Conditions based on `resolver` are dynamic — the field appears or disappears immediately as the user edits a sibling field, without a page reload.
 
@@ -148,3 +149,17 @@ A field with `"x-lt-hide-if-empty": true` is suppressed entirely when its value 
 ```
 
 `x-lt-hide-if-empty` is evaluated against the field's current value in form state. It is distinct from `x-lt-showIf`, which evaluates against a path in the escalation context.
+
+---
+
+## `x-lt-hidden`
+
+A field with `"x-lt-hidden": true` never renders. Use it for a value the form carries but no one on the form answers: a discriminant the workflow or an API caller sets. The value passes through to the resolver payload unchanged, and where the schema is enforced it is checked against the field's `type` and `enum`. A hidden field is never required, even when it is listed in `required`.
+
+```json
+"type": {
+  "type": "string",
+  "enum": ["release", "reset", "cancel"],
+  "x-lt-hidden": true
+}
+```

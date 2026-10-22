@@ -109,4 +109,31 @@ describe('useSubmitGuard', () => {
     expect(call.available).toBe(true);
     expect(call.assigned_to).toBeUndefined();
   });
+
+  describe('a roster guard', () => {
+    const ROSTER_GUARD: SubmitGuardDef = { roster: 'orders', message: '{{count}} orders unaccounted for' };
+    const view = (outstanding: number) => ({
+      entries: [],
+      counts: { expected: 3, in: 3 - outstanding, flagged: 0, waiting: outstanding, outstanding },
+    });
+
+    it('holds the submit while entries are outstanding, never running the query', () => {
+      const { result } = renderHook(() => useSubmitGuard(ROSTER_GUARD, CTX, { orders: view(2) }));
+      expect(result.current).toMatchObject({ blocked: true, count: 2, message: '2 orders unaccounted for', confirmedEmpty: false });
+      expect(mockUseEscalations.mock.calls[0][0].enabled).toBe(false);
+    });
+
+    it('clears once every entry is accounted for, without auto-submitting', () => {
+      const { result } = renderHook(() => useSubmitGuard(ROSTER_GUARD, CTX, { orders: view(0) }));
+      expect(result.current).toMatchObject({ blocked: false, confirmedEmpty: false });
+    });
+
+    it('holds while the roster loads, and when the form declares no such roster', () => {
+      expect(renderHook(() => useSubmitGuard(ROSTER_GUARD, CTX, { orders: null })).result.current.message)
+        .toBe('Checking expected items…');
+      expect(renderHook(() => useSubmitGuard(ROSTER_GUARD, CTX, {})).result.current.message)
+        .toContain('roster "orders"');
+    });
+  });
 });
+

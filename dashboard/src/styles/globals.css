@@ -248,13 +248,15 @@
      interactive rectangle in the product. */
   .btn-primary {
     @apply px-5 py-2.5 bg-accent text-text-inverse text-sm font-medium
-           hover:bg-accent-hover transition-colors duration-150;
+           hover:bg-accent-hover transition-colors duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-accent;
     border-radius: var(--lt-radius-field);
   }
 
   .btn-secondary {
     @apply px-5 py-2.5 bg-surface-raised border border-surface-border text-sm font-medium
-           text-text-primary hover:bg-surface-hover transition-colors duration-150;
+           text-text-primary hover:bg-surface-hover transition-colors duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-surface-raised;
     border-radius: var(--lt-radius-field);
   }
 

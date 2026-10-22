@@ -17,8 +17,9 @@
  * A role that enforces but declares no schema has no contract to enforce —
  * the gate passes.
  */
-import { validateResolverPayload, type ShowIfContext } from '../../shared/form-validation';
+import { mapPayloadToForm, validateResolverPayload, type ShowIfContext } from '../../shared/form-validation';
 import { checkSubmitGuard } from './submit-guard';
+import { loadRosterCounts } from './roster';
 import { getEnforcingRoles, getEnforcedFormSchema } from '../role/enforcement-cache';
 import { resolveLookupContext } from '../knowledge';
 import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS } from '../../types/escalation';
@@ -106,6 +107,12 @@ export async function checkResolverPayload(
     payload: parseJsonOrNull(escalation.escalation_payload),
     ...(lookup ? { lookup } : {}),
   };
+
+  // Roster counts read the submitted form values (an `in` source may name a
+  // form field), then join the context so showIf and the guard see them.
+  const formValues = mapPayloadToForm(resolverPayload, schema);
+  const roster = await loadRosterCounts(schema, { ...ctx, resolver: formValues, input: formValues });
+  if (Object.keys(roster).length) ctx.roster = roster as Record<string, unknown>;
 
   const violations = validateResolverPayload(schema, resolverPayload, ctx);
 

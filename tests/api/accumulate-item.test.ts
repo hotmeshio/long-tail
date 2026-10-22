@@ -151,7 +151,8 @@ describe('accumulateItem (api) — the add', () => {
     });
     const result = await accumulateItem({ id: BIN_ID, itemKey: 'o-1', reciprocal: { id: MEMBER_ID, payload: { slot: 1 } } }, AUTH);
     expect(result.status).toBe(200);
-    expect(mockAdd.mock.calls[0][1].reciprocal).toEqual({ id: MEMBER_ID, payload: { slot: 1 } });
+    // the member row records who completed it, as the container does
+    expect(mockAdd.mock.calls[0][1].reciprocal).toEqual({ id: MEMBER_ID, payload: { slot: 1 }, metadata: { resolved_by: AUTH.userId } });
     expect(result.data.reciprocal).toMatchObject({ outcome: 'completed', count: 1, escalationId: MEMBER_ID, signaled: true });
   });
 
@@ -160,7 +161,7 @@ describe('accumulateItem (api) — the add', () => {
     mockGetBySignalKey.mockResolvedValue(makeBin({ id: MEMBER_ID }));
     mockAdd.mockResolvedValue(accepted(2, 1));
     await accumulateItem({ id: BIN_ID, itemKey: 'o-1', reciprocal: { signalKey: 'sig-m' } }, AUTH);
-    expect(mockAdd.mock.calls[0][1].reciprocal).toEqual({ id: MEMBER_ID, payload: undefined });
+    expect(mockAdd.mock.calls[0][1].reciprocal).toEqual({ id: MEMBER_ID, payload: undefined, metadata: { resolved_by: AUTH.userId } });
 
     const both = await accumulateItem({ id: BIN_ID, itemKey: 'o-1', reciprocal: { id: MEMBER_ID, signalKey: 'sig-m' } }, AUTH);
     expect(both.status).toBe(400);

@@ -15,13 +15,19 @@
  *  - A guard whose scope cannot be evaluated (e.g. `assigned:'me'` on a surface
  *    with no resolving user, like an MCP resolve) is skipped here; the consuming
  *    workflow's own verification remains the durable backstop.
+ *
+ * A roster guard reads the counts the caller placed under `ctx.roster`
+ * (services/escalation/roster.ts) and rejects while entries are outstanding.
  */
 import {
   readSubmitGuard,
   resolveScopedQuery,
   interpolateHelp,
   SUBMIT_GUARD_DEFAULT_MESSAGE,
+  ROSTER_GUARD_DEFAULT_MESSAGE,
+  type RosterCounts,
   type ShowIfContext,
+  type SubmitGuardDef,
 } from '../../shared/form-validation';
 import { searchEscalationsFaceted } from './queries';
 import type { LTFieldViolation } from '../../types/validation';
@@ -42,6 +48,8 @@ export async function checkSubmitGuard(
 ): Promise<LTFieldViolation | null> {
   const guard = readSubmitGuard(schema);
   if (!guard || guard.mustBeEmpty === false) return null;
+  if (guard.roster) return checkRosterGuard(guard, ctx);
+  if (!guard.query) return null;
 
   const scoped = resolveScopedQuery(guard.query, ctx, resolvingUserId);
   if (!scoped.enabled) return null;
@@ -60,7 +68,20 @@ export async function checkSubmitGuard(
   });
   if (total <= 0) return null;
 
-  const template = guard.message ?? SUBMIT_GUARD_DEFAULT_MESSAGE;
-  const message = interpolateHelp(template.replace(/\{\{count\}\}/g, String(total)), ctx);
+  return guardViolation(guard.message ?? SUBMIT_GUARD_DEFAULT_MESSAGE, total, ctx);
+}
+
+/** A roster guard: outstanding entries reject; a roster the schema does not declare rejects too. */
+function checkRosterGuard(guard: SubmitGuardDef, ctx: ShowIfContext): LTFieldViolation | null {
+  const counts = (ctx.roster as Record<string, RosterCounts> | null | undefined)?.[guard.roster!];
+  if (!counts) {
+    return { field: SUBMIT_GUARD_VIOLATION_FIELD, message: `Submit guard names roster "${guard.roster}", which the form does not declare` };
+  }
+  if (counts.outstanding <= 0) return null;
+  return guardViolation(guard.message ?? ROSTER_GUARD_DEFAULT_MESSAGE, counts.outstanding, ctx);
+}
+
+function guardViolation(template: string, count: number, ctx: ShowIfContext): LTFieldViolation {
+  const message = interpolateHelp(template.replace(/\{\{count\}\}/g, String(count)), ctx);
   return { field: SUBMIT_GUARD_VIOLATION_FIELD, message };
 }

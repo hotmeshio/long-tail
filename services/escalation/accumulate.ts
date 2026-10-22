@@ -15,6 +15,8 @@ export interface AccumulateReciprocal {
   roles?: string[];
   /** Stored as the reciprocal entry's payload. */
   payload?: Record<string, any>;
+  /** Merge patch for the reciprocal row's metadata, same statement. */
+  metadata?: Record<string, any>;
 }
 
 export interface AccumulateItemInput {
@@ -51,7 +53,7 @@ export interface AccumulateItemServiceOutcome {
 export interface RemoveItemInput {
   itemKey: string;
   actor?: string;
-  reciprocal?: Omit<AccumulateReciprocal, 'payload'>;
+  reciprocal?: Omit<AccumulateReciprocal, 'payload' | 'metadata'>;
 }
 
 export interface RemoveItemServiceOutcome {

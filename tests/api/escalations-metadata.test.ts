@@ -328,7 +328,7 @@ describe('resolveByMetadata', () => {
     expect(result.data.signaled).toBe(true);
     expect(result.data.escalationId).toBe('esc-uuid');
     // SDK resolve is called — not handle.signal
-    expect(mockResolveEscalation).toHaveBeenCalledWith('esc-uuid', { approved: true });
+    expect(mockResolveEscalation).toHaveBeenCalledWith('esc-uuid', { approved: true }, { resolved_by: SYSTEM_AUTH.userId });
   });
 
   it('returns 409 when concurrent caller already claimed a signal_id escalation', async () => {
@@ -381,7 +381,7 @@ describe('resolveByMetadata', () => {
     // extra-facet guards and the claim state (none supplied).
     expect(mockResolveByMetadataAtomic).toHaveBeenCalledWith(
       'orderId', 'order-123', 'system-uuid',
-      { approved: true }, { completedBy: 'jimbo' }, null, null, null,
+      { approved: true }, { completedBy: 'jimbo', resolved_by: SYSTEM_AUTH.userId }, null, null, null,
       null, undefined, undefined,
     );
   });

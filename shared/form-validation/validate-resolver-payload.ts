@@ -9,6 +9,7 @@
  * Semantics per field:
  *   - x-lt-showIf-hidden fields are skipped entirely (a field the submitter
  *     cannot see never blocks submission)
+ *   - x-lt-hidden fields are never required; a value they carry is checked
  *   - required (schema.required membership), with checklist/empty-object rules
  *   - declared-type check (string/number/integer/boolean/array/object)
  *   - enum membership
@@ -24,7 +25,7 @@
  * condition like `resolver.approved` reads the same on both sides.
  */
 import { type FieldError, validateField } from './field-validator';
-import { evaluateShowIf, type ShowIfContext } from './x-lt-show-if';
+import { evaluateShowIf, isHiddenField, type ShowIfContext } from './x-lt-show-if';
 import { mapPayloadToForm } from './x-lt-bind';
 import { readRequireAnyGroups, hasRequireAnyValue } from './x-lt-require-any';
 import { readRequireSumGroups, requireSumContribution } from './x-lt-require-sum';
@@ -62,7 +63,7 @@ export function validateResolverForm(
     const err = validateField(
       formValues[field],
       fieldSchema,
-      required.has(field),
+      required.has(field) && !isHiddenField(fieldSchema),
       true,
       liveCtx as Record<string, unknown>,
     );

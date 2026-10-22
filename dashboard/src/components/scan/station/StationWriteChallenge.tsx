@@ -12,12 +12,18 @@ export function StationWriteChallenge({
   verb = 'submit',
   claimantId,
   wrongBadgeName,
+  anyBadge,
+  message,
   onCancel,
 }: {
   open: boolean;
   verb?: string;
   claimantId?: string | null;
   wrongBadgeName?: string | null;
+  /** Any badge answers: the write acts as whoever badges in. */
+  anyBadge?: boolean;
+  /** Why this badge is asked for, or why the last one was refused. */
+  message?: string;
   onCancel: () => void;
 }) {
   if (!open) return null;
@@ -29,11 +35,18 @@ export function StationWriteChallenge({
           <IdCard className="w-9 h-9 text-accent-muted" strokeWidth={1} />
         </div>
         <p className="text-lg text-text-secondary">
-          Scan your badge to {verb} as{' '}
-          <span className="font-medium text-text-primary">
-            {claimantId ? <UserName userId={claimantId} /> : 'the claimant'}
-          </span>.
+          {anyBadge ? <>Scan your badge to {verb}.</> : (
+            <>
+              Scan your badge to {verb} as{' '}
+              <span className="font-medium text-text-primary">
+                {claimantId ? <UserName userId={claimantId} /> : 'the claimant'}
+              </span>.
+            </>
+          )}
         </p>
+        {message && (
+          <p className="text-sm text-status-warning mt-3" data-testid="badge-message">{message}</p>
+        )}
         {wrongBadgeName && (
           <p className="text-sm text-status-error mt-3" data-testid="wrong-badge">
             That badge is {wrongBadgeName}'s — scan the claimant's badge to {verb}.

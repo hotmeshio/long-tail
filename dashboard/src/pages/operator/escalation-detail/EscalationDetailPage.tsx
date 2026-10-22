@@ -39,7 +39,7 @@ import type { FieldError } from '../../../lib/field-validator';
 import { validateResolverForm } from '../../../lib/field-validator';
 import { EscalationContextBlocks, EscalationFormSection, buildShowIfContext } from './EscalationDetailSections';
 import { VIEWPORT_STAGES, expandViewportSrc, readViewport } from '../../../lib/x-lt-viewport';
-import { isReadOnlyLogin } from '../../../lib/station-login';
+import { embedWriteRunsNow, isReadOnlyLogin } from '../../../lib/station-login';
 import { useMyRoles } from '../../../api/users';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ClaimExpiryModal } from './ClaimExpiryModal';
@@ -50,6 +50,8 @@ import { readSubmitOnClaim } from '../../../lib/x-lt-submit-on-claim';
 import { readFooterLabels } from '../../../lib/x-lt-labels';
 import { readSubmitGuard } from '../../../lib/x-lt-submit-guard';
 import { useSubmitGuard } from '../../../hooks/useSubmitGuard';
+import { useRosters, rosterContext } from '../../../hooks/useRosters';
+import { EmbedWriteContext, type EmbedWriteGuard } from '../../../components/escalation/widgets/embed-write';
 import { buildResolverPayload } from '../../../lib/resolver-payload';
 import { interpolateHelp } from '../../../lib/x-lt-help';
 import { TransitionWaitModal } from '../../../components/escalation/TransitionWaitModal';
@@ -83,6 +85,13 @@ function safeParse(value: string | null | undefined): unknown {
   } catch {
     return value;
   }
+}
+
+/** The form's answer fields from its JSON: internal `_`/`$` keys dropped. */
+function formValuesOf(json: string): Record<string, unknown> {
+  const parsed = safeParse(json);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  return Object.fromEntries(Object.entries(parsed).filter(([k]) => !k.startsWith('_') && !k.startsWith('$')));
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +200,8 @@ function EscalationDetailView({ id }: { id: string }) {
   const scanSubmitRef = useRef<(json: string) => void>(() => {});
 
   const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
+  // An embedded row action (roster, list) waiting on a badge at a shared station.
+  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void>; message?: string } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -208,7 +219,7 @@ function EscalationDetailView({ id }: { id: string }) {
       const payload = JSON.parse(json) as Record<string, unknown>;
       const schema = payload._form_schema as Record<string, unknown> | undefined;
       if (!schema) { setFormErrors([]); return; }
-      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc, lookupCtx)));
+      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc, lookupCtx, rosterCtx)));
     } catch { /* leave errors unchanged on parse failure */ }
   }, [json, submitAttempted, esc]);
   // Schema resolution, most specific first:
@@ -231,8 +242,17 @@ function EscalationDetailView({ id }: { id: string }) {
   // x-lt-submit-guard — the query precondition. The page owns it (not the action
   // bar) because it also drives auto-resolve-when-empty. Inert until the row
   // loads; the hook self-disables when the schema declares no guard.
+  // x-lt-roster: each roster's entries, read against the live form values.
+  // Their counts join the context as `roster.*` for showIf, help, and the guard.
+  const formValues = useMemo(() => formValuesOf(json), [json]);
+  const rosters = useRosters(
+    effectiveSchema as Record<string, unknown> | null,
+    esc ? { ...buildShowIfContext(esc, lookupCtx), resolver: formValues, input: formValues } : undefined,
+  );
+  const rosterCtx = rosterContext(rosters);
+
   const submitGuardDef = readSubmitGuard(effectiveSchema as Record<string, unknown> | null);
-  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc, lookupCtx) : undefined);
+  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc, lookupCtx, rosterCtx) : undefined, rosters);
 
   // Initialize json from the form exactly once. Fields are seeded in priority order:
   // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
@@ -368,6 +388,15 @@ function EscalationDetailView({ id }: { id: string }) {
     }
   }, [acting, pendingWrite, esc?.assigned_to, clearActing]);
 
+  // An embedded action resolves another row, so it runs for whoever badges
+  // in and that row's RBAC judges them; then the badge retires as above.
+  useEffect(() => {
+    if (!pendingEmbedWrite || !acting) return;
+    const { run } = pendingEmbedWrite;
+    setPendingEmbedWrite(null);
+    void run().finally(() => clearActing());
+  }, [acting, pendingEmbedWrite, clearActing]);
+
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
 
   // An open, editable form takes scans its x-lt-scan fields accept.
@@ -378,7 +407,7 @@ function EscalationDetailView({ id }: { id: string }) {
       && (esc.assigned_to === effectiveActorId || isReadOnlyLogin(myRoles)),
     json,
     onJsonChange: setJson,
-    context: esc ? buildShowIfContext(esc, lookupCtx) : undefined,
+    context: esc ? buildShowIfContext(esc, lookupCtx, rosterCtx) : undefined,
     onScanSubmit: (next) => scanSubmitRef.current(next),
   });
   // A scan's message renders at the field that took or refused it, and the
@@ -479,7 +508,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const resolveDoneDest = (): string | null => {
     const tmpl = readTransitionDone(effectiveSchema as Record<string, unknown> | null);
     if (!tmpl) return null;
-    return interpolateHelp(tmpl, buildShowIfContext(esc, lookupCtx)) || null;
+    return interpolateHelp(tmpl, buildShowIfContext(esc, lookupCtx, rosterCtx)) || null;
   };
 
   // Navigate to a resolved destination — internal path in-app, else external —
@@ -550,6 +579,22 @@ function EscalationDetailView({ id }: { id: string }) {
     });
   };
 
+  // A read-only station login acts only through a badge, and so does an
+  // action limited to a role the person acting lacks.
+  const guardEmbedWrite: EmbedWriteGuard = (verb, run, options) => {
+    if (options?.badge) {
+      clearActing();
+      if (scanEnabled) setPendingEmbedWrite({ verb, run, message: options.badge });
+      return;
+    }
+    if (embedWriteRunsNow(myRoles, scanEnabled, acting)) {
+      void run();
+      return;
+    }
+    clearActing();
+    setPendingEmbedWrite({ verb, run });
+  };
+
   const handleResolve = async (payload: Record<string, unknown>) => {
     guardStationWrite('submit', () => submitResolve(payload));
   };
@@ -571,7 +616,7 @@ function EscalationDetailView({ id }: { id: string }) {
     // parent with its children to work; the auto-resolve effect closes it once
     // they clear (pair submitOnClaim with autoResolveWhenEmpty for full flow).
     if (submitGuard.blocked) return;
-    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx));
     if (result.parseError) return; // seeded form is malformed — leave it claimed
     if (result.errors.length > 0) {
       setSubmitAttempted(true);
@@ -600,14 +645,14 @@ function EscalationDetailView({ id }: { id: string }) {
   // clears. Revalidates first — if the parent's own form is incomplete, leave it
   // for the person rather than auto-closing an invalid record.
   autoResolveActionRef.current = () => {
-    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx));
     if (result.parseError || result.errors.length > 0) return;
     handleResolve(result.payload!);
   };
 
   scanSubmitRef.current = (nextJson: string) => {
     if (submitGuard.blocked) return;
-    const result = buildResolverPayload(nextJson, buildShowIfContext(esc, lookupCtx));
+    const result = buildResolverPayload(nextJson, buildShowIfContext(esc, lookupCtx, rosterCtx));
     if (result.parseError) return;
     if (result.errors.length > 0) {
       setSubmitAttempted(true);
@@ -771,6 +816,7 @@ function EscalationDetailView({ id }: { id: string }) {
               )}
 
               <FieldNoticeProvider value={editable && fieldNotice ? fieldNotice : null}>
+              <EmbedWriteContext.Provider value={guardEmbedWrite}>
               <EscalationFormSection
                 esc={esc}
                 resolverPayload={resolverPayload}
@@ -778,6 +824,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 editable={editable}
                 activeView={activeView}
                 lookup={lookupCtx}
+                roster={rosterCtx}
                 metadataFormSchema={metadataFormSchema}
                 effectiveSchema={effectiveSchema as Record<string, unknown> | null}
                 json={json}
@@ -800,6 +847,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 onDisabledClick={() => setClaimNudge((n) => n + 1)}
                 disabledHint={lockedFormHint}
               />
+              </EmbedWriteContext.Provider>
               </FieldNoticeProvider>
 
               <div className="h-10" />
@@ -808,7 +856,7 @@ function EscalationDetailView({ id }: { id: string }) {
         )}
 
         {!isIframeMode && <EscalationActionBar
-          escalationContext={buildShowIfContext(esc, lookupCtx)}
+          escalationContext={buildShowIfContext(esc, lookupCtx, rosterCtx)}
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
@@ -894,6 +942,14 @@ function EscalationDetailView({ id }: { id: string }) {
       {/* Scan hand-off: a scanned confirm-step lands here with the pending
           action in route state; the modal asks the rule's prompt. */}
       <ScanConfirmModal escalationId={id} />
+
+      <StationWriteChallenge
+        open={!!pendingEmbedWrite}
+        verb={pendingEmbedWrite?.verb ?? 'continue'}
+        message={pendingEmbedWrite?.message}
+        anyBadge
+        onCancel={() => setPendingEmbedWrite(null)}
+      />
 
       <StationWriteChallenge
         open={!!pendingWrite}

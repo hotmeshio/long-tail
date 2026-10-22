@@ -193,6 +193,23 @@ The cell reads `3 · Standard 2 · Express 1`: the count, then each split value 
 
 `labels` maps split values to display text. A `role` chip opens that role's list filtered to the row's facets.
 
+`display` reads a count as text. An exact count wins, then `default`; `{n}` reads the count:
+
+```jsonc
+{ "label": "Coming", "related": "coming", "display": { "0": "Ready", "default": "Waiting on {n}" } }
+```
+
+The cell reads *Ready* or *Waiting on 3*, with its split chips beside it and the count in its tooltip.
+
+`aggregate: "min"` or `"max"` shows the least or greatest value across the set instead of a count. `value` names it: `{{item.payload.<path>}}` on an `items` set, `{{metadata.<key>}}` on a `query` set. `format` renders it as on any column:
+
+```jsonc
+{ "label": "Earliest commit", "related": "contents", "aggregate": "min",
+  "value": "{{item.payload.commitBy}}", "format": "date" }
+```
+
+Values compare as numbers when every value is a number, otherwise as text, so ISO dates and instants order by time. Strings, numbers and booleans count as values; an item without one is skipped, and a row whose set holds none shows an em dash. A min or max column takes no `splitBy` or `display`.
+
 ### Row detail
 
 `x-lt-row-detail` lists sections a row expands into. Each section loads when the row opens, and lists its set's rows with its own columns:
@@ -214,7 +231,7 @@ Item sections read `{{item.itemKey}}`, `{{item.payload.*}}`, `{{item.actor}}` an
 
 ### Grouped rows
 
-On a `facet-table`, `x-lt-group-by: "metadata.<key>"` reads every row sharing that facet as one line, expanding to its members. The list pages by groups, so a page holds whole groups and the total counts groups; a row without the facet is a group of one. Plain columns fold across a group with `group: "first" | "min" | "max" | "sum" | "count" | "distinct"` (default `first`); `min` and `max` compare numbers as numbers and instants as text, and `distinct` lists each value once ("standard, express"). Related columns merge across the group: counts and splits add. A container split finer (one bin per service level in the same tub) keeps reading as one line per tub.
+On a `facet-table`, `x-lt-group-by: "metadata.<key>"` reads every row sharing that facet as one line, expanding to its members. The list pages by groups, so a page holds whole groups and the total counts groups; a row without the facet is a group of one. Plain columns fold across a group with `group: "first" | "min" | "max" | "sum" | "count" | "distinct"` (default `first`); `min` and `max` compare numbers as numbers and instants as text, and `distinct` lists each value once ("standard, express"). Related columns merge across the group: counts and splits add, and a min or max takes the least or greatest across the group. A container split finer (one bin per service level in the same tub) keeps reading as one line per tub.
 
 Containment reads by indentation and band: an open line takes a light band; its members are rows of the same table, stepped in under it on a stronger band; a row's detail sections step in past their row on that row's band. The facets carry the hierarchy, so nothing repeats beneath the line that states it: a member leaves blank every value it shares with its group (the group line already shows it), and a detail section drops a column whose every row restates a facet the opened row carries (a lane's look-ahead needs no Service column). A section's first column always stays.
 
@@ -226,7 +243,7 @@ Related sets read under the viewer's own read scope, as every list does:
 - A query set counts only roles the viewer reads in full. The roles it cannot count are named in the cell's tooltip and in each expansion (*partial*). Granting `read` on those roles is the dial that widens the view.
 - A viewer who cannot read the host role gets a 404.
 
-The server reads the declaration from the role's stored list schema at the version the page rendered, never from the request. `POST /api/escalations/related` aggregates one page of rows in one statement per declared (set, split) pair, whatever the page size or item count; a query set's facet match is served by the metadata GIN index. `POST /api/escalations/related/rows` reads one row's set for its expansion. The list refreshes the sets live on the list tier, from the row's own role events and from the roles each set reads: a query set's roles, and the roles of the reciprocal rows an item split reads, so a held item whose own row changes moves its split. A change refreshes the list when the path that makes it publishes an escalation event on that row's role.
+The server reads the declaration from the role's stored list schema at the version the page rendered, never from the request. `POST /api/escalations/related` aggregates one page of rows in one statement per declared (set, split) pair or (set, min/max value) pair, whatever the page size or item count; a query set's facet match is served by the metadata GIN index. `POST /api/escalations/related/rows` reads one row's set for its expansion. The list refreshes the sets live on the list tier, from the row's own role events and from the roles each set reads: a query set's roles, and the roles of the reciprocal rows an item split reads, so a held item whose own row changes moves its split. A change refreshes the list when the path that makes it publishes an escalation event on that row's role.
 
 A role's list schema is validated wherever it is written (the role API, the MCP tool, the startup apply): a column naming an undeclared set, an unknown split path, or a malformed query is refused with the path that failed. Keys outside this vocabulary stay free-form.
 

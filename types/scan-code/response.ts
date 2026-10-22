@@ -36,6 +36,8 @@ export interface ScanHeldSubject extends ScanSubjectRef {
   expect?: { schemes: number[]; prompt?: string };
   /** Someone else holds a live claim on the row. */
   claimedBy?: { id: string; displayName: string };
+  /** A roster field of the held row's form to show under the hold card. */
+  show?: string;
 }
 
 export interface ScanExecuteRequest {

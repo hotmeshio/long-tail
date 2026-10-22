@@ -54,7 +54,7 @@ function foldAggregateRows(
 }
 
 /** The hosts and their item entries, read under the caller's scope. */
-function itemEntriesCte(params: unknown[], scope: ReadScopeInput, hostIds: string[]): string {
+export function itemEntriesCte(params: unknown[], scope: ReadScopeInput, hostIds: string[]): string {
   const hi = params.push(hostIds);
   const hostScope = buildReadScopeClause(scope, params, 'h');
   return `hosts AS (
@@ -164,7 +164,7 @@ export async function listRelatedItems(opts: {
 }
 
 /** The shared FROM/WHERE of a query set: hosts unnested beside their matches. */
-function querySetFrom(params: unknown[], input: RelatedQueryInput): string {
+export function querySetFrom(params: unknown[], input: RelatedQueryInput): string {
   const hi = params.push(input.hosts.map((h) => h.hostId));
   const mi = params.push(input.hosts.map((h) => JSON.stringify(h.match)));
   const ri = params.push(input.roles);

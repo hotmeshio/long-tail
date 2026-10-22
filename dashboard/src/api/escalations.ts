@@ -151,8 +151,8 @@ export function useFacetValues(key: string | null | undefined) {
   });
 }
 
-export function useEscalations(filters: EscalationFilters) {
-  const { enabled = true, staleTime, ...rest } = filters;
+/** The list endpoint's query string for a set of filters. */
+export function escalationListParams(rest: Omit<EscalationFilters, 'enabled' | 'staleTime'>): URLSearchParams {
   const params = new URLSearchParams();
   if (rest.status) params.set('status', rest.status);
   if (rest.role) params.set('role', rest.role);
@@ -168,10 +168,21 @@ export function useEscalations(filters: EscalationFilters) {
   if (rest.order) params.set('order', rest.order);
   if (rest.search) params.set('search', rest.search);
   appendFacetParams(params, rest);
+  return params;
+}
 
+/** One list read: the query key and fetch every list surface shares, so reads dedupe and refresh together. */
+export function escalationListQuery(rest: Omit<EscalationFilters, 'enabled' | 'staleTime'>) {
+  return {
+    queryKey: ['escalations', rest] as const,
+    queryFn: () => apiFetch<EscalationListResponse>(`/escalations?${escalationListParams(rest)}`),
+  };
+}
+
+export function useEscalations(filters: EscalationFilters) {
+  const { enabled = true, staleTime, ...rest } = filters;
   return useQuery<EscalationListResponse>({
-    queryKey: ['escalations', rest],
-    queryFn: () => apiFetch(`/escalations?${params}`),
+    ...escalationListQuery(rest),
     enabled,
     ...(staleTime !== undefined ? { staleTime } : {}),
   });
@@ -288,6 +299,46 @@ export function useResolveEscalation() {
       queryClient.resetQueries({ queryKey: ['escalationStats'] });
       queryClient.resetQueries({ queryKey: ['tasks'] });
       queryClient.resetQueries({ queryKey: ['jobs'] });
+    },
+  });
+}
+
+/** Outcomes a roster action refuses with before its act runs. */
+export const ROSTER_ACTION_OUTCOMES = {
+  NEEDS_BADGE: 'needs_badge',
+  ROLE_REFUSED: 'role_refused',
+  NOT_PRIMED: 'not_primed',
+  CODE_MISMATCH: 'code_mismatch',
+} as const;
+
+export interface RosterActionRequest {
+  /** The host row whose form declares the roster. */
+  id: string;
+  field: string;
+  /** The action's index among the field's actions. */
+  action: number;
+  /** The entry's key. */
+  entry: string;
+  /** A key-in's entered code. */
+  code?: string;
+}
+
+/**
+ * Run one roster entry's action on the server: it re-reads the action from
+ * the row's form, checks the entry and any role limit, and acts as the
+ * person acting (a live badge rides the request as every write does).
+ */
+export function useRosterAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: RosterActionRequest) =>
+      apiFetch<{ outcome: string }>(`/escalations/${id}/roster-action`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'] });
     },
   });
 }

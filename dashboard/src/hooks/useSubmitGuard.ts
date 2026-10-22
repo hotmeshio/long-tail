@@ -4,6 +4,8 @@ import { interpolateHelp } from '../lib/x-lt-help';
 import { resolveScopedQuery } from '../lib/x-lt-query';
 import { SUBMIT_GUARD_DEFAULT_MESSAGE, type SubmitGuardDef } from '../lib/x-lt-submit-guard';
 import type { ShowIfContext } from '../lib/x-lt-show-if';
+import { ROSTER_GUARD_DEFAULT_MESSAGE } from '../lib/x-lt-submit-guard';
+import type { RosterView } from './useRosters';
 
 export type { SubmitGuardDef } from '../lib/x-lt-submit-guard';
 
@@ -32,6 +34,7 @@ export interface SubmitGuardState {
 export function useSubmitGuard(
   guard: SubmitGuardDef | undefined,
   ctx: ShowIfContext | undefined,
+  rosters: Record<string, RosterView> = {},
 ): SubmitGuardState {
   const { user } = useAuth();
 
@@ -40,6 +43,7 @@ export function useSubmitGuard(
   // matches the rows a same-query embed renders.
   const scoped = resolveScopedQuery(guard?.query ?? {}, ctx ?? {}, user?.userId);
 
+  const isRosterGuard = !!guard?.roster;
   const { data, isSuccess } = useEscalations({
     role: scoped.role,
     status: scoped.status,
@@ -47,8 +51,9 @@ export function useSubmitGuard(
     assigned_to: scoped.assigned_to,
     available: scoped.available,
     limit: 1, // the gate needs only the total; rows are irrelevant
-    enabled: !!guard && scoped.enabled,
+    enabled: !!guard && !isRosterGuard && scoped.enabled,
   });
+  if (guard && isRosterGuard) return rosterGuardState(guard, rosters, ctx);
 
   // A guard whose scope cannot be evaluated (no role/facets, or `assigned:'me'`
   // with no viewer) is inert — it neither blocks nor auto-resolves. When the
@@ -73,4 +78,31 @@ export function useSubmitGuard(
   }
 
   return { blocked, count, message, confirmedEmpty };
+}
+
+/**
+ * A roster guard holds the submit while its roster has outstanding entries,
+ * reading the same result the widget renders. A roster still loading, or one
+ * the form does not declare, holds it too. A roster guard never auto-submits.
+ */
+function rosterGuardState(
+  guard: SubmitGuardDef,
+  rosters: Record<string, RosterView>,
+  ctx: ShowIfContext | undefined,
+): SubmitGuardState {
+  const field = guard.roster!;
+  if (!(field in rosters)) {
+    return { blocked: true, count: 0, message: `Submit guard names roster "${field}", which the form does not declare`, confirmedEmpty: false };
+  }
+  const view = rosters[field];
+  if (!view) return { blocked: true, count: 0, message: 'Checking expected items…', confirmedEmpty: false };
+  const count = view.counts.outstanding;
+  if (count <= 0) return { blocked: false, count: 0, message: '', confirmedEmpty: false };
+  const template = guard.message ?? ROSTER_GUARD_DEFAULT_MESSAGE;
+  return {
+    blocked: true,
+    count,
+    message: interpolateHelp(template.replace(/\{\{count\}\}/g, String(count)), ctx ?? {}),
+    confirmedEmpty: false,
+  };
 }

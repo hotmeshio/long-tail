@@ -54,7 +54,7 @@ interface FacetQuery {
 ```
 
 `orderBy.field` is either a whitelisted top-level column (`priority`, `created_at`,
-`updated_at`, `status`, `role`) or a metadata path written as `metadata.<key>` (extracted as
+`updated_at`, `resolved_at`, `status`, `role`) or a metadata path written as `metadata.<key>` (extracted as
 text, or numeric when `numeric` is set). Every value is parameterized; only validated column
 names / metadata keys and a fixed operator set are ever interpolated.
 
@@ -122,6 +122,20 @@ place).
 Values are strings — jsonb containment is type-sensitive, so numeric facets
 are not templatable. Link variables are a view convenience: RBAC read scope
 still governs what any query can return.
+
+`{lt:me}` is built in: it reads the person acting, the badged person while a
+badge grant is live and the signed-in user otherwise, so one pin means "mine"
+on a shared station and on a personal login. Every completing
+resolve records its completer in the row's `metadata.resolved_by` (resolves,
+batch fills, both rows of an accumulate add, scan acts), so a role can pin a
+"My recent work" list, newest first:
+
+```
+/escalations/available?status=resolved&facets={"resolved_by":"{lt:me}"}&orderBy=[{"field":"resolved_at","direction":"desc"}]
+```
+
+`resolved_at` sorts with rows that have no completion time last, in either
+direction.
 
 A bound link variable also **scopes the Pace Board** — the same device value
 narrows the board's station counts, time-in-state mix, and entity timelines,

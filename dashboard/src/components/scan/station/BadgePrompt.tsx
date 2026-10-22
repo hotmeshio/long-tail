@@ -15,6 +15,7 @@ import type { ScanPresentedChoice } from '../../../api/scan-codes';
 export function BadgePrompt({
   choice,
   notPrimedMarkdown,
+  message,
   primed,
   busy,
   onExecute,
@@ -22,6 +23,8 @@ export function BadgePrompt({
 }: {
   choice: ScanPresentedChoice;
   notPrimedMarkdown?: string;
+  /** Why the last badge did not run the choice (a role it lacks). */
+  message?: string;
   primed: boolean;
   busy: boolean;
   onExecute: (choice: ScanPresentedChoice) => void;
@@ -52,6 +55,9 @@ export function BadgePrompt({
         Scan your badge to continue
       </h2>
       <p className="text-lg text-text-secondary mt-2">to {choice.label}</p>
+      {message && (
+        <p className="text-sm text-status-warning mt-4 max-w-prose" data-testid="badge-prompt-message">{message}</p>
+      )}
       {notPrimedMarkdown && (
         <div className="text-sm text-text-tertiary mt-6 max-w-prose">
           <SimpleMarkdown content={notPrimedMarkdown} compact />

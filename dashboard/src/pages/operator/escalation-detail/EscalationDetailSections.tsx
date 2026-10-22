@@ -20,6 +20,7 @@ function parseJson(s: string | null | undefined): Record<string, unknown> | null
 export function buildShowIfContext(
   esc: LTEscalationRecord,
   lookup?: Record<string, unknown> | null,
+  roster?: Record<string, unknown> | null,
 ): ShowIfContext {
   return {
     escalation: esc as unknown as Record<string, unknown>,
@@ -28,6 +29,7 @@ export function buildShowIfContext(
     payload: parseJson(esc.escalation_payload),
     resolver: null,
     ...(lookup ? { lookup } : {}),
+    ...(roster ? { roster } : {}),
   };
 }
 
@@ -100,6 +102,8 @@ interface FormSectionProps {
   effectiveSchema: Record<string, unknown> | null;
   /** Resolved versioned knowledge lookups — the form's `lookup.*` context domain. */
   lookup?: Record<string, unknown> | null;
+  /** Each roster field's counts, the form's `roster.*` context domain. */
+  roster?: Record<string, unknown> | null;
   json: string;
   onJsonChange: (v: string) => void;
   requestTriage: boolean;
@@ -135,6 +139,7 @@ export function EscalationFormSection({
   metadataFormSchema,
   effectiveSchema,
   lookup,
+  roster,
   json,
   onJsonChange,
   requestTriage,
@@ -152,7 +157,7 @@ export function EscalationFormSection({
   disabledHint,
 }: FormSectionProps) {
   const schema = effectiveSchema;
-  const showIfCtx = buildShowIfContext(esc, lookup);
+  const showIfCtx = buildShowIfContext(esc, lookup, roster);
 
   // Terminal: show the submitted resolution read-only. The stored payload is
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it

@@ -79,3 +79,35 @@ describe('listSchemaRelationsError', () => {
     expect(listSchemaRelationsError(valid)).toBeNull();
   });
 });
+
+describe('related column aggregates', () => {
+  const querySet = (col: unknown) => ({
+    'x-lt-related': { s: { source: 'query', query: { roles: ['prep'], facets: { d: '{{metadata.d}}' } } } },
+    'x-lt-columns': [col],
+  });
+
+  it('accepts min and max over a value that fits the set', () => {
+    expect(listSchemaRelationsError(withColumn({ label: 'Earliest', related: 's', aggregate: 'min', value: '{{item.payload.commitBy}}', format: 'date' }))).toBeNull();
+    expect(listSchemaRelationsError(querySet({ label: 'Latest', related: 's', aggregate: 'max', value: '{{metadata.due}}' }))).toBeNull();
+  });
+
+  it('refuses a min or max whose value does not fit, or that splits or displays', () => {
+    expect(listSchemaRelationsError(withColumn({ label: 'E', related: 's', aggregate: 'min', value: '{{metadata.due}}' })))
+      .toMatch(/value must be "\{\{item.payload.<path>\}\}"/);
+    expect(listSchemaRelationsError(querySet({ label: 'E', related: 's', aggregate: 'min' }))).toMatch(/metadata.<key>/);
+    expect(listSchemaRelationsError(withColumn({ label: 'E', related: 's', aggregate: 'max', value: '{{item.payload.a}}', splitBy: 'payload.b' })))
+      .toMatch(/takes no splitBy/);
+    expect(listSchemaRelationsError(withColumn({ label: 'E', related: 's', aggregate: 'max', value: '{{item.payload.a}}', display: { '0': 'x' } })))
+      .toMatch(/display applies to a count column/);
+    expect(listSchemaRelationsError(withColumn({ label: 'E', related: 's', value: '{{item.payload.a}}' }))).toMatch(/applies to a min or max/);
+    expect(listSchemaRelationsError(withColumn({ label: 'E', related: 's', aggregate: 'avg' }))).toMatch(/"count", "min" or "max"/);
+  });
+
+  it('accepts a count display keyed by count or default, and nothing else', () => {
+    expect(listSchemaRelationsError(withColumn({ label: 'C', related: 's', display: { '0': 'Ready', default: 'Waiting on {n}' } }))).toBeNull();
+    expect(listSchemaRelationsError(withColumn({ label: 'C', related: 's', display: { '01': 'x' } }))).toMatch(/display must map counts/);
+    expect(listSchemaRelationsError(withColumn({ label: 'C', related: 's', display: { many: 'x' } }))).toMatch(/display must map counts/);
+    expect(listSchemaRelationsError(withColumn({ label: 'C', related: 's', display: { '0': 1 } }))).toMatch(/display must map counts/);
+    expect(listSchemaRelationsError(withColumn({ label: 'C', related: 's', display: {} }))).toMatch(/display must map counts/);
+  });
+});

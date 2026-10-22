@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Package, ScanBarcode } from 'lucide-react';
+import { CircleX, Package, ScanBarcode } from 'lucide-react';
 import { SimpleMarkdown } from '../../common/display/SimpleMarkdown';
+import { HeldRoster } from './HeldRoster';
+import { expectedLine } from './RefusalPanel';
 import type { StationSubject } from '../../../lib/scan-subject';
 
 function secondsLeft(expiresAt: string): number {
@@ -13,6 +15,9 @@ function secondsLeft(expiresAt: string): number {
  * place name under it, the item itself as a quiet line above. Without one,
  * the item leads. The subject lapses on its own (the scan pipeline clears it
  * at expiry); the per-second tick is a visible clock, not polling.
+ *
+ * With `show`, the held row's roster stays under the card for the whole
+ * motion, and a refused scan reads on the card above it.
  */
 export function HoldScreen({
   subject,
@@ -20,6 +25,8 @@ export function HoldScreen({
   progress,
   progressLabel = 'checked off',
   note,
+  refusal,
+  refreshKey = 0,
   onRelease,
 }: {
   subject: StationSubject;
@@ -29,6 +36,10 @@ export function HoldScreen({
   progressLabel?: string;
   /** The last act's done copy while the item is still held (a fill in progress). */
   note?: string | null;
+  /** A refused scan while the list stays on screen. */
+  refusal?: { markdown: string; expected?: string[] } | null;
+  /** Changes on every bench response, so the shown roster refetches. */
+  refreshKey?: number;
   onRelease: () => void;
 }) {
   const [, setTick] = useState(0);
@@ -42,7 +53,7 @@ export function HoldScreen({
   return (
     <div
       key={subject.escalationId}
-      className="flex-1 flex flex-col items-center justify-center text-center py-16 animate-page-enter"
+      className={`flex-1 flex flex-col items-center ${subject.show ? 'justify-start' : 'justify-center'} text-center py-16 animate-page-enter`}
       data-testid="hold-screen"
     >
       {destination ? (
@@ -77,6 +88,19 @@ export function HoldScreen({
       ) : (
         <p className="text-lg text-text-secondary mt-8">Scan where it goes</p>
       )}
+      {refusal && (
+        <div role="alert" className="mt-6 flex items-start gap-3 text-left max-w-prose" data-testid="hold-refusal">
+          <CircleX className="w-6 h-6 text-status-error shrink-0 mt-0.5" strokeWidth={1.5} />
+          <div>
+            <div className="text-lg text-text-primary"><SimpleMarkdown content={refusal.markdown} inherit /></div>
+            {refusal.expected && refusal.expected.length > 0 && (
+              <p className="text-sm text-text-secondary mt-1">
+                Expected <span className="text-text-primary">{expectedLine(refusal.expected)}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {note ? (
         <div className="text-base text-text-primary mt-4" data-testid="hold-progress">
           <SimpleMarkdown content={note} inherit />
@@ -102,6 +126,9 @@ export function HoldScreen({
       >
         Put it down
       </button>
+      {subject.show && (
+        <HeldRoster escalationId={subject.escalationId} field={subject.show} refreshKey={refreshKey} />
+      )}
     </div>
   );
 }

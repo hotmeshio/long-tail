@@ -23,6 +23,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | A role-authored list page — document views, facet tables, entity card boards | List schema | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Rename the resolve footer, or claim-and-submit in one gesture | Footer tokens | [x-lt-footer.md](hitl/x-lt-footer.md) |
 | Block the resolve until embedded work drains, then auto-close when it does | `x-lt-submit-guard` | [x-lt-embed.md](hitl/x-lt-embed.md) |
+| Show every member a container expects, check each off as it arrives, and hold the rest of the form until all are accounted for | `x-lt-roster` | [x-lt-roster.md](hitl/x-lt-roster.md) |
 | Start another workflow from inside the form, mapped from the record, directly or in a prefilled dialog | `x-lt-invoke` | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
 | Fill a field by scanning a container, checked against what the record expects | `x-lt-scan` | [x-lt-scan.md](hitl/x-lt-scan.md) |
 | A role's pinned views laid out as named pages of live panels | `portals` on the role | [portal.md](hitl/portal.md) |
@@ -89,11 +90,12 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Versioned knowledge lookups, the `lookup.*` domain, cascading selects | [lookups.md](hitl/lookups.md) |
 | Field types, formats, required, read-only | [form.md](hitl/form.md) |
 | Pre-submission validation guards (min, max, pattern, dynamic bounds) | [x-lt-validation.md](hitl/x-lt-validation.md) |
-| Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
+| Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`, `x-lt-hidden`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Layout, ordering, sections, binding, help panel | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Custom widgets (checklist, file upload, code editor, signature, markdown) | [x-lt-widget.md](hitl/x-lt-widget.md) |
 | List schema (`active-history`, `active`, `facet-table`, `facet-board` cards) | [x-lt-list-schema.md](hitl/x-lt-list-schema.md) |
 | Embedded widgets (`link`, `escalation`, `escalation-list`) and the submit guard | [x-lt-embed.md](hitl/x-lt-embed.md) |
+| Rosters of expected members, their states, actions, and the roster guard (`x-lt-roster`) | [x-lt-roster.md](hitl/x-lt-roster.md) |
 | Starting a workflow from the form (`x-lt-invoke`) | [x-lt-invoke.md](hitl/x-lt-invoke.md) |
 | Scan fields and scan-to-submit (`x-lt-scan`, `x-lt-scan-submit`) | [x-lt-scan.md](hitl/x-lt-scan.md) |
 | Pinned views, role default pins, link variables | [pinned-views.md](hitl/pinned-views.md) |

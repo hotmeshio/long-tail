@@ -1137,6 +1137,39 @@ Submit ONE declared item of a batch escalation (a `conditional` wait created wit
 
 Claim semantics: claim-agnostic by default; `assertClaim: true` (by id) requires the caller's own live claim, asserted atomically. RBAC mirrors the single-resolve forms: the by-id form answers 404 for rows outside the caller's read scope and 403 inside it but outside write scope; the ingress forms collapse a write denial to 404.
 
+### Batch item flags
+
+```
+POST /api/escalations/:id/flag-batch-item
+POST /api/escalations/:id/unflag-batch-item
+```
+
+Flag ONE pending key of a batch escalation, or clear its flag. **Body:** `{ itemKey, label, payload? }` to flag, `{ itemKey }` to unflag.
+
+A flag writes `envelope.batch_flags[itemKey]` (`label`, `payload`, the caller as `actor`, the database `at`) in one statement, only while the row and the key are pending. The key stays pending and still fills. On a wait declared with `wakeOnFlag`, the flag resolves the row (recording the caller in `metadata.resolved_by`) and the workflow wakes with the items so far, `$flags` and `$trigger: "flag"`: the answer is `{ outcome: 'completed', workflowId }`. Otherwise it is `{ outcome: 'flagged' }`.
+
+Refusals: a key already filled 409, a key without a flag (unflag) 409, an undeclared key 400, a non-batch row 400, a row no longer pending 409. RBAC is the by-id batch fill's: 404 outside read scope, 403 outside write scope. Both carry `X-LT-Acting-Token` as the other work verbs do.
+
+### Roster actions
+
+```
+POST /api/escalations/:id/roster-action
+```
+
+Run one action a [roster](../../hitl/x-lt-roster.md#actions) entry offers on this row's form. **Body:** `{ field, action, entry, code? }`: the roster field, the action's index among its `x-lt-actions`, the entry key, and a key-in's entered code.
+
+The request is a pointer. The server re-reads the action from the row's pinned form schema, requires the entry to be on the roster it computes, builds the payload from the declaration, and runs the act (resolve, batch fill, flag, unflag) through its own endpoint as the person acting, under their RBAC and `enforce_schema`. With `X-LT-Acting-Token`, the person acting is the badged person; the badge is read first and spent only when the act runs, and a use is returned when the act does not land.
+
+| Status | `outcome` | Meaning |
+|--------|-----------|---------|
+| 403 | `needs_badge` | The action is limited to roles the person acting lacks; a badge of that role answers it |
+| 403 | `role_refused` | The badged person lacks the roles; the badge is not spent |
+| 401 | `not_primed` | The badge expired or was spent |
+| 422 | `code_mismatch` | The entered code does not name the entry's code |
+| 409 | | The action or the entry is no longer offered |
+
+Otherwise the answer is the act's own.
+
 ## Accumulate items
 
 ```

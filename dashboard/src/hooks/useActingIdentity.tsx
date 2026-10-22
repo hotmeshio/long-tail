@@ -49,6 +49,11 @@ export function useActingIdentity(): ActingIdentityContextValue {
   return ctx;
 }
 
+/** The live badge holder, or null when none is primed or no provider is mounted. */
+export function useActingIdentityOptional(): ActingIdentity | null {
+  return useContext(ActingIdentityContext)?.identity ?? null;
+}
+
 /**
  * Holds the acting-identity grant a badge scan mints. One state for the whole
  * shell: any page reads who is primed, scan execution attaches the token, and

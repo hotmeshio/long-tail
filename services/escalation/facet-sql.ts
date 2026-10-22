@@ -10,7 +10,9 @@ import type { FacetOrder, FacetQuery } from '../../types';
 
 // Top-level columns a caller may sort/range on directly. Anything else must be a
 // `metadata.<key>` facet. Keeps interpolation to a fixed, audited set.
-const ORDER_COLUMNS = new Set(['priority', 'created_at', 'updated_at', 'status', 'role']);
+const ORDER_COLUMNS = new Set(['priority', 'created_at', 'updated_at', 'resolved_at', 'status', 'role']);
+// Columns a pending row leaves empty: they sort after every value, either direction.
+const NULLABLE_ORDER_COLUMNS = new Set(['resolved_at']);
 const RANGE_OPS = new Set(['<', '<=', '>', '>=', '=']);
 // Metadata keys are interpolated (as a JSON path), so they are strictly validated.
 // Exported so role config (priority_facet) validates keys against the same rule.
@@ -155,7 +157,7 @@ export function buildFacetOrder(orderBy?: FacetOrder[]): string {
   for (const o of orderBy) {
     const dir = o.direction === 'desc' ? 'DESC' : 'ASC';
     if (ORDER_COLUMNS.has(o.field)) {
-      parts.push(`${o.field} ${dir}`);
+      parts.push(`${o.field} ${dir}${NULLABLE_ORDER_COLUMNS.has(o.field) ? ' NULLS LAST' : ''}`);
     } else if (o.field.startsWith('metadata.')) {
       const key = o.field.slice('metadata.'.length);
       if (!FACET_KEY.test(key)) continue;

@@ -128,6 +128,13 @@ function assertValidChoices(choices: ScanChoice[] | undefined, at: string): void
       || choice.verb === SCAN_VERBS.FILL) {
       throw new Error(`${cat}: ${choice.verb} cannot be a choice verb`);
     }
+    if (choice.roles !== undefined && (!Array.isArray(choice.roles) || choice.roles.length === 0
+      || choice.roles.some((r) => typeof r !== 'string' || !r))) {
+      throw new Error(`${cat}: roles must be a non-empty array of role names`);
+    }
+    if (choice.refuse !== undefined && (typeof choice.refuse !== 'string' || !choice.refuse.trim())) {
+      throw new Error(`${cat}: refuse must be non-empty text`);
+    }
     if (choice.confirm && !choice.confirm.prompt) {
       throw new Error(`${cat}: confirm requires a prompt`);
     }

@@ -2,6 +2,7 @@ export * from './types';
 export * from './crud';
 export { claimAssertedByMetadata } from './claim-asserted';
 export * from './batch';
+export * from './batch-flag';
 export * from './accumulate';
 export * from './bulk';
 export * from './queries';
@@ -32,3 +33,4 @@ export {
   readRelatedHosts,
 } from './related';
 export type { RelatedQueryHost } from './related';
+export { extremeRelatedItems, extremeRelatedQuery } from './related-extremes';

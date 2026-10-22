@@ -69,4 +69,10 @@ describe('mergeAggregates', () => {
     expect(mergeAggregates([{ count: 0, unresolved: true }, { count: 3 }])).toEqual({ count: 3 });
     expect(mergeAggregates([undefined])).toBeUndefined();
   });
+  it('folds a min or max across members, by number or by text', () => {
+    expect(mergeAggregates([{ count: 1, value: 30 }, { count: 2, value: 4 }, { count: 0 }], 'min')).toEqual({ count: 3, value: 4 });
+    expect(mergeAggregates([{ count: 1, value: '2026-10-22' }, { count: 1, value: '2026-11-01' }], 'max'))
+      .toEqual({ count: 2, value: '2026-11-01' });
+    expect(mergeAggregates([{ count: 0 }, { count: 0 }], 'min')).toEqual({ count: 0 });
+  });
 });
