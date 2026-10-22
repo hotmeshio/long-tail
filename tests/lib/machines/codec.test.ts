@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildEnvelope, genericCodec, RECEIPT_FROM } from '../../../lib/machines/protocol';
+import { buildEnvelope, genericCodec, RECEIPT_FROM, topicOf } from '../../../lib/machines/protocol';
 
 const ident = { siteId: 'site-1', lineId: 'line-1', machineId: 'cut-01' };
 const topic = (channel: string) => `line/v1/site-1/line-1/cut-01/${channel}`;
@@ -40,4 +40,25 @@ describe('generic codec', () => {
     expect(codec.channels.telemetry).toEqual(['telemetry']);
     expect(codec.unitsPerDispatch).toBe(1);
   });
+
+  it('speaks for a machine by its wire address and reads the address back as its id', () => {
+    const line = { machines: [{ machineId: 'cut-01', address: '8f77e321' }] } as any;
+    const codec = genericCodec({ root: 'line/v1', line });
+    const at = { ...ident, address: '8f77e321' };
+    const [wire] = codec.encode(at, { cmdId: 'c1', op: 'dispatch', args: {} });
+    expect(wire.topic).toBe('line/v1/site-1/line-1/8f77e321/cmd');
+    expect(JSON.parse(wire.payload).source.machine).toBe('8f77e321');
+    const [seen] = codec.decode(wire.topic.replace(/cmd$/, 'job'), JSON.stringify(buildEnvelope(at, { event: 'arrived', jobId: 'J1', unitId: 'U1' })));
+    expect(seen.parsed?.ident).toEqual({ ...ident, address: '8f77e321' });
+    expect(seen.violations).not.toContain('source disagrees with the topic');
+  });
+
+  it('lays out topics as root/site/line/address/channel unless the codec says otherwise', () => {
+    const codec = genericCodec({ root: 'line/v1' });
+    expect(topicOf(codec, { siteId: 's', lineId: 'l', address: 'm' }, 'cmd')).toBe('line/v1/s/l/m/cmd');
+    expect(topicOf(codec, { siteId: 's', lineId: 'l' }, 'cmd')).toBe('line/v1/s/l/+/cmd');
+    const own = { ...codec, topicFor: (sc: { address?: string }, c: string) => `x/${sc.address ?? '+'}/${c}` };
+    expect(topicOf(own, { address: 'm' }, 'cmd')).toBe('x/m/cmd');
+  });
 });
+

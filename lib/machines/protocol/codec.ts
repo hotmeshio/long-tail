@@ -6,6 +6,7 @@
  * host whose machines speak another protocol supplies a codec for it.
  */
 
+import type { LineDef } from '../../../types/machines';
 import { CHANNEL, JOB_EVENT } from './constants';
 import { inspectMessage, type Inspection } from './contract';
 import { buildEnvelope, type Envelope, type MachineIdent } from './envelope';
@@ -32,9 +33,23 @@ export interface CodecChannels {
   commands: string[];
 }
 
+/** Which topics a filter covers: a level left out matches any (`+`). */
+export interface TopicScope {
+  siteId?: string;
+  lineId?: string;
+  /** The machine's wire address (`MachineDef.address`, else its id). */
+  address?: string;
+}
+
 export interface LineCodec {
   readonly root: string;
   readonly channels: CodecChannels;
+  /**
+   * The topic of one machine channel. Defaults to `{root}/{site}/{line}/{address}/{channel}`.
+   * A layout must begin with `{root}/{site}/{line}/`, the prefix the line's subscription and
+   * retained reads use; the ACL and stream subjects are built from this.
+   */
+  topicFor?(scope: TopicScope, channel: string): string;
   /** Most units one dispatch may carry; the gateway sends one dispatch per unit when 1. Null: any. */
   readonly unitsPerDispatch: number | null;
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
@@ -49,6 +64,8 @@ export type ReceiptFrom = typeof RECEIPT_FROM[keyof typeof RECEIPT_FROM];
 
 export interface GenericCodecOptions {
   root: string;
+  /** Maps topic levels back to machine ids for machines whose `address` differs from their id. */
+  line?: Pick<LineDef, 'machines'>;
   /** For machines that report no arrival: treat the receiver's carrier bind or job start as the receipt. */
   receiptFrom?: ReceiptFrom;
   unitsPerDispatch?: number | null;
@@ -59,6 +76,26 @@ export const GENERIC_CHANNELS: CodecChannels = {
   telemetry: [CHANNEL.TELEMETRY],
   commands: [CHANNEL.CMD],
 };
+
+/** The topic of one machine channel under the codec's layout. */
+export function topicOf(codec: Pick<LineCodec, 'root' | 'topicFor'>, scope: TopicScope, channel: string): string {
+  if (codec.topicFor) return codec.topicFor(scope, channel);
+  const level = (v?: string) => v ?? '+';
+  return `${codec.root}/${level(scope.siteId)}/${level(scope.lineId)}/${level(scope.address)}/${channel}`;
+}
+
+/** Topic level to machine id, for the machines whose address is not their id. */
+function addressMap(line?: Pick<LineDef, 'machines'>): Map<string, string> {
+  return new Map((line?.machines ?? []).filter((m) => m.address && m.address !== m.machineId).map((m) => [m.address!, m.machineId]));
+}
+
+/** The inspection with the topic's address read back as the machine id. */
+function atMachine(seen: Inspection, ids: Map<string, string>): Inspection {
+  const machineId = seen.parsed && ids.get(seen.parsed.ident.machineId);
+  if (!machineId) return seen;
+  const ident = { ...seen.parsed!.ident, machineId, address: seen.parsed!.ident.machineId };
+  return { ...seen, parsed: { ...seen.parsed!, ident } };
+}
 
 function withEvent(seen: Inspection, event: string): Inspection {
   const body = seen.body as Envelope;
@@ -76,12 +113,13 @@ function inferReceipt(seen: Inspection, from: ReceiptFrom): Inspection[] {
 
 export function genericCodec(opts: GenericCodecOptions): LineCodec {
   const receiptFrom = opts.receiptFrom ?? RECEIPT_FROM.ARRIVED;
+  const ids = addressMap(opts.line);
   return {
     root: opts.root,
     channels: GENERIC_CHANNELS,
     unitsPerDispatch: opts.unitsPerDispatch ?? null,
     decode(topic, payload, retained) {
-      const seen = inspectMessage(opts.root, topic, payload, retained);
+      const seen = atMachine(inspectMessage(opts.root, topic, payload, retained), ids);
       if (!seen.parsed) return [];
       return receiptFrom === RECEIPT_FROM.ARRIVED ? [seen] : inferReceipt(seen, receiptFrom);
     },

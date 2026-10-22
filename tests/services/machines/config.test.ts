@@ -54,6 +54,14 @@ describe('line definition', () => {
     expect(() => validateLine({ ...DEFAULT_LINE, machines: [DEFAULT_LINE.machines[0], DEFAULT_LINE.machines[0]] })).toThrow(/duplicate/);
   });
 
+  it('names each machine on the wire by its address when it has one, and keeps addresses unique', () => {
+    const [press, ...rest] = DEFAULT_LINE.machines;
+    const line = { ...DEFAULT_LINE, machines: [{ ...press, address: '8f77e321' }, ...rest] };
+    expect(clientIds(validateLine(line))[0]).toBe('site-1-line-1-8f77e321');
+    expect(() => validateLine({ ...line, machines: [line.machines[0], { ...rest[0], address: '8f77e321' }] })).toThrow(/duplicate address/);
+    expect(() => validateLine({ ...line, machines: [{ ...press, address: 'a/b' }] })).toThrow();
+  });
+
   it('accepts a whole queue depth of at least 1 and rejects anything else', () => {
     const withDepth = (queueDepth: unknown) => ({ ...DEFAULT_LINE, machines: [{ ...DEFAULT_LINE.machines[0], queueDepth: queueDepth as number }] });
     expect(validateLine(withDepth(3)).machines[0].queueDepth).toBe(3);

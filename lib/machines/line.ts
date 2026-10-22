@@ -20,10 +20,15 @@ export function validateLine(line: LineDef): LineDef {
   assertTopicLevel('lineId', line.lineId);
   if (!line.machines?.length) throw new Error('line has no machines');
   const seen = new Set<string>();
+  const addresses = new Set<string>();
   for (const m of line.machines) {
     assertTopicLevel('machineId', m.machineId);
     if (seen.has(m.machineId)) throw new Error(`duplicate machineId "${m.machineId}"`);
     seen.add(m.machineId);
+    const address = m.address ?? m.machineId;
+    assertTopicLevel('address', address);
+    if (addresses.has(address)) throw new Error(`duplicate address "${address}"`);
+    addresses.add(address);
     if (!(m.cycleSec > 0)) throw new Error(`${m.machineId}: cycleSec must be positive`);
     if (m.queueDepth !== undefined && !(Number.isInteger(m.queueDepth) && m.queueDepth >= 1)) {
       throw new Error(`${m.machineId}: queueDepth must be a whole number of at least 1`);
@@ -42,7 +47,8 @@ export function loadLine(path: string | undefined, fallback?: LineDef): LineDef 
 }
 
 export function identOf(line: LineDef, machineId: string): MachineIdent {
-  return { siteId: line.siteId, lineId: line.lineId, machineId };
+  const address = line.machines.find((m) => m.machineId === machineId)?.address;
+  return { siteId: line.siteId, lineId: line.lineId, machineId, ...(address ? { address } : {}) };
 }
 
 export function machineById(line: LineDef, machineId: string): MachineDef {
@@ -51,7 +57,7 @@ export function machineById(line: LineDef, machineId: string): MachineDef {
   return def;
 }
 
-/** The broker identity of each machine, {site}-{line}-{machine}. */
+/** The broker identity of each machine, {site}-{line}-{address}. */
 export function clientIds(line: LineDef): string[] {
   return line.machines.map((m) => clientIdOf(identOf(line, m.machineId)));
 }

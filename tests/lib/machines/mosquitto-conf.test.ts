@@ -52,4 +52,19 @@ describe('machine broker ACL', () => {
     const ctl = other.split('\n\n').find((b) => b.includes('user line-controller-site-1-line-1'))!;
     expect(ctl).toContain('topic write cell/v2/site-1/line-1/+/control');
   });
+
+  it('follows the codec\'s layout and each machine\'s wire address', () => {
+    const line = { ...DEFAULT_LINE, machines: DEFAULT_LINE.machines.map((m, i) => (i === 0 ? { ...m, address: '8f77e321' } : m)) };
+    const acl = renderMosquittoAcl(line, {
+      root: 'acme/v1',
+      channels: { events: ['events'], telemetry: ['telemetry'], commands: ['commands'] },
+      topicFor: (s, c) => `acme/v1/${s.siteId ?? '+'}/${s.lineId ?? '+'}/${c === 'commands' ? 'down' : 'up'}/${s.address ?? '+'}/${c}`,
+    });
+    const press = acl.split('\n\n').find((b) => b.includes('user site-1-line-1-8f77e321'))!;
+    expect(press).toContain('topic write acme/v1/site-1/line-1/up/8f77e321/events');
+    expect(press).toContain('topic read acme/v1/site-1/line-1/down/8f77e321/commands');
+    const ctl = acl.split('\n\n').find((b) => b.includes('user line-controller-site-1-line-1'))!;
+    expect(ctl).toContain('topic write acme/v1/site-1/line-1/down/+/commands');
+    expect(ctl).toContain('topic read acme/v1/site-1/line-1/#');
+  });
 });

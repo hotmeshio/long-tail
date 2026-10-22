@@ -8,7 +8,7 @@
  */
 
 import { clientIdOf } from '../protocol/envelope';
-import type { LineCodec } from '../protocol/codec';
+import { topicOf, type LineCodec } from '../protocol/codec';
 import { controllerId, identOf, type LineDef } from '../line';
 import { bridgeId } from './site-conf';
 
@@ -55,19 +55,22 @@ topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
 }
 
 /** The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands. */
-export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels'>): string {
-  const base = `${codec.root}/${line.siteId}/${line.lineId}`;
+export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+  const { siteId, lineId } = line;
   const { events, telemetry, commands } = codec.channels;
   const machines = line.machines.map((m) => {
-    const own = `${base}/${m.machineId}`;
+    const ident = identOf(line, m.machineId);
+    const own = (c: string) => topicOf(codec, { siteId, lineId, address: ident.address ?? ident.machineId }, c);
     return [
-      `user ${clientIdOf(identOf(line, m.machineId))}`,
-      ...[...events, ...telemetry].map((c) => `topic write ${own}/${c}`),
-      ...commands.map((c) => `topic read ${own}/${c}`),
+      `user ${clientIdOf(ident)}`,
+      ...[...events, ...telemetry].map((c) => `topic write ${own(c)}`),
+      ...commands.map((c) => `topic read ${own(c)}`),
     ].join('\n');
   });
   const controller = [
-    `user ${controllerId(line)}`, ...commands.map((c) => `topic write ${base}/+/${c}`), `topic read ${base}/#`,
+    `user ${controllerId(line)}`,
+    ...commands.map((c) => `topic write ${topicOf(codec, { siteId, lineId }, c)}`),
+    `topic read ${codec.root}/${siteId}/${lineId}/#`,
   ].join('\n');
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...machines, controller].join('\n\n')}\n`;
 }

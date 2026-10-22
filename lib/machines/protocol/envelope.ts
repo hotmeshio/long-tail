@@ -5,9 +5,14 @@ import { randomUUID } from 'crypto';
 
 import { PROTOCOL_VERSION } from './constants';
 
-/** {site}-{line}-{machine}, stable across reconnects. */
+/** The machine's wire address: its topic level and client id. */
+export function addressOf(ident: MachineIdent): string {
+  return ident.address ?? ident.machineId;
+}
+
+/** {site}-{line}-{address}, stable across reconnects. */
 export function clientIdOf(ident: MachineIdent): string {
-  return `${ident.siteId}-${ident.lineId}-${ident.machineId}`;
+  return `${ident.siteId}-${ident.lineId}-${addressOf(ident)}`;
 }
 
 /** ISO 8601 UTC with milliseconds. */
@@ -20,7 +25,7 @@ export function buildEnvelope<T>(ident: MachineIdent, body: T, opts: { at?: stri
     v: PROTOCOL_VERSION,
     id: opts.id ?? randomUUID(),
     at: opts.at ?? isoTs(),
-    source: { site: ident.siteId, line: ident.lineId, machine: ident.machineId },
+    source: { site: ident.siteId, line: ident.lineId, machine: addressOf(ident) },
     body,
   };
 }

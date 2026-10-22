@@ -71,7 +71,7 @@ class LineRun {
       return id;
     };
     const { config, line } = this;
-    const codec = this.opts.codec ?? defaultCodec(config);
+    const codec = this.opts.codec ?? defaultCodec(config, line);
     this.gateway = new MachineGateway({
       bus: createMachineBus(config, line, codec),
       codec,

@@ -13,8 +13,7 @@ import { toTopic } from '../protocol';
 import { MqttSession } from './mqtt-session';
 import { payloadOf, readDurable } from './nats-durable';
 import { SerialQueue } from './serial';
-import { LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects } from './streams';
-import type { CodecChannels } from '../protocol/codec';
+import { LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects, type StreamCodec } from './streams';
 import type { Disposition, InboundMessage, MachineBus } from './delivery';
 
 export interface NatsBusOptions {
@@ -24,11 +23,10 @@ export interface NatsBusOptions {
   mqtt: MqttEndpoint;
   /** The gateway's broker identity; also its MQTT client id. */
   controllerId: string;
-  root: string;
   siteId: string;
   lineId: string;
-  /** The codec's channels: which subjects are durable events and which are live telemetry. */
-  channels: CodecChannels;
+  /** The codec's topics: which subjects are durable events and which are live telemetry. */
+  codec: StreamCodec;
   nakDelayMs?: number;
 }
 
@@ -46,20 +44,20 @@ export class NatsMachineBus implements MachineBus {
   }
 
   async connect(): Promise<void> {
-    const { natsUrl, user, password, controllerId, root, siteId, lineId, channels } = this.opts;
+    const { natsUrl, user, password, controllerId, siteId, lineId, codec } = this.opts;
     this.nc = await connect({ servers: natsUrl, user, pass: password, name: controllerId });
     const jsm = await this.nc.jetstreamManager();
-    await ensureStreams(jsm, lineStreamConfigs(root, channels));
-    await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer(root, siteId, lineId, this.durableName, channels));
+    await ensureStreams(jsm, lineStreamConfigs(codec));
+    await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer(codec, siteId, lineId, this.durableName));
     this.session = await MqttSession.open(this.opts.mqtt, controllerId);
   }
 
   async consume(handler: (msg: InboundMessage) => Promise<Disposition>): Promise<void> {
     const nc = this.nats();
-    const { root, siteId, lineId, channels, nakDelayMs = 1_000 } = this.opts;
+    const { codec, siteId, lineId, nakDelayMs = 1_000 } = this.opts;
     this.messages = await readDurable(nc.jetstream(), LINE_STREAM.EVENTS, this.durableName, this.queue, (m) =>
       handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: m.info.deliveryCount }), nakDelayMs);
-    this.telemetry = telemetrySubjects(root, siteId, lineId, channels).map((subject) => nc.subscribe(subject, {
+    this.telemetry = telemetrySubjects(codec, siteId, lineId).map((subject) => nc.subscribe(subject, {
       callback: (_err, m) => void this.queue.run(() => handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: 1 })),
     }));
   }

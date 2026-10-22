@@ -53,10 +53,24 @@ describe('channels from a codec', () => {
 
   it('builds the streams and the consumer from the codec\'s own channels', () => {
     const channels = { events: ['state', 'work', 'events/alert/+'], telemetry: ['readings/raw'], commands: ['control'] };
-    const [events, telemetry] = lineStreamConfigs('acme/v1', channels);
+    const [events, telemetry] = lineStreamConfigs({ root: 'acme/v1', channels });
     expect(events.subjects).toEqual(['acme.v1.*.*.*.state', 'acme.v1.*.*.*.work', 'acme.v1.*.*.*.events.alert.*']);
     expect(telemetry.subjects).toEqual(['acme.v1.*.*.*.readings.raw']);
-    expect(lineEventConsumer('acme/v1', 's', 'l', 'gw', channels).filter_subjects).toContain('acme.v1.s.l.*.work');
+    expect(lineEventConsumer({ root: 'acme/v1', channels }, 's', 'l', 'gw').filter_subjects).toContain('acme.v1.s.l.*.work');
+  });
+
+  it('follows a codec\'s own topic layout, such as a direction level before the machine', () => {
+    const codec = {
+      root: 'acme/v1',
+      channels: { events: ['events'], telemetry: ['telemetry'], commands: ['commands'] },
+      topicFor: (s: { siteId?: string; lineId?: string; address?: string }, c: string) =>
+        `acme/v1/${s.siteId ?? '+'}/${s.lineId ?? '+'}/${c === 'commands' ? 'down' : 'up'}/${s.address ?? '+'}/${c}`,
+    };
+    const [events, telemetry] = lineStreamConfigs(codec);
+    expect(events.subjects).toEqual(['acme.v1.*.*.up.*.events']);
+    expect(telemetry.subjects).toEqual(['acme.v1.*.*.up.*.telemetry']);
+    expect(lineEventConsumer(codec, 's', 'l', 'gw').filter_subjects).toEqual(['acme.v1.s.l.up.*.events']);
+    expect(telemetrySubjects(codec, 's', 'l')).toEqual(['acme.v1.s.l.up.*.telemetry']);
   });
 });
 

@@ -23,18 +23,17 @@ function mqttOf(config: MachineLineConfig): MqttEndpoint {
 }
 
 /** The codec for a line when the host supplies none: the line protocol under MACHINE_TOPIC_ROOT. */
-export function defaultCodec(config: MachineLineConfig): LineCodec {
-  return genericCodec({ root: config.topicRoot });
+export function defaultCodec(config: MachineLineConfig, line?: LineDef): LineCodec {
+  return genericCodec({ root: config.topicRoot, line });
 }
 
 /** The gateway's view of every machine on the line. */
-export function createMachineBus(config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config)): MachineBus {
+export function createMachineBus(config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config, line)): MachineBus {
   switch (config.transport) {
     case MACHINE_TRANSPORT.NATS:
       return new NatsMachineBus({
         natsUrl: config.siteNatsUrl!, user: config.siteNatsUser, password: config.siteNatsPassword,
-        mqtt: mqttOf(config), controllerId: controllerId(line), root: codec.root, siteId: line.siteId, lineId: line.lineId,
-        channels: codec.channels,
+        mqtt: mqttOf(config), controllerId: controllerId(line), siteId: line.siteId, lineId: line.lineId, codec,
       });
     case MACHINE_TRANSPORT.MQTT:
       return new MqttMachineBus(mqttOf(config), controllerId(line), lineFilter(codec.root, line.siteId, line.lineId));

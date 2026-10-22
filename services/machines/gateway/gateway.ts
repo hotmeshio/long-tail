@@ -56,7 +56,7 @@ export class MachineGateway {
   constructor(private readonly deps: GatewayDeps) {
     this.log = deps.log ?? consoleLog;
     this.rows = deps.rows ?? standardRows;
-    this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot });
+    this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.executor = new Executor({
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,

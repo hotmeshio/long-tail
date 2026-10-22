@@ -12,6 +12,8 @@ export interface MachineIdent {
   siteId: string;
   lineId: string;
   machineId: string;
+  /** The machine on the wire: its topic level and broker client id. The machine id when unset. */
+  address?: string;
 }
 
 /** Every message: version, a unique id (the dedupe key), the event time, the source, the body. */
@@ -41,7 +43,13 @@ export interface MeasurementDef {
 export interface MachineDef {
   /** The role whose handoff rows this machine resolves; defaults to line-<process>. */
   role?: string;
+  /** The station: the id rows, roles and routes name. */
   machineId: string;
+  /**
+   * The physical machine's identity on the wire (topic level, client id, certificate), when it
+   * differs from the station, e.g. a permanent UUID that stays with the machine if it moves.
+   */
+  address?: string;
   process: string;
   description: string;
   carrier: 'bind' | 'release' | 'none';

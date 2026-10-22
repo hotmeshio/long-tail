@@ -5,7 +5,7 @@
  */
 
 import { CHANNEL } from './constants';
-import type { MachineIdent } from './envelope';
+import { addressOf, type MachineIdent } from './envelope';
 
 export const MESSAGE_KIND = {
   PRESENCE: 'presence',
@@ -35,7 +35,7 @@ export function assertTopicLevel(name: string, value: string): void {
 }
 
 export function machineTopic(root: string, ident: MachineIdent, channel: string): string {
-  return `${root}/${ident.siteId}/${ident.lineId}/${ident.machineId}/${channel}`;
+  return `${root}/${ident.siteId}/${ident.lineId}/${addressOf(ident)}/${channel}`;
 }
 
 export function alarmTopic(root: string, ident: MachineIdent, alarmId: string): string {
