@@ -40,6 +40,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 | Field | Meaning |
 |---|---|
 | `machines[].role` | The role whose handoff rows the machine resolves. Default `line-<process>` |
+| `machines[].address` | The physical machine on the wire: its topic level, client id and certificate name, such as a permanent UUID that stays with the machine if it moves. Default `machineId`, which stays the station that rows, roles and routes name |
 | `roles.exit` | The role of the person who receives units at the end of a route. Default `line-exit` |
 | `roles.operator` | The role that gets failed handoffs, stopping alarms, and offline or quiet machines. Default `line-operator` |
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
@@ -63,18 +64,21 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | `artifactUrl`, `artifactSha256` | The job file, by reference |
 | `attempt` | Retry number |
 
-The gateway dispatches to `toMachine` when the row is created. It claims the row as that machine once the machine accepts. It records each unit's release by the sender and each arrival at the receiver as items. It resolves the row as the receiver once every unit has arrived:
+The gateway dispatches to `toMachine` when the row is created, or, under a codec that dispatches on arrival, once every unit has arrived there. It claims the row as that machine once the machine accepts. It records each unit's release by the sender and each arrival at the receiver as items. It resolves the row as the receiver once every unit has arrived:
 
 ```typescript
 { received: true, receiver: 'cut-01', units: ['U1', 'U2'] }
 ```
+
+On arrival dispatch, the units are already at the receiver, so its acceptance resolves the row the same way.
 
 When the handoff ends without a receipt, the row resolves `{ received: false, errorCode, unitId?, reason?, detail }`:
 
 | `errorCode` | Cause |
 |---|---|
 | `dispatch-refused` | The machine refused or failed the dispatch (mode, recipe, queue, artifact), or the machine requires an artifact and the row has none. The reason is in `detail` |
-| `no-reply` | No reply after every attempt with the same command id. The dispatch is then cancelled, so a copy still queued for an absent machine never runs |
+| `dispatch-failed` | The machine accepted the job, then could not prepare it (artifact, recipe). The reason is in `detail` |
+| `no-reply` | No reply after every attempt with the same command id, and the machine's snapshot does not list the job, or it sent none (`detail` then says the state is unknown). A job the snapshot lists counts as accepted. The dispatch is cancelled, so a copy still queued for an absent machine never runs |
 | `software-unsupported` | The machine runs a version the line does not allow |
 | `sender-rejected` | The sender finished a unit as reject, hold, scrap or rework. Its reason is in `reason` and `detail` |
 | `jam`, `incomplete-handshake`, `carrier-mismatch`, `unreadable-id` | The move between machines failed |
@@ -153,14 +157,24 @@ The gateway works in the generic line protocol. A codec translates:
 interface LineCodec {
   root: string;
   channels: { events: string[]; telemetry: string[]; commands: string[] };   // MQTT filters under each machine
+  topicFor?(scope: { siteId?, lineId?, address? }, channel: string): string; // the topic layout; absent levels are +
   unitsPerDispatch: number | null;                        // 1: one dispatch per unit
+  dispatchOn?: 'created' | 'arrival';                     // when a handoff's job goes out
+  strict?: boolean;                                       // broken messages go to a person, never acted on
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
+  receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
 }
 ```
 
 - `decode` may return several events for one message. That is how a codec infers a receipt from a different event when the machines report no arrival. `Machines.genericCodec({ root, receiptFrom: 'started' | 'bound' })` does this for the generic protocol.
 - With `unitsPerDispatch: 1` the gateway sends one job per unit, claims the row once every job is accepted, and cancels the accepted jobs if any is refused.
+- `topicFor` lays out the topics, for a protocol with its own levels (a direction before the machine, say). The layout begins with `{root}/{site}/{line}/`. The broker ACL and the stream subjects follow it. Without it the layout is `{root}/{site}/{line}/{address}/{channel}`.
+- `dispatchOn: 'arrival'` is for machines that take work only for units they have scanned in. The job goes out once every unit of the row has arrived, and each unit carries the arrival event its receiver reported (`units[].arrival`), so `encode` can echo the receiver's own visit id.
+- A reply is `accepted` (recorded), and a machine that prepares its jobs may later reply `completed` (ready) or `failed` under the same `cmdId`. A failure after acceptance ends the handoff as `dispatch-failed`. When no reply comes, the gateway asks the machine for its snapshot before deciding.
+- `receipt` confirms the messages the gateway is done with, for machines that resend an event until it is confirmed. `decode` marks each such message with a `receiptId`. The ids go out per machine in batches of up to 100 after `MACHINE_RECEIPT_DELAY_MS`, including messages already applied. A message still waiting for its row is confirmed once it lands.
+- `strict: true` holds a message with contract violations: it is confirmed, never acted on, and one `contract-violation` row shows it to the operator role. Without it, known fields are acted on and the violations are logged.
+- An alarm body may name the catalog edition its code comes from, `catalog: { domain, key, version }`. The alarm row then carries it as a lookup ref, so the row reads the code's meaning as of that edition.
 - Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
@@ -174,7 +188,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `alarm/<id>` (retained while active) | Raise, acknowledgement, clear (with who cleared it) |
 | `telemetry` | Readings |
 | `report/<name>` | Production, availability, inventory and other reporting, kept in the stream |
-| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop`, `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `refused`, `failed`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
+| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop`, `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `completed`, `refused`, `failed`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
 
 ## Rows for people
 
@@ -183,19 +197,20 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `line-alarm` | A stopping alarm (critical or emergency) is raised | The machine clears it (with who cleared it). If a person resolves it first, the gateway sends `ack-alarm` |
 | `machine-offline` | Presence goes offline past a debounce | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
+| `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
 
 A replica taking a line reads back its open handoff, command, alarm, offline and quiet rows. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
 
 ## Topology and identity
 
 ```
- machines ──MQTT 5, TLS, client cert──▶ machine broker ──bridge──▶ site NATS
+ machines ──MQTT, TLS, client cert──▶ machine broker ──bridge──▶ site NATS
                                          (Mosquitto)               JetStream
                                               ▲                        ▲
                                               └── gateway (commands)    └── gateway (streams, read only)
 ```
 
-- **Machines:** each machine logs in with its own certificate; the CN is its username. The broker ACL lets it write only its own channels and read only its own commands. The line controller may command every machine on the line.
+- **Machines:** each machine logs in over MQTT 3.1.1 or 5 with its own certificate; the CN (`{site}-{line}-{address}`) is its username. The broker ACL lets it write only its own channels and read only its own commands. The line controller may command every machine on the line.
 - **Durable streams:** the bridge carries the line's topics one way, into the site NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer and may publish only JetStream requests and acks.
 - **Escalation events:** the gateway inside Long Tail reads them in process. The site NATS is a server of its own; Long Tail's events and NATS stay inside Long Tail.
 - **Commands:** the gateway publishes commands to the machine broker at QoS 1, so they queue for a machine that is away.
@@ -220,6 +235,7 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 | `MACHINE_DISPATCH_TTL_MS` | `600000` | How long a dispatch stays valid at the machine |
 | `MACHINE_OFFLINE_DEBOUNCE_MS` | `15000` | Offline this long before a row |
 | `MACHINE_QUIET_MS` | `90000` | Silent this long before a row; `0` turns it off |
+| `MACHINE_RECEIPT_DELAY_MS` | `250` | How long confirmed message ids gather before a receipt goes out |
 
 ## Testing a codec or adapter
 
@@ -254,4 +270,4 @@ broker.publish(capturedArrival.topic, capturedArrival.payload);
 expect((await lt.ended(row.id)).resolver_payload).toMatchObject({ received: true, receiver: 'bond-cell-1' });
 ```
 
-The same rig covers the unhappy paths: drop the machine's replies for `no-reply`, answer with a refusal for `dispatch-refused`, publish a not-ok finish for `sender-rejected`, or stop and start the gateway to prove a takeover reads its rows back.
+The same rig covers the unhappy paths: cut the machine off the network for `no-reply`, drop only its replies to see the snapshot keep the job, answer with a refusal for `dispatch-refused`, publish a not-ok finish for `sender-rejected`, or stop and start the gateway to prove a takeover reads its rows back.
