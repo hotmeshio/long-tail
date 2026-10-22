@@ -15,6 +15,10 @@ export interface CreateRowInput {
   description: string;
   priority: number;
   metadata: Record<string, any>;
+  /** JSON envelope, e.g. `{ lookups: [...] }` naming the catalog edition a code comes from. */
+  envelope?: string;
+  /** What the row shows a person, serialized. */
+  escalation_payload?: string;
 }
 
 export type Action =
@@ -28,6 +32,8 @@ export type Action =
   | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; metadata?: Record<string, any>; complete?: Completion }
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
   | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
+  /** A row for a person, raised by the controller. */
+  | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
   | { kind: 'settleReply'; cmdId: string; status: string; reason: string }
   /** A machine reported the jobs it holds: answers a status query in flight. */

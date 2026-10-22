@@ -73,6 +73,8 @@ export class GatewayState {
   private dispatches = new Map<string, string>();
   private endedCommands = new Set<string>();
   readonly links = new Map<string, LinkTrack>();
+  /** Messages already shown to a person as contract violations. */
+  private violations = new Set<string>();
 
   index(row: HandoffRow): void {
     if (this.closedRows.has(row.id)) return;
@@ -180,6 +182,18 @@ export class GatewayState {
     if (this.endedCommands.size > CLOSED_LIMIT) {
       const oldest = this.endedCommands.values().next().value;
       if (oldest) this.endedCommands.delete(oldest);
+    }
+  }
+
+  violationRaised(key: string): boolean {
+    return this.violations.has(key);
+  }
+
+  raiseViolation(key: string): void {
+    this.violations.add(key);
+    if (this.violations.size > CLOSED_LIMIT) {
+      const oldest = this.violations.values().next().value;
+      if (oldest) this.violations.delete(oldest);
     }
   }
 

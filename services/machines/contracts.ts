@@ -16,6 +16,8 @@ export const ROW_TYPE = {
   MACHINE_QUIET: 'machine-quiet',
   /** A host asks a machine to start, stop, pause, resume or change over. */
   MACHINE_COMMAND: 'machine-command',
+  /** A message that broke the contract under a strict codec: held for a person, never acted on. */
+  CONTRACT_VIOLATION: 'contract-violation',
 } as const;
 
 export const LINE_ROLE = {

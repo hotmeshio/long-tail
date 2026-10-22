@@ -9,7 +9,7 @@ import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE, itemKeys } from '../contracts';
 import { CONTROLLER } from './actions';
 import { alarmsClearedMeanwhile, restoreLineRows } from './reconcile';
-import type { LineDef } from '../../../lib/machines/line';
+import { operatorRole, type LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
@@ -218,7 +218,9 @@ export class MachineGateway {
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
       }
-      const applied = await this.applyMachine(msg.topic, seen.parsed, seen.body);
+      const applied = seen.violations.length && this.codec.strict
+        ? await this.holdViolation(msg, seen)
+        : await this.applyMachine(msg.topic, seen.parsed, seen.body);
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
     }
@@ -229,6 +231,26 @@ export class MachineGateway {
     }
     if (outcome !== DISPOSITION.NAK) this.confirm(decoded);
     return outcome;
+  }
+
+  /** Under a strict codec a broken message is not acted on: a person sees it on a row, once. */
+  private async holdViolation(msg: InboundMessage, seen: Inspection): Promise<{ disposition: Disposition; failed: boolean }> {
+    const { ident, kind } = seen.parsed!;
+    const key = seen.receiptId ?? seen.body?.id ?? `${msg.topic}:${msg.payload}`;
+    if (this.state.violationRaised(key)) return { disposition: DISPOSITION.ACK, failed: false };
+    try {
+      await this.executor.apply([{ kind: 'createRow', row: {
+        type: ROW_TYPE.CONTRACT_VIOLATION, role: operatorRole(this.deps.line), priority: 2,
+        description: `${ident.machineId} sent a ${kind} message that breaks the contract: ${seen.violations.join('; ')}`,
+        metadata: { siteId: ident.siteId, lineId: ident.lineId, machineId: ident.machineId, kind, topic: msg.topic, messageId: seen.body?.id ?? null, violations: seen.violations },
+        escalation_payload: msg.payload,
+      } }]);
+      this.state.raiseViolation(key);
+      return { disposition: DISPOSITION.ACK, failed: false };
+    } catch (err: any) {
+      this.log.error(GATEWAY_LOG.VERB_FAILED, { topic: msg.topic, error: err.message });
+      return { disposition: DISPOSITION.NAK, failed: true };
+    }
   }
 
   /** Done with the message: confirm each id its codec asked to confirm. */

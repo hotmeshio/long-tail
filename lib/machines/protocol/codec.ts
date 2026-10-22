@@ -58,6 +58,11 @@ export interface LineCodec {
    * dispatched unit then carries the arrival event its receiver reported.
    */
   readonly dispatchOn?: DispatchOn;
+  /**
+   * Strict: a message with contract violations is confirmed but never acted on, and a row shows it
+   * to a person. Otherwise (the default) known fields are acted on and the violations are logged.
+   */
+  readonly strict?: boolean;
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */

@@ -14,6 +14,7 @@
 import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, itemKeys } from '../contracts';
 import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type Envelope, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION } from '../../../lib/machines/transport';
+import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../types/escalation';
 import { CONTROLLER, type Action, type Plan } from './actions';
 import { dispatchAction } from './pacing';
 import { failHandoff } from './plan-shared';
@@ -186,8 +187,16 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
         siteId, lineId, machineId: m, alarmId, code: b.code, level: b.level, raisedAt: b.raisedAt,
         zone: b.zone ?? null, autoClears: b.autoClears ?? false, action: b.action ?? null, jobId: b.jobId ?? null,
       },
+      ...catalogEnvelope(b.catalog),
     },
   }]);
+}
+
+/** An alarm naming the catalog edition its code comes from carries that edition as a lookup, so the row reads its meaning. */
+function catalogEnvelope(catalog: unknown): { envelope?: string } {
+  const ref = catalog as EscalationLookupRef | undefined;
+  if (!ref || typeof ref.domain !== 'string' || typeof ref.key !== 'string') return {};
+  return { envelope: JSON.stringify({ [ESCALATION_ENVELOPE_KEYS.LOOKUPS]: [ref] }) };
 }
 
 function planPresence(state: GatewayState, m: string, b: Record<string, any>): Plan {

@@ -23,6 +23,8 @@ export interface FakeRow {
   items: { itemKey: string; payload: any; actor: Actor }[];
   resolver_payload?: Record<string, any>;
   resolved_by?: string;
+  envelope?: string;
+  escalation_payload?: string;
 }
 
 export interface Call { verb: string; as: Actor; id: string; payload?: any }

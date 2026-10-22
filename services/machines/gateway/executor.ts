@@ -87,6 +87,11 @@ export class Executor {
         return;
       case 'createAlarmRow':
         return this.createAlarmRow(a);
+      case 'createRow': {
+        const { id } = await lt.create(CONTROLLER, a.row);
+        this.d.log.info(GATEWAY_LOG.VIOLATION_ROW, { row: id, type: a.row.type });
+        return;
+      }
       case 'watchOffline':
         return this.watchOffline(a.machineId);
       case 'settleReply':
