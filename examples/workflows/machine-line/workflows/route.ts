@@ -3,7 +3,7 @@
  * route, the row each hop parks, and what a finished row means.
  */
 
-import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
+import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, arrivedUnit, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
 import { machineById, machineRole, stationRole, type LineDef } from '../../../../lib/machines/line';
 
 export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
@@ -127,10 +127,17 @@ export interface HopOutcome {
   detail?: string;
 }
 
+/** A timeout after some units arrived splits them between two stations, which a retry of the hop cannot move. */
+function timedOut(items: { itemKey: string }[]): HopOutcome {
+  const arrived = items.map((i) => arrivedUnit(i.itemKey)).filter((u): u is string => !!u);
+  if (!arrived.length) return { received: false, errorCode: HANDOFF_ERROR.HANDOFF_TIMEOUT, detail: 'no receipt before the timeout' };
+  return { received: false, errorCode: HANDOFF_ERROR.PARTIAL_ARRIVAL, detail: `${arrived.join(', ')} arrived; the rest did not before the timeout` };
+}
+
 /** Read a finished handoff row: a receipt, an error, a timeout, or a cancel. */
 export function readHopOutcome(result: Record<string, any> | null): HopOutcome {
   if (result === null) return { received: false, errorCode: HANDOFF_ERROR.CANCELLED, detail: 'the handoff was cancelled' };
-  if (result.$trigger === 'timeout') return { received: false, errorCode: HANDOFF_ERROR.HANDOFF_TIMEOUT, detail: 'no receipt before the timeout' };
+  if (result.$trigger === 'timeout') return timedOut(result.$accumulated ?? []);
   if (result.received === true) return { received: true };
   return { received: false, errorCode: result.errorCode, detail: result.detail ?? result.reason ?? undefined };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DECISION, HANDOFF_ERROR, handoffDecisions, signalKeys } from '../../../services/machines/contracts';
+import { DECISION, HANDOFF_ERROR, arrivedUnit, handoffDecisions, itemKeys, signalKeys } from '../../../services/machines/contracts';
 
 describe('handoffDecisions', () => {
   it('offers retry, manual and scrap for a failure in the move', () => {
@@ -12,8 +12,19 @@ describe('handoffDecisions', () => {
     expect(handoffDecisions(HANDOFF_ERROR.SENDER_REJECTED)).toEqual([DECISION.MANUAL, DECISION.SCRAP]);
   });
 
+  it('offers only manual and scrap once a partial arrival split the units', () => {
+    expect(handoffDecisions(HANDOFF_ERROR.PARTIAL_ARRIVAL)).toEqual([DECISION.MANUAL, DECISION.SCRAP]);
+  });
+
   it('treats an unknown error as a failure in the move', () => {
     expect(handoffDecisions(undefined)).toContain(DECISION.RETRY);
+  });
+});
+
+describe('arrivedUnit', () => {
+  it('names the unit of an arrival item and nothing else', () => {
+    expect(arrivedUnit(itemKeys.arrived('U1'))).toBe('U1');
+    expect(arrivedUnit(itemKeys.released('U1'))).toBeNull();
   });
 });
 

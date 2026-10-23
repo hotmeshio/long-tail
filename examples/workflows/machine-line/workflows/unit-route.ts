@@ -4,7 +4,8 @@
  * gateway, a person resolves the last one on the dashboard. A hop that ends
  * without a receipt parks a line-operator row: retry the hop, finish the
  * units by hand, or scrap them. Units the sender finished as not ok are off
- * the line, so their row offers only manual and scrap.
+ * the line, and units split by a partial arrival are no longer all at the
+ * sender, so those rows offer only manual and scrap.
  */
 
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';

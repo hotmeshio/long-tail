@@ -56,6 +56,8 @@ export interface HandoffFacets {
   attempt: number;
 }
 
+const ARRIVED_PREFIX = 'arrived:';
+
 /**
  * Items a handoff row accumulates, one per unit: the sender's finished-job
  * record, and the receiver's arrival. When every unit's arrival is held, the
@@ -63,8 +65,13 @@ export interface HandoffFacets {
  */
 export const itemKeys = {
   released: (unitId: string) => `released:${unitId}`,
-  arrived: (unitId: string) => `arrived:${unitId}`,
+  arrived: (unitId: string) => `${ARRIVED_PREFIX}${unitId}`,
 };
+
+/** The unit an arrival item names; null for any other item. */
+export function arrivedUnit(itemKey: string): string | null {
+  return itemKey.startsWith(ARRIVED_PREFIX) ? itemKey.slice(ARRIVED_PREFIX.length) : null;
+}
 
 export const HANDOFF_ERROR = {
   DISPATCH_REFUSED: 'dispatch-refused',
@@ -73,6 +80,8 @@ export const HANDOFF_ERROR = {
   NO_REPLY: 'no-reply',
   SENDER_REJECTED: 'sender-rejected',
   HANDOFF_TIMEOUT: 'handoff-timeout',
+  /** The handoff timed out after some of its units arrived; the units are split between two stations. */
+  PARTIAL_ARRIVAL: 'partial-arrival',
   SOFTWARE_UNSUPPORTED: 'software-unsupported',
   WITHDRAWN: 'withdrawn',
   CANCELLED: 'cancelled',
@@ -128,13 +137,17 @@ export const DECISION = {
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
-/** Units a sender finished as not ok leave the automated line: they finish by hand or as scrap, and never re-enter it. */
-const LEAVES_LINE: readonly HandoffErrorCode[] = [HANDOFF_ERROR.SENDER_REJECTED];
+/**
+ * Failures a retry cannot repair. Units a sender finished as not ok leave the
+ * automated line and never re-enter it; units split by a partial arrival are
+ * no longer all at the sender, so the same hop cannot move them again.
+ */
+const NO_RETRY: readonly HandoffErrorCode[] = [HANDOFF_ERROR.SENDER_REJECTED, HANDOFF_ERROR.PARTIAL_ARRIVAL];
 
-/** The decisions an operator may take on a failed handoff; retry only while the units are still on the line. */
+/** The decisions an operator may take on a failed handoff; retry only while every unit is still at the sender. */
 export function handoffDecisions(errorCode?: HandoffErrorCode): Decision[] {
-  const offLine = !!errorCode && LEAVES_LINE.includes(errorCode);
-  return offLine ? [DECISION.MANUAL, DECISION.SCRAP] : [DECISION.RETRY, DECISION.MANUAL, DECISION.SCRAP];
+  const noRetry = !!errorCode && NO_RETRY.includes(errorCode);
+  return noRetry ? [DECISION.MANUAL, DECISION.SCRAP] : [DECISION.RETRY, DECISION.MANUAL, DECISION.SCRAP];
 }
 
 export interface OperatorResolution {

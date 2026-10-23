@@ -75,4 +75,12 @@ describe('unit route: reading a finished handoff', () => {
     expect(readHopOutcome({ $trigger: 'timeout', $accumulated: [] })).toMatchObject({ received: false, errorCode: 'handoff-timeout' });
     expect(readHopOutcome(null)).toMatchObject({ received: false, errorCode: 'cancelled' });
   });
+
+  it('reads a timeout after some units arrived as a partial arrival naming them', () => {
+    const $accumulated = [{ itemKey: 'released:U1' }, { itemKey: 'released:U2' }, { itemKey: 'arrived:U2' }];
+    expect(readHopOutcome({ $trigger: 'timeout', $accumulated })).toEqual({
+      received: false, errorCode: 'partial-arrival', detail: 'U2 arrived; the rest did not before the timeout',
+    });
+    expect(readHopOutcome({ $trigger: 'timeout', $accumulated: $accumulated.slice(0, 2) })).toMatchObject({ errorCode: 'handoff-timeout' });
+  });
 });
