@@ -11,7 +11,7 @@ export const OAUTH_ENDPOINT_PATHS = {
 
 const SCOPES_SUPPORTED = [MCP_SCOPES.READ, MCP_SCOPES.FULL];
 
-/** RFC 8414 authorization server metadata. */
+/** RFC 8414 authorization server metadata. Authorization responses carry `iss` (RFC 9207). */
 export function authorizationServerMetadata(settings: OAuthServerSettings): Record<string, unknown> {
   const at = (path: string) => `${settings.issuer}${path}`;
   return {
@@ -26,6 +26,7 @@ export function authorizationServerMetadata(settings: OAuthServerSettings): Reco
     token_endpoint_auth_methods_supported: ['none'],
     revocation_endpoint_auth_methods_supported: ['none'],
     scopes_supported: SCOPES_SUPPORTED,
+    authorization_response_iss_parameter_supported: true,
   };
 }
 

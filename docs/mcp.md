@@ -216,13 +216,18 @@ start({
   auth: {
     oauthServer: {
       issuer: 'https://api.example.com/longtail', // the public base URL Long Tail is served under
-      allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'], // exact https redirects, beyond loopback
+      allowedRedirectUris: [                      // exact https redirects, beyond loopback
+        'https://claude.ai/api/mcp/auth_callback',
+        'https://chatgpt.com/connector_platform_oauth_redirect',
+      ],
     },
   },
 });
 ```
 
 Clients register themselves (RFC 7591). Loopback redirects (`http://127.0.0.1`, `localhost`, `[::1]`, any port) are always allowed, which covers Claude Code and Claude Desktop; an `https` redirect is allowed only when it equals a URI in `allowedRedirectUris`.
+
+Every authorization response, a code or an error, carries the issuer as `iss` (RFC 9207), and the server metadata advertises it with `authorization_response_iss_parameter_supported`. Clients that check the issuer use one fixed callback for every connection, which a single `allowedRedirectUris` entry covers: ChatGPT's is `https://chatgpt.com/connector_platform_oauth_redirect`.
 
 **Embedded deployments** mount two routers, and let four paths reach Long Tail without the host's login:
 
