@@ -56,6 +56,7 @@ export interface HandoffFacets {
   attempt: number;
 }
 
+const RELEASED_PREFIX = 'released:';
 const ARRIVED_PREFIX = 'arrived:';
 
 /**
@@ -64,13 +65,34 @@ const ARRIVED_PREFIX = 'arrived:';
  * receiver resolves the row.
  */
 export const itemKeys = {
-  released: (unitId: string) => `released:${unitId}`,
+  released: (unitId: string) => `${RELEASED_PREFIX}${unitId}`,
   arrived: (unitId: string) => `${ARRIVED_PREFIX}${unitId}`,
 };
 
 /** The unit an arrival item names; null for any other item. */
 export function arrivedUnit(itemKey: string): string | null {
   return itemKey.startsWith(ARRIVED_PREFIX) ? itemKey.slice(ARRIVED_PREFIX.length) : null;
+}
+
+/** Where a handoff's units stand, read from its items. */
+export interface HandoffProgress {
+  /** Units the sender reported finished and released. */
+  released: string[];
+  /** Units the receiver reported arrived. */
+  arrived: string[];
+  /** Units with no arrival, in the handoff's order. */
+  missing: string[];
+}
+
+/** A handoff's progress from its items (a row's items, or `$accumulated` on a finished wait), for the units it carries. */
+export function handoffProgress(units: readonly string[], items: readonly { itemKey: string }[]): HandoffProgress {
+  const keys = new Set(items.map((i) => i.itemKey));
+  const arrived = units.filter((u) => keys.has(itemKeys.arrived(u)));
+  return {
+    released: units.filter((u) => keys.has(itemKeys.released(u))),
+    arrived,
+    missing: units.filter((u) => !arrived.includes(u)),
+  };
 }
 
 export const HANDOFF_ERROR = {
@@ -160,6 +182,7 @@ export const signalKeys = {
   handoff: (jobKey: string, step: number, attempt: number) => `handoff-${jobKey}-s${step}-a${attempt}`,
   handoffError: (jobKey: string, step: number, attempt: number, round = 1) =>
     `handoff-error-${jobKey}-s${step}-a${attempt}${round > 1 ? `-r${round}` : ''}`,
+  jobStop: (jobKey: string, step: number, attempt: number) => `job-stop-${jobKey}-s${step}-a${attempt}`,
 };
 
 /** Metadata on a machine-command row. */

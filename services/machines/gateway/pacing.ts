@@ -74,14 +74,20 @@ export function hasRoom(state: GatewayState, line: LineDef, row: HandoffRow): bo
   return fits(line, row, machineLoad(state, row.toMachine!), state);
 }
 
-/** The resolution refusing a handoff for the machine's software or a missing artifact; empty when it may go. */
+/** Two open handoffs may not name the same job at one machine: each row, subsets of a route's units included, needs its own. */
+export function jobRefusal(state: GatewayState, row: HandoffRow): string | null {
+  const other = state.open().find((r) => r.id !== row.id && r.toMachine === row.toMachine && r.jobId === row.jobId && r.dispatch !== DISPATCH_STATE.REFUSED);
+  return other ? `job ${row.jobId} at ${row.toMachine} already belongs to handoff ${other.id}` : null;
+}
+
+/** The resolution refusing a handoff for the machine's software, a missing artifact or a job id in use; empty when it may go. */
 export function refuseUnfit(state: GatewayState, line: LineDef, row: HandoffRow): Action[] {
   const software = softwareRefusal(state, line, row.toMachine!);
-  const artifact = software ? null : artifactRefusal(line, row);
-  if (!software && !artifact) return [];
+  const other = software ?? artifactRefusal(line, row) ?? jobRefusal(state, row);
+  if (!other) return [];
   row.dispatch = DISPATCH_STATE.REFUSED;
   const errorCode = software ? HANDOFF_ERROR.SOFTWARE_UNSUPPORTED : HANDOFF_ERROR.DISPATCH_REFUSED;
-  return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode, detail: software ?? artifact } }];
+  return [{ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { received: false, errorCode, detail: other } }];
 }
 
 /** Send a handoff to its machine now, or refuse it for the machine's software or a missing artifact. */

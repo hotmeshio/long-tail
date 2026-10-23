@@ -1,20 +1,27 @@
 import { cancelCommandId, type HandoffResolution } from '../contracts';
 import { OP } from '../../../lib/machines/protocol';
 import type { Action, Actor } from './actions';
-import { dispatchJobs } from './jobs';
+import { dispatchJobs, type DispatchJob } from './jobs';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
-/** A cancel for each job a handoff's units became at `machineId`. */
-export function cancelJobs(state: GatewayState, row: HandoffRow, machineId: string, jobId: string, tag = ''): Action[] {
-  return dispatchJobs(jobId, row.units, state.unitsPerDispatch).map((job) => ({
+/** A cancel for each job a handoff's units became at `machineId`, or for those `keep` leaves out. */
+export function cancelJobs(
+  state: GatewayState, row: HandoffRow, machineId: string, jobId: string, tag = '', keep: (job: DispatchJob) => boolean = () => false,
+): Action[] {
+  return dispatchJobs(jobId, row.units, state.unitsPerDispatch).filter((job) => !keep(job)).map((job) => ({
     kind: 'command', machineId, op: OP.CANCEL, cmdId: `${cancelCommandId(row.id)}${tag}${job.suffix}`, args: { jobId: job.jobId },
   }));
 }
 
-/** Withdraw a dispatch that may still sit in the receiver's queue. */
+/**
+ * Withdraw a dispatch that may still sit in the receiver's queue. A job some
+ * of whose units already reached the receiver is under way: it stays, and
+ * what happens to it is the workflow's next decision (a machine-command row).
+ */
 export function cancelDispatch(state: GatewayState, row: HandoffRow): Action[] {
-  if (!row.toMachine || row.dispatch === DISPATCH_STATE.NONE || row.dispatch === DISPATCH_STATE.REFUSED) return [];
-  return cancelJobs(state, row, row.toMachine, row.jobId);
+  const to = row.toMachine;
+  if (!to || row.dispatch === DISPATCH_STATE.NONE || row.dispatch === DISPATCH_STATE.REFUSED) return [];
+  return cancelJobs(state, row, to, row.jobId, '', (job) => job.units.some((u) => state.heldJob(to, u.unitId) === job.jobId));
 }
 
 /** Stop the sender's job too: a row cancelled while the sender still works its units. */

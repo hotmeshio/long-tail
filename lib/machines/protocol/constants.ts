@@ -103,7 +103,7 @@ export const OP = {
 export type Op = typeof OP[keyof typeof OP];
 
 /** Commands a host may ask of a machine through a machine-command row. */
-export const CONTROL_OPS: readonly Op[] = [OP.START, OP.STOP, OP.PAUSE, OP.RESUME, OP.CHANGEOVER];
+export const CONTROL_OPS: readonly Op[] = [OP.START, OP.STOP, OP.PAUSE, OP.RESUME, OP.CHANGEOVER, OP.CANCEL];
 
 /**
  * A command's reply. `accepted` means recorded; a machine that prepares the work first (fetch, verify)

@@ -18,7 +18,7 @@ import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../typ
 import { CONTROLLER, type Action, type Plan } from './actions';
 import { dispatchAction } from './pacing';
 import { failHandoff } from './plan-shared';
-import { dispatchJobs } from './jobs';
+import { dispatchJobs, jobOwns } from './jobs';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
@@ -64,10 +64,10 @@ function missing(state: GatewayState, unitId: string, pred: (r: HandoffRow) => b
   return state.closedFor(unitId, pred) ? ack() : nak;
 }
 
-/** Whether a machine's job id is one of the jobs a handoff's units became under `jobId`. */
-function ownsJob(state: GatewayState, r: HandoffRow, jobId: string | null, reported: unknown): boolean {
+/** Whether a machine's job id belongs to `jobId`; a row for some of a job's units still owns it. */
+function ownsJob(jobId: string | null, reported: unknown): boolean {
   if (!jobId || typeof reported !== 'string') return true;
-  return dispatchJobs(jobId, r.units, state.unitsPerDispatch).some((j) => j.jobId === reported);
+  return jobOwns(jobId, reported);
 }
 
 /** Keep the receiver's arrival event for the unit, to go out with its dispatch. */
@@ -79,8 +79,8 @@ function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>): H
 function planJob(state: GatewayState, m: string, b: Record<string, any>, at: string | undefined, ttl: number): Plan {
   const unitId = b.unitId;
   // An event from an earlier attempt's job never touches a later attempt's row.
-  const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(state, r, r.jobId, b.jobId);
-  const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(state, r, r.senderJobId, b.jobId);
+  const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(r.jobId, b.jobId);
+  const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(r.senderJobId, b.jobId);
 
   if (b.event === JOB_EVENT.ARRIVED) {
     const row = state.openFor(unitId, toHere);
@@ -154,7 +154,7 @@ function releasedAction(row: HandoffRow, m: string, b: Record<string, any>): Act
 /** The sender's finished record that came before the row, written ahead of the arrival that may resolve it. */
 function releasedEarly(state: GatewayState, row: HandoffRow, unitId: string): Action[] {
   const b = state.takeFinish(row.fromMachine!, unitId);
-  if (!b || b.result !== JOB_RESULT.OK || !ownsJob(state, row, row.senderJobId, b.jobId)) return [];
+  if (!b || b.result !== JOB_RESULT.OK || !ownsJob(row.senderJobId, b.jobId)) return [];
   return [releasedAction(row, row.fromMachine!, b)];
 }
 

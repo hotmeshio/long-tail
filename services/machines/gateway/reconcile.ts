@@ -1,13 +1,17 @@
 /**
- * What a gateway restores when it starts leading a line: the alarm, offline
- * and quiet rows it raised before, read back from Long Tail, so a clear or a
- * return that comes later still resolves them.
+ * What a gateway restores when it starts leading a line, read back from Long
+ * Tail: the alarm, offline and quiet rows it raised before, so a clear or a
+ * return that comes later still resolves them; and the units each open
+ * handoff saw arrive, so the receiver holds them again.
  */
 
-import { ROW_TYPE } from '../contracts';
+import { ROW_TYPE, arrivedUnit, handoffProgress } from '../contracts';
 import { operatorRole, type LineDef } from '../../../lib/machines/line';
+import type { Action } from './actions';
 import type { LineEscalations } from './escalations';
-import type { GatewayState } from './state';
+import { dispatchJobs } from './jobs';
+import { dispatchAction } from './pacing';
+import { DISPATCH_STATE, type GatewayState } from './state';
 
 export interface RestoredRows {
   alarms: number;
@@ -39,4 +43,33 @@ export function alarmsClearedMeanwhile(state: GatewayState, active: Set<string>)
   return [...state.alarms.entries()]
     .filter(([key, t]) => t.open && t.rowId && !active.has(key))
     .map(([key, t]) => ({ key, rowId: t.rowId!, machineId: t.machineId }));
+}
+
+/**
+ * Units that arrived at an open handoff's receiver, read from the row's items:
+ * the receiver holds them again, so a timeout leaves their job alone. A row
+ * whose units all arrived completes; one dispatched on arrival is sent with the
+ * arrivals it holds.
+ */
+export async function arrivalsOnRows(state: GatewayState, lt: LineEscalations, dispatchTtlMs: number): Promise<Action[]> {
+  const actions: Action[] = [];
+  for (const row of state.open()) {
+    const to = row.toMachine;
+    if (!to || (row.dispatch !== DISPATCH_STATE.ARRIVING && row.dispatch !== DISPATCH_STATE.ACCEPTED)) continue;
+    const items = await lt.items(row.id);
+    const units = row.units.map((u) => u.unitId);
+    const { arrived, missing } = handoffProgress(units, items);
+    for (const job of dispatchJobs(row.jobId, row.units, state.unitsPerDispatch)) {
+      for (const u of job.units) if (arrived.includes(u.unitId)) state.hold(to, u.unitId, job.jobId);
+    }
+    if (missing.length) continue;
+    if (row.dispatch === DISPATCH_STATE.ACCEPTED) {
+      actions.push({ kind: 'resolve', as: to, rowId: row.id, payload: { received: true, receiver: to, units } });
+      continue;
+    }
+    const byUnit = new Map(items.filter((i) => arrivedUnit(i.itemKey)).map((i) => [i.payload.unitId, i.payload]));
+    row.arrivals = Object.fromEntries(units.map((u) => [u, byUnit.get(u)?.arrival ?? { unitId: u, carrierId: byUnit.get(u)?.carrierId ?? null }]));
+    actions.push(dispatchAction(row, to, dispatchTtlMs));
+  }
+  return actions;
 }

@@ -13,7 +13,7 @@ import { machineById, machineRole, receiverRoles, type LineDef } from '../../../
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
-import { admit, hasRoom, refuseUnfit, softwareRefusal } from './pacing';
+import { admit, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './pacing';
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { standardRows, type HandoffRowAdapter } from '../rows';
@@ -77,6 +77,7 @@ function commandRefusal(line: LineDef, c: CommandFacets, role: string): string |
   const own = machineRole(machineById(line, c.machineId));
   if (role !== own) return `commands for ${c.machineId} are parked on ${own}, not ${role}`;
   if (!CONTROL_OPS.includes(c.op as Op)) return `${c.op} is not a command a row may ask for; one of ${CONTROL_OPS.join(', ')}`;
+  if (c.op === OP.CANCEL && typeof c.args.jobId !== 'string') return `${OP.CANCEL} needs args.jobId, the job to withdraw or stop`;
   return null;
 }
 
@@ -119,7 +120,7 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
       if (!refused.length) row.dispatch = DISPATCH_STATE.ARRIVING;
       return refused;
     }
-    const refused = !!softwareRefusal(state, line, row.toMachine);
+    const refused = !!softwareRefusal(state, line, row.toMachine) || !!jobRefusal(state, row);
     if (state.holdDispatch || (!refused && !hasRoom(state, line, row))) {
       row.dispatch = DISPATCH_STATE.WAITING;
       return [];

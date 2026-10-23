@@ -1,6 +1,6 @@
 /**
- * Commands as rows. A host asks a machine to start, stop, pause, resume or
- * change over by parking a machine-command row on the machine's role, from a
+ * Commands as rows. A host asks a machine to start, stop, pause, resume,
+ * change over or cancel a job by parking a machine-command row on the machine's role, from a
  * workflow step or through the API, the same way it asks a person for
  * anything. The gateway sends the command and resolves the row with the
  * machine's reply (CommandResolution), so the step reads the outcome as data.

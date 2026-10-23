@@ -14,6 +14,11 @@ export interface DispatchJob {
   suffix: string;
 }
 
+/** Whether a machine's job id is `jobId` or one of the jobs it was split into, whichever units a row names. */
+export function jobOwns(jobId: string, reported: string): boolean {
+  return reported === jobId || reported.startsWith(`${jobId}#`);
+}
+
 export function dispatchJobs(jobId: string, units: HandoffUnit[], perDispatch: number | null): DispatchJob[] {
   if (!perDispatch || units.length <= perDispatch) return [{ jobId, units, suffix: '' }];
   const jobs: DispatchJob[] = [];

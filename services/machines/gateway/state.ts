@@ -128,6 +128,11 @@ export class GatewayState {
     this.held.get(machineId)?.delete(unitId);
   }
 
+  /** The job a unit arrived under at `machineId`, while it is still there. */
+  heldJob(machineId: string, unitId: string): string | undefined {
+    return this.held.get(machineId)?.get(unitId);
+  }
+
   heldAt(machineId: string): string[] {
     return [...(this.held.get(machineId)?.values() ?? [])];
   }
