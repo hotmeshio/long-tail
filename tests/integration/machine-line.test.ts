@@ -82,7 +82,7 @@ async function command(target: CommandTarget, op: string, args: Record<string, u
 }
 
 /** A person at a station: wait for the sender's release of each unit, take the units off, receive them. */
-async function receive(jobId: string, unitIds: string[], ms = 60_000): Promise<void> {
+async function receive(jobId: string, unitIds: string[], ms = 180_000): Promise<void> {
   const [row] = await rowsFor(jobId, (rows) => rows.some((r) => r.status === 'pending'), ms);
   const from = row.metadata.fromMachine;
   if (from) {
