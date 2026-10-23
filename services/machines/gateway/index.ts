@@ -6,3 +6,5 @@ export * from './lt-http';
 export * from './api-escalations';
 export * from './provision';
 export * from './state';
+export * from './address-book';
+export * from './registration';

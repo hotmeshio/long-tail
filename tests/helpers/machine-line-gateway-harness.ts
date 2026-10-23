@@ -47,9 +47,13 @@ export function facetsFor(units: string | string[], from: string | null, to: str
   };
 }
 
+/** `gatewayLine`: the line as the gateway knows it, when it differs from the mock's (a line that learns addresses). */
+export type RigSeams = Pick<GatewayDeps, 'rows' | 'codec' | 'log' | 'addresses'> & { gatewayLine?: LineDef };
+
 export async function startRig(
-  mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: Pick<GatewayDeps, 'rows' | 'codec' | 'log'> = {},
+  mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: RigSeams = {},
 ): Promise<LineRig> {
+  const { gatewayLine = line, ...deps } = seams;
   const base = await startHarness(mock, line);
   const feed = new MemoryEscalationFeed(base.broker);
   const lt = new FakeLongTail(feed);
@@ -58,7 +62,7 @@ export async function startRig(
   const startGateway = async () => {
     const gateway = new MachineGateway({
       bus: new MemoryMachineBus(base.broker, lineFilter(ROOT, line.siteId, line.lineId)),
-      feed, lt, line, settings, ...seams, log: seams.log ?? silentLog,
+      feed, lt, line: gatewayLine, settings, ...deps, log: deps.log ?? silentLog,
     });
     await gateway.start();
     return gateway;

@@ -12,7 +12,7 @@ import { ESCALATION_FEED, MACHINE_TRANSPORT, loadMachineLineConfig, type Machine
 import { ApiLineEscalations } from './gateway/api-escalations';
 import { MachineGateway } from './gateway/gateway';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './gateway/log';
-import { ensureLineBots } from './identities';
+import { BotAddressBook, ensureLineBots } from './identities';
 import { LineLeadership } from './leadership';
 import { createEscalationFeed, createMachineBus, defaultCodec } from './select';
 import type { LineCodec } from '../../lib/machines/protocol';
@@ -78,6 +78,7 @@ class LineRun {
       rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
       lt: new ApiLineEscalations(userFor),
+      addresses: new BotAddressBook(ids),
       line,
       log: this.log,
       settings: {

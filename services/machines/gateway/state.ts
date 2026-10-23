@@ -75,6 +75,13 @@ export class GatewayState {
   readonly links = new Map<string, LinkTrack>();
   /** Messages already shown to a person as contract violations. */
   private violations = new Set<string>();
+  /** Learned addresses, both ways: station → address and address → station. */
+  private addressOfStation = new Map<string, string>();
+  private stationOfAddress = new Map<string, string>();
+  /** Contested claims already raised as registration rows, `${address}>${station}`. */
+  private claims = new Set<string>();
+  /** Addresses heard that claim no station, logged once each. */
+  private strangers = new Set<string>();
 
   index(row: HandoffRow): void {
     if (this.closedRows.has(row.id)) return;
@@ -188,6 +195,44 @@ export class GatewayState {
       const oldest = this.endedCommands.values().next().value;
       if (oldest) this.endedCommands.delete(oldest);
     }
+  }
+
+  /** Bind a station to an address, replacing whatever either was bound to before. */
+  bindAddress(machineId: string, address: string): void {
+    const before = this.addressOfStation.get(machineId);
+    if (before) this.stationOfAddress.delete(before);
+    const other = this.stationOfAddress.get(address);
+    if (other) this.addressOfStation.delete(other);
+    this.addressOfStation.set(machineId, address);
+    this.stationOfAddress.set(address, machineId);
+  }
+
+  learnedAddress(machineId: string): string | undefined {
+    return this.addressOfStation.get(machineId);
+  }
+
+  stationAt(address: string): string | undefined {
+    return this.stationOfAddress.get(address);
+  }
+
+  claimRaised(address: string, machineId: string): boolean {
+    return this.claims.has(`${address}>${machineId}`);
+  }
+
+  raiseClaim(address: string, machineId: string): void {
+    this.claims.add(`${address}>${machineId}`);
+  }
+
+  settleClaim(address: string, machineId: string): void {
+    this.claims.delete(`${address}>${machineId}`);
+  }
+
+  /** True the first time an address that claims no station is heard. */
+  firstHeardStranger(address: string): boolean {
+    if (this.strangers.has(address)) return false;
+    this.strangers.add(address);
+    if (this.strangers.size > CLOSED_LIMIT) this.strangers.delete(this.strangers.values().next().value!);
+    return true;
   }
 
   violationRaised(key: string): boolean {

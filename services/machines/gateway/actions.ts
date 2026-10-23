@@ -37,7 +37,9 @@ export type Action =
   | { kind: 'watchOffline'; machineId: string }
   | { kind: 'settleReply'; cmdId: string; status: string; reason: string }
   /** A machine reported the jobs it holds: answers a status query in flight. */
-  | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] };
+  | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] }
+  /** Bind a station to the address that claims it, and keep the binding in the address book. `by`: who approved it, when someone did. */
+  | { kind: 'bindAddress'; machineId: string; address: string; by?: string };
 
 /** Once the row holds every one of `keys`: resolve it with `payload`, or run `then` instead. */
 export interface Completion {

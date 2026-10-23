@@ -10,6 +10,7 @@ import { operatorRole, type LineDef } from '../../../lib/machines/line';
 import { REPLY_STATUS, type LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
+import type { AddressBook } from './address-book';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
@@ -31,6 +32,8 @@ export interface ExecutorDeps {
   dispatchAttempts: number;
   offlineDebounceMs: number;
   log: GatewayLog;
+  /** Where learned addresses are kept (registration.ts). */
+  addresses: AddressBook;
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
@@ -99,6 +102,11 @@ export class Executor {
         return;
       case 'settleSnapshot':
         replies.settleSnapshot(a.machineId, new Set(a.jobIds));
+        return;
+      case 'bindAddress':
+        await this.d.addresses.bind(a.machineId, a.address);
+        state.bindAddress(a.machineId, a.address);
+        this.d.log.info(GATEWAY_LOG.ADDRESS_BOUND, { machine: a.machineId, address: a.address, ...(a.by ? { approvedBy: a.by } : {}) });
     }
   }
 

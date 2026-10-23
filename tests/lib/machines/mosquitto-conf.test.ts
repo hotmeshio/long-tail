@@ -68,3 +68,22 @@ describe('machine broker ACL', () => {
     expect(ctl).toContain('topic read acme/v1/site-1/line-1/#');
   });
 });
+
+describe('machine broker ACL, a line that learns addresses', () => {
+  const learned = renderMosquittoAcl({ ...DEFAULT_LINE, addressing: 'learned' }, genericCodec({ root: 'line/v1' }));
+
+  it('gives every certificate its own channels by common name, before any user block, and no user per station', () => {
+    expect(learned.indexOf('pattern write line/v1/site-1/line-1/%u/job')).toBeGreaterThan(-1);
+    expect(learned).toContain('pattern read line/v1/site-1/line-1/%u/cmd');
+    expect(learned.indexOf('pattern ')).toBeLessThan(learned.indexOf('user '));
+    expect(learned).not.toContain('user site-1-line-1-press-01');
+    expect(learned).toContain('user line-controller-site-1-line-1');
+  });
+
+  it('a station whose address is declared keeps its own user block', () => {
+    const [press, ...rest] = DEFAULT_LINE.machines;
+    const mixed = renderMosquittoAcl({ ...DEFAULT_LINE, addressing: 'learned', machines: [{ ...press, address: '8f77e321' }, ...rest] }, genericCodec({ root: 'line/v1' }));
+    expect(mixed).toContain('user site-1-line-1-8f77e321');
+    expect(mixed).toContain('pattern write line/v1/site-1/line-1/%u/job');
+  });
+});

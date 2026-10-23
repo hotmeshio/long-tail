@@ -21,7 +21,8 @@ export interface Envelope<T = Record<string, any>> {
   v: string;
   id: string;
   at: string;
-  source: { site: string; line: string; machine: string };
+  /** `station`: the station the sender says it is, when its address is not the station's id. */
+  source: { site: string; line: string; machine: string; station?: string };
   body: T;
 }
 
@@ -88,6 +89,12 @@ export interface LineDef {
   siteId: string;
   lineId: string;
   machines: MachineDef[];
+  /**
+   * `declared` (the default): each machine's address is its `address`, or its id.
+   * `learned`: a machine with no `address` is bound to the address that first
+   * claims its station, and a contested claim waits for a person to approve it.
+   */
+  addressing?: 'declared' | 'learned';
 }
 
 export interface InboundMessage {

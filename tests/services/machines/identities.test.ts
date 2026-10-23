@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { migrate } from '../../../lib/db/migrate';
 import { getBotRoles, removeBotRole } from '../../../services/iam';
-import { createUser, deleteUser } from '../../../services/user';
-import { ensureLineBots } from '../../../services/machines/identities';
+import { createUser, deleteUser, getUser } from '../../../services/user';
+import { ADDRESS_PROPERTY, BotAddressBook, ensureLineBots } from '../../../services/machines/identities';
 import { lineIdentities } from '../../../services/machines/gateway/provision';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 
@@ -43,5 +43,15 @@ describe('machine identities in process', () => {
     } finally {
       await deleteUser(person.id);
     }
+  });
+
+  it('keeps each learned address on its station\'s bot account, one station per address', async () => {
+    const book = new BotAddressBook(ids);
+    const uuid = '8f77e321-53de-4a60-988b-27f4b46a922d';
+    await book.bind('press-01', uuid);
+    expect((await getUser(ids.get('press-01')!))!.metadata?.[ADDRESS_PROPERTY]).toBe(uuid);
+    await book.bind('cut-01', uuid);
+    expect([...(await new BotAddressBook(ids).load())]).toEqual([['cut-01', uuid]]);
+    expect((await getUser(ids.get('press-01')!))!.metadata?.[ADDRESS_PROPERTY]).toBeUndefined();
   });
 });

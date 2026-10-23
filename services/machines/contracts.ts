@@ -18,6 +18,8 @@ export const ROW_TYPE = {
   MACHINE_COMMAND: 'machine-command',
   /** A message that broke the contract under a strict codec: held for a person, never acted on. */
   CONTRACT_VIOLATION: 'contract-violation',
+  /** An address claims a station the line already knows by another address, or the reverse: a person approves or rejects. */
+  MACHINE_REGISTRATION: 'machine-registration',
 } as const;
 
 export const LINE_ROLE = {
@@ -160,7 +162,7 @@ export interface HandoffResolution {
   detail?: string;
 }
 
-/** Decisions on line-operator rows: failed handoffs, alarms, dark machines. */
+/** Decisions on line-operator rows: failed handoffs, alarms, dark machines, contested registrations. */
 export const DECISION = {
   RETRY: 'retry',
   MANUAL: 'manual',
@@ -168,6 +170,8 @@ export const DECISION = {
   ACKNOWLEDGE: 'acknowledge',
   CLEARED: 'cleared',
   RESTORED: 'restored',
+  APPROVE: 'approve',
+  REJECT: 'reject',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 

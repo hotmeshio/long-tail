@@ -13,7 +13,8 @@
 import { setTimeout as sleep } from 'timers/promises';
 
 import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, type CommandResolution } from '../contracts';
-import { identOf, type LineDef } from '../../../lib/machines/line';
+import type { LineDef } from '../../../lib/machines/line';
+import { identFor } from './registration';
 import { OP, REPLY_STATUS, isoTs, type LineCodec } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
@@ -54,7 +55,7 @@ export class Dispatcher {
 
   /** False when the codec has no message for the command. */
   async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<boolean> {
-    const wires = this.d.codec.encode(identOf(this.d.line, machineId), { cmdId, op, args });
+    const wires = this.d.codec.encode(identFor(this.d.state, this.d.line, machineId), { cmdId, op, args });
     for (const wire of wires) await this.d.bus.publish(wire.topic, wire.payload);
     return wires.length > 0;
   }

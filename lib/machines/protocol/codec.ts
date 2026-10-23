@@ -109,10 +109,13 @@ function addressMap(line?: Pick<LineDef, 'machines'>): Map<string, string> {
   return new Map((line?.machines ?? []).filter((m) => m.address && m.address !== m.machineId).map((m) => [m.address!, m.machineId]));
 }
 
-/** The inspection with the topic's address read back as the machine id. */
+/** The inspection with the topic's address read back as the machine id; an unknown address keeps the station its message claims. */
 function atMachine(seen: Inspection, ids: Map<string, string>): Inspection {
   const machineId = seen.parsed && ids.get(seen.parsed.ident.machineId);
-  if (!machineId) return seen;
+  if (!machineId) {
+    const station = seen.body?.source?.station;
+    return typeof station === 'string' && station ? { ...seen, claim: station } : seen;
+  }
   const ident = { ...seen.parsed!.ident, machineId, address: seen.parsed!.ident.machineId };
   return { ...seen, parsed: { ...seen.parsed!, ident } };
 }

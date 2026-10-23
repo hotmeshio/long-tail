@@ -34,7 +34,7 @@ const ENVELOPE = shape({
   v: { type: 'string', pattern: '^1(\\.\\d+)?$' },
   id: UUID,
   at: TS,
-  source: shape({ site: STR, line: STR, machine: STR }),
+  source: shape({ site: STR, line: STR, machine: STR, station: STR }, ['station']),
   body: { type: 'object' },
 });
 
@@ -81,6 +81,8 @@ export interface Inspection {
   violations: string[];
   /** Set by a codec whose machines await a receipt: the id to confirm once the gateway is done with the message. */
   receiptId?: string;
+  /** The station the message says it comes from, when the wire names one apart from the address (a line that learns addresses). */
+  claim?: string;
 }
 
 const errorsOf = (prefix: string, fn: ValidateFunction) =>

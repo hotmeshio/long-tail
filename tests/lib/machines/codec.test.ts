@@ -53,6 +53,18 @@ describe('generic codec', () => {
     expect(seen.violations).not.toContain('source disagrees with the topic');
   });
 
+  it('an address the line does not know keeps the station its message claims', () => {
+    const codec = genericCodec({ root: 'line/v1', line: { machines: [{ machineId: 'cut-01' }] } as any });
+    const at = { ...ident, machineId: 'cut-01', address: '9e9e9e9e' };
+    const env = buildEnvelope(at, { event: 'arrived', jobId: 'J1', unitId: 'U1' });
+    expect(env.source).toEqual({ site: 'site-1', line: 'line-1', machine: '9e9e9e9e', station: 'cut-01' });
+    const [seen] = codec.decode('line/v1/site-1/line-1/9e9e9e9e/job', JSON.stringify(env));
+    expect(seen.parsed?.ident.machineId).toBe('9e9e9e9e');
+    expect(seen.claim).toBe('cut-01');
+    expect(seen.violations.filter((v) => v.includes('source'))).toEqual([]);
+    expect(buildEnvelope(ident, {}).source).not.toHaveProperty('station');
+  });
+
   it('lays out topics as root/site/line/address/channel unless the codec says otherwise', () => {
     const codec = genericCodec({ root: 'line/v1' });
     expect(topicOf(codec, { siteId: 's', lineId: 'l', address: 'm' }, 'cmd')).toBe('line/v1/s/l/m/cmd');

@@ -62,6 +62,14 @@ describe('line definition', () => {
     expect(() => validateLine({ ...line, machines: [{ ...press, address: 'a/b' }] })).toThrow();
   });
 
+  it('a line that learns addresses needs none declared, names no broker user for those stations, and rejects an unknown mode', () => {
+    const learned = validateLine({ ...DEFAULT_LINE, addressing: 'learned' });
+    expect(clientIds(learned)).toEqual([]);
+    const [press, ...rest] = DEFAULT_LINE.machines;
+    expect(clientIds(validateLine({ ...learned, machines: [{ ...press, address: '8f77e321' }, ...rest] }))).toEqual(['site-1-line-1-8f77e321']);
+    expect(() => validateLine({ ...DEFAULT_LINE, addressing: 'guessed' as any })).toThrow(/addressing must be one of/);
+  });
+
   it('accepts a whole queue depth of at least 1 and rejects anything else', () => {
     const withDepth = (queueDepth: unknown) => ({ ...DEFAULT_LINE, machines: [{ ...DEFAULT_LINE.machines[0], queueDepth: queueDepth as number }] });
     expect(validateLine(withDepth(3)).machines[0].queueDepth).toBe(3);

@@ -6,7 +6,8 @@
  */
 
 import { ROW_TYPE, arrivedUnit, handoffProgress } from '../contracts';
-import { operatorRole, type LineDef } from '../../../lib/machines/line';
+import { learnsAddress, operatorRole, type LineDef } from '../../../lib/machines/line';
+import type { AddressBook } from './address-book';
 import type { Action } from './actions';
 import type { LineEscalations } from './escalations';
 import { dispatchJobs } from './jobs';
@@ -17,13 +18,15 @@ export interface RestoredRows {
   alarms: number;
   offline: number;
   quiet: number;
+  registrations: number;
 }
 
 export async function restoreLineRows(state: GatewayState, lt: LineEscalations, line: LineDef): Promise<RestoredRows> {
   const role = operatorRole(line);
   const mine = (row: Record<string, any>) => row.metadata?.siteId === line.siteId && row.metadata?.lineId === line.lineId && row.metadata?.machineId;
-  const [alarms, offline, quiet] = await Promise.all(
-    [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET].map(async (type) => (await lt.listOpen({ type, role })).filter(mine)),
+  const [alarms, offline, quiet, registrations] = await Promise.all(
+    [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_REGISTRATION]
+      .map(async (type) => (await lt.listOpen({ type, role })).filter(mine)),
   );
   for (const row of alarms) {
     const { machineId, alarmId, raisedAt } = row.metadata;
@@ -35,7 +38,19 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
     link.rowId = row.id;
   }
   for (const row of quiet) state.link(row.metadata.machineId).quietRowId = row.id;
-  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length };
+  for (const row of registrations) state.raiseClaim(row.metadata.address, row.metadata.machineId);
+  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length };
+}
+
+/** The addresses the line learned before, for the stations that still learn theirs. */
+export async function restoreAddresses(state: GatewayState, book: AddressBook, line: LineDef): Promise<number> {
+  let restored = 0;
+  for (const [machineId, address] of await book.load()) {
+    if (!learnsAddress(line, machineId)) continue;
+    state.bindAddress(machineId, address);
+    restored++;
+  }
+  return restored;
 }
 
 /** Alarm rows whose alarm the machine no longer holds: it cleared while no gateway was listening. */

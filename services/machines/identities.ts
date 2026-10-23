@@ -6,10 +6,14 @@
  */
 
 import { addBotRole, createBot, getBotRoles } from '../iam';
-import { getUserByExternalId } from '../user';
+import { getUser, getUserByExternalId, patchUserProperties } from '../user';
 import type { LineDef } from '../../lib/machines/line';
-import type { Actor } from './gateway/actions';
+import { CONTROLLER, type Actor } from './gateway/actions';
+import type { AddressBook } from './gateway/address-book';
 import { lineIdentities } from './gateway/provision';
+
+/** The user property on a station's bot account that holds the address its machine registered. */
+export const ADDRESS_PROPERTY = 'machineAddress';
 
 const MEMBER = 'member' as const;
 const BOT = 'bot' as const;
@@ -36,4 +40,36 @@ export async function ensureLineBots(line: LineDef): Promise<Map<Actor, string>>
     ids.set(identity.actor, existing.id);
   }
   return ids;
+}
+
+/**
+ * Learned addresses kept on each station's bot account, so a replica that
+ * takes the line over sends to the machines the line already knows. An address
+ * belongs to one station: binding it to a station clears it from any other.
+ */
+export class BotAddressBook implements AddressBook {
+  constructor(private readonly bots: Map<Actor, string>) {}
+
+  async load(): Promise<Map<string, string>> {
+    const bound = new Map<string, string>();
+    for (const [machineId, address] of await this.read()) if (address) bound.set(machineId, address);
+    return bound;
+  }
+
+  async bind(machineId: string, address: string): Promise<void> {
+    const id = this.bots.get(machineId);
+    if (!id) throw new Error(`no bot for station "${machineId}"`);
+    for (const [other, held] of await this.read()) {
+      if (other !== machineId && held === address) await patchUserProperties(this.bots.get(other)!, { remove: [ADDRESS_PROPERTY] });
+    }
+    await patchUserProperties(id, { set: { [ADDRESS_PROPERTY]: address } });
+  }
+
+  private async read(): Promise<[string, string | undefined][]> {
+    const stations = [...this.bots.entries()].filter(([actor]) => actor !== CONTROLLER);
+    return Promise.all(stations.map(async ([machineId, id]) => {
+      const address = (await getUser(id))?.metadata?.[ADDRESS_PROPERTY];
+      return [machineId, typeof address === 'string' ? address : undefined] as [string, string | undefined];
+    }));
+  }
 }

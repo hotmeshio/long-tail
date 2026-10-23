@@ -41,6 +41,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 |---|---|
 | `machines[].role` | The role whose handoff rows the machine resolves. Default `line-<process>` |
 | `machines[].address` | The physical machine on the wire: its topic level, client id and certificate name, such as a permanent UUID that stays with the machine if it moves. Default `machineId`, which stays the station that rows, roles and routes name |
+| `addressing` | `declared` (default): each address is `machines[].address`, or the station's id. `learned`: a station with no `address` learns it from the machine that claims it. See [Learned addresses](#learned-addresses) |
 | `roles.exit` | The role of the person who receives units at the end of a route. Default `line-exit` |
 | `roles.operator` | The role that gets failed handoffs, stopping alarms, and offline or quiet machines. Default `line-operator` |
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
@@ -205,8 +206,9 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `machine-offline` | Presence goes offline past a debounce | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
+| `machine-registration` | On a line that learns addresses, an address claims a station bound to another address, or an address bound to one station claims another | A person resolves it with `{ decision: 'approve' }`, which binds the station to the claimant, or `reject` |
 
-A replica taking a line reads back its open handoff, command, alarm, offline and quiet rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
+A replica taking a line reads back its learned addresses, its open handoff, command, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
 
 ## Topology and identity
 
@@ -225,6 +227,17 @@ A replica taking a line reads back its open handoff, command, alarm, offline and
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role.
 - **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
+
+### Learned addresses
+
+A line with `addressing: 'learned'` names its stations and lets each machine tell it who it is, so a machine can be commissioned, moved or replaced without editing the line.
+
+- **The claim:** every message carries the machine's address (its topic level, which the broker ties to its certificate) and the station it says it is. A codec reports that station as the inspection's `claim`; the line protocol carries it as the envelope's `source.station`.
+- **First contact binds:** a station with no address yet is bound to the first address that claims it. The gateway logs it, keeps it in its `AddressBook`, and sends the station's waiting work. Until then, handoffs into the station wait in its role queue, and command rows for it resolve `unsupported`.
+- **A person settles a disagreement:** a claim on a station already bound to another address, or by an address bound to another station, raises one `machine-registration` row on the operator role. The claimant's messages have no effect, and get no receipt, until a person approves it.
+- **Where bindings live:** in process, on each station's bot account as the user property `machineAddress`; `MemoryAddressBook` otherwise. A replica taking the line reads them back before it sends anything.
+- **Broker access:** stations that learn their address get no broker user of their own. `renderMosquittoAcl` writes `pattern` rules on `%u`, so every certificate may use the channels under its own name; each machine's certificate common name must therefore be its address.
+- **Mixed lines:** a station that declares `address` on a learning line keeps it; claims on that station are ignored.
 
 ## Configuration
 

@@ -9,7 +9,7 @@
 
 import { clientIdOf } from '../protocol/envelope';
 import { topicOf, type LineCodec } from '../protocol/codec';
-import { controllerId, identOf, type LineDef } from '../line';
+import { controllerId, identOf, learnsAddress, type LineDef } from '../line';
 import { bridgeId } from './site-conf';
 
 export interface MosquittoConfOptions {
@@ -54,23 +54,32 @@ topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
 `;
 }
 
-/** The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands. */
+/**
+ * The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands.
+ * A station whose address the line learns has no user of its own: `pattern` rules give every certificate
+ * the channels under its own name (%u), so its certificate's common name must be its address.
+ */
 export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
   const { siteId, lineId } = line;
   const { events, telemetry, commands } = codec.channels;
-  const machines = line.machines.map((m) => {
-    const ident = identOf(line, m.machineId);
-    const own = (c: string) => topicOf(codec, { siteId, lineId, address: ident.address ?? ident.machineId }, c);
+  const rules = (prefix: string, address: string) => {
+    const own = (c: string) => topicOf(codec, { siteId, lineId, address }, c);
     return [
-      `user ${clientIdOf(ident)}`,
-      ...[...events, ...telemetry].map((c) => `topic write ${own(c)}`),
-      ...commands.map((c) => `topic read ${own(c)}`),
-    ].join('\n');
+      ...[...events, ...telemetry].map((c) => `${prefix}write ${own(c)}`),
+      ...commands.map((c) => `${prefix}read ${own(c)}`),
+    ];
+  };
+  const machines = line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => {
+    const ident = identOf(line, m.machineId);
+    return [`user ${clientIdOf(ident)}`, ...rules('topic ', ident.address ?? ident.machineId)].join('\n');
   });
+  const learned = line.machines.some((m) => learnsAddress(line, m.machineId))
+    ? [['# Stations that learn their address: each certificate, under its own common name.', ...rules('pattern ', '%u')].join('\n')]
+    : [];
   const controller = [
     `user ${controllerId(line)}`,
     ...commands.map((c) => `topic write ${topicOf(codec, { siteId, lineId }, c)}`),
     `topic read ${codec.root}/${siteId}/${lineId}/#`,
   ].join('\n');
-  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...machines, controller].join('\n\n')}\n`;
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...learned, ...machines, controller].join('\n\n')}\n`;
 }

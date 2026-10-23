@@ -9,7 +9,7 @@
 import { COMMAND_STATUS, ROW_TYPE, controlCommandId, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
 import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
-import { machineById, machineRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
+import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch, cancelSender } from './plan-shared';
@@ -17,6 +17,7 @@ import { admit, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './paci
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { standardRows, type HandoffRowAdapter } from '../rows';
+import { planRegistrationRow, reachable } from './registration';
 
 const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
@@ -25,7 +26,7 @@ const STATUS_FOR_VERB: Record<string, string> = {
   [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
 };
 
-const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND];
+const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION];
 
 function handoffRow(id: string, role: string, facets: HandoffFacets, metadata?: Record<string, any>): HandoffRow {
   return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata) };
@@ -68,16 +69,18 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   if (type === ROW_TYPE.MACHINE_COMMAND) return planCommandRow(state, line, event);
+  if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, event) : [];
   return [];
 }
 
 /** Why the gateway will not send a command row's command; null when it will. */
-function commandRefusal(line: LineDef, c: CommandFacets, role: string): string | null {
+function commandRefusal(state: GatewayState, line: LineDef, c: CommandFacets, role: string): string | null {
   if (!onLine(line, c.machineId)) return `${c.machineId} is not on ${line.siteId}/${line.lineId}`;
   const own = machineRole(machineById(line, c.machineId));
   if (role !== own) return `commands for ${c.machineId} are parked on ${own}, not ${role}`;
   if (!CONTROL_OPS.includes(c.op as Op)) return `${c.op} is not a command a row may ask for; one of ${CONTROL_OPS.join(', ')}`;
   if (c.op === OP.CANCEL && typeof c.args.jobId !== 'string') return `${OP.CANCEL} needs args.jobId, the job to withdraw or stop`;
+  if (!reachable(state, line, c.machineId)) return `${c.machineId} has not registered an address yet`;
   return null;
 }
 
@@ -90,7 +93,7 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   if (event.verb !== VERB.CREATED && event.verb !== VERB.CLAIMED) return [];
   const c = readCommandFacets(event.data?.metadata);
   if (!c || !state.trackCommand(id)) return [];
-  const refusal = commandRefusal(line, c, event.role);
+  const refusal = commandRefusal(state, line, c, event.role);
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
@@ -121,7 +124,7 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
       return refused;
     }
     const refused = !!softwareRefusal(state, line, row.toMachine) || !!jobRefusal(state, row);
-    if (state.holdDispatch || (!refused && !hasRoom(state, line, row))) {
+    if (state.holdDispatch || (!refused && (!hasRoom(state, line, row) || !reachable(state, line, row.toMachine)))) {
       row.dispatch = DISPATCH_STATE.WAITING;
       return [];
     }

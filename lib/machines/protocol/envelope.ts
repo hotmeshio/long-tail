@@ -25,7 +25,7 @@ export function buildEnvelope<T>(ident: MachineIdent, body: T, opts: { at?: stri
     v: PROTOCOL_VERSION,
     id: opts.id ?? randomUUID(),
     at: opts.at ?? isoTs(),
-    source: { site: ident.siteId, line: ident.lineId, machine: addressOf(ident) },
+    source: { site: ident.siteId, line: ident.lineId, machine: addressOf(ident), ...(ident.address && ident.address !== ident.machineId ? { station: ident.machineId } : {}) },
     body,
   };
 }

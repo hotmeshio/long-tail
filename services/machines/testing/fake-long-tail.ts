@@ -159,6 +159,8 @@ export class FakeLongTail implements LineEscalations {
     return {
       id: row.id, type: row.type, subtype: row.subtype, role: row.role, status: row.status,
       assigned_to: row.assigned_to ?? null, resolved_by: row.resolved_by ?? null, metadata: { ...row.metadata },
+      // Stored serialized, as Long Tail returns it.
+      resolver_payload: row.resolver_payload ? JSON.stringify(row.resolver_payload) : null,
     };
   }
 

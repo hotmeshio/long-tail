@@ -21,7 +21,7 @@ import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import { MachineGateway } from '../../services/machines/gateway/gateway';
 import { silentLog } from '../../services/machines/gateway/log';
 import { ApiLineEscalations } from '../../services/machines/gateway/api-escalations';
-import { ensureLineBots } from '../../services/machines/identities';
+import { BotAddressBook, ensureLineBots } from '../../services/machines/identities';
 import { DISPATCH_ON, lineFilter, type DispatchOn } from '../../lib/machines/protocol';
 import { CallbackEscalationFeed, MemoryMachineBus } from '../../lib/machines/transport';
 import type { LineDef } from '../../lib/machines/line';
@@ -44,7 +44,10 @@ export async function eventually<T>(check: () => Promise<T | undefined | null | 
 }
 
 export interface WorkflowRig {
+  /** The line as the gateway knows it. */
   line: LineDef;
+  /** The line as the machines know it: every machine with its own address. */
+  machines: LineDef;
   harness: Harness;
   gateway: MachineGateway;
   users: Map<string, string>;
@@ -56,13 +59,17 @@ export interface WorkflowRig {
   stop(): Promise<void>;
 }
 
-export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: DispatchOn; mock?: Partial<MockSettings> }): Promise<WorkflowRig> {
+/** `learned`: the gateway's line names stations only and learns each machine's address from its messages. */
+export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: DispatchOn; mock?: Partial<MockSettings>; learned?: boolean }): Promise<WorkflowRig> {
   await connectTelemetry();
   await Connection.connect({ class: Postgres, options: postgres_options });
   await migrate();
 
   // A line of its own per run, so rows left by another run belong to another line.
-  const line = addressedLine({ ...structuredClone(DEFAULT_LINE), lineId: `line-${Date.now().toString(36)}` });
+  const machines = addressedLine({ ...structuredClone(DEFAULT_LINE), lineId: `line-${Date.now().toString(36)}` });
+  const line: LineDef = opts.learned
+    ? { ...machines, addressing: 'learned', machines: machines.machines.map(({ address: _address, ...m }) => m) }
+    : machines;
   const users = new Map<string, string>();
   for (const [actor, id] of await ensureLineBots(line)) users.set(actor, id);
   const person = await userService.createUser({
@@ -70,9 +77,9 @@ export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: D
     roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }],
   });
 
-  const harness = await startHarness({ msPerSec: 2, ...opts.mock }, line, REAL_ORCHESTRATOR_BROKER);
-  relayMockLine(harness.broker, line);
-  const receipts = watchReceipts(harness.broker, line);
+  const harness = await startHarness({ msPerSec: 2, ...opts.mock }, machines, REAL_ORCHESTRATOR_BROKER);
+  relayMockLine(harness.broker, machines);
+  const receipts = watchReceipts(harness.broker, machines);
   const callbacks = new CallbackEventAdapter();
   eventRegistry.register(callbacks);
   await eventRegistry.connect();
@@ -87,6 +94,7 @@ export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: D
     const gw = new MachineGateway({
       bus: new MemoryMachineBus(harness.broker, lineFilter(WIRE_ROOT, line.siteId, line.lineId)),
       feed: new CallbackEscalationFeed(callbacks, 50), lt: new ApiLineEscalations((as) => users.get(as)!), line, codec, log: silentLog,
+      ...(opts.learned ? { addresses: new BotAddressBook(users) } : {}),
       settings: { topicRoot: WIRE_ROOT, replyTimeoutMs: 1_000, dispatchAttempts: 2, offlineDebounceMs: 60_000, dispatchTtlMs: 600_000, quietMs: 0, receiptDelayMs: 20 },
     });
     await gw.start();
@@ -94,7 +102,7 @@ export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: D
   };
 
   const rig: WorkflowRig = {
-    line, harness, users, personId: person.id, receipts, gateway: await startGateway(), startGateway,
+    line, machines, harness, users, personId: person.id, receipts, gateway: await startGateway(), startGateway,
     start: (routeKey, units, extra = {}) => client.workflow.start({
       args: [{ data: { siteId: line.siteId, lineId: line.lineId, routeKey, orderRef: `ORD-${routeKey}`, units: units.map((unitId) => ({ unitId, carrierId: `CR-${unitId}` })), ...extra } }],
       taskQueue: opts.taskQueue, workflowName: 'machineUnitRoute', workflowId: `mur-${routeKey}`, expire: 300,

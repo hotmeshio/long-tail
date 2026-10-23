@@ -8,8 +8,10 @@
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER } from './actions';
-import { alarmsClearedMeanwhile, arrivalsOnRows, restoreLineRows } from './reconcile';
-import { operatorRole, type LineDef } from '../../../lib/machines/line';
+import { alarmsClearedMeanwhile, arrivalsOnRows, restoreAddresses, restoreLineRows } from './reconcile';
+import { MemoryAddressBook, type AddressBook } from './address-book';
+import { admitSender, holdViolation, type AdmissionContext, type Applied } from './admission';
+import type { LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
@@ -46,6 +48,8 @@ export interface GatewayDeps {
   rows?: HandoffRowAdapter;
   /** The machines' wire protocol; the line protocol under `settings.topicRoot` by default. */
   codec?: LineCodec;
+  /** Where a line that learns addresses keeps them; in memory by default. */
+  addresses?: AddressBook;
 }
 
 export class MachineGateway {
@@ -55,6 +59,8 @@ export class MachineGateway {
   private readonly executor: Executor;
   private readonly receipts: ReceiptBatcher;
   private readonly log: GatewayLog;
+  private readonly addresses: AddressBook;
+  private readonly admission: AdmissionContext;
   private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
@@ -63,11 +69,14 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
+    this.addresses = deps.addresses ?? new MemoryAddressBook();
     this.executor = new Executor({
+      addresses: this.addresses,
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
+    this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace() };
     this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log });
   }
 
@@ -108,12 +117,13 @@ export class MachineGateway {
     // Handoffs wait until the whole line is read back, so pacing sees every job before it sends one.
     this.state.holdDispatch = true;
     try {
+      const addresses = await restoreAddresses(this.state, this.addresses, this.deps.line);
       const handoffs = await this.reconcileHandoffs();
       await this.executor.apply(await arrivalsOnRows(this.state, this.deps.lt, this.deps.settings.dispatchTtlMs));
       const commands = await this.reconcileCommands();
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();
-      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, ...restored });
+      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, addresses, ...restored });
     } finally {
       this.state.holdDispatch = false;
     }
@@ -153,8 +163,10 @@ export class MachineGateway {
     const { line } = this.deps;
     const active = new Set<string>();
     for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
-      for (const seen of this.codec.decode(msg.topic, msg.payload, true)) {
-        if (!seen.parsed) continue;
+      for (const raw of this.codec.decode(msg.topic, msg.payload, true)) {
+        if (!raw.parsed) continue;
+        const seen = await admitSender(this.admission, msg.topic, raw);
+        if (!('parsed' in seen) || !seen.parsed) continue;
         if (seen.parsed.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed.ident.machineId, seen.parsed.key!));
         await this.applyMachine(msg.topic, seen.parsed, seen.body);
       }
@@ -191,16 +203,24 @@ export class MachineGateway {
 
   private async onMachine(msg: InboundMessage): Promise<Disposition> {
     const decoded = this.codec.decode(msg.topic, msg.payload, msg.retained);
+    const acted: Inspection[] = [];
     let outcome: Disposition = DISPOSITION.TERM;
     let failed = false;
-    for (const seen of decoded) {
-      if (!seen.parsed) continue;
+    for (const raw of decoded) {
+      if (!raw.parsed) continue;
+      const seen = await admitSender(this.admission, msg.topic, raw);
+      if (!('parsed' in seen)) {
+        failed ||= seen.failed;
+        outcome = worse(outcome, seen.disposition);
+        continue;
+      }
+      acted.push(seen);
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
       }
       const applied = seen.violations.length && this.codec.strict
-        ? await this.holdViolation(msg, seen)
-        : await this.applyMachine(msg.topic, seen.parsed, seen.body);
+        ? await holdViolation(this.admission, msg, seen)
+        : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
     }
@@ -209,28 +229,8 @@ export class MachineGateway {
       this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries });
       outcome = DISPOSITION.TERM;
     }
-    if (outcome !== DISPOSITION.NAK) this.confirm(decoded);
+    if (outcome !== DISPOSITION.NAK) this.confirm(acted);
     return outcome;
-  }
-
-  /** Under a strict codec a broken message is not acted on: a person sees it on a row, once. */
-  private async holdViolation(msg: InboundMessage, seen: Inspection): Promise<{ disposition: Disposition; failed: boolean }> {
-    const { ident, kind } = seen.parsed!;
-    const key = seen.receiptId ?? seen.body?.id ?? `${msg.topic}:${msg.payload}`;
-    if (this.state.violationRaised(key)) return { disposition: DISPOSITION.ACK, failed: false };
-    try {
-      await this.executor.apply([{ kind: 'createRow', row: {
-        type: ROW_TYPE.CONTRACT_VIOLATION, role: operatorRole(this.deps.line), priority: 2,
-        description: `${ident.machineId} sent a ${kind} message that breaks the contract: ${seen.violations.join('; ')}`,
-        metadata: { siteId: ident.siteId, lineId: ident.lineId, machineId: ident.machineId, kind, topic: msg.topic, messageId: seen.body?.id ?? null, violations: seen.violations },
-        escalation_payload: msg.payload,
-      } }]);
-      this.state.raiseViolation(key);
-      return { disposition: DISPOSITION.ACK, failed: false };
-    } catch (err: any) {
-      this.log.error(GATEWAY_LOG.VERB_FAILED, { topic: msg.topic, error: err.message });
-      return { disposition: DISPOSITION.NAK, failed: true };
-    }
   }
 
   /** Done with the message: confirm each id its codec asked to confirm. */
@@ -243,7 +243,7 @@ export class MachineGateway {
     }
   }
 
-  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<{ disposition: Disposition; failed: boolean }> {
+  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<Applied> {
     const plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
     try {
       await this.executor.apply(plan.actions);

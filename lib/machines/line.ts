@@ -10,6 +10,14 @@ import { assertTopicLevel, clientIdOf } from './protocol';
 
 export type { LineDef, MachineDef, MaterialDef, MeasurementDef };
 
+/** How a line knows its machines' addresses (`LineDef.addressing`). */
+export const ADDRESSING = { DECLARED: 'declared', LEARNED: 'learned' } as const;
+
+/** Whether the line learns this station's address from the machine that claims it. */
+export function learnsAddress(line: LineDef, machineId: string): boolean {
+  return line.addressing === ADDRESSING.LEARNED && !line.machines.find((m) => m.machineId === machineId)?.address;
+}
+
 /** Which machine puts a unit on its carrier plate and which takes it off. */
 export const CARRIER_ROLE = { BIND: 'bind', RELEASE: 'release', NONE: 'none' } as const;
 export type CarrierRole = typeof CARRIER_ROLE[keyof typeof CARRIER_ROLE];
@@ -19,16 +27,21 @@ export function validateLine(line: LineDef): LineDef {
   assertTopicLevel('siteId', line.siteId);
   assertTopicLevel('lineId', line.lineId);
   if (!line.machines?.length) throw new Error('line has no machines');
+  if (line.addressing && !Object.values(ADDRESSING).includes(line.addressing)) {
+    throw new Error(`addressing must be one of ${Object.values(ADDRESSING).join(', ')}`);
+  }
   const seen = new Set<string>();
   const addresses = new Set<string>();
   for (const m of line.machines) {
     assertTopicLevel('machineId', m.machineId);
     if (seen.has(m.machineId)) throw new Error(`duplicate machineId "${m.machineId}"`);
     seen.add(m.machineId);
-    const address = m.address ?? m.machineId;
-    assertTopicLevel('address', address);
-    if (addresses.has(address)) throw new Error(`duplicate address "${address}"`);
-    addresses.add(address);
+    if (!learnsAddress(line, m.machineId)) {
+      const address = m.address ?? m.machineId;
+      assertTopicLevel('address', address);
+      if (addresses.has(address)) throw new Error(`duplicate address "${address}"`);
+      addresses.add(address);
+    }
     if (!(m.cycleSec > 0)) throw new Error(`${m.machineId}: cycleSec must be positive`);
     if (m.queueDepth !== undefined && !(Number.isInteger(m.queueDepth) && m.queueDepth >= 1)) {
       throw new Error(`${m.machineId}: queueDepth must be a whole number of at least 1`);
@@ -57,9 +70,9 @@ export function machineById(line: LineDef, machineId: string): MachineDef {
   return def;
 }
 
-/** The broker identity of each machine, {site}-{line}-{address}. */
+/** The broker identity of each machine whose address the line declares, {site}-{line}-{address}. */
 export function clientIds(line: LineDef): string[] {
-  return line.machines.map((m) => clientIdOf(identOf(line, m.machineId)));
+  return line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => clientIdOf(identOf(line, m.machineId)));
 }
 
 /** The broker and Long Tail identity of the line's gateway. */

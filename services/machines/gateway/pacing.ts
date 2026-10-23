@@ -13,6 +13,7 @@ import { machineById, type LineDef } from '../../../lib/machines/line';
 import { CONTROLLER, type Action } from './actions';
 import { dispatchJobs } from './jobs';
 import { DISPATCH_STATE, type DispatchState, type GatewayState, type HandoffRow } from './state';
+import { reachable } from './registration';
 
 /** Dispatch arguments for a handoff row. */
 export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string, any> {
@@ -107,7 +108,8 @@ export function planPacing(state: GatewayState, line: LineDef, dispatchTtlMs: nu
   const full = new Set<string>();
   for (const row of state.open()) {
     const m = row.toMachine;
-    if (row.dispatch !== DISPATCH_STATE.WAITING || !m || full.has(m)) continue;
+    // A station that has not registered its address yet keeps its rows waiting.
+    if (row.dispatch !== DISPATCH_STATE.WAITING || !m || full.has(m) || !reachable(state, line, m)) continue;
     if (!loads.has(m)) loads.set(m, machineLoad(state, m));
     const load = loads.get(m)!;
     if (!fits(line, row, load, state)) {
