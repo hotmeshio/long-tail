@@ -46,6 +46,7 @@ describe('OAuth well-known router', () => {
       revocation_endpoint: 'http://lt.example/api/oauth/revoke',
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
+      authorization_response_iss_parameter_supported: true,
     });
     const pr = await get('/.well-known/oauth-protected-resource/mcp');
     expect(pr.body).toEqual({
