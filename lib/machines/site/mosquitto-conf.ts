@@ -1,0 +1,90 @@
+/**
+ * The machine broker (Mosquitto), rendered from the line. Machines speak
+ * MQTT 5 to it over TLS, each with its own client certificate (the CN is
+ * its username). The ACL lets a machine publish only its own channels and
+ * read only its own commands, and lets the line controller command every
+ * machine on the line. A bridge carries the line's topics out to the site
+ * NATS, where JetStream keeps them.
+ */
+
+import { addressOf, clientIdOf } from '../protocol/envelope';
+import { topicOf, type LineCodec } from '../protocol/codec';
+import { controllerId, identOf, learnsAddress, type LineDef } from '../line';
+import { bridgeId } from './site-conf';
+
+export interface MosquittoConfOptions {
+  root: string;
+  /** Certificate directory as the broker sees it. */
+  certDir: string;
+  /** Where the site NATS MQTT listener is, host:port. */
+  siteNats: string;
+  aclFile: string;
+  maxPacketBytes?: number;
+}
+
+export function renderMosquittoConf(line: LineDef, opts: MosquittoConfOptions): string {
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.
+persistence true
+persistence_location /mosquitto/data/
+log_dest stdout
+log_type error
+log_type warning
+log_type notice
+
+listener 8883
+cafile ${opts.certDir}/ca.pem
+certfile ${opts.certDir}/broker.pem
+keyfile ${opts.certDir}/broker.key
+require_certificate true
+use_identity_as_username true
+acl_file ${opts.aclFile}
+max_packet_size ${opts.maxPacketBytes ?? 262_144}
+
+connection ${line.siteId}-${line.lineId}-site-nats
+address ${opts.siteNats}
+bridge_protocol_version mqttv311
+bridge_cafile ${opts.certDir}/ca.pem
+bridge_certfile ${opts.certDir}/${bridgeId(line)}.pem
+bridge_keyfile ${opts.certDir}/${bridgeId(line)}.key
+remote_clientid ${bridgeId(line)}
+cleansession false
+try_private false
+notifications false
+topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
+`;
+}
+
+/**
+ * The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands.
+ * A station whose address the line learns has no user of its own: `pattern` rules give every certificate
+ * the channels under its own name (%u), so its certificate's common name must be its address. On a line
+ * that also declares addresses, a certificate named for a declared address is denied that station's channels.
+ */
+export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+  const { siteId, lineId } = line;
+  const { events, telemetry, commands } = codec.channels;
+  const own = (address: string, channels: string[]) => channels.map((c) => topicOf(codec, { siteId, lineId, address }, c));
+  const rules = (prefix: string, address: string) => [
+    ...own(address, [...events, ...telemetry]).map((t) => `${prefix}write ${t}`),
+    ...own(address, commands).map((t) => `${prefix}read ${t}`),
+  ];
+  const declared = line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => identOf(line, m.machineId));
+  const machines = declared.map((ident) => [`user ${clientIdOf(ident)}`, ...rules('topic ', addressOf(ident))].join('\n'));
+  const learns = line.machines.some((m) => learnsAddress(line, m.machineId));
+  const learned = learns ? [['# Stations that learn their address: each certificate, under its own common name.', ...rules('pattern ', '%u')].join('\n')] : [];
+  const every = [...events, ...telemetry, ...commands];
+  const shadows = learns ? declared.map((ident) => shadowRules(line, addressOf(ident), own(addressOf(ident), every))) : [];
+  const controller = [
+    `user ${controllerId(line)}`,
+    ...commands.map((c) => `topic write ${topicOf(codec, { siteId, lineId }, c)}`),
+    `topic read ${codec.root}/${siteId}/${lineId}/#`,
+  ].join('\n');
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...learned, ...shadows, ...machines, controller].join('\n\n')}\n`;
+}
+
+/** Deny a declared station's channels to a certificate named for its address, which the patterns would grant. */
+function shadowRules(line: LineDef, address: string, topics: string[]): string {
+  const users = [controllerId(line), ...line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => clientIdOf(identOf(line, m.machineId)))];
+  if (users.includes(address)) throw new Error(`address "${address}" is also a broker user name; a declared address on a learning line must differ from every user`);
+  return [`user ${address}`, ...topics.map((t) => `topic deny ${t}`)].join('\n');
+}

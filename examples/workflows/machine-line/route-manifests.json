@@ -1,0 +1,27 @@
+{
+  "automated": {
+    "description": "Print cell to conveyor, then machines through optical inspection; a person at the inspector receives.",
+    "steps": [
+      "print-01",
+      "convey-01",
+      "press-01",
+      "cut-01",
+      "inspect-01"
+    ]
+  },
+  "manual": {
+    "description": "Print cell harvested by hand, bagged and carried through people at each station to the inspector.",
+    "steps": [
+      "print-02",
+      {
+        "role": "harvester"
+      },
+      {
+        "role": "bonder"
+      },
+      {
+        "role": "finisher"
+      }
+    ]
+  }
+}

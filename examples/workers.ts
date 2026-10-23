@@ -33,6 +33,8 @@ import * as printRoutingWorkflow from './workflows/print-routing';
 import * as orthoPipelineWorkflow from './workflows/ortho-pipeline';
 import * as printerTwinWorkflow from './workflows/printer-twin';
 import * as fleetToolsWorkflow from './workflows/fleet-tools';
+import * as machineLineWorkflow from './workflows/machine-line';
+import { LINE_ROLE } from '../services/machines/contracts';
 import { FLEET_TOOLS_INPUT_SCHEMA, FLEET_TOOLS_ENVELOPE_METADATA, FLEET_SERIALS_LOOKUP, FLEET_MATERIALS_LOOKUP } from './workflows/fleet-tools/forms';
 import { WORKFLOW_ICONS } from '../types/workflow-icons';
 import {
@@ -608,6 +610,46 @@ const twinBrokerConfig: LTWorkerConfig = {
   },
 };
 
+const machineUnitRouteConfig: LTWorkerConfig = {
+  description:
+    'Machine unit route: one set of units through an automated line. Each hop parks a handoff row for the receiving machine, which a machine gateway dispatches, claims and resolves over MQTT as the machine; the last hop is a person receiving the units at line exit. A hop that ends without a receipt asks a line operator to retry it, finish the units by hand, or scrap them.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: LINE_ROLE.OPERATOR,
+  roles: [LINE_ROLE.OPERATOR, LINE_ROLE.EXIT],
+  certified: false,
+  envelopeSchema: {
+    data: {
+      siteId: 'site-1',
+      lineId: 'line-1',
+      routeKey: 'U-0001',
+      orderRef: 'ORD-0001',
+      units: [{ unitId: 'U-0001', carrierId: 'CR-0001' }],
+      steps: [
+        { machineId: 'press-01', process: 'bond', recipe: { id: 'RCP-BOND-A', version: '2' } },
+        { machineId: 'cut-01', process: 'trim', recipe: { id: 'RCP-TRIM-A', version: '1' } },
+        { machineId: 'inspect-01', process: 'inspect', recipe: { id: 'RCP-INSPECT-A', version: '1' } },
+      ],
+      handoffTimeout: '30m',
+    },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const machineCommandConfig: LTWorkerConfig = {
+  description:
+    'Machine command: ask one machine to start, stop, pause, resume or change over. Parks a machine-command row on the machine\'s role; the machine gateway sends the command and resolves the row with the machine\'s reply.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: LINE_ROLE.OPERATOR,
+  roles: [LINE_ROLE.OPERATOR],
+  certified: false,
+  envelopeSchema: {
+    data: { siteId: 'site-1', lineId: 'line-1', machineId: 'press-01', role: 'line-bond', requestKey: 'C-0001', op: 'pause', args: {} },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 const fleetToolsConfig: LTWorkerConfig = {
   description: 'Four tools for one machine. Pick the tool; the form shows only its knobs.',
   icon: WORKFLOW_ICONS.WRENCH,
@@ -663,4 +705,6 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.twinOrder, config: twinOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: printerTwinWorkflow.twinBroker, config: twinBrokerConfig },
   { taskQueue: 'long-tail-examples', workflow: fleetToolsWorkflow.fleetTools, config: fleetToolsConfig },
+  { taskQueue: 'long-tail-examples', workflow: machineLineWorkflow.machineUnitRoute, config: machineUnitRouteConfig },
+  { taskQueue: 'long-tail-examples', workflow: machineLineWorkflow.machineCommand, config: machineCommandConfig },
 ];
