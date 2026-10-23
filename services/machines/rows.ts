@@ -7,7 +7,7 @@
  */
 
 import type { LineDef } from '../../lib/machines/line';
-import { ROW_TYPE, type HandoffFacets, type HandoffUnit } from './contracts';
+import { ROW_TYPE, type ArtifactRef, type HandoffFacets, type HandoffUnit } from './contracts';
 
 /** The parts of an escalation row the adapter reads. */
 export interface EscalationRowView {
@@ -32,9 +32,22 @@ export interface HandoffRowAdapter {
 
 const str = (v: unknown): string | null => (v === undefined || v === null || v === '' ? null : String(v));
 
+/** A plain object of parameters; anything else is not parameters. */
+function paramsOf(v: unknown): Record<string, unknown> | undefined {
+  return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : undefined;
+}
+
+function artifactOf(v: any): ArtifactRef | undefined {
+  return v && typeof v.url === 'string' && v.url && typeof v.sha256 === 'string' && v.sha256 ? { url: v.url, sha256: v.sha256 } : undefined;
+}
+
 function unitsOf(v: unknown): HandoffUnit[] {
   if (!Array.isArray(v)) return [];
-  return v.filter((u) => u && u.unitId).map((u) => ({ unitId: String(u.unitId), carrierId: str(u.carrierId) }));
+  return v.filter((u) => u && u.unitId).map((u) => {
+    const artifact = artifactOf(u.artifact);
+    const parameters = paramsOf(u.parameters);
+    return { unitId: String(u.unitId), carrierId: str(u.carrierId), ...(artifact ? { artifact } : {}), ...(parameters ? { parameters } : {}) };
+  });
 }
 
 /** Read standard handoff facets; null when the line, job or units are missing. */
@@ -56,6 +69,7 @@ export function readHandoffFacets(md: Record<string, any> = {}): HandoffFacets |
     artifactUrl: str(md.artifactUrl),
     artifactSha256: str(md.artifactSha256),
     attempt: Number(md.attempt ?? 1),
+    ...(paramsOf(md.parameters) ? { parameters: paramsOf(md.parameters) } : {}),
   };
 }
 

@@ -46,7 +46,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
 | `machines[].allowedSoftware` | Versions the line accepts. A machine reporting another version is refused before any dispatch |
 | `machines[].queueDepth` | Most jobs the machine is sent or holds at once. Unset: no limit. See [Pacing](#pacing) |
-| `machines[].requireArtifact` | The machine needs a job file. A handoff whose row has no `artifactUrl` and `artifactSha256` is refused before anything is sent |
+| `machines[].requireArtifact` | The machine needs a job file. A handoff with neither the job's `artifactUrl` and `artifactSha256` nor an `artifact` on every unit is refused before anything is sent |
 
 `start({ machines })` declares the station, exit and operator roles unless `roles` already declares them; set `declareRoles: false` to own them all.
 
@@ -57,11 +57,12 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | Facet | Meaning |
 |---|---|
 | `siteId`, `lineId` | The line; a gateway acts only on its own line's rows |
-| `units` | `[{ unitId, carrierId }]`: the units that move together; any of a route's units, all or some |
+| `units` | `[{ unitId, carrierId, artifact?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` (`{ url, sha256 }`) is its own file, such as a per-unit model; its `parameters` are its own settings |
 | `jobId`, `senderJobId` | The receiver's job and the sender's. Each open handoff into a machine names its own job; a second open row naming the same job there resolves `dispatch-refused`. A row for some of a sender job's units still receives their releases, however the codec split that job |
 | `fromMachine`, `toMachine` | Machine ids, or null for line entry and for a person |
 | `recipeId`, `recipeVersion`, `process` | What the receiver runs |
 | `artifactUrl`, `artifactSha256` | The job file, by reference |
+| `parameters` | Settings for the job, sent to the machine as given. Long Tail does not read them; what they mean is between the host and its codec |
 | `attempt` | Retry number |
 
 The gateway dispatches to `toMachine` when the row is created, or, under a codec that dispatches on arrival, once every unit has arrived there. It claims the row as that machine once the machine accepts. It records each unit's release by the sender and each arrival at the receiver as items. It resolves the row as the receiver once every unit has arrived:

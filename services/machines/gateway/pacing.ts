@@ -25,6 +25,7 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
     from: row.fromMachine,
     expiresAt: isoTs(expiresAt),
     ...(row.artifactUrl ? { artifact: { url: row.artifactUrl, sha256: row.artifactSha256 } } : {}),
+    ...(row.parameters ? { parameters: row.parameters } : {}),
   };
 }
 
@@ -43,10 +44,11 @@ export function softwareRefusal(state: GatewayState, line: LineDef, machineId: s
   return `${machineId} runs ${software}; allowed: ${allowed.join(', ')}`;
 }
 
-/** A machine that requires an artifact is never sent a handoff without one. */
+/** A machine that requires an artifact is never sent a handoff without one: the job's, or one for every unit. */
 export function artifactRefusal(line: LineDef, row: HandoffRow): string | null {
   if (!machineById(line, row.toMachine!).requireArtifact || (row.artifactUrl && row.artifactSha256)) return null;
-  return `${row.toMachine} requires an artifact (url and sha256); the row has none`;
+  if (row.units.every((u) => u.artifact)) return null;
+  return `${row.toMachine} requires an artifact (url and sha256), for the job or for every unit; the row has none`;
 }
 
 const SENT: readonly DispatchState[] = [DISPATCH_STATE.PENDING, DISPATCH_STATE.ACCEPTED];

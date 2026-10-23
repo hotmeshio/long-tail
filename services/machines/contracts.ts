@@ -29,9 +29,19 @@ export const LINE_ROLE = {
   CONTROLLER: 'line-controller',
 } as const;
 
+/** A file a machine fetches and verifies before it starts, by reference. */
+export interface ArtifactRef {
+  url: string;
+  sha256: string;
+}
+
 export interface HandoffUnit {
   unitId: string;
   carrierId: string | null;
+  /** This unit's own file, when each unit has one (a per-unit model or toolpath). */
+  artifact?: ArtifactRef;
+  /** Parameters for this unit alone, sent to the machine as given. */
+  parameters?: Record<string, unknown>;
 }
 
 /** Metadata on a handoff row. Everything a dispatch needs rides here. */
@@ -54,6 +64,8 @@ export interface HandoffFacets {
   artifactUrl: string | null;
   artifactSha256: string | null;
   attempt: number;
+  /** Parameters for the job, sent to the machine as given; what they mean is between the host and its codec. */
+  parameters?: Record<string, unknown>;
 }
 
 const RELEASED_PREFIX = 'released:';

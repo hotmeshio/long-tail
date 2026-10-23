@@ -79,6 +79,11 @@ export class Cell {
     if (this.jobs.size >= this.m.settings.queueCapacity) return { status: REPLY_STATUS.REFUSED, reason: 'queue full' };
     const artifact = await this.m.payloads.verify(a.artifact?.url, a.artifact?.sha256);
     if (!artifact.ok) return { status: REPLY_STATUS.FAILED, reason: artifact.detail };
+    for (const u of a.units) {
+      if (!u.artifact) continue;
+      const own = await this.m.payloads.verify(u.artifact.url, u.artifact.sha256);
+      if (!own.ok) return { status: REPLY_STATUS.FAILED, reason: `${u.unitId}: ${own.detail}` };
+    }
     const job: Job = {
       jobId: a.jobId, orderRef: a.orderRef, recipe: { id: recipeId, version: String(version) }, from: a.from ?? null,
       units: a.units.map((u: any) => ({ unitId: u.unitId, carrierId: u.carrierId ?? null, status: UNIT_STATUS.EXPECTED })),

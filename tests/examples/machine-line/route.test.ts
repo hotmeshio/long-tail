@@ -67,6 +67,15 @@ describe('unit route: stations people work', () => {
   });
 });
 
+describe('unit route: job parameters', () => {
+  it('a machine step\'s parameters ride on the hop into it, and only that hop', () => {
+    const steps = [{ ...INPUT.steps[0], parameters: { dwellS: 6 } }, INPUT.steps[1]];
+    const [intoPress, intoCut] = planHops(steps);
+    expect(hopFacets({ ...INPUT, steps }, intoPress, 1)).toMatchObject({ parameters: { dwellS: 6 } });
+    expect(hopFacets({ ...INPUT, steps }, intoCut, 1)).not.toHaveProperty('parameters');
+  });
+});
+
 describe('unit route: a pickup row', () => {
   it('asks a person to collect some units at a station, naming no sender so no machine event touches it', () => {
     const cut = INPUT.steps[1];

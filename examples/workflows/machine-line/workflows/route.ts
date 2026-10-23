@@ -15,6 +15,8 @@ export interface MachineStep {
   recipe: { id: string; version: string };
   /** The machine's role when the line names one; line-<process> otherwise. */
   role?: string;
+  /** Parameters this station's job needs, sent to the machine as given. */
+  parameters?: Record<string, unknown>;
 }
 
 /** A station people work: its handoff is resolved on the dashboard, like any form. */
@@ -95,6 +97,7 @@ export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number, send
     artifactUrl: machineOf(hop.to) && input.artifact ? input.artifact.url : null,
     artifactSha256: machineOf(hop.to) && input.artifact ? input.artifact.sha256 : null,
     attempt,
+    ...(machineOf(hop.to)?.parameters ? { parameters: machineOf(hop.to)!.parameters } : {}),
   };
 }
 

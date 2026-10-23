@@ -103,6 +103,26 @@ describe('planPacing', () => {
     expect(b).toMatchObject({ kind: 'resolve', rowId: 'c', payload: { errorCode: 'dispatch-refused' } });
   });
 
+  it('a row whose every unit has its own artifact goes to a machine that requires one; one unit without leaves it refused', () => {
+    const line = { ...LINE, machines: LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
+    const file = (unitId: string) => ({ url: `https://files/${unitId}.step`, sha256: 'cd'.repeat(32) });
+    const each = row('b', ['U2', 'U3'], null, 'press-01', DISPATCH_STATE.WAITING);
+    each.units = each.units.map((u) => ({ ...u, artifact: file(u.unitId) }));
+    const some = row('c', ['U4', 'U5'], null, 'press-01', DISPATCH_STATE.WAITING);
+    some.units = [{ ...some.units[0], artifact: file('U4') }, some.units[1]];
+    const [a, b] = planPacing(stateWith(each, some), line, 60_000);
+    expect(a).toMatchObject({ kind: 'dispatch', rowId: 'b', args: { units: [{ unitId: 'U2', artifact: file('U2') }, { unitId: 'U3', artifact: file('U3') }] } });
+    expect(b).toMatchObject({ kind: 'resolve', rowId: 'c', payload: { errorCode: 'dispatch-refused' } });
+  });
+
+  it('a dispatch carries the job\'s parameters and each unit\'s, as given', () => {
+    const r = { ...row('b', ['U2', 'U3'], null, 'press-01', DISPATCH_STATE.WAITING), parameters: { dwellS: 6, profile: 'A' } };
+    r.units = [{ ...r.units[0], parameters: { trimPath: 'p-2' } }, r.units[1]];
+    const [action] = planPacing(stateWith(r), LINE, 60_000);
+    expect(action).toMatchObject({ kind: 'dispatch', args: { parameters: { dwellS: 6, profile: 'A' }, units: [{ unitId: 'U2', parameters: { trimPath: 'p-2' } }, { unitId: 'U3' }] } });
+    expect((action as any).args.units[1]).not.toHaveProperty('parameters');
+  });
+
   it('a row with its artifact goes to a machine that requires one', () => {
     const line = { ...LINE, machines: LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
     const full = { ...row('b', 'U2', null, 'press-01', DISPATCH_STATE.WAITING), artifactUrl: 'https://files/job.bin', artifactSha256: 'ab'.repeat(32) };
