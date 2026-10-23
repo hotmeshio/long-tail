@@ -55,6 +55,19 @@ The machines override adds:
 - `machine-broker`: Mosquitto, MQTT 5 with client certificates, bridged into `site-nats`;
 - `machine-mock`: the simulated line, with drills on `:8090`.
 
+### Learned addresses
+
+`docker-compose.machines-learned.yml`, layered on the machines override, runs the same factory on a line that learns its addresses:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
+  -f docker-compose.machines-learned.yml up -d --build
+```
+
+- Each mock machine speaks as its permanent address from [`factory-line-addresses.json`](factory-line-addresses.json), with a certificate whose common name is that address.
+- `machine-site` renders `line.json`, the line as Long Tail knows it (stations only, `addressing: "learned"`), and an ACL of `pattern` rules on `%u`.
+- Long Tail binds each station to the machine that claims it as its first messages arrive, and keeps the binding on the station's bot account. The driver and its drills run unchanged.
+
 Long Tail runs the gateway in process. `--profile standalone-gateway` runs it as its own service over the HTTP API instead (`gateway/main.ts`). Adding the override to a stack that already ran needs `up -d --build -V` once, so the containers pick up the `mqtt` dependency. When a host port is taken, set `LT_NATS_PORT` and point the driver at it with `NATS_URL`.
 
 The driver mints routes from either manifest and plays the people:
@@ -69,6 +82,7 @@ The driver mints routes from either manifest and plays the people:
 | Path | What it holds |
 |---|---|
 | [`factory-line.json`](factory-line.json), [`demo-line.json`](demo-line.json) | The factory, and the small three-machine line the tests use |
+| [`factory-line-addresses.json`](factory-line-addresses.json) | Each factory station's machine address, for the learned-address run |
 | [`route-manifests.json`](route-manifests.json), [`manifests.ts`](manifests.ts) | The two manifests, the roles people work, the even percentage split |
 | [`workflows/`](workflows/) | `machineUnitRoute` and its pure route planning (machine and person steps); `machineCommand`, one step that asks a machine to start, stop, pause, resume or change over |
 | [`site/setup.ts`](site/setup.ts) | Certificates and broker configuration for the compose run |

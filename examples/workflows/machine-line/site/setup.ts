@@ -5,6 +5,11 @@
  * rendered from the line. Certificates already on disk are kept; the
  * configuration is rendered again on every run.
  *
+ * With MACHINE_LINE_ADDRESSES (station → permanent address) the line learns
+ * its addresses: each machine's certificate names its address as its CN, the
+ * ACL gives every certificate its own channels by that name, and line.json,
+ * the line as Long Tail knows it (stations only), is written beside site.conf.
+ *
  *   MACHINE_SITE_DIR=deploy/machine-site npx ts-node examples/workflows/machine-line/site/setup.ts
  */
 
@@ -13,8 +18,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { loadMachineLineConfig } from '../../../../services/machines/config';
-import { clientIds, controllerId } from '../../../../lib/machines/line';
-import { loadLine } from '../line';
+import { clientIds, controllerId, identOf } from '../../../../lib/machines/line';
+import { clientIdOf } from '../../../../lib/machines/protocol/envelope';
+import { learnedLine, loadLine, readAddresses, withAddresses } from '../line';
 import { bridgeId, renderSiteConf } from '../../../../lib/machines/site/site-conf';
 import { renderMosquittoAcl, renderMosquittoConf } from '../../../../lib/machines/site/mosquitto-conf';
 import { genericCodec } from '../../../../lib/machines/protocol/codec';
@@ -39,7 +45,9 @@ function issue(dir: string, name: string, cn: string, extensions: string): void 
 function main(): void {
   // 1. Line and output directory
   const config = loadMachineLineConfig({ ...process.env, MACHINE_TRANSPORT: 'memory', MACHINE_ESCALATION_FEED: 'memory' });
-  const line = loadLine(config.lineConfigPath);
+  const addresses = readAddresses(process.env.MACHINE_LINE_ADDRESSES);
+  const machines = withAddresses(loadLine(config.lineConfigPath), addresses);
+  const line = addresses ? learnedLine(machines) : machines;
   const dir = process.env.MACHINE_SITE_DIR ?? 'deploy/machine-site';
   const certDir = join(dir, 'certs');
   const brokerDir = join(dir, 'mosquitto');
@@ -53,6 +61,11 @@ function main(): void {
   issue(certDir, 'server', NATS_NAMES[0], `subjectAltName=${sansOf(NATS_NAMES)}\nextendedKeyUsage=serverAuth\n`);
   issue(certDir, 'broker', BROKER_NAMES[0], `subjectAltName=${sansOf(BROKER_NAMES)}\nextendedKeyUsage=serverAuth\n`);
   for (const id of [...clientIds(line), controllerId(line), bridgeId(line)]) issue(certDir, id, id, 'extendedKeyUsage=clientAuth\n');
+  // A machine whose address the line learns is known to the broker by its address alone.
+  if (addresses) {
+    for (const m of machines.machines) issue(certDir, clientIdOf(identOf(machines, m.machineId)), m.address!, 'extendedKeyUsage=clientAuth\n');
+    writeFileSync(join(dir, 'line.json'), `${JSON.stringify(line, null, 2)}\n`);
+  }
 
   // 3. site.conf for the site NATS, mosquitto.conf and acl for the machine broker
   const conf = renderSiteConf(line, {
@@ -67,7 +80,8 @@ function main(): void {
     root: config.topicRoot, certDir: '/certs', siteNats: process.env.MACHINE_SITE_NATS_MQTT ?? 'site-nats:8883', aclFile: '/mosquitto/config/acl',
   }));
   writeFileSync(join(brokerDir, 'acl'), renderMosquittoAcl(line, genericCodec({ root: config.topicRoot })));
-  console.log(JSON.stringify({ level: 'info', event: 'machine_site.ready', dir, identities: clientIds(line).length + 2 }));
+  const identities = (addresses ? machines.machines.length : clientIds(line).length) + 2;
+  console.log(JSON.stringify({ level: 'info', event: 'machine_site.ready', dir, identities, addressing: line.addressing ?? 'declared' }));
 }
 
 main();

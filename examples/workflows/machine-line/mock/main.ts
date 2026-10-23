@@ -1,13 +1,14 @@
 /**
  * The mock line as a process: one MQTT session per machine, each logged in
- * with its own credentials, plus the drill and payload HTTP server.
+ * with its own credentials, plus the drill and payload HTTP server. With
+ * MACHINE_LINE_ADDRESSES each machine speaks as its own permanent address.
  *
  *   MACHINE_TRANSPORT=nats|mqtt MACHINE_MQTT_URL=mqtts://site-nats:8883 \
  *   MACHINE_MQTT_CERT=/certs/{clientId}.pem ... npx ts-node examples/workflows/machine-line/mock/main.ts
  */
 
 import { loadMachineLineConfig } from '../../../../services/machines/config';
-import { loadLine } from '../line';
+import { loadLine, readAddresses, withAddresses } from '../line';
 import { createLinkFactory } from '../../../../services/machines/select';
 import { startDrillServer } from './drills';
 import { MockLine } from './mock-line';
@@ -16,7 +17,7 @@ import { mockSettingsFromEnv } from './settings';
 async function main(): Promise<void> {
   // 1. Config, line and links
   const config = loadMachineLineConfig({ ...process.env, MACHINE_ESCALATION_FEED: 'memory' });
-  const line = loadLine(config.lineConfigPath);
+  const line = withAddresses(loadLine(config.lineConfigPath), readAddresses(process.env.MACHINE_LINE_ADDRESSES));
   const settings = mockSettingsFromEnv();
   const port = Number(process.env.MOCK_LINE_PORT ?? 8090);
   const publicUrl = process.env.MOCK_LINE_PUBLIC_URL ?? `http://localhost:${port}`;

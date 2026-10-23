@@ -1,0 +1,20 @@
+# Learned addresses: layered on docker-compose.machines.yml. Long Tail's line
+# names stations only; each mock machine speaks as a permanent address
+# (factory-line-addresses.json) with a certificate whose CN is that address,
+# and the line learns which machine is at which station from its messages.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
+#     -f docker-compose.machines-learned.yml up -d --build
+
+services:
+  long-tail:
+    environment:
+      MACHINE_LINE_CONFIG: /etc/site/line.json
+
+  machine-site:
+    environment:
+      MACHINE_LINE_ADDRESSES: /app/examples/workflows/machine-line/factory-line-addresses.json
+
+  machine-mock:
+    environment:
+      MACHINE_LINE_ADDRESSES: /app/examples/workflows/machine-line/factory-line-addresses.json
