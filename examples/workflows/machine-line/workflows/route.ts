@@ -3,7 +3,7 @@
  * route, the row each hop parks, and what a finished row means.
  */
 
-import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, arrivedUnit, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
+import { HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, handoffProgress, type HandoffErrorCode, type HandoffFacets, type HandoffUnit } from '../../../../services/machines/contracts';
 import { machineById, machineRole, stationRole, type LineDef } from '../../../../lib/machines/line';
 
 export const UNIT_ROUTE_WORKFLOW = 'machineUnitRoute';
@@ -79,11 +79,11 @@ export function jobIdFor(routeKey: string, step: RouteStep | null, attempt = 1):
 }
 
 /** `senderAttempt` is the attempt of the hop that brought the units to the sender. */
-export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt = 1): HandoffFacets {
+export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt = 1, units = input.units): HandoffFacets {
   return {
     siteId: input.siteId,
     lineId: input.lineId,
-    units: input.units,
+    units,
     jobId: jobIdFor(input.routeKey, hop.to, attempt),
     senderJobId: hop.from ? jobIdFor(input.routeKey, hop.from, senderAttempt) : null,
     orderRef: input.orderRef,
@@ -98,7 +98,7 @@ export function hopFacets(input: UnitRouteInput, hop: Hop, attempt: number, send
   };
 }
 
-function roleOf(input: UnitRouteInput, step: RouteStep | null): string {
+export function roleOf(input: UnitRouteInput, step: RouteStep | null): string {
   if (!step) return input.exitRole ?? LINE_ROLE.EXIT;
   return isMachineStep(step) ? step.role ?? stationRole(step.process) : step.role;
 }
@@ -121,23 +121,41 @@ export function hopRow(input: UnitRouteInput, hop: Hop, attempt: number, senderA
   };
 }
 
+/**
+ * A row asking a person to collect units where they stopped, outside any
+ * handoff between stations: it names no sender, so no machine event touches it.
+ */
+export function pickupRow(input: UnitRouteInput, index: number, at: RouteStep, units: HandoffUnit[]) {
+  const hop: Hop = { index, from: null, to: null };
+  const names = units.map((u) => u.unitId).join(', ');
+  return {
+    role: roleOf(input, null),
+    type: ROW_TYPE.HANDOFF,
+    subtype: 'pickup',
+    description: `Collect ${names} at ${stationKey(at)} and take them off the line`,
+    metadata: { ...hopFacets(input, hop, 1, 1, units), jobId: `${input.routeKey}-pickup-${stationKey(at)}`, pickupAt: stationKey(at) } as Record<string, unknown>,
+  };
+}
+
+/** How a hop ended; on a failure, which units reached the receiver and which did not. */
 export interface HopOutcome {
   received: boolean;
   errorCode?: HandoffErrorCode;
   detail?: string;
+  arrived?: string[];
+  missing?: string[];
 }
 
-/** A timeout after some units arrived splits them between two stations, which a retry of the hop cannot move. */
-function timedOut(items: { itemKey: string }[]): HopOutcome {
-  const arrived = items.map((i) => arrivedUnit(i.itemKey)).filter((u): u is string => !!u);
-  if (!arrived.length) return { received: false, errorCode: HANDOFF_ERROR.HANDOFF_TIMEOUT, detail: 'no receipt before the timeout' };
-  return { received: false, errorCode: HANDOFF_ERROR.PARTIAL_ARRIVAL, detail: `${arrived.join(', ')} arrived; the rest did not before the timeout` };
-}
-
-/** Read a finished handoff row: a receipt, an error, a timeout, or a cancel. */
-export function readHopOutcome(result: Record<string, any> | null): HopOutcome {
+/** Read a finished handoff row for `units`: a receipt, an error, a timeout, or a cancel. */
+export function readHopOutcome(result: Record<string, any> | null, units: readonly string[]): HopOutcome {
   if (result === null) return { received: false, errorCode: HANDOFF_ERROR.CANCELLED, detail: 'the handoff was cancelled' };
-  if (result.$trigger === 'timeout') return timedOut(result.$accumulated ?? []);
   if (result.received === true) return { received: true };
-  return { received: false, errorCode: result.errorCode, detail: result.detail ?? result.reason ?? undefined };
+  const { arrived, missing } = handoffProgress(units, result.$accumulated ?? []);
+  if (result.$trigger !== 'timeout') {
+    return { received: false, errorCode: result.errorCode, detail: result.detail ?? result.reason ?? undefined, arrived, missing };
+  }
+  // A timeout after some units arrived has split them between two stations.
+  return arrived.length
+    ? { received: false, errorCode: HANDOFF_ERROR.PARTIAL_ARRIVAL, detail: `${arrived.join(', ')} arrived; the rest did not before the timeout`, arrived, missing }
+    : { received: false, errorCode: HANDOFF_ERROR.HANDOFF_TIMEOUT, detail: 'no receipt before the timeout', arrived, missing };
 }

@@ -142,17 +142,21 @@ async function released(rowId: string, units: { unitId: string }[], ms = 180_000
 /** Units the operator sent off the line by hand: the sender already finished them, so no release is coming. */
 const takenOver = new Set<string>();
 
-/** A person at a station: take each unit off the machine it came from (if any), then receive the set. */
+/**
+ * A person at a station: take each unit off the machine it came from (if any),
+ * or collect it where a split left it (a pickup row), then receive the set.
+ */
 async function receive(row: Record<string, any>): Promise<void> {
   const md = row.metadata ?? {};
   const units = md.units ?? [];
-  const finished = async () => units.every((u: any) => takenOver.has(u.unitId)) || released(row.id, units);
-  if (md.fromMachine && !(await finished() && await takeUnits(md.fromMachine, units))) {
-    say(`[${row.role}]`.padEnd(11) + ` ${units.map((u: any) => u.unitId).join(', ')} never left ${md.fromMachine}; leaving the row open`);
+  const at: string | null = md.pickupAt ?? md.fromMachine ?? null;
+  const finished = async () => !!md.pickupAt || units.every((u: any) => takenOver.has(u.unitId)) || released(row.id, units);
+  if (at && !(await finished() && await takeUnits(at, units))) {
+    say(`[${row.role}]`.padEnd(11) + ` ${units.map((u: any) => u.unitId).join(', ')} never left ${at}; leaving the row open`);
     return;
   }
   await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { received: true, receiver: `${row.role}-person` } });
-  say(`[${row.role}]`.padEnd(11) + ` received ${(md.units ?? []).map((u: any) => u.unitId).join(', ')} from ${md.fromMachine ?? 'a person'}`);
+  say(`[${row.role}]`.padEnd(11) + ` received ${units.map((u: any) => u.unitId).join(', ')} ${md.pickupAt ? `collected at ${at}` : `from ${at ?? 'a person'}`}`);
 }
 
 /** Set once a route left the line on purpose (manual or scrap), so an incomplete run is expected. */
@@ -168,6 +172,8 @@ async function decideFailure(row: Record<string, any>): Promise<void> {
   if (decision === DECISION.MANUAL) for (const u of md.units ?? []) takenOver.add(u.unitId);
   if (decision === DECISION.SCRAP) await takeUnits(md.fromMachine ?? null, md.units ?? [], 4);
   await api('POST', `/escalations/${row.id}/resolve`, { resolverPayload: { decision, note: `driver: ${md.errorCode}` } });
+  // Scrapped units split by a partial arrival: the ones that arrived wait at the receiver once the workflow stops its job.
+  if (decision === DECISION.SCRAP && md.errorCode === 'partial-arrival') await takeUnits(md.toMachine ?? null, md.units ?? [], 8);
   say(`[operator] ${md.jobId} ${md.errorCode} at ${md.fromMachine ?? 'entry'} -> ${decision}`);
 }
 

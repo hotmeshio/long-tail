@@ -103,11 +103,12 @@ export class Cell {
     return { status: REPLY_STATUS.ACCEPTED, reason: `withdrew ${jobId}` };
   }
 
-  /** The job leaves the queue (cancelled, or given up by the machine). */
+  /** The job leaves the queue (cancelled, or given up by the machine); units already at the station stay there for a person. */
   async withdraw(job: Job): Promise<void> {
     this.jobs.delete(job.jobId);
     for (const u of job.units) this.m.floor.unexpect(u.unitId, this.m, job);
     if (this.station === job) this.station = null;
+    for (const u of job.units) if (u.status === UNIT_STATUS.PRESENT) this.m.floor.hold(this.m, job, u.unitId, u.carrierId);
     for (const u of job.units) await this.publishJob(JOB_EVENT.WITHDRAWN, job, u);
     this.m.floor.poke();
   }

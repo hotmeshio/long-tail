@@ -38,6 +38,15 @@ describe('mock jobs: cancel, withdraw, restart', () => {
     expect(h.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0]).toMatchObject({ result: 'hold', reason: 'cancelled' });
   });
 
+  it('cancelling a job still waiting for its units leaves the ones already present for a person to take back', async () => {
+    h = await startHarness({ autoArriveAtEntry: false });
+    await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', ['U1', 'U2']));
+    expect(await h.line.arrive('press-01', { unitId: 'U1', carrierId: 'CR-U1' })).toBe(true);
+    expect(await h.command('press-01', OP.CANCEL, { jobId: 'U1-press-01' })).toMatchObject({ status: 'accepted', reason: 'withdrew U1-press-01' });
+    expect(await h.line.unload('press-01', { unitId: 'U1' })).toBe(true);
+    expect(await h.line.unload('press-01', { unitId: 'U2' })).toBe(false);
+  });
+
   it('the machine can give up a queued job by itself', async () => {
     h = await startHarness({ autoArriveAtEntry: false });
     await h.command('press-01', OP.DISPATCH, dispatchArgs('press-01', 'U1'));

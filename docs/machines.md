@@ -57,8 +57,8 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | Facet | Meaning |
 |---|---|
 | `siteId`, `lineId` | The line; a gateway acts only on its own line's rows |
-| `units` | `[{ unitId, carrierId }]`: the units that move together |
-| `jobId`, `senderJobId` | The receiver's job and the sender's |
+| `units` | `[{ unitId, carrierId }]`: the units that move together; any of a route's units, all or some |
+| `jobId`, `senderJobId` | The receiver's job and the sender's. Each open handoff into a machine names its own job; a second open row naming the same job there resolves `dispatch-refused`. A row for some of a sender job's units still receives their releases, however the codec split that job |
 | `fromMachine`, `toMachine` | Machine ids, or null for line entry and for a person |
 | `recipeId`, `recipeVersion`, `process` | What the receiver runs |
 | `artifactUrl`, `artifactSha256` | The job file, by reference |
@@ -69,6 +69,10 @@ The gateway dispatches to `toMachine` when the row is created, or, under a codec
 ```typescript
 { received: true, receiver: 'cut-01', units: ['U1', 'U2'] }
 ```
+
+When a handoff ends without every unit (a failure, a timeout, a cancel), the gateway withdraws only the jobs none of whose units reached the receiver, so nothing queued for an absent unit runs later. A job some of whose units already arrived is under way: it stays, and what happens to it is the workflow's next decision. A workflow that wants it stopped parks a `cancel` command row (see Commands).
+
+`Machines.handoffProgress(units, items)` reads where a handoff's units stand from its items (a row's items, or `$accumulated` on a finished wait): `{ released, arrived, missing }`. A workflow reads it to decide what a split means for its own process.
 
 On arrival dispatch, the units are already at the receiver, so its acceptance resolves the row the same way.
 
@@ -99,7 +103,9 @@ Both are containment-searchable, so the rows that used a lot, and with them the 
 
 ### Decisions on a failed handoff
 
-`Machines.handoffDecisions(errorCode)` gives the decisions that fit a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit. A hop that times out after only some of its units arrived (`partial-arrival`, which names the units that arrived) has split them between two stations; a retry would ask the sender for units it no longer holds, so only `manual` and `scrap` fit there too.
+`Machines.handoffDecisions(errorCode)` gives a default set of decisions for a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit. After a `partial-arrival` (a timeout once only some units arrived) the units are split between two stations, and a retry of the same hop would ask the sender for units it no longer holds, so the default offers `manual` and `scrap`. A workflow is free to offer its own decisions instead, such as moving only the missing units on; the platform reports the facts and does not choose.
+
+The example route's policy for a split: it stops the receiver's job with a `cancel` command row, then a person collects each group of units where it stopped.
 
 A host whose rows already carry their own facets supplies a `HandoffRowAdapter`:
 
@@ -123,7 +129,7 @@ A unit leaves when the machine releases it, when it arrives at the next machine,
 
 ## Commands
 
-A host asks a machine to start, stop, pause, resume or change over by parking a `machine-command` row on the machine's role, from a workflow step or through the API, the way it asks a person for anything:
+A host asks a machine to start, stop, pause, resume, change over or cancel a job (`cancel` needs `args.jobId`) by parking a `machine-command` row on the machine's role, from a workflow step or through the API, the way it asks a person for anything:
 
 ```typescript
 const reply = await conditional<Machines.CommandResolution>(`changeover-${orderId}`, {
@@ -199,7 +205,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
 
-A replica taking a line reads back its open handoff, command, alarm, offline and quiet rows. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
+A replica taking a line reads back its open handoff, command, alarm, offline and quiet rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
 
 ## Topology and identity
 

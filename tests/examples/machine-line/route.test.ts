@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { hopFacets, hopRow, planHops, readHopOutcome, type RouteStep, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
+import { hopFacets, hopRow, pickupRow, planHops, readHopOutcome, type RouteStep, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
 
 const INPUT: UnitRouteInput = {
   siteId: 'site-1',
@@ -67,20 +67,37 @@ describe('unit route: stations people work', () => {
   });
 });
 
+describe('unit route: a pickup row', () => {
+  it('asks a person to collect some units at a station, naming no sender so no machine event touches it', () => {
+    const cut = INPUT.steps[1];
+    const row = pickupRow(INPUT, 4, cut, [INPUT.units[1]]);
+    expect(row).toMatchObject({ role: 'line-exit', subtype: 'pickup', description: `Collect ${INPUT.units[1].unitId} at cut-01 and take them off the line` });
+    expect(row.metadata).toMatchObject({ units: [INPUT.units[1]], fromMachine: null, senderJobId: null, toMachine: null, jobId: 'R1-pickup-cut-01', pickupAt: 'cut-01' });
+  });
+});
+
 describe('unit route: reading a finished handoff', () => {
+  const units = ['U1', 'U2'];
+  const items = (...keys: string[]) => keys.map((itemKey) => ({ itemKey }));
+
   it('reads a receipt, an error, a timeout and a cancel', () => {
-    expect(readHopOutcome({ $trigger: 'resolve', received: true, units: ['U1'] })).toEqual({ received: true });
-    expect(readHopOutcome({ $trigger: 'resolve', received: false, errorCode: 'jam', detail: 'cut-01 reported jam' }))
-      .toEqual({ received: false, errorCode: 'jam', detail: 'cut-01 reported jam' });
-    expect(readHopOutcome({ $trigger: 'timeout', $accumulated: [] })).toMatchObject({ received: false, errorCode: 'handoff-timeout' });
-    expect(readHopOutcome(null)).toMatchObject({ received: false, errorCode: 'cancelled' });
+    expect(readHopOutcome({ $trigger: 'resolve', received: true, units }, units)).toEqual({ received: true });
+    expect(readHopOutcome({ $trigger: 'resolve', received: false, errorCode: 'jam', detail: 'cut-01 reported jam', $accumulated: [] }, units))
+      .toEqual({ received: false, errorCode: 'jam', detail: 'cut-01 reported jam', arrived: [], missing: units });
+    expect(readHopOutcome({ $trigger: 'timeout', $accumulated: [] }, units)).toMatchObject({ received: false, errorCode: 'handoff-timeout' });
+    expect(readHopOutcome(null, units)).toMatchObject({ received: false, errorCode: 'cancelled' });
   });
 
-  it('reads a timeout after some units arrived as a partial arrival naming them', () => {
-    const $accumulated = [{ itemKey: 'released:U1' }, { itemKey: 'released:U2' }, { itemKey: 'arrived:U2' }];
-    expect(readHopOutcome({ $trigger: 'timeout', $accumulated })).toEqual({
-      received: false, errorCode: 'partial-arrival', detail: 'U2 arrived; the rest did not before the timeout',
+  it('reads a timeout after some units arrived as a partial arrival, with the units as data', () => {
+    const $accumulated = items('released:U1', 'released:U2', 'arrived:U2');
+    expect(readHopOutcome({ $trigger: 'timeout', $accumulated }, units)).toEqual({
+      received: false, errorCode: 'partial-arrival', detail: 'U2 arrived; the rest did not before the timeout', arrived: ['U2'], missing: ['U1'],
     });
-    expect(readHopOutcome({ $trigger: 'timeout', $accumulated: $accumulated.slice(0, 2) })).toMatchObject({ errorCode: 'handoff-timeout' });
+    expect(readHopOutcome({ $trigger: 'timeout', $accumulated: $accumulated.slice(0, 2) }, units)).toMatchObject({ errorCode: 'handoff-timeout', missing: units });
+  });
+
+  it('a failure the gateway reports still says which units arrived', () => {
+    const outcome = readHopOutcome({ $trigger: 'resolve', received: false, errorCode: 'jam', $accumulated: items('arrived:U1') }, units);
+    expect(outcome).toMatchObject({ errorCode: 'jam', arrived: ['U1'], missing: ['U2'] });
   });
 });
