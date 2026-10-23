@@ -70,6 +70,14 @@ export function withQuery(uri: string, params: Record<string, string | undefined
 }
 
 /**
+ * The client's redirect for an authorization response, a code or an error.
+ * Always carries `iss` (RFC 9207), as the server metadata advertises.
+ */
+export function authorizationResponseUri(redirectUri: string, issuer: string, params: Record<string, string | undefined>): string {
+  return withQuery(redirectUri, { ...params, iss: issuer });
+}
+
+/**
  * The presets the person may grant. Read-only always; Just be me only when it
  * adds something: a membership that can write, or an admin tier.
  */

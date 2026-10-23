@@ -4,7 +4,7 @@ import { getOAuthServerSettings } from '../../modules/oauth-server';
 import { OAUTH_CODE_TTL_SECONDS } from '../../modules/defaults';
 import { getClient, issueAuthorizationCode, PRESET_SCOPE } from '../../services/auth/oauth-server';
 import {
-  checkAuthorizationRequest, grantablePresets, isGrantPreset, withQuery, type AuthorizationCheck,
+  authorizationResponseUri, checkAuthorizationRequest, grantablePresets, isGrantPreset, withQuery, type AuthorizationCheck,
 } from '../../services/auth/oauth-server/authorization';
 import { getUserRoles } from '../../services/user';
 
@@ -18,8 +18,8 @@ function sendAuthorizationError(res: Response, check: Exclude<AuthorizationCheck
     res.status(400).json({ error: check.error, error_description: check.description });
     return;
   }
-  const redirect = withQuery(check.redirectUri, {
-    error: check.error, error_description: check.description, state: check.state, iss: issuer,
+  const redirect = authorizationResponseUri(check.redirectUri, issuer, {
+    error: check.error, error_description: check.description, state: check.state,
   });
   if (asJson) res.json({ redirect });
   else res.redirect(302, redirect);
@@ -75,7 +75,7 @@ router.post('/authorize', requireCredentialAuth, async (req, res) => {
     userId: req.auth!.userId, clientId: client.client_id, policy: { preset }, scope: PRESET_SCOPE[preset],
     redirectUri, codeChallenge, resource, ttlSeconds: OAUTH_CODE_TTL_SECONDS,
   });
-  res.json({ redirect: withQuery(redirectUri, { code, state, iss: settings.issuer }) });
+  res.json({ redirect: authorizationResponseUri(redirectUri, settings.issuer, { code, state }) });
 });
 
 /**
@@ -93,7 +93,7 @@ router.post('/deny', requireCredentialAuth, async (req, res) => {
     return;
   }
   const state = typeof req.body?.state === 'string' ? req.body.state : undefined;
-  res.json({ redirect: withQuery(redirectUri, { error: 'access_denied', state, iss: settings.issuer }) });
+  res.json({ redirect: authorizationResponseUri(redirectUri, settings.issuer, { error: 'access_denied', state }) });
 });
 
 /**

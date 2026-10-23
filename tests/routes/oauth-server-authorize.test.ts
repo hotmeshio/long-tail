@@ -12,7 +12,8 @@ import { createApp, jsonBody } from '../../lib/http';
 import routes from '../../routes';
 import { config } from '../../modules/config';
 import { signToken } from '../../modules/auth';
-import { setOAuthServerConfig, clearOAuthServerConfig } from '../../modules/oauth-server';
+import { setOAuthServerConfig, clearOAuthServerConfig, getOAuthServerSettings } from '../../modules/oauth-server';
+import { authorizationServerMetadata } from '../../services/auth/oauth-server/metadata';
 import { setSSOConfig, clearSSOConfig } from '../../modules/sso';
 import { exchangeAuthorizationCode } from '../../services/auth/oauth-server';
 import { REDIRECT_URI, pkcePair, createGrantFixture, removeGrantFixture } from '../helpers/oauth-server-fixtures';
@@ -141,6 +142,19 @@ describe('POST /api/oauth/authorize and /deny', () => {
     const reply = await post('/deny', { client_id: fixture.clientId, redirect_uri: REDIRECT_URI, state: 'st-2' });
     expect(Object.fromEntries(new URL(reply.body.redirect).searchParams)).toEqual({ error: 'access_denied', state: 'st-2', iss: ISSUER });
     expect((await post('/deny', { client_id: fixture.clientId, redirect_uri: 'http://127.0.0.1:1/x' })).status).toBe(400);
+  });
+});
+
+describe('issuer identification (RFC 9207)', () => {
+  it('every authorization response carries the issuer the metadata advertises', async () => {
+    const metadata = authorizationServerMetadata(getOAuthServerSettings()!);
+    expect(metadata.authorization_response_iss_parameter_supported).toBe(true);
+    const responses = [
+      (await authorizeGet(request({ response_type: 'token' }))).location!,
+      (await post('/authorize', { ...request(), preset: 'read_only' })).body.redirect,
+      (await post('/deny', { client_id: fixture.clientId, redirect_uri: REDIRECT_URI })).body.redirect,
+    ];
+    for (const uri of responses) expect(new URL(uri).searchParams.get('iss')).toBe(metadata.issuer);
   });
 });
 
