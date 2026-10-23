@@ -42,6 +42,7 @@ export async function admitSender(ctx: AdmissionContext, topic: string, raw: Ins
       await ctx.pace();
     }
     if (sender.seen) return sender.seen;
+    if (sender.status === SENDER.CONTESTED) ctx.state.hearClaim(sender.address, sender.machineId!);
     if (sender.status === SENDER.CONTESTED && !ctx.state.claimRaised(sender.address, sender.machineId!)) {
       await ctx.executor.apply([{ kind: 'createRow', row: registrationRow(ctx.state, ctx.line, sender.address, sender.machineId!) }]);
       ctx.state.raiseClaim(sender.address, sender.machineId!);

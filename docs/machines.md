@@ -225,7 +225,7 @@ A replica taking a line reads back its learned addresses, its open handoff, comm
 - **Commands:** the gateway publishes commands to the machine broker at QoS 1, so they queue for a machine that is away.
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
-- **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role.
+- **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role. A row commands only the machine whose role it is on: cancelling a handoff withdraws the receiver's dispatch, and the sender's job is stopped only by a `cancel` command row on the sender's role.
 - **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
 
 ### Learned addresses
@@ -234,10 +234,10 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 
 - **The claim:** every message carries the machine's address (its topic level, which the broker ties to its certificate) and the station it says it is. A codec reports that station as the inspection's `claim`; the line protocol carries it as the envelope's `source.station`.
 - **First contact binds:** a station with no address yet is bound to the first address that claims it. The gateway logs it, keeps it in its `AddressBook`, and sends the station's waiting work. Until then, handoffs into the station wait in its role queue, and command rows for it resolve `unsupported`.
-- **A person settles a disagreement:** a claim on a station already bound to another address, or by an address bound to another station, raises one `machine-registration` row on the operator role. The claimant's messages have no effect, and get no receipt, until a person approves it.
+- **A person settles a disagreement:** a claim on a station already bound to another address, or by an address bound to another station, raises one `machine-registration` row on the operator role. The claimant's messages have no effect, and get no receipt, until a person approves it. Approval binds only a claim the gateway has heard from that address since it took the line, for a station that learns its address; any other approval is logged (`machine_gateway.address.refused`) and changes nothing, and the claimant's next message raises a new row.
 - **Where bindings live:** in process, on each station's bot account as the user property `machineAddress`; `MemoryAddressBook` otherwise. A replica taking the line reads them back before it sends anything.
 - **Broker access:** stations that learn their address get no broker user of their own. `renderMosquittoAcl` writes `pattern` rules on `%u`, so every certificate may use the channels under its own name; each machine's certificate common name must therefore be its address.
-- **Mixed lines:** a station that declares `address` on a learning line keeps it; claims on that station are ignored.
+- **Mixed lines:** a station that declares `address` on a learning line keeps it; claims on that station are ignored, and the gateway knows it only on its declared address. `renderMosquittoAcl` denies that station's channels to a certificate named for its address, which the `pattern` rules would otherwise grant.
 
 ## Configuration
 

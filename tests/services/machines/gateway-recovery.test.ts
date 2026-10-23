@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { ROW_TYPE } from '../../../services/machines/contracts';
 import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
 import { RecordingLog } from '../../../services/machines/testing/recording-log';
-import { CHANNEL, alarmTopic, buildEnvelope, machineTopic } from '../../../lib/machines/protocol';
+import { CHANNEL, OP, alarmTopic, buildEnvelope, machineTopic } from '../../../lib/machines/protocol';
 import { identOf } from '../../../lib/machines/line';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
@@ -50,7 +50,7 @@ describe('recovery: a gateway restart keeps its own rows', () => {
     expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ decision: 'restored' });
   });
 
-  it('an alarm id the machine reuses with a new raise time is a new alarm', async () => {
+  it('an alarm id the machine reuses with a new raise time is a new alarm; ending the old row acknowledges nothing', async () => {
     rig = await startRig();
     const ident = identOf(DEFAULT_LINE, 'press-01');
     const raise = (raisedAt: string) => rig.broker.publish(alarmTopic(ROOT, ident, 'A-7'), JSON.stringify(buildEnvelope(ident, {
@@ -63,8 +63,15 @@ describe('recovery: a gateway restart keeps its own rows', () => {
     await sleep(20);
     expect(rowsOf(ROW_TYPE.ALARM)).toHaveLength(1);
     raise('2026-01-02T00:00:00.000Z');
-    await until(() => rowsOf(ROW_TYPE.ALARM).length === 2);
+    const second = await until(() => rowsOf(ROW_TYPE.ALARM).find((r) => r.id !== first.id));
     expect((await rig.lt.ended(first.id)).resolver_payload).toMatchObject({ decision: 'cleared' });
+    await sleep(20);
+    await rig.gateway.idle();
+    expect(rig.recorder.commands('press-01', OP.ACKNOWLEDGE_ALARM)).toEqual([]);
+
+    // The machine's clear still ends the new raise's row.
+    rig.broker.publish(alarmTopic(ROOT, ident, 'A-7'), '', true);
+    expect((await rig.lt.ended(second.id)).resolver_payload).toMatchObject({ decision: 'cleared' });
   });
 });
 

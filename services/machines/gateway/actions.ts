@@ -39,7 +39,9 @@ export type Action =
   /** A machine reported the jobs it holds: answers a status query in flight. */
   | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] }
   /** Bind a station to the address that claims it, and keep the binding in the address book. `by`: who approved it, when someone did. */
-  | { kind: 'bindAddress'; machineId: string; address: string; by?: string };
+  | { kind: 'bindAddress'; machineId: string; address: string; by?: string }
+  /** An approved registration the gateway will not bind, and why. */
+  | { kind: 'refuseBinding'; machineId: string; address: string; reason: string };
 
 /** Once the row holds every one of `keys`: resolve it with `payload`, or run `then` instead. */
 export interface Completion {

@@ -103,10 +103,11 @@ describe('commands: replies are tracked', () => {
     await rig.line.machine('cut-01').enable(false);
     const row = rig.park('U1', 'press-01', 'cut-01');
     await until(() => rig.lt.calls.some((c) => c.verb === 'claim' && c.id === row.id));
-    await until(() => press().cell.jobs.get('U1-press-01')?.status === 'done');
+    // The receiver no longer holds the queued job, so it refuses the withdrawal.
+    rig.line.machine('cut-01').cell.jobs.delete('U1-cut-01');
     rig.lt.cancel(row.id);
     await until(() => log.of(GATEWAY_LOG.COMMAND_REFUSED).length, 2_000);
-    expect(log.of(GATEWAY_LOG.COMMAND_REFUSED)[0]).toMatchObject({ op: OP.CANCEL, machine: 'press-01' });
+    expect(log.of(GATEWAY_LOG.COMMAND_REFUSED)[0]).toMatchObject({ op: OP.CANCEL, machine: 'cut-01' });
 
     rig.line.config('cut-01', { replyMode: 'drop' });
     await rig.line.fault('cut-01', { code: 'F-201' });

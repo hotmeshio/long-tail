@@ -80,6 +80,8 @@ export class GatewayState {
   private stationOfAddress = new Map<string, string>();
   /** Contested claims already raised as registration rows, `${address}>${station}`. */
   private claims = new Set<string>();
+  /** Contested claims heard from the machines themselves, `${address}>${station}`. */
+  private heard = new Set<string>();
   /** Addresses heard that claim no station, logged once each. */
   private strangers = new Set<string>();
 
@@ -225,6 +227,15 @@ export class GatewayState {
 
   settleClaim(address: string, machineId: string): void {
     this.claims.delete(`${address}>${machineId}`);
+  }
+
+  hearClaim(address: string, machineId: string): void {
+    this.heard.add(`${address}>${machineId}`);
+    if (this.heard.size > CLOSED_LIMIT) this.heard.delete(this.heard.values().next().value!);
+  }
+
+  claimHeard(address: string, machineId: string): boolean {
+    return this.heard.has(`${address}>${machineId}`);
   }
 
   /** True the first time an address that claims no station is heard. */

@@ -57,6 +57,14 @@ describe('resolveSender', () => {
     expect(resolveSender(state, LEARNED, from(UUID_A, 'mill-99')).status).toBe(SENDER.UNKNOWN);
     expect(resolveSender(state, mixed, from(UUID_A, 'cut-01')).status).toBe(SENDER.UNKNOWN);
   });
+
+  it('knows a declared station on a learning line only on its declared address', () => {
+    const mixed = { ...LEARNED, machines: LEARNED.machines.map((m) => (m.machineId === 'cut-01' ? { ...m, address: UUID_B } : m)) };
+    const declared = (ident: Record<string, string>): Inspection => ({ ...from(UUID_B), parsed: { ...from(UUID_B).parsed!, ident: { siteId: 'site-1', lineId: 'line-1', machineId: 'cut-01', ...ident } } });
+    expect(resolveSender(new GatewayState(), mixed, declared({ address: UUID_B }))).toMatchObject({ status: SENDER.KNOWN, machineId: 'cut-01' });
+    // A certificate named for the station rather than its address speaks under the station's name, not as it.
+    expect(resolveSender(new GatewayState(), mixed, declared({})).status).toBe(SENDER.UNKNOWN);
+  });
 });
 
 describe('identFor and reachable', () => {
@@ -92,17 +100,37 @@ describe('registration rows', () => {
   it('approval binds the station to the claimant, naming who approved; rejection changes nothing', () => {
     const state = new GatewayState();
     const md = { machineId: 'press-01', address: UUID_B };
-    expect(planRegistrationRow(state, event('created', md))).toEqual([]);
+    state.hearClaim(UUID_B, 'press-01');
+    expect(planRegistrationRow(state, LEARNED, event('created', md))).toEqual([]);
     expect(state.claimRaised(UUID_B, 'press-01')).toBe(true);
-    expect(planRegistrationRow(state, event('resolved', md, { resolver_payload: { decision: DECISION.APPROVE }, resolved_by: 'person-1' })))
+    expect(planRegistrationRow(state, LEARNED, event('resolved', md, { resolver_payload: { decision: DECISION.APPROVE }, resolved_by: 'person-1' })))
       .toEqual([{ kind: 'bindAddress', machineId: 'press-01', address: UUID_B, by: 'person-1' }]);
     expect(state.claimRaised(UUID_B, 'press-01')).toBe(false);
-    expect(planRegistrationRow(state, event('resolved', md, { resolver_payload: { decision: DECISION.REJECT } }))).toEqual([]);
+    expect(planRegistrationRow(state, LEARNED, event('resolved', md, { resolver_payload: { decision: DECISION.REJECT } }))).toEqual([]);
+  });
+
+  it('refuses an approval for a claim no machine made, a station that does not learn, or an address no machine can send from', () => {
+    const mixed = { ...LEARNED, machines: LEARNED.machines.map((m) => (m.machineId === 'cut-01' ? { ...m, address: UUID_B } : m)) };
+    const approve = (state: GatewayState, line: typeof LEARNED, md: Record<string, string>) =>
+      planRegistrationRow(state, line, event('resolved', md, { resolver_payload: { decision: DECISION.APPROVE } }));
+    const heard = (address: string, machineId: string) => {
+      const state = new GatewayState();
+      state.hearClaim(address, machineId);
+      return state;
+    };
+    const refusal = (actions: unknown[]) => (actions as { kind: string; reason: string }[]).map((a) => [a.kind, a.reason]);
+    expect(refusal(approve(new GatewayState(), LEARNED, { machineId: 'press-01', address: UUID_A }))).toEqual([['refuseBinding', expect.stringContaining('has claimed press-01')]]);
+    expect(refusal(approve(heard(UUID_A, 'cut-01'), mixed, { machineId: 'cut-01', address: UUID_A }))).toEqual([['refuseBinding', expect.stringContaining('learns its address')]]);
+    expect(refusal(approve(heard(UUID_A, 'mill-99'), LEARNED, { machineId: 'mill-99', address: UUID_A }))).toEqual([['refuseBinding', expect.stringContaining('learns its address')]]);
+    expect(refusal(approve(heard('a/b', 'press-01'), LEARNED, { machineId: 'press-01', address: 'a/b' }))).toEqual([['refuseBinding', expect.stringContaining('can send from')]]);
+    expect(refusal(approve(heard(UUID_B, 'press-01'), mixed, { machineId: 'press-01', address: UUID_B }))).toEqual([['refuseBinding', expect.stringContaining('declared address')]]);
   });
 
   it('reads the decision from the row as Long Tail stores it, serialized', () => {
     const md = { machineId: 'press-01', address: UUID_B };
-    expect(planRegistrationRow(new GatewayState(), event('resolved', md, { resolver_payload: JSON.stringify({ decision: DECISION.APPROVE }) })))
+    const state = new GatewayState();
+    state.hearClaim(UUID_B, 'press-01');
+    expect(planRegistrationRow(state, LEARNED, event('resolved', md, { resolver_payload: JSON.stringify({ decision: DECISION.APPROVE }) })))
       .toEqual([{ kind: 'bindAddress', machineId: 'press-01', address: UUID_B, by: undefined }]);
   });
 });

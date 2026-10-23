@@ -39,6 +39,7 @@ Minting one manifest or the other per order is all it takes to run a share of or
 A handoff that ends without a receipt (refusal, no reply, jam, wrong carrier, unreadable id, reject, timeout) parks a `line-operator` row. Its `decisions` facet lists what the operator may choose:
 - For a failure in the move itself, the units are still on the line: `retry` dispatches the same hop again as a new job, `manual` hands them to a person from where they stopped, and `scrap` ends the route.
 - When the sender finished the units as reject, hold, scrap or rework, they are off the line for good: the row offers `manual` (a person takes them from the sender) and `scrap`. Any other answer gets a new row that says so.
+- A cancelled handoff first stops the sender's job with a `cancel` command row on the sender's role, so the units come to rest there, then asks the operator.
 
 ## Run it
 

@@ -34,6 +34,13 @@ describe('contract: envelope and topics', () => {
     expect(inspectMessage(ROOT, presence, msg({ online: 'yes', firmwareBuild: 'b17' }), true).violations.join()).toMatch(/online/);
   });
 
+  it('reports a malformed measurement list without throwing', () => {
+    const topic = machineTopic(ROOT, ident, CHANNEL.JOB);
+    for (const measurements of [1, [null], { name: 'temp' }, [7]]) {
+      expect(inspectMessage(ROOT, topic, msg({ ...FINISHED, measurements })).violations.join()).toMatch(/measurements/);
+    }
+  });
+
   it('allows payloads up to 256 KB', () => {
     const topic = machineTopic(ROOT, ident, CHANNEL.TELEMETRY);
     const big = msg({ readings: { a: 1 }, pad: 'x'.repeat(200 * 1024) });

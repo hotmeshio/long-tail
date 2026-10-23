@@ -24,12 +24,6 @@ export function cancelDispatch(state: GatewayState, row: HandoffRow): Action[] {
   return cancelJobs(state, row, to, row.jobId, '', (job) => job.units.some((u) => state.heldJob(to, u.unitId) === job.jobId));
 }
 
-/** Stop the sender's job too: a row cancelled while the sender still works its units. */
-export function cancelSender(state: GatewayState, row: HandoffRow): Action[] {
-  if (!row.fromMachine || !row.senderJobId) return [];
-  return cancelJobs(state, row, row.fromMachine, row.senderJobId, ':sender');
-}
-
 /**
  * End a handoff without a receipt: resolve it with the error, then withdraw the
  * dispatch. A row the receiver has claimed is resolved by the receiver (only the

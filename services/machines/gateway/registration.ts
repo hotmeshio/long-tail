@@ -9,7 +9,7 @@
 
 import { DECISION, ROW_TYPE } from '../contracts';
 import { ADDRESSING, identOf, learnsAddress, operatorRole, type LineDef } from '../../../lib/machines/line';
-import type { Inspection, MachineIdent } from '../../../lib/machines/protocol';
+import { addressOf, isTopicLevel, type Inspection, type MachineIdent } from '../../../lib/machines/protocol';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import type { Action, CreateRowInput } from './actions';
 import type { GatewayState } from './state';
@@ -29,6 +29,10 @@ export interface Sender {
 const onLine = (line: LineDef, machineId: string | undefined): machineId is string =>
   !!machineId && line.machines.some((m) => m.machineId === machineId);
 
+function declaredAt(line: LineDef, machineId: string, address: string): boolean {
+  return onLine(line, machineId) && !learnsAddress(line, machineId) && addressOf(identOf(line, machineId)) === address;
+}
+
 function asStation(seen: Inspection, machineId: string, address: string): Inspection {
   return { ...seen, parsed: { ...seen.parsed!, ident: { ...seen.parsed!.ident, machineId, address } } };
 }
@@ -38,8 +42,8 @@ export function resolveSender(state: GatewayState, line: LineDef, seen: Inspecti
   const ident = seen.parsed!.ident;
   const address = ident.address ?? ident.machineId;
   if (line.addressing !== ADDRESSING.LEARNED) return { status: SENDER.KNOWN, address, machineId: ident.machineId, seen };
-  // A station whose address the line declares is resolved by the codec, as on any line.
-  if (onLine(line, ident.machineId) && !learnsAddress(line, ident.machineId)) return { status: SENDER.KNOWN, address, machineId: ident.machineId, seen };
+  // A station whose address the line declares is known only on that address.
+  if (declaredAt(line, ident.machineId, address)) return { status: SENDER.KNOWN, address, machineId: ident.machineId, seen };
   const claim = seen.claim ?? (ident.address ? ident.machineId : undefined);
   const bound = state.stationAt(address);
   if (bound) {
@@ -89,8 +93,21 @@ function resolutionOf(raw: unknown): Record<string, any> | null {
   }
 }
 
+/**
+ * Why an approved registration may not bind; null when it may. The row is only a request:
+ * the station must learn its address, the address must be one a machine could send from,
+ * and a machine at that address must have claimed the station on the wire.
+ */
+function bindingRefusal(state: GatewayState, line: LineDef, machineId: string, address: string): string | null {
+  if (!onLine(line, machineId) || !learnsAddress(line, machineId)) return `${machineId} is not a station on this line that learns its address`;
+  if (!isTopicLevel(address)) return `"${address}" is not an address a machine can send from`;
+  if (line.machines.some((m) => declaredAt(line, m.machineId, address))) return `${address} is the declared address of another station`;
+  if (!state.claimHeard(address, machineId)) return `no machine at ${address} has claimed ${machineId} since this gateway took the line`;
+  return null;
+}
+
 /** A person decided a registration row: approval binds the station to the claimant; anything else leaves the binding. */
-export function planRegistrationRow(state: GatewayState, event: EscalationEvent): Action[] {
+export function planRegistrationRow(state: GatewayState, line: LineDef, event: EscalationEvent): Action[] {
   const md = event.data?.metadata ?? {};
   if (typeof md.machineId !== 'string' || typeof md.address !== 'string') return [];
   if (event.verb === 'created') {
@@ -100,5 +117,9 @@ export function planRegistrationRow(state: GatewayState, event: EscalationEvent)
   state.settleClaim(md.address, md.machineId);
   const approved = event.verb === 'resolved' && resolutionOf(event.data?.resolver_payload)?.decision === DECISION.APPROVE;
   const by = event.data?.resolved_by ?? event.data?.metadata?.resolved_by ?? undefined;
-  return approved ? [{ kind: 'bindAddress', machineId: md.machineId, address: md.address, by }] : [];
+  if (!approved) return [];
+  const reason = bindingRefusal(state, line, md.machineId, md.address);
+  return reason
+    ? [{ kind: 'refuseBinding', machineId: md.machineId, address: md.address, reason }]
+    : [{ kind: 'bindAddress', machineId: md.machineId, address: md.address, by }];
 }

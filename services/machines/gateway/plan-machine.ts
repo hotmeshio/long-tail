@@ -232,7 +232,7 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   const previous = link.bootId;
   link.bootId = b.bootId;
   if (!previous || previous === b.bootId) return ack([answer]);
-  const held = new Set((b.jobs ?? []).map((j: any) => j.jobId));
+  const held = new Set(jobIds);
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
   const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
   return ack([answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);

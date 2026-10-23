@@ -7,7 +7,7 @@
  * NATS, where JetStream keeps them.
  */
 
-import { clientIdOf } from '../protocol/envelope';
+import { addressOf, clientIdOf } from '../protocol/envelope';
 import { topicOf, type LineCodec } from '../protocol/codec';
 import { controllerId, identOf, learnsAddress, type LineDef } from '../line';
 import { bridgeId } from './site-conf';
@@ -57,29 +57,34 @@ topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
 /**
  * The codec's channels decide the topics: a machine writes its events and telemetry and reads its commands.
  * A station whose address the line learns has no user of its own: `pattern` rules give every certificate
- * the channels under its own name (%u), so its certificate's common name must be its address.
+ * the channels under its own name (%u), so its certificate's common name must be its address. On a line
+ * that also declares addresses, a certificate named for a declared address is denied that station's channels.
  */
 export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
   const { siteId, lineId } = line;
   const { events, telemetry, commands } = codec.channels;
-  const rules = (prefix: string, address: string) => {
-    const own = (c: string) => topicOf(codec, { siteId, lineId, address }, c);
-    return [
-      ...[...events, ...telemetry].map((c) => `${prefix}write ${own(c)}`),
-      ...commands.map((c) => `${prefix}read ${own(c)}`),
-    ];
-  };
-  const machines = line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => {
-    const ident = identOf(line, m.machineId);
-    return [`user ${clientIdOf(ident)}`, ...rules('topic ', ident.address ?? ident.machineId)].join('\n');
-  });
-  const learned = line.machines.some((m) => learnsAddress(line, m.machineId))
-    ? [['# Stations that learn their address: each certificate, under its own common name.', ...rules('pattern ', '%u')].join('\n')]
-    : [];
+  const own = (address: string, channels: string[]) => channels.map((c) => topicOf(codec, { siteId, lineId, address }, c));
+  const rules = (prefix: string, address: string) => [
+    ...own(address, [...events, ...telemetry]).map((t) => `${prefix}write ${t}`),
+    ...own(address, commands).map((t) => `${prefix}read ${t}`),
+  ];
+  const declared = line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => identOf(line, m.machineId));
+  const machines = declared.map((ident) => [`user ${clientIdOf(ident)}`, ...rules('topic ', addressOf(ident))].join('\n'));
+  const learns = line.machines.some((m) => learnsAddress(line, m.machineId));
+  const learned = learns ? [['# Stations that learn their address: each certificate, under its own common name.', ...rules('pattern ', '%u')].join('\n')] : [];
+  const every = [...events, ...telemetry, ...commands];
+  const shadows = learns ? declared.map((ident) => shadowRules(line, addressOf(ident), own(addressOf(ident), every))) : [];
   const controller = [
     `user ${controllerId(line)}`,
     ...commands.map((c) => `topic write ${topicOf(codec, { siteId, lineId }, c)}`),
     `topic read ${codec.root}/${siteId}/${lineId}/#`,
   ].join('\n');
-  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...learned, ...machines, controller].join('\n\n')}\n`;
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...learned, ...shadows, ...machines, controller].join('\n\n')}\n`;
+}
+
+/** Deny a declared station's channels to a certificate named for its address, which the patterns would grant. */
+function shadowRules(line: LineDef, address: string, topics: string[]): string {
+  const users = [controllerId(line), ...line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => clientIdOf(identOf(line, m.machineId)))];
+  if (users.includes(address)) throw new Error(`address "${address}" is also a broker user name; a declared address on a learning line must differ from every user`);
+  return [`user ${address}`, ...topics.map((t) => `topic deny ${t}`)].join('\n');
 }

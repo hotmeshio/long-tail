@@ -107,6 +107,9 @@ export class Executor {
         await this.d.addresses.bind(a.machineId, a.address);
         state.bindAddress(a.machineId, a.address);
         this.d.log.info(GATEWAY_LOG.ADDRESS_BOUND, { machine: a.machineId, address: a.address, ...(a.by ? { approvedBy: a.by } : {}) });
+        return;
+      case 'refuseBinding':
+        this.d.log.warn(GATEWAY_LOG.ADDRESS_REFUSED, { machine: a.machineId, address: a.address, reason: a.reason });
     }
   }
 
@@ -153,12 +156,14 @@ export class Executor {
     const { id } = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
     this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: id, machine: a.machineId, alarm: a.alarmId });
     const track = this.d.state.alarms.get(this.d.state.alarmKey(a.machineId, a.alarmId));
-    if (track) {
+    const raisedAt = a.row.metadata?.raisedAt;
+    if (track && (!track.raisedAt || !raisedAt || track.raisedAt === raisedAt)) {
       track.rowId = id;
       return;
     }
-    // Cleared at the machine while the row was being created.
-    await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.CLEARED, note: `cleared at ${a.machineId}` });
+    // Cleared at the machine, or raised again, while the row was being created.
+    const note = track ? `${a.machineId} raised ${a.alarmId} again; this one ended` : `cleared at ${a.machineId}`;
+    await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.CLEARED, note });
   }
 
   /** Raise a quiet row for each connected machine silent longer than `quietMs`. */

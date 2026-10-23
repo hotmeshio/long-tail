@@ -123,7 +123,9 @@ function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean)
     }
     if (b.result && b.result !== JOB_RESULT.OK && !b.reason) out.push(`${b.result} without a reason`);
     if (b.event === JOB_EVENT.TRANSFER_FAILED && !b.failure) out.push('transfer-failed without a failure');
-    for (const m of b.measurements ?? []) {
+    // The schema has already reported a malformed list; these rules read only well-formed entries.
+    for (const m of Array.isArray(b.measurements) ? b.measurements : []) {
+      if (!m || typeof m !== 'object') continue;
       if (m.min != null && m.max != null && (m.min <= m.value && m.value <= m.max) !== m.ok) out.push(`${m.name}: ok disagrees with min/max`);
     }
   }

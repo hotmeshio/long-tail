@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { ROW_TYPE } from '../../../services/machines/contracts';
+import { commandRow, commandTarget } from '../../../services/machines/commands';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { JOB_EVENT, OP } from '../../../lib/machines/protocol';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
@@ -49,7 +50,7 @@ describe('gateway: refusals and give-ups', () => {
 });
 
 describe('gateway: cancel mid-cycle', () => {
-  it('cancelling a row stops the sender at a safe point and the held unit is not chased', async () => {
+  it('cancelling a row withdraws the receiver\'s queued job and leaves the sender working; a cancel row on the sender\'s role stops it', async () => {
     rig = await startRig();
     await rig.handoff('U1', null, 'press-01');
     rig.line.config('press-01', { cycleSec: 500 });
@@ -57,8 +58,12 @@ describe('gateway: cancel mid-cycle', () => {
     await claimed(rig, row.id, 'cut-01');
     await until(() => rig.recorder.jobs('press-01', JOB_EVENT.STARTED)[0]);
     rig.lt.cancel(row.id);
-    expect(await until(() => rig.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0])).toMatchObject({ result: 'hold', reason: 'cancelled' });
     await until(() => rig.recorder.jobs('cut-01', JOB_EVENT.WITHDRAWN)[0]);
+    await rig.gateway.idle();
+    expect(rig.recorder.commands('press-01', OP.CANCEL)).toEqual([]);
+
+    rig.lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.CANCEL, { jobId: 'U1-press-01' }));
+    expect(await until(() => rig.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0])).toMatchObject({ result: 'hold', reason: 'cancelled' });
     await rig.gateway.idle();
     expect(rig.lt.calls.filter((c) => c.id === row.id && c.verb !== 'claim')).toEqual([]);
   });

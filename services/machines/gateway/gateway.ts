@@ -163,7 +163,7 @@ export class MachineGateway {
     const { line } = this.deps;
     const active = new Set<string>();
     for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
-      for (const raw of this.codec.decode(msg.topic, msg.payload, true)) {
+      for (const raw of this.decode(msg.topic, msg.payload, true)) {
         if (!raw.parsed) continue;
         const seen = await admitSender(this.admission, msg.topic, raw);
         if (!('parsed' in seen) || !seen.parsed) continue;
@@ -202,7 +202,7 @@ export class MachineGateway {
   }
 
   private async onMachine(msg: InboundMessage): Promise<Disposition> {
-    const decoded = this.codec.decode(msg.topic, msg.payload, msg.retained);
+    const decoded = this.decode(msg.topic, msg.payload, msg.retained);
     const acted: Inspection[] = [];
     let outcome: Disposition = DISPOSITION.TERM;
     let failed = false;
@@ -233,6 +233,16 @@ export class MachineGateway {
     return outcome;
   }
 
+  /** A message the codec cannot read is not retried: it is logged and has no effect. */
+  private decode(topic: string, payload: string, retained?: boolean): Inspection[] {
+    try {
+      return this.codec.decode(topic, payload, retained);
+    } catch (err: any) {
+      this.log.warn(GATEWAY_LOG.UNREADABLE, { topic, error: err.message });
+      return [];
+    }
+  }
+
   /** Done with the message: confirm each id its codec asked to confirm. */
   private confirm(decoded: Inspection[]): void {
     const seen = new Set<string>();
@@ -244,7 +254,13 @@ export class MachineGateway {
   }
 
   private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<Applied> {
-    const plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
+    let plan: ReturnType<typeof planMachineMessage>;
+    try {
+      plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
+    } catch (err: any) {
+      this.log.warn(GATEWAY_LOG.UNREADABLE, { topic, error: err.message });
+      return { disposition: DISPOSITION.TERM, failed: false };
+    }
     try {
       await this.executor.apply(plan.actions);
       await this.pace();

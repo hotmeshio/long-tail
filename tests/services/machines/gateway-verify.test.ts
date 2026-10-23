@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { OP } from '../../../lib/machines/protocol';
+import { JOB_EVENT, OP } from '../../../lib/machines/protocol';
 import { commandRow, commandTarget } from '../../../services/machines/commands';
 import { CONTROLLER } from '../../../services/machines/gateway/actions';
 import { ROW_TYPE } from '../../../services/machines/contracts';
@@ -67,6 +67,19 @@ describe('the gateway acts on stored rows, never on what an event claims', () =>
     const ended = await rig.lt.ended(row.id, 3_000);
     expect(ended.resolver_payload).toMatchObject({ received: true });
     expect(rig.recorder.commands('press-01', OP.CANCEL)).toEqual([]);
+  });
+
+  it('a row on a receiver role that names another machine\'s job cannot stop it', async () => {
+    rig = await startRig();
+    await rig.handoff('U1', null, 'press-01');
+    rig.line.config('press-01', { cycleSec: 500 });
+    const named = rig.lt.parkRow({ type: ROW_TYPE.HANDOFF, role: 'line-exit', metadata: facetsFor('U1', 'press-01', null) });
+    await until(() => rig.recorder.jobs('press-01', JOB_EVENT.STARTED)[0]);
+    rig.lt.cancel(named.id);
+    await sleep(50);
+    await rig.gateway.idle();
+    expect(rig.recorder.commands('press-01', OP.CANCEL)).toEqual([]);
+    expect(rig.line.machine('press-01').cell.jobs.get('U1-press-01')?.status).toBe('running');
   });
 });
 

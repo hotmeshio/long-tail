@@ -1,8 +1,10 @@
 /**
  * Escalation events to gateway actions. A new handoff row for a machine is the
  * cue to dispatch, exactly as a new row is the cue for a person to look at the
- * dashboard. A cancelled row stops both sides; an expired one withdraws its
- * dispatch; an alarm row a person resolves acknowledges the alarm at the machine.
+ * dashboard. A cancelled or expired row withdraws its dispatch; a row commands
+ * only the machine whose role it is parked on, so the sender's job is the
+ * workflow's to stop (a machine-command row on the sender's role). An alarm
+ * row a person resolves acknowledges the alarm at the machine.
  * A machine-command row is sent to its machine as the command it names.
  */
 
@@ -12,7 +14,8 @@ import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
-import { cancelDispatch, cancelSender } from './plan-shared';
+import { cancelDispatch } from './plan-shared';
+import { jobOwns } from './jobs';
 import { admit, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './pacing';
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
@@ -69,7 +72,7 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.ALARM) return planAlarmRow(state, event);
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   if (type === ROW_TYPE.MACHINE_COMMAND) return planCommandRow(state, line, event);
-  if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, event) : [];
+  if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, line, event) : [];
   return [];
 }
 
@@ -104,14 +107,19 @@ function onLine(line: LineDef, machineId: string | null): machineId is string {
   return !!machineId && line.machines.some((m) => m.machineId === machineId);
 }
 
+function heldUnder(state: GatewayState, machineId: string, unitId: string, senderJobId: string | null): boolean {
+  const held = state.heldJob(machineId, unitId);
+  return !!held && (!senderJobId || jobOwns(senderJobId, held));
+}
+
 function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, facets: HandoffFacets | null, dispatchTtlMs: number): Action[] {
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
     if (state.isClosed(id) || !facets) return [];
     state.index(handoffRow(id, event.role, facets, event.data?.metadata));
     const row = state.get(id)!;
-    // The units now wait on the sender as this row's sender job.
-    if (row.fromMachine) for (const u of row.units) state.letGo(row.fromMachine, u.unitId);
+    // The units now wait on the sender as this row's sender job, when the sender holds them under it.
+    if (row.fromMachine) for (const u of row.units) if (heldUnder(state, row.fromMachine, u.unitId, row.senderJobId)) state.letGo(row.fromMachine, u.unitId);
     if (!onLine(line, row.toMachine) || row.dispatch !== DISPATCH_STATE.NONE) return [];
     // Read back already claimed: the machine accepted it before this gateway started.
     if (event.data?.assigned_to) {
@@ -130,12 +138,8 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
     }
     return admit(state, line, row, dispatchTtlMs);
   }
-  if (event.verb === VERB.CANCELLED) {
-    const row = state.close(id, ROW_END.CANCELLED);
-    return row ? [...cancelDispatch(state, row), ...cancelSender(state, row)] : [];
-  }
-  if (event.verb === VERB.EXPIRED) {
-    const row = state.close(id, ROW_END.EXPIRED);
+  if (event.verb === VERB.CANCELLED || event.verb === VERB.EXPIRED) {
+    const row = state.close(id, event.verb === VERB.CANCELLED ? ROW_END.CANCELLED : ROW_END.EXPIRED);
     return row ? cancelDispatch(state, row) : [];
   }
   if (event.verb === VERB.RESOLVED) state.close(id);
@@ -146,10 +150,12 @@ function planAlarmRow(state: GatewayState, event: EscalationEvent): Action[] {
   const md = event.data.metadata ?? {};
   const track = state.alarms.get(state.alarmKey(md.machineId, md.alarmId));
   if (event.verb === VERB.CREATED) {
-    if (track && !track.rowId) track.rowId = event.escalationId;
+    // A row for an earlier raise of the same alarm id is not this raise's row.
+    if (track && !track.rowId && (!track.raisedAt || !md.raisedAt || track.raisedAt === md.raisedAt)) track.rowId = event.escalationId;
     return [];
   }
-  if (!track || (event.verb !== VERB.RESOLVED && event.verb !== VERB.CANCELLED)) return [];
+  // Only the row of the raise still tracked speaks for it; an older row ending acknowledges nothing.
+  if (!track || track.rowId !== event.escalationId || (event.verb !== VERB.RESOLVED && event.verb !== VERB.CANCELLED)) return [];
   track.open = false;
   if (event.verb !== VERB.RESOLVED) return [];
   // Still tracked means the machine has not cleared it: a person acknowledged it.

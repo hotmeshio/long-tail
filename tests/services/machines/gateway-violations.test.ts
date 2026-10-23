@@ -4,6 +4,8 @@ import { CHANNEL, alarmTopic, buildEnvelope, genericCodec, machineTopic } from '
 import { identOf } from '../../../lib/machines/line';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { ROW_TYPE } from '../../../services/machines/contracts';
+import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
+import { RecordingLog } from '../../../services/machines/testing/recording-log';
 import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 
@@ -38,6 +40,36 @@ describe('contract violations', () => {
     send();
     await until(() => rig.lt.rows.get(row.id)!.items.length, 2_000);
     expect(rowsOf(ROW_TYPE.CONTRACT_VIOLATION)).toEqual([]);
+  });
+});
+
+describe('messages the gateway cannot read', () => {
+  const finished = (measurements: unknown) => JSON.stringify(buildEnvelope(ident, {
+    event: 'finished', jobId: 'X-press-01', unitId: 'X1', orderRef: 'ORD-1', recipe: { id: 'R', version: '1' }, carrierId: null,
+    result: 'ok', reason: null, materials: [], measurements, startedAt: '2026-01-01T00:00:00.000Z', endedAt: '2026-01-01T00:00:01.000Z',
+  }));
+
+  it('a retained message with a malformed list does not keep a gateway from taking the line', async () => {
+    rig = await startRig();
+    rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.JOB), finished(1), true);
+    rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.SNAPSHOT), JSON.stringify(buildEnvelope(ident, { bootId: 'other-boot', jobs: 'none' })), true);
+    await rig.gateway.stop();
+    rig.gateway = await rig.startGateway();
+    expect((await rig.handoff('U2', null, 'press-01')).resolver_payload).toMatchObject({ received: true });
+  });
+
+  it('a message the codec throws on is logged once and dropped, and the line keeps running', async () => {
+    const log = new RecordingLog();
+    const base = genericCodec({ root: ROOT });
+    const codec = { ...base, decode: (topic: string, payload: string, retained?: boolean) => {
+      if (payload.includes('poison')) throw new Error('cannot read this');
+      return base.decode(topic, payload, retained);
+    } };
+    rig = await startRig({}, {}, DEFAULT_LINE, { codec, log });
+    rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.JOB), 'poison');
+    await until(() => log.of(GATEWAY_LOG.UNREADABLE).length, 2_000);
+    expect((await rig.handoff('U2', null, 'press-01')).resolver_payload).toMatchObject({ received: true });
+    expect(log.of(GATEWAY_LOG.UNREADABLE)).toHaveLength(1);
   });
 });
 

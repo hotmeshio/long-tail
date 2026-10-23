@@ -28,8 +28,12 @@ export interface ParsedTopic {
 
 const RESERVED = /[/+#.\s]/;
 
+export function isTopicLevel(value: unknown): value is string {
+  return typeof value === 'string' && !!value && !RESERVED.test(value);
+}
+
 export function assertTopicLevel(name: string, value: string): void {
-  if (!value || RESERVED.test(value)) {
+  if (!isTopicLevel(value)) {
     throw new Error(`${name} "${value}" is not a valid topic level (no / + # . or whitespace)`);
   }
 }
