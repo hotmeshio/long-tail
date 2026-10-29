@@ -72,6 +72,7 @@ export async function arrivalsOnRows(state: GatewayState, lt: LineEscalations, d
     const to = row.toMachine;
     if (!to || (row.dispatch !== DISPATCH_STATE.ARRIVING && row.dispatch !== DISPATCH_STATE.ACCEPTED)) continue;
     const items = await lt.items(row.id);
+    row.noted = items.map((i) => i.itemKey);
     const units = row.units.map((u) => u.unitId);
     const { arrived, missing } = handoffProgress(units, items);
     for (const job of dispatchJobs(row.jobId, row.units, state.unitsPerDispatch)) {
@@ -87,4 +88,12 @@ export async function arrivalsOnRows(state: GatewayState, lt: LineEscalations, d
     actions.push(dispatchAction(row, to, dispatchTtlMs));
   }
   return actions;
+}
+
+/** With lifecycle notes on, the items each handoff out of a machine already holds, so a restart notes nothing twice. */
+export async function notesOnRows(state: GatewayState, lt: LineEscalations): Promise<void> {
+  if (!state.lifecycle) return;
+  for (const row of state.open()) {
+    if (row.fromMachine && !row.noted) row.noted = (await lt.items(row.id)).map((i) => i.itemKey);
+  }
 }

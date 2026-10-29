@@ -29,6 +29,10 @@ export interface HandoffRow extends HandoffFacets {
   trace?: TraceEntry[];
   /** Each unit's arrival event, as its receiver reported it (dispatch on arrival). */
   arrivals?: Record<string, Record<string, any>>;
+  /** Lifecycle item keys already on the row (lifecycle.ts). */
+  noted?: string[];
+  /** Parked with a limit on its items, which lifecycle notes must never use up. */
+  capped?: boolean;
 }
 
 export interface AlarmTrack {
@@ -39,6 +43,8 @@ export interface AlarmTrack {
   rowId?: string;
   /** Created and not yet resolved by anyone. */
   open: boolean;
+  /** Rows the alarm paused, noted again when it clears. */
+  noted?: string[];
 }
 
 export interface LinkTrack {
@@ -59,6 +65,10 @@ export class GatewayState {
   unitsPerDispatch: number | null = null;
   /** Jobs go to a receiver once its units arrive there, from the codec. */
   dispatchOnArrival = false;
+  /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
+  lifecycle = false;
+  /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
+  progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
   /** Units at each machine that arrived and have not left: machine → unit → job. */

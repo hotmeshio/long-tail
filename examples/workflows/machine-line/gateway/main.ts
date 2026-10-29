@@ -53,6 +53,7 @@ async function main(): Promise<void> {
       offlineDebounceMs: config.offlineDebounceMs,
       dispatchTtlMs: config.dispatchTtlMs,
       quietMs: config.quietMs,
+      progressStep: config.progressStep,
     },
   });
   await gateway.start();

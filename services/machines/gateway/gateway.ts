@@ -7,12 +7,12 @@
 
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE } from '../contracts';
-import { CONTROLLER } from './actions';
-import { alarmsClearedMeanwhile, arrivalsOnRows, restoreAddresses, restoreLineRows } from './reconcile';
+import { CONTROLLER, type Action } from './actions';
+import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdViolation, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, OP, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
@@ -35,6 +35,10 @@ export interface GatewaySettings {
   quietMs: number;
   /** How long confirmed message ids gather before a receipt goes out (codecs with receipts). */
   receiptDelayMs?: number;
+  /** Note each job's start, progress steps and pauses on the row that holds it; off unless set. */
+  lifecycle?: boolean;
+  /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
+  progressStep?: number;
 }
 
 export interface GatewayDeps {
@@ -69,6 +73,8 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
+    this.state.lifecycle = deps.settings.lifecycle === true;
+    this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
     this.executor = new Executor({
       addresses: this.addresses,
@@ -86,6 +92,7 @@ export class MachineGateway {
     await this.reconcile();
     await this.deps.feed.consume((event) => this.onEscalation(event));
     await this.deps.bus.consume((msg) => this.onMachine(msg));
+    if (this.codec.snapshotOnStart) await this.askEveryMachine();
     const { quietMs } = this.deps.settings;
     if (quietMs > 0) {
       const machines = this.deps.line.machines.map((m) => m.machineId);
@@ -100,6 +107,14 @@ export class MachineGateway {
     await this.receipts.flush();
     await this.deps.feed.close();
     await this.deps.bus.close();
+  }
+
+  /** Machines that report only changes are asked for their full state once the gateway listens. */
+  private async askEveryMachine(): Promise<void> {
+    const at = Date.now();
+    await this.executor.apply(this.deps.line.machines.map((m): Action => ({
+      kind: 'command', machineId: m.machineId, op: OP.SNAPSHOT, cmdId: `${m.machineId}:takeover:${at}`, args: {},
+    })));
   }
 
   /** Resolves when no dispatch is in flight (tests). */
@@ -120,6 +135,7 @@ export class MachineGateway {
       const addresses = await restoreAddresses(this.state, this.addresses, this.deps.line);
       const handoffs = await this.reconcileHandoffs();
       await this.executor.apply(await arrivalsOnRows(this.state, this.deps.lt, this.deps.settings.dispatchTtlMs));
+      await notesOnRows(this.state, this.deps.lt);
       const commands = await this.reconcileCommands();
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();

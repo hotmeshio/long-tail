@@ -29,10 +29,15 @@ const STATUS_FOR_VERB: Record<string, string> = {
   [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
 };
 
+/** The metadata key an accumulator row parked with an item limit carries. */
+const ACCUMULATE_MAX = 'accumulate_max';
+
 const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION];
 
-function handoffRow(id: string, role: string, facets: HandoffFacets, metadata?: Record<string, any>): HandoffRow {
-  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata) };
+function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
+  const metadata = data?.metadata;
+  const capped = metadata?.[ACCUMULATE_MAX] != null;
+  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata), ...(capped ? { capped } : {}) };
 }
 
 /** Rows for another line belong to that line's gateway. */
@@ -116,7 +121,7 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
     if (state.isClosed(id) || !facets) return [];
-    state.index(handoffRow(id, event.role, facets, event.data?.metadata));
+    state.index(handoffRow(id, event.role, facets, event.data));
     const row = state.get(id)!;
     // The units now wait on the sender as this row's sender job, when the sender holds them under it.
     if (row.fromMachine) for (const u of row.units) if (heldUnder(state, row.fromMachine, u.unitId, row.senderJobId)) state.letGo(row.fromMachine, u.unitId);

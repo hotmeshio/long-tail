@@ -177,6 +177,9 @@ CLAUDE.md
 # Machine line: site-specific line config and dev broker certificates, local only
 /examples/workflows/machine-line/line_config/
 /deploy/machine-site/
+
+# Bambu printers: print files are local only, never checked in
+/examples/workflows/bambu-printer/files/
 .smoke/
 
 # Planning and brainstorming docs (never checked in)

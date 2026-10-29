@@ -103,6 +103,21 @@ When a sender finishes a unit, the gateway records the release on the row and, i
 
 Both are containment-searchable, so the rows that used a lot, and with them the units, are one query: `GET /escalations?facets={"lots":["LOT-7"]}`. A unit's whole path is every handoff row whose `units` holds it. The sender's full finished record stays on the row as its `released:<unit>` item. A codec maps its own lot fields into `materials`.
 
+### Job lifecycle on the row
+
+With `MACHINE_LIFECYCLE=on`, while a machine works a job, the gateway notes the job's milestones as items on the open row that holds it, as the machine's bot:
+- the dispatch into the machine, until its units arrive;
+- after that, the handoff out of the machine.
+
+| Item | When |
+|---|---|
+| `started:<unit>` | The machine reports `started` |
+| `progress:<unit>:<step>` | `progress` crosses a step of `MACHINE_PROGRESS_STEP` percent (25 by default, so 25, 50 and 75); the row's `progress` facet holds the latest `{ percent, remainingSec, detail, at }` |
+| `paused:<alarm>:<raisedAt>` | A stopping alarm is raised at the machine (the alarm row still goes to the operator role) |
+| `resumed:<alarm>:<raisedAt>` | The machine clears that alarm |
+
+Every other progress message stays in the stream, so an hour-long job leaves a handful of items on its row. A row parked with a limit on its items (`accumulate: { max }`) gets no notes, so they never take a slot its units need. Off, the rows hold only their releases and arrivals. A machine whose job runs before its units arrive, such as a printer whose part exists only once the print finishes, reports the arrival at the end, and the whole job lands on the one row. A `progress` job event may carry `percent` (0 to 100), `remainingSec` and a `detail` object.
+
 ### Decisions on a failed handoff
 
 `Machines.handoffDecisions(errorCode)` gives a default set of decisions for a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit. After a `partial-arrival` (a timeout once only some units arrived) the units are split between two stations, and a retry of the same hop would ask the sender for units it no longer holds, so the default offers `manual` and `scrap`. A workflow is free to offer its own decisions instead, such as moving only the missing units on; the platform reports the facts and does not choose.
@@ -169,6 +184,7 @@ interface LineCodec {
   unitsPerDispatch: number | null;                        // 1: one dispatch per unit
   dispatchOn?: 'created' | 'arrival';                     // when a handoff's job goes out
   strict?: boolean;                                       // broken messages go to a person, never acted on
+  snapshotOnStart?: boolean;                              // ask every machine for a snapshot on taking the line
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
@@ -184,6 +200,7 @@ interface LineCodec {
 - `strict: true` holds a message with contract violations: it is confirmed, never acted on, and one `contract-violation` row shows it to the operator role. Without it, known fields are acted on and the violations are logged.
 - An alarm body may name the catalog edition its code comes from, `catalog: { domain, key, version }`. The alarm row then carries it as a lookup ref, so the row reads the code's meaning as of that edition.
 - Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
+- `snapshotOnStart: true` is for machines that keep no retained state and report only what changes. The gateway asks each machine for a snapshot once it takes the line, so it learns every machine's current job before it acts on a change.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.
@@ -227,6 +244,7 @@ A replica taking a line reads back its learned addresses, its open handoff, comm
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role. A row commands only the machine whose role it is on: cancelling a handoff withdraws the receiver's dispatch, and the sender's job is stopped only by a `cancel` command row on the sender's role.
 - **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
+- **Machines that host their own broker:** the machine broker connects out to each machine's broker with a Mosquitto bridge, carrying the machine's messages in and its commands out under the machine's level of the line's topics, and its codec reads them there. The bridge's notification topic, kept on the machine broker, is the machine's presence. `examples/workflows/bambu-printer` does this for 3D printers.
 
 ### Learned addresses
 
@@ -256,6 +274,9 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 | `MACHINE_OFFLINE_DEBOUNCE_MS` | `15000` | Offline this long before a row |
 | `MACHINE_QUIET_MS` | `90000` | Silent this long before a row; `0` turns it off |
 | `MACHINE_RECEIPT_DELAY_MS` | `250` | How long confirmed message ids gather before a receipt goes out |
+| `MACHINE_LIFECYCLE` | `off` | `on` notes each job's start, progress steps and pauses on the row that holds it |
+| `MACHINE_PROGRESS_STEP` | `25` | With lifecycle notes on, progress is noted each time it crosses this many percent; `0` notes none |
+| `MACHINE_CODEC_MODULE` | | Development server only: a module whose `createCodec(line)` speaks the machines' protocol |
 
 ## Testing a codec or adapter
 

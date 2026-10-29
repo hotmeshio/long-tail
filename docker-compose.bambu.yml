@@ -1,0 +1,39 @@
+# Bambu printers on the machine line: layered on docker-compose.machines.yml.
+# The machine broker bridges out to each enabled printer's own broker (see
+# examples/workflows/bambu-printer/README.md), JetStream keeps every report,
+# and Long Tail runs the gateway with the Bambu codec. Printers are described
+# in .env (BAMBU_PRINTERS and BAMBU_<STATION>_*); the mock line is left off.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
+#     -f docker-compose.bambu.yml up -d --build
+
+services:
+  long-tail:
+    environment:
+      MACHINE_LINE_CONFIG: /etc/site/line.json
+      MACHINE_CODEC_MODULE: /app/examples/workflows/bambu-printer/codec.ts
+      MACHINE_LIFECYCLE: "on"
+      MACHINE_PROGRESS_STEP: ${MACHINE_PROGRESS_STEP:-25}
+      MACHINE_QUIET_MS: ${MACHINE_QUIET_MS:-0}
+    volumes:
+      - ./deploy/bambu-site:/etc/site:ro
+
+  machine-site:
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MACHINE_SITE_DIR: /app/deploy/bambu-site
+    command: ["npx", "ts-node", "--transpile-only", "examples/workflows/bambu-printer/site/setup.ts"]
+
+  site-nats:
+    volumes:
+      - ./deploy/bambu-site:/etc/site:ro
+
+  machine-broker:
+    volumes:
+      - ./deploy/bambu-site/mosquitto:/mosquitto/config:ro
+      - ./deploy/bambu-site/certs:/certs:ro
+
+  machine-mock:
+    profiles: ["mock"]

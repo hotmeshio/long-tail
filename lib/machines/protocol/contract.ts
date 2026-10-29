@@ -57,7 +57,8 @@ const BODY: Record<MessageKind, Schema> = {
     },
     materials: { type: 'array', items: shape({ material: STR, lot: STR }) },
     startedAt: TS, endedAt: TS, durationMs: INT0, failure: oneOf(TRANSFER_FAILURE),
-  }, ['peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure']),
+    percent: { type: 'number', minimum: 0, maximum: 100 }, remainingSec: INT0, detail: { type: 'object' },
+  }, ['peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'detail']),
   [MESSAGE_KIND.ALARM]: shape({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
     raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,

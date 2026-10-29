@@ -81,6 +81,10 @@ const ARRIVED_PREFIX = 'arrived:';
 export const itemKeys = {
   released: (unitId: string) => `${RELEASED_PREFIX}${unitId}`,
   arrived: (unitId: string) => `${ARRIVED_PREFIX}${unitId}`,
+  started: (unitId: string) => `started:${unitId}`,
+  progress: (unitId: string, step: number) => `progress:${unitId}:${step}`,
+  paused: (alarmId: string, raisedAt: string) => `paused:${alarmId}:${raisedAt}`,
+  resumed: (alarmId: string, raisedAt: string) => `resumed:${alarmId}:${raisedAt}`,
 };
 
 /** The unit an arrival item names; null for any other item. */
@@ -146,6 +150,9 @@ export interface TraceEntry {
  * containment-searchable, e.g. `{ lots: ['LOT-7'] }`.
  */
 export const TRACE_FACET = { TRACE: 'trace', LOTS: 'lots' } as const;
+
+/** The facet a row holding a job carries while it runs: its latest noted progress. */
+export const LIFECYCLE_FACET = { PROGRESS: 'progress' } as const;
 
 /** What resolves a handoff row, from a machine or from a person's form. */
 export interface HandoffResolution {

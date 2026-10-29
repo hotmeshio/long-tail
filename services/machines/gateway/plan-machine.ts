@@ -2,10 +2,11 @@
  * Machine messages to gateway actions: the escalation verbs a person would
  * perform, performed for the machine. Each unit's arrival and the sender's
  * finished record accumulate on the handoff row, and the last expected item
- * resolves it. A failure on either side resolves it with an error. Alarms that
- * stop work and machines that go dark or quiet become rows for people. A
- * restarted machine gets back the dispatches it lost. Everything else stays
- * in the stream.
+ * resolves it. A failure on either side resolves it with an error. A job's
+ * start, its progress steps, and the alarms that pause it are noted on the row
+ * that holds it (lifecycle.ts). Alarms that stop work and machines that go
+ * dark or quiet become rows for people. A restarted machine gets back the
+ * dispatches it lost. Everything else stays in the stream.
  *
  * A message whose row does not exist yet is nak'd and arrives again; one whose
  * row already closed is acked, so a replay never resolves anything twice.
@@ -19,8 +20,9 @@ import { CONTROLLER, type Action, type Plan } from './actions';
 import { dispatchAction } from './pacing';
 import { failHandoff } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
+import { noteJobEvent, notePause, noteResume } from './lifecycle';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
-import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
+import { DISPATCH_STATE, type AlarmTrack, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
 const nak: Plan = { actions: [], disposition: DISPOSITION.NAK };
@@ -143,6 +145,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: HANDOFF_ERROR.WITHDRAWN, detail: `${m} gave up ${b.jobId}` }));
   }
 
+  if (b.event === JOB_EVENT.STARTED || b.event === JOB_EVENT.PROGRESS) return ack(noteJobEvent(state, m, b, at));
+
   return ack();
 }
 
@@ -165,8 +169,9 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
   if (!env || b.active === false) {
     const track = state.alarms.get(key);
     state.alarms.delete(key);
-    if (!track?.rowId || !track.open) return ack();
-    return ack([{
+    const resumed = track ? noteResume(state, track, b) : [];
+    if (!track?.rowId || !track.open) return ack(resumed);
+    return ack([...resumed, {
       kind: 'resolve', as: CONTROLLER, rowId: track.rowId,
       payload: { decision: DECISION.CLEARED, clearedBy: b.clearedBy ?? null, note: `cleared at ${m}${b.clearedBy ? ` by ${b.clearedBy}` : ''}` },
     }]);
@@ -177,8 +182,9 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
   const superseded: Action[] = known?.rowId && known.open
     ? [{ kind: 'resolve', as: CONTROLLER, rowId: known.rowId, payload: { decision: DECISION.CLEARED, note: `${m} raised ${alarmId} again; this one ended` } }]
     : [];
-  state.alarms.set(key, { machineId: m, alarmId, raisedAt: b.raisedAt, open: true });
-  return ack([...superseded, {
+  const track: AlarmTrack = { machineId: m, alarmId, raisedAt: b.raisedAt, open: true };
+  state.alarms.set(key, track);
+  return ack([...superseded, ...notePause(state, track, b), {
     kind: 'createAlarmRow', machineId: m, alarmId,
     row: {
       type: ROW_TYPE.ALARM, subtype: b.level, role: LINE_ROLE.OPERATOR, priority: b.level === LEVEL.EMERGENCY ? 1 : 2,

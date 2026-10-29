@@ -41,6 +41,15 @@ describe('machine line config', () => {
   });
 });
 
+describe('lifecycle notes', () => {
+  it('are off unless MACHINE_LIFECYCLE is on, with progress noted every 25 percent', () => {
+    expect(loadMachineLineConfig({})).toMatchObject({ lifecycle: false, progressStep: 25 });
+    expect(loadMachineLineConfig({ MACHINE_LIFECYCLE: 'on', MACHINE_PROGRESS_STEP: '10' })).toMatchObject({ lifecycle: true, progressStep: 10 });
+    expect(() => loadMachineLineConfig({ MACHINE_LIFECYCLE: 'yes' })).toThrow(/MACHINE_LIFECYCLE/);
+    expect(() => loadMachineLineConfig({ MACHINE_PROGRESS_STEP: '120' })).toThrow(/at most 100/);
+  });
+});
+
 describe('line definition', () => {
   it('loads the default line in route order', () => {
     const line = loadLine();
