@@ -55,12 +55,13 @@ BAMBU_P1S_01_ENABLED=true
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
   -f docker-compose.bambu.yml up -d --build
-docker compose exec long-tail npm run bambu:print -- examples/workflows/bambu-printer/files/<part>.gcode.3mf
+docker compose exec long-tail npm run bambu:print
 ```
 
 - **Setup:** `machine-site` renders the site into `deploy/bambu-site/`. That includes a bridge per printer, with the printer's CA read from the printer itself, and `line.json`.
 - **The driver:** copies the file to the printer's storage over FTPS (`files.ts`), starts the route with that file as the unit's artifact, and prints the rows as they change. A printer on the LAN prints only files on its own storage. It runs in the Long Tail container, which reaches the printer.
-- **The part:** clear the bed first. Use a file sliced for that printer, its nozzle and the filament loaded. Put it in `files/`, which is never checked in.
+- **The part:** clear the bed first. Without a file the driver prints the boat: a half-size [3DBenchy](https://www.3dbenchy.com) by Creative Tools in `boat/p1s-0.8-tpu.gcode.3mf`, sliced for a P1S with a 0.8 nozzle and TPU, about eleven minutes. Any other part is a file sliced for that printer, its nozzle and the filament loaded: `npm run bambu:print -- path/to/part.gcode.3mf`. Keep your own parts in `files/`, which is never checked in.
+- **A boat for your printer:** `npm run bambu:boat` runs on the host with [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) installed. It downloads the model, scales it (`BAMBU_BOAT_SCALE`, 0.5), slices it with the presets in `BAMBU_BOAT_PRINTER`, `_PROCESS` and `_FILAMENT` (system preset names or preset files; a stock P1S with a 0.4 nozzle and PLA by default), and writes `files/boat.gcode.3mf`.
 - **Unload:** when the print finishes, resolve the `print-unload` row on the dashboard.
 
 ## Layout
@@ -71,6 +72,7 @@ docker compose exec long-tail npm run bambu:print -- examples/workflows/bambu-pr
 | `report.ts` | The printer's report: the merged state, the print's phase, the job named in `subtask_name` |
 | `catalog.ts` | What an error code means, for the alarm row |
 | `files.ts` | Copies a print file to a printer's storage over FTPS |
+| `boat/` | The boat, the example's first print |
 | `env.ts` | The printers from `.env`, and the line they form |
 | `site/` | The printer bridges, and the site setup that renders them |
 

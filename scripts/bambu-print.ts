@@ -2,7 +2,10 @@
  * Print one file on a Bambu printer through Long Tail, and follow its rows.
  * Run it where the printer is reachable, e.g. in the Long Tail container:
  *
- *   docker compose exec long-tail npm run bambu:print -- examples/workflows/bambu-printer/files/part.gcode.3mf [station]
+ *   docker compose exec long-tail npm run bambu:print -- [examples/workflows/bambu-printer/files/part.gcode.3mf] [station]
+ *
+ * Without a file it prints the example's boat, a half-size 3DBenchy for a P1S with a 0.8 nozzle and TPU;
+ * `npm run bambu:boat` slices one for another printer or filament.
  *
  * 1. Put the file on the printer (it prints only files on its own storage) and hash it: the unit's artifact.
  * 2. Start the unit route: one print step at the station, then a person unloads.
@@ -16,7 +19,7 @@
 try { require('dotenv/config'); } catch { /* dotenv optional */ }
 
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { basename, join } from 'path';
 
 import { BAMBU_ROLES, PRINT_PROCESS, PRINT_RECIPE, printersFromEnv } from '../examples/workflows/bambu-printer/env';
@@ -28,6 +31,7 @@ const env = process.env;
 const BASE_URL = env.BASE_URL || 'http://localhost:3000';
 const SITE_DIR = env.BAMBU_SITE_DIR || 'deploy/bambu-site';
 const WATCH_MS = 3_000;
+const BOAT = 'examples/workflows/bambu-printer/boat/p1s-0.8-tpu.gcode.3mf';
 
 const ts = () => new Date().toISOString().slice(11, 19);
 const say = (msg: string) => console.log(`[${ts()}] ${msg}`);
@@ -74,8 +78,8 @@ async function look(orderRef: string, workflowId: string, shown: Map<string, str
 }
 
 async function main(): Promise<void> {
-  const [file, stationArg] = process.argv.slice(2);
-  if (!file) throw new Error('usage: npm run bambu:print -- path/to/part.gcode.3mf [station]');
+  const [file = BOAT, stationArg] = process.argv.slice(2);
+  if (!existsSync(file)) throw new Error(`${file} is missing; usage: npm run bambu:print -- [path/to/part.gcode.3mf] [station]`);
   const line: LineDef = JSON.parse(readFileSync(join(SITE_DIR, 'line.json'), 'utf8'));
   const station = stationArg || line.machines[0].machineId;
   const printer = printersFromEnv().find((p) => p.station === station);
