@@ -25,6 +25,7 @@ export interface FakeRow {
   resolved_by?: string;
   envelope?: string;
   escalation_payload?: string;
+  created_at?: string;
 }
 
 export interface Call { verb: string; as: Actor; id: string; payload?: any }
@@ -65,7 +66,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   private add(input: Omit<FakeRow, 'id' | 'status' | 'items'>): FakeRow {
-    const row: FakeRow = { ...input, id: `e${++this.seq}`, status: 'pending', items: [] };
+    const row: FakeRow = { ...input, id: `e${++this.seq}`, status: 'pending', items: [], created_at: new Date().toISOString() };
     this.rows.set(row.id, row);
     this.emit(row, 'created');
     return row;
@@ -158,7 +159,7 @@ export class FakeLongTail implements LineEscalations {
     if (!row || this.hidden(CONTROLLER, row)) return null;
     return {
       id: row.id, type: row.type, subtype: row.subtype, role: row.role, status: row.status,
-      assigned_to: row.assigned_to ?? null, resolved_by: row.resolved_by ?? null, metadata: { ...row.metadata },
+      assigned_to: row.assigned_to ?? null, resolved_by: row.resolved_by ?? null, metadata: { ...row.metadata }, created_at: row.created_at ?? null,
       // Stored serialized, as Long Tail returns it.
       resolver_payload: row.resolver_payload ? JSON.stringify(row.resolver_payload) : null,
     };
@@ -167,7 +168,10 @@ export class FakeLongTail implements LineEscalations {
   async listOpen(query: OpenRowQuery): Promise<Record<string, any>[]> {
     return [...this.rows.values()]
       .filter((r) => r.status === 'pending' && (!query.type || r.type === query.type) && (!query.role || r.role === query.role))
-      .map((r) => ({ id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, assigned_to: r.assigned_to ?? null, metadata: r.metadata }));
+      .map((r) => ({
+        id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, assigned_to: r.assigned_to ?? null, metadata: r.metadata,
+        created_at: r.created_at ?? null,
+      }));
   }
 
   ofType(type: string): FakeRow[] {

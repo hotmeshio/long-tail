@@ -30,9 +30,25 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
   };
 }
 
+/**
+ * The validity round a dispatch belongs to. Rounds of one validity period count
+ * from the row's creation, and a dispatch in the second half of a round takes
+ * the next, so a machine always has at least half a period to start. Within a
+ * round a dispatch sent again, by a retry, a restarted machine or a restarted
+ * gateway, is the same command with the same arguments; a new round is a new
+ * command, never an old one with changed arguments.
+ */
+export function dispatchWindow(createdAt: number, now: number, ttlMs: number): { round: number; expiresAt: number } {
+  const round = Math.max(1, Math.floor((now - createdAt + ttlMs / 2) / ttlMs) + 1);
+  return { round, expiresAt: createdAt + round * ttlMs };
+}
+
 export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
+  const now = Date.now();
+  row.createdAt ??= now;
+  const { round, expiresAt } = dispatchWindow(row.createdAt, now, dispatchTtlMs);
   return {
-    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs),
+    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id, round), args: dispatchArgs(row, expiresAt),
     ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { receivedOnAccept: true } : {}),
   };
 }

@@ -37,7 +37,11 @@ const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
   const metadata = data?.metadata;
   const capped = metadata?.[ACCUMULATE_MAX] != null;
-  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata), ...(capped ? { capped } : {}) };
+  const createdAt = data?.created_at ? Date.parse(data.created_at) : NaN;
+  return {
+    ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata),
+    ...(capped ? { capped } : {}), ...(Number.isFinite(createdAt) ? { createdAt } : {}),
+  };
 }
 
 /** Rows for another line belong to that line's gateway. */

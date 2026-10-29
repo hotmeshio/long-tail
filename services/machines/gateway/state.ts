@@ -33,6 +33,8 @@ export interface HandoffRow extends HandoffFacets {
   noted?: string[];
   /** Parked with a limit on its items, which lifecycle notes must never use up. */
   capped?: boolean;
+  /** When the row was created (epoch ms); its dispatch windows count from here. */
+  createdAt?: number;
 }
 
 export interface AlarmTrack {
