@@ -616,7 +616,6 @@ const machineUnitRouteConfig: LTWorkerConfig = {
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: LINE_ROLE.OPERATOR,
-  roles: [LINE_ROLE.OPERATOR, LINE_ROLE.EXIT],
   certified: false,
   envelopeSchema: {
     data: {
@@ -642,7 +641,6 @@ const machineCommandConfig: LTWorkerConfig = {
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: LINE_ROLE.OPERATOR,
-  roles: [LINE_ROLE.OPERATOR],
   certified: false,
   envelopeSchema: {
     data: { siteId: 'site-1', lineId: 'line-1', machineId: 'press-01', role: 'line-bond', requestKey: 'C-0001', op: 'pause', args: {} },
