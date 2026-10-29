@@ -13,29 +13,46 @@ const LOCK_SQL = 'SELECT pg_advisory_lock(hashtext($1))';
 const RETRY_MS = 5_000;
 const UNLOCK_SQL = 'SELECT pg_advisory_unlock(hashtext($1))';
 
+export interface LeadershipOptions {
+  /** A dedicated connection for the lock; the shared pool's by default. */
+  connect?: () => Promise<PoolClient>;
+  /** The pause before contending again. */
+  retryMs?: number;
+}
+
 export class LineLeadership {
   private client?: PoolClient;
   private stopped = false;
   private leading = false;
+  private readonly connect: () => Promise<PoolClient>;
+  private readonly retryMs: number;
 
-  constructor(readonly key: string) {}
+  constructor(readonly key: string, opts: LeadershipOptions = {}) {
+    this.connect = opts.connect ?? (() => getPool().connect());
+    this.retryMs = opts.retryMs ?? RETRY_MS;
+  }
 
   /**
-   * Wait for the lock, then call `lead`. When leading fails or the
-   * connection drops, the lock is released, `lost` runs, and the line
-   * contends again after a pause.
+   * Wait for the lock, then call `lead`. When the connection is refused,
+   * leading fails or the connection drops, the lock is released, `lost`
+   * runs, and the line contends again after a pause.
    */
   async run(lead: () => Promise<void>, lost: (err: Error) => Promise<void>): Promise<void> {
     while (!this.stopped) {
       const err = await this.leadOnce(lead);
       if (this.stopped) return;
       await lost(err);
-      await new Promise((r) => setTimeout(r, RETRY_MS));
+      await new Promise((r) => setTimeout(r, this.retryMs));
     }
   }
 
   private async leadOnce(lead: () => Promise<void>): Promise<Error> {
-    const client = await getPool().connect();
+    let client: PoolClient;
+    try {
+      client = await this.connect();
+    } catch (err) {
+      return err as Error;
+    }
     this.client = client;
     const dropped = new Promise<Error>((resolve) => client.once('error', resolve));
     try {

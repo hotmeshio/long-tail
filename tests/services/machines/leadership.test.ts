@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
+import { getPool } from '../../../lib/db';
 import { LineLeadership } from '../../../services/machines/leadership';
 import { sleep, until } from '../../../services/machines/testing/wait';
 
@@ -48,5 +49,22 @@ describe('line leadership', () => {
     contender(`test-line-b-${Date.now()}`, log, 'b');
     await until(() => log.length === 2, 5_000);
     expect(log.sort()).toEqual(['a', 'b']);
+  });
+
+  it('contends again when the database refuses the connection, as while it recovers', async () => {
+    let refusals = 2;
+    const lost: string[] = [];
+    const log: string[] = [];
+    const l = new LineLeadership(`test-line-refused-${Date.now()}`, {
+      retryMs: 10,
+      connect: async () => {
+        if (refusals-- > 0) throw new Error('the database system is not yet accepting connections');
+        return getPool().connect();
+      },
+    });
+    held.push(l);
+    void l.run(async () => { log.push('leading'); }, async (err) => { lost.push(err.message); });
+    await until(() => log.length === 1, 5_000);
+    expect(lost).toEqual(['the database system is not yet accepting connections', 'the database system is not yet accepting connections']);
   });
 });
