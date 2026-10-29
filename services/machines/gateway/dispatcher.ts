@@ -51,21 +51,35 @@ function took(reply: CommandReply | null): boolean {
   return reply?.status === REPLY_STATUS.ACCEPTED || reply?.status === REPLY_STATUS.COMPLETED;
 }
 
+/** Most command ids whose sends are counted; the oldest are forgotten first. */
+const SENT_REMEMBERED = 10_000;
+
 export class Dispatcher {
+  private readonly sent = new Map<string, number>();
+
   constructor(private readonly d: DispatcherDeps) {}
 
-  /** False when the codec has no message for the command. */
-  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<boolean> {
-    const wires = this.d.codec.encode(identFor(this.d.state, this.d.line, machineId), { cmdId, op, args });
+  /** This send's attempt number, and whether the machine may have the command already. */
+  private countSend(cmdId: string, since?: number): { attempt: number; retry: boolean } {
+    const attempt = (this.sent.get(cmdId) ?? 0) + 1;
+    this.sent.delete(cmdId);
+    this.sent.set(cmdId, attempt);
+    if (this.sent.size > SENT_REMEMBERED) this.sent.delete(this.sent.keys().next().value!);
+    return { attempt, retry: attempt > 1 || (since !== undefined && since < this.d.state.takenAt) };
+  }
+
+  /** False when the codec has no message for the command. `since` is when the command's row was created. */
+  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<boolean> {
+    const wires = this.d.codec.encode(identFor(this.d.state, this.d.line, machineId), { cmdId, op, args, ...this.countSend(cmdId, since) });
     for (const wire of wires) await this.d.bus.publish(wire.topic, wire.payload);
     return wires.length > 0;
   }
 
   /** Publish and wait for the reply, asking again with the same id; null when none came. */
-  async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>): Promise<CommandReply | null> {
+  async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<CommandReply | null> {
     for (let attempt = 1; attempt <= this.d.dispatchAttempts; attempt++) {
       const waiting = this.d.replies.wait(cmdId, this.d.replyTimeoutMs);
-      if (!await this.publish(machineId, op, cmdId, args)) {
+      if (!await this.publish(machineId, op, cmdId, args, since)) {
         this.d.replies.settle({ cmdId, status: COMMAND_STATUS.UNSUPPORTED, reason: `the line's codec has no ${op} command` });
       }
       const reply = await waiting;
@@ -93,7 +107,7 @@ export class Dispatcher {
   async control(a: ControlAction): Promise<void> {
     const now = Date.now();
     const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, this.d.replyTimeoutMs * this.d.dispatchAttempts);
-    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) });
+    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt);
     // Timers may fire a little early; the command must have expired before the row says no-reply.
     if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1);
     const outcome: CommandResolution = reply
@@ -116,7 +130,8 @@ export class Dispatcher {
     const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
     // Known before any reply, so a failure that follows an acceptance finds its row.
     for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
-    const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units })));
+    const since = state.get(a.rowId)?.createdAt;
+    const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units }, since)));
     const refused = replies.find((r) => r && !took(r));
     const silent = jobs.filter((_, i) => !replies[i]);
     const held = !refused && silent.length ? await this.heldJobs(a.machineId, a.cmdId) : null;

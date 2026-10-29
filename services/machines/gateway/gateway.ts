@@ -90,6 +90,7 @@ export class MachineGateway {
   async start(): Promise<void> {
     await this.deps.bus.connect();
     await this.deps.feed.connect();
+    this.state.takenAt = Date.now();
     await this.reconcile();
     await this.deps.feed.consume((event) => this.onEscalation(event));
     await this.deps.bus.consume((msg) => this.onMachine(msg));

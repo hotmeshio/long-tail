@@ -73,6 +73,8 @@ export class GatewayState {
   retainedAlarms = false;
   /** Reading the broker's retained messages on taking the line; a snapshot read back may be older than its alarms. */
   readingRetained = false;
+  /** When this gateway took the line (epoch ms); a command for an older row may have been sent by an earlier one. */
+  takenAt = 0;
   /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
   progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */

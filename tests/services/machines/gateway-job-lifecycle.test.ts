@@ -120,6 +120,16 @@ describe('job lifecycle on the row', () => {
     expect(rig.lt.rows.get(row.id)!.status).toBe('pending');
   });
 
+  it('notes each named stage once, for machines that report stages instead of a percent', async () => {
+    rig = await startRig();
+    const row = await running(rig);
+    for (const stage of ['PREHEAT', 'PREHEAT', 'CURE', 'PREHEAT']) job(rig, JOB_EVENT.PROGRESS, { stage, detail: { code: stage } });
+    await until(() => keysOf(rig!, row.id).length === 2);
+    await sleep(30);
+    expect(keysOf(rig, row.id)).toEqual(['stage:U1:PREHEAT', 'stage:U1:CURE']);
+    expect(rig.lt.rows.get(row.id)!.metadata.progress).toMatchObject({ stage: 'CURE', detail: { code: 'CURE' } });
+  });
+
   it('notes nothing unless lifecycle notes are on', async () => {
     rig = await startRig({ lifecycle: false });
     const row = await running(rig);

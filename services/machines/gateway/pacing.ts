@@ -64,7 +64,7 @@ export function softwareRefusal(state: GatewayState, line: LineDef, machineId: s
 /** A machine that requires an artifact is never sent a handoff without one: the job's, or one for every unit. */
 export function artifactRefusal(line: LineDef, row: HandoffRow): string | null {
   if (!machineById(line, row.toMachine!).requireArtifact || (row.artifactUrl && row.artifactSha256)) return null;
-  if (row.units.every((u) => u.artifact)) return null;
+  if (row.units.every((u) => u.artifact || u.artifacts?.length)) return null;
   return `${row.toMachine} requires an artifact (url and sha256), for the job or for every unit; the row has none`;
 }
 

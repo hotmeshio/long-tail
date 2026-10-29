@@ -3,7 +3,7 @@ import { MachineGateway } from '../../../services/machines/gateway/gateway';
 import { silentLog } from '../../../services/machines/gateway/log';
 import { dispatchWindow } from '../../../services/machines/gateway/pacing';
 import { identOf, machineById, stationRole } from '../../../lib/machines/line';
-import { CHANNEL, OP, REPLY_STATUS, buildEnvelope, lineFilter, machineTopic } from '../../../lib/machines/protocol';
+import { CHANNEL, OP, REPLY_STATUS, buildEnvelope, genericCodec, lineFilter, machineTopic, type MachineCommand } from '../../../lib/machines/protocol';
 import { MemoryBroker, MemoryEscalationFeed, MemoryMachineBus } from '../../../lib/machines/transport';
 import { FakeLongTail } from '../../../services/machines/testing/fake-long-tail';
 import { commandRow, commandTarget } from '../../../services/machines/commands';
@@ -94,5 +94,37 @@ describe('a command sent again', () => {
 
     expect(sent[1].cmdId).toBe(`${row.id}:command`);
     expect(sent[1]).toEqual(sent[0]);
+  });
+
+  it('tells the codec each send\'s attempt, and that a command whose row predates the takeover may have been sent', async () => {
+    const broker = new MemoryBroker();
+    const feed = new MemoryEscalationFeed(broker);
+    const lt = new FakeLongTail(feed);
+    const base = genericCodec({ root: ROOT });
+    const sends: MachineCommand[] = [];
+    const codec = { ...base, encode: (ident: Parameters<typeof base.encode>[0], cmd: MachineCommand) => { if (cmd.op === OP.PAUSE) sends.push(cmd); return base.encode(ident, cmd); } };
+    const start = async (replyTimeoutMs: number) => {
+      gateway = new MachineGateway({
+        bus: new MemoryMachineBus(broker, lineFilter(ROOT, DEFAULT_LINE.siteId, DEFAULT_LINE.lineId)),
+        feed, lt, codec, line: DEFAULT_LINE, settings: { ...GATEWAY_SETTINGS, replyTimeoutMs, dispatchAttempts: 2 }, log: silentLog,
+      });
+      await gateway.start();
+    };
+    await start(30);
+    const first = lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.PAUSE));
+    await until(() => sends.length === 2);
+    expect(sends.map((c) => [c.attempt, c.retry])).toEqual([[1, false], [2, true]]);
+    await lt.ended(first.id);
+
+    await gateway!.stop();
+    await start(5_000);
+    const later = lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.PAUSE));
+    await until(() => sends.some((c) => c.cmdId === `${later.id}:command`));
+    await gateway!.stop();
+    await start(5_000);
+    const ofLater = () => sends.filter((c) => c.cmdId === `${later.id}:command`).map((c) => [c.attempt, c.retry]);
+    await until(() => ofLater().some(([attempt, retry]) => attempt === 1 && retry));
+    expect(ofLater()[0]).toEqual([1, false]);
+    expect(ofLater().at(-1)).toEqual([1, true]);
   });
 });

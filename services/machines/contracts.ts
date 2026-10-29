@@ -35,6 +35,10 @@ export const LINE_ROLE = {
 export interface ArtifactRef {
   url: string;
   sha256: string;
+  /** The host's id for the file. */
+  id?: string;
+  contentType?: string;
+  sizeBytes?: number;
 }
 
 export interface HandoffUnit {
@@ -42,6 +46,8 @@ export interface HandoffUnit {
   carrierId: string | null;
   /** This unit's own file, when each unit has one (a per-unit model or toolpath). */
   artifact?: ArtifactRef;
+  /** This unit's files, when it has several. */
+  artifacts?: ArtifactRef[];
   /** Parameters for this unit alone, sent to the machine as given. */
   parameters?: Record<string, unknown>;
 }
@@ -83,6 +89,7 @@ export const itemKeys = {
   arrived: (unitId: string) => `${ARRIVED_PREFIX}${unitId}`,
   started: (unitId: string) => `started:${unitId}`,
   progress: (unitId: string, step: number) => `progress:${unitId}:${step}`,
+  stage: (unitId: string, stage: string) => `stage:${unitId}:${stage}`,
   paused: (alarmId: string, raisedAt: string) => `paused:${alarmId}:${raisedAt}`,
   resumed: (alarmId: string, raisedAt: string) => `resumed:${alarmId}:${raisedAt}`,
 };

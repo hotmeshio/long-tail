@@ -2,8 +2,9 @@
  * Job lifecycle on the row. A machine's started and progress events, and the
  * alarms that stop it, are noted as items on the open row that holds the job:
  * the accepted dispatch into the machine until its units arrive, then the
- * handoff out of it. Progress is noted only when it crosses a step, so a row
- * carries a handful of items while the stream keeps every report.
+ * handoff out of it. Progress is noted only when it crosses a step, or reaches
+ * a named stage it has not reached before, so a row carries a handful of items
+ * while the stream keeps every report.
  *
  * Off unless the line turns it on (MACHINE_LIFECYCLE=on). A row parked with a
  * limit on its items gets no notes, so they never use a slot its units need.
@@ -53,12 +54,18 @@ export function noteJobEvent(state: GatewayState, m: string, b: Record<string, a
     return note(row, m, itemKeys.started(unitId), { unitId, jobId: b.jobId ?? null, at: when });
   }
   const step = progressStepOf(b.percent, state.progressStep);
-  if (step === null) return [];
+  const stage = typeof b.stage === 'string' && b.stage ? b.stage : null;
+  if (step === null && stage === null) return [];
   const progress = {
-    percent: b.percent, remainingSec: b.remainingSec ?? null, at: when,
+    ...(typeof b.percent === 'number' ? { percent: b.percent } : {}), remainingSec: b.remainingSec ?? null, ...(stage ? { stage } : {}), at: when,
     ...(b.detail && typeof b.detail === 'object' ? { detail: b.detail } : {}),
   };
-  return note(row, m, itemKeys.progress(unitId, step), { unitId, jobId: b.jobId ?? null, step, ...progress }, { [LIFECYCLE_FACET.PROGRESS]: progress });
+  const facet = { [LIFECYCLE_FACET.PROGRESS]: progress };
+  const job = { unitId, jobId: b.jobId ?? null };
+  return [
+    ...(step === null ? [] : note(row, m, itemKeys.progress(unitId, step), { ...job, step, ...progress }, facet)),
+    ...(stage === null ? [] : note(row, m, itemKeys.stage(unitId, stage), { ...job, ...progress }, facet)),
+  ];
 }
 
 /** Rows a stopping alarm pauses: those running or leaving with its job, or every row the machine holds. */

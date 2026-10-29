@@ -58,7 +58,7 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | Facet | Meaning |
 |---|---|
 | `siteId`, `lineId` | The line; a gateway acts only on its own line's rows |
-| `units` | `[{ unitId, carrierId, artifact?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` (`{ url, sha256 }`) is its own file, such as a per-unit model; its `parameters` are its own settings |
+| `units` | `[{ unitId, carrierId, artifact?, artifacts?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` is its own file, such as a per-unit model, and `artifacts` its files when it has several; each is `{ url, sha256, id?, contentType?, sizeBytes? }`. Its `parameters` are its own settings |
 | `jobId`, `senderJobId` | The receiver's job and the sender's. Each open handoff into a machine names its own job; a second open row naming the same job there resolves `dispatch-refused`. A row for some of a sender job's units still receives their releases, however the codec split that job |
 | `fromMachine`, `toMachine` | Machine ids, or null for line entry and for a person |
 | `recipeId`, `recipeVersion`, `process` | What the receiver runs |
@@ -112,11 +112,12 @@ With `MACHINE_LIFECYCLE=on`, while a machine works a job, the gateway notes the 
 | Item | When |
 |---|---|
 | `started:<unit>` | The machine reports `started` |
-| `progress:<unit>:<step>` | `progress` crosses a step of `MACHINE_PROGRESS_STEP` percent (25 by default, so 25, 50 and 75); the row's `progress` facet holds the latest `{ percent, remainingSec, detail, at }` |
+| `progress:<unit>:<step>` | `progress` crosses a step of `MACHINE_PROGRESS_STEP` percent (25 by default, so 25, 50 and 75); the row's `progress` facet holds the latest `{ percent, remainingSec, stage, detail, at }` |
+| `stage:<unit>:<stage>` | `progress` names a `stage` the job has not reached before, for machines that report named steps rather than a percent |
 | `paused:<alarm>:<raisedAt>` | A stopping alarm is raised at the machine (the alarm row still goes to the operator role) |
 | `resumed:<alarm>:<raisedAt>` | The machine clears that alarm |
 
-Every other progress message stays in the stream, so an hour-long job leaves a handful of items on its row. A row parked with a limit on its items (`accumulate: { max }`) gets no notes, so they never take a slot its units need. Off, the rows hold only their releases and arrivals. A machine whose job runs before its units arrive, such as a printer whose part exists only once the print finishes, reports the arrival at the end, and the whole job lands on the one row. A `progress` job event may carry `percent` (0 to 100), `remainingSec` and a `detail` object.
+Every other progress message stays in the stream, so an hour-long job leaves a handful of items on its row. A row parked with a limit on its items (`accumulate: { max }`) gets no notes, so they never take a slot its units need. Off, the rows hold only their releases and arrivals. A machine whose job runs before its units arrive, such as a printer whose part exists only once the print finishes, reports the arrival at the end, and the whole job lands on the one row. A `progress` job event may carry `percent` (0 to 100), `remainingSec`, a `stage` name and a `detail` object.
 
 ### Decisions on a failed handoff
 
@@ -206,6 +207,7 @@ interface LineCodec {
 - `snapshotOnStart: true` is for machines that keep no retained state and report only what changes. The gateway asks each machine for a snapshot once it takes the line, so it learns every machine's current job before it acts on a change.
 - `retainedAlarms: true` says active alarms stay retained on the broker until they clear, as in the line protocol. A gateway taking the line then reads every active alarm back, and an alarm row whose alarm is missing has cleared. Without it, a machine's snapshot lists its active alarms (`alarms`), and an alarm row whose alarm a snapshot the machine sends no longer lists resolves `cleared`; a snapshot read back from the broker is never used for this, since it may be older than the alarms.
 - A receiver that reads only the carrier may report `arrived`, or `transfer-failed` with `unreadable-id`, with `carrierId` and no `unitId` or `jobId`. The gateway finds the unit an open handoff into that machine carries on that carrier.
+- Each command reaches `encode` with `attempt`, how many times this gateway has sent that `cmdId`, and `retry`, true when the machine may already have it: sent earlier, or its row existed before this gateway took the line. A protocol with a retransmission flag sets it from `retry`.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.

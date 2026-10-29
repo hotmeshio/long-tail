@@ -21,6 +21,10 @@ export interface MachineCommand {
   cmdId: string;
   op: string;
   args: Record<string, unknown>;
+  /** How many times this gateway has sent this cmdId, this time included. */
+  attempt?: number;
+  /** The command may have reached the machine before: sent earlier, or its row predates this gateway's takeover. */
+  retry?: boolean;
 }
 
 /** MQTT filters under each machine's topic, e.g. `job` or `alarm/+`. */

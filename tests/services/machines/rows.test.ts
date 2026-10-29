@@ -36,6 +36,16 @@ describe('readHandoffFacets', () => {
     expect(facets.units).toEqual([{ unitId: 'U1', carrierId: null }]);
   });
 
+  it('keeps each file\'s id, content type and size, and a unit\'s several files, dropping fields of the wrong kind', () => {
+    const model = { ...FILE, id: 'ART-1', contentType: 'model/step', sizeBytes: 2048 };
+    const toolpath = { url: 'https://files/U1.nc', sha256: 'cd'.repeat(32), id: 'ART-2', contentType: 'text/plain', sizeBytes: -1 };
+    const md = { ...facetsFor('U1', null, 'press-01'), units: [{ unitId: 'U1', carrierId: null, artifact: model, artifacts: [model, toolpath, { url: 'x' }] }] };
+    expect(readHandoffFacets(md)!.units[0]).toEqual({
+      unitId: 'U1', carrierId: null, artifact: model,
+      artifacts: [model, { url: toolpath.url, sha256: toolpath.sha256, id: 'ART-2', contentType: 'text/plain' }],
+    });
+  });
+
   it('is null without the line, the job or any unit', () => {
     const md = facetsFor('U1', null, 'press-01') as unknown as Record<string, any>;
     for (const key of ['siteId', 'lineId', 'jobId']) expect(readHandoffFacets({ ...md, [key]: undefined })).toBeNull();
