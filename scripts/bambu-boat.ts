@@ -8,8 +8,8 @@
  * 1. Download the model once into files/.
  * 2. Scale it (BAMBU_BOAT_SCALE, 0.5 by default: about ten minutes on a P1S).
  * 3. Slice it with the printer, process and filament presets. Each is an
- *    OrcaSlicer system preset name or a path to a preset JSON; a process or
- *    filament preset of your own is marked compatible with the printer.
+ *    OrcaSlicer system preset name or a path to a preset JSON, which may
+ *    inherit a system preset by name.
  *
  * Env: BAMBU_BOAT_PRINTER, BAMBU_BOAT_PROCESS, BAMBU_BOAT_FILAMENT, BAMBU_BOAT_SCALE,
  * ORCA_SLICER (the OrcaSlicer executable) and ORCA_PROFILES (its BBL profiles directory).
@@ -59,21 +59,44 @@ function scaleStl(stl: Buffer, factor: number): Buffer {
   return out;
 }
 
-/** A preset by path, or by the name of a system preset in ORCA_PROFILES. */
-function presetPath(kind: keyof typeof PRESET_DIR, value: string): string {
-  if (existsSync(value)) return resolve(value);
-  const path = join(PROFILES, PRESET_DIR[kind], `${value}.json`);
-  if (!existsSync(path)) throw new Error(`no ${kind.toLowerCase()} preset ${value} (a path, or a name in ${PROFILES}/${PRESET_DIR[kind]})`);
-  return path;
+type Preset = Record<string, any>;
+type PresetKind = keyof typeof PRESET_DIR;
+
+/** The system presets of one kind in ORCA_PROFILES, by name. */
+function systemPresets(kind: PresetKind): Map<string, Preset> {
+  const dir = join(PROFILES, PRESET_DIR[kind]);
+  const byName = new Map<string, Preset>();
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const preset = JSON.parse(readFileSync(join(dir, file), 'utf8'));
+    if (preset.name) byName.set(preset.name, preset);
+  }
+  return byName;
 }
 
-/** A preset of your own, copied as compatible with the printer, which OrcaSlicer requires before it slices. */
-function compatible(path: string, printerName: string, dir: string): string {
-  const preset = JSON.parse(readFileSync(path, 'utf8'));
-  if (preset.from === 'system') return path;
-  const copy = join(dir, `${preset.type}.json`);
-  writeFileSync(copy, JSON.stringify({ ...preset, compatible_printers: [printerName] }));
-  return copy;
+/**
+ * A preset by path or system preset name, with every setting it inherits
+ * written out: OrcaSlicer's command line reads only the keys in the file, so
+ * an inherited start, layer-change or end G-code would otherwise be lost.
+ */
+function fullPreset(kind: PresetKind, value: string): Preset {
+  const system = systemPresets(kind);
+  const own = existsSync(value) ? JSON.parse(readFileSync(value, 'utf8')) : system.get(value);
+  if (!own) throw new Error(`no ${kind.toLowerCase()} preset ${value} (a path, or a name in ${PROFILES}/${PRESET_DIR[kind]})`);
+  const chain: Preset[] = [own];
+  for (let p = own; p.inherits; ) {
+    p = system.get(p.inherits)!;
+    if (!p) throw new Error(`${kind.toLowerCase()} preset ${value} inherits ${chain[chain.length - 1].inherits}, which is not in ${PROFILES}`);
+    chain.unshift(p);
+  }
+  return Object.assign({}, ...chain, { inherits: '' });
+}
+
+/** Write a full preset for the slicer; a process or filament is marked compatible with the printer, as OrcaSlicer requires. */
+function writePreset(dir: string, kind: PresetKind, preset: Preset, printerName: string): string {
+  const path = join(dir, `${PRESET_DIR[kind]}.json`);
+  const compatibility = kind === 'PRINTER' ? {} : { from: 'User', compatible_printers: [printerName], compatible_printers_condition: '' };
+  writeFileSync(path, JSON.stringify({ ...preset, ...compatibility }));
+  return path;
 }
 
 async function main(): Promise<void> {
@@ -91,10 +114,11 @@ async function main(): Promise<void> {
   writeFileSync(scaled, scaleStl(readFileSync(model), scale));
 
   // 3. Sliced
-  const printer = presetPath('PRINTER', PRESET.PRINTER);
-  const printerName = JSON.parse(readFileSync(printer, 'utf8')).name;
-  const process_ = compatible(presetPath('PROCESS', PRESET.PROCESS), printerName, work);
-  const filament = compatible(presetPath('FILAMENT', PRESET.FILAMENT), printerName, work);
+  const printerPreset = fullPreset('PRINTER', PRESET.PRINTER);
+  const printerName: string = printerPreset.name;
+  const printer = writePreset(work, 'PRINTER', printerPreset, printerName);
+  const process_ = writePreset(work, 'PROCESS', fullPreset('PROCESS', PRESET.PROCESS), printerName);
+  const filament = writePreset(work, 'FILAMENT', fullPreset('FILAMENT', PRESET.FILAMENT), printerName);
   say(`slicing at ${scale}x for ${printerName}`);
   execFileSync(ORCA, [
     '--load-settings', `${printer};${process_}`, '--load-filaments', filament,
