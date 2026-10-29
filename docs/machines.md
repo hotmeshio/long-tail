@@ -230,15 +230,16 @@ A replica taking a line reads back its learned addresses, its open handoff, comm
 ## Topology and identity
 
 ```
- machines ──MQTT, TLS, client cert──▶ machine broker ──bridge──▶ site NATS
-                                         (Mosquitto)               JetStream
+ machines ──MQTT, TLS, client cert──▶ machine broker ──bridge──▶ NATS with JetStream
+                                         (Mosquitto)              (Long Tail's messaging, or a site NATS)
                                               ▲                        ▲
                                               └── gateway (commands)    └── gateway (streams, read only)
 ```
 
 - **Machines:** each machine logs in over MQTT 3.1.1 or 5 with its own certificate; the CN (`{site}-{line}-{address}`) is its username. The broker ACL lets it write only its own channels and read only its own commands. The line controller may command every machine on the line.
-- **Durable streams:** the bridge carries the line's topics one way, into the site NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer and may publish only JetStream requests and acks.
-- **Escalation events:** the gateway inside Long Tail reads them in process. The site NATS is a server of its own; Long Tail's events and NATS stay inside Long Tail.
+- **Durable streams:** the bridge carries the line's topics one way into NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer, `<controller>-events`, and may publish only JetStream requests and acks for its own streams and consumer; it cannot delete or purge them.
+- **Where the streams live:** by default in Long Tail's messaging ([events](events.md#messaging)), whose NATS server must run JetStream. The bridge then logs in to that server's edge account for the line (`Machines.edgeAccountFor`), which may publish only the line's subjects, so the edge reaches nothing of Long Tail's. With `MACHINE_SITE_NATS_URL`, the streams live instead in a NATS server of the site's own (`Machines.renderSiteConf`), and Long Tail's NATS stays inside Long Tail. Either way the gateway reads the same streams under the same consumer name.
+- **Escalation events:** the gateway inside Long Tail reads them in process. A standalone gateway subscribes to them over Long Tail's messaging.
 - **Commands:** the gateway publishes commands to the machine broker at QoS 1, so they queue for a machine that is away.
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
@@ -261,11 +262,11 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MACHINE_TRANSPORT` | | `nats` (site NATS streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
-| `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes to Long Tail's NATS (`NATS_URL`, `NATS_TOKEN`) |
+| `MACHINE_TRANSPORT` | | `nats` (durable streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
+| `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes over Long Tail's messaging, or to `NATS_URL` with `NATS_TOKEN` when the gateway has none |
 | `MACHINE_TOPIC_ROOT` | `line/v1` | The generic codec's root |
 | `MACHINE_LINE_CONFIG` | | Path of the line JSON |
-| `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | Site NATS for the streams |
+| `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | A site NATS of its own for the streams; unset, `nats` keeps them in Long Tail's messaging |
 | `MACHINE_MQTT_URL`, `_PROTOCOL` | `_PROTOCOL` 5 | Machine broker, for commands and retained reads; 4 for a broker that speaks only MQTT 3.1.1 |
 | `MACHINE_MQTT_CA`, `_CERT`, `_KEY` | | TLS files; `{clientId}` in a path picks each identity's certificate |
 | `MACHINE_REPLY_TIMEOUT_MS` | `5000` | Wait for a command reply |

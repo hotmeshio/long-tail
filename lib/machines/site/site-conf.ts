@@ -2,13 +2,16 @@
  * The site's NATS server, rendered from the line. It runs JetStream and an
  * MQTT listener that only the machine broker's bridge logs in to (by client
  * certificate; the CN is its user, and it may publish only under the line's
- * topics). The gateway logs in by password and may only read: the JetStream
- * API, acks and its inbox, and the line's subjects. The site NATS stands
- * alone; Long Tail's escalation events stay inside Long Tail.
+ * topics). The gateway logs in by password and may only keep and read the
+ * line's streams through its own consumer (it can neither publish a machine
+ * subject nor delete a stream), and subscribe to its inbox and the line. The
+ * site NATS stands alone; Long Tail's escalation events stay inside Long Tail.
  */
 
-import type { LineDef } from '../line';
+import { controllerId, type LineDef } from '../line';
 import { toSubject } from '../protocol';
+import { jsPermissions } from '../../messaging/nats/permissions';
+import { LINE_STREAM } from '../transport/streams';
 
 export interface SiteConfOptions {
   root: string;
@@ -26,8 +29,10 @@ export function bridgeId(line: LineDef): string {
   return `${line.siteId}-${line.lineId}-bridge`;
 }
 
-/** What the gateway may publish: JetStream requests, acks and flow control, never a machine subject. */
-const GATEWAY_PUBLISH = ['$JS.API.>', '$JS.ACK.>', '$JS.FC.>'];
+/** What the gateway may publish: its streams' and its consumer's JetStream requests and acks, never a machine subject. */
+export function gatewayPublish(line: LineDef): string[] {
+  return jsPermissions({ streams: Object.values(LINE_STREAM), durable: `${controllerId(line)}-events` }).publish;
+}
 
 export function renderSiteConf(line: LineDef, opts: SiteConfOptions): string {
   const base = toSubject(`${opts.root}/${line.siteId}/${line.lineId}`);
@@ -37,7 +42,7 @@ export function renderSiteConf(line: LineDef, opts: SiteConfOptions): string {
   ].join('\n');
   const gateway = [
     `    { user: ${q(opts.gatewayUser)}, password: ${q(opts.gatewayPassword)}, allowed_connection_types: ["STANDARD"],`,
-    `      permissions: { publish: ${q(GATEWAY_PUBLISH)}, subscribe: ${q(['_INBOX.>', `${base}.>`])} } }`,
+    `      permissions: { publish: ${q(gatewayPublish(line))}, subscribe: ${q(['_INBOX.>', `${base}.>`])} } }`,
   ].join('\n');
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.
 server_name: ${q(`${line.siteId}-${line.lineId}`)}

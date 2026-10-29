@@ -1,19 +1,13 @@
 /**
- * The gateway on the site NATS. Machine events come from the line's durable
- * consumer on LINE_EVENTS (replayed after a restart); telemetry is read live,
- * since it only proves a machine is alive. Commands leave through an MQTT
- * session at QoS 1: a NATS publish reaches MQTT subscribers at QoS 0 and
- * would not wait for a machine that is away.
+ * The gateway on a NATS server of the site's own (MACHINE_SITE_NATS_*): the
+ * stream bus on a NATS messaging provider this bus connects and closes itself.
+ * With Long Tail's messaging configured, the stream bus runs on that instead.
  */
 
-import { connect, type ConsumerMessages, type NatsConnection, type Subscription } from 'nats';
-
 import type { MqttEndpoint } from '../../../services/machines/config';
-import { toTopic } from '../protocol';
-import { MqttSession } from './mqtt-session';
-import { payloadOf, readDurable } from './nats-durable';
-import { SerialQueue } from './serial';
-import { LINE_STREAM, ensureConsumer, ensureStreams, lineEventConsumer, lineStreamConfigs, telemetrySubjects, type StreamCodec } from './streams';
+import { NatsMessagingProvider } from '../../messaging/nats/provider';
+import { StreamMachineBus } from './stream-bus';
+import type { StreamCodec } from './streams';
 import type { Disposition, InboundMessage, MachineBus } from './delivery';
 
 export interface NatsBusOptions {
@@ -31,60 +25,45 @@ export interface NatsBusOptions {
 }
 
 export class NatsMachineBus implements MachineBus {
-  private nc?: NatsConnection;
-  private session?: MqttSession;
-  private messages?: ConsumerMessages;
-  private telemetry: Subscription[] = [];
-  private readonly queue = new SerialQueue();
+  private readonly provider: NatsMessagingProvider;
+  private bus?: StreamMachineBus;
 
-  constructor(private readonly opts: NatsBusOptions) {}
+  constructor(private readonly opts: NatsBusOptions) {
+    this.provider = new NatsMessagingProvider({ url: opts.natsUrl, user: opts.user, password: opts.password, name: opts.controllerId });
+  }
 
   get durableName(): string {
     return `${this.opts.controllerId}-events`;
   }
 
   async connect(): Promise<void> {
-    const { natsUrl, user, password, controllerId, siteId, lineId, codec } = this.opts;
-    this.nc = await connect({ servers: natsUrl, user, pass: password, name: controllerId });
-    const jsm = await this.nc.jetstreamManager();
-    await ensureStreams(jsm, lineStreamConfigs(codec));
-    await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumer(codec, siteId, lineId, this.durableName));
-    this.session = await MqttSession.open(this.opts.mqtt, controllerId);
+    await this.provider.connect();
+    const streams = this.provider.streams;
+    if (!streams) throw new Error(`the site NATS at ${this.opts.natsUrl} has no JetStream for the gateway`);
+    const { natsUrl: _url, user: _user, password: _password, ...rest } = this.opts;
+    this.bus = new StreamMachineBus({ ...rest, streams, pubsub: this.provider.pubsub });
+    await this.bus.connect();
   }
 
-  async consume(handler: (msg: InboundMessage) => Promise<Disposition>): Promise<void> {
-    const nc = this.nats();
-    const { codec, siteId, lineId, nakDelayMs = 1_000 } = this.opts;
-    this.messages = await readDurable(nc.jetstream(), LINE_STREAM.EVENTS, this.durableName, this.queue, (m) =>
-      handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: m.info.deliveryCount }), nakDelayMs);
-    this.telemetry = telemetrySubjects(codec, siteId, lineId).map((subject) => nc.subscribe(subject, {
-      callback: (_err, m) => void this.queue.run(() => handler({ topic: toTopic(m.subject), payload: payloadOf(m), deliveries: 1 })),
-    }));
+  consume(handler: (msg: InboundMessage) => Promise<Disposition>): Promise<void> {
+    return this.stream().consume(handler);
   }
 
-  async publish(topic: string, payload: string, opts: { retain?: boolean } = {}): Promise<void> {
-    await this.mqtt().publish(topic, payload, 1, opts.retain ?? false);
+  publish(topic: string, payload: string, opts?: { retain?: boolean }): Promise<void> {
+    return this.stream().publish(topic, payload, opts);
   }
 
   retained(filter: string): Promise<InboundMessage[]> {
-    return this.mqtt().retained(filter);
+    return this.stream().retained(filter);
   }
 
   async close(): Promise<void> {
-    for (const sub of this.telemetry) sub.unsubscribe();
-    await this.messages?.close();
-    await this.queue.drained();
-    await this.session?.close(true);
-    await this.nc?.drain();
+    await this.bus?.close();
+    await this.provider.disconnect();
   }
 
-  private nats(): NatsConnection {
-    if (!this.nc) throw new Error('NATS bus used before connect()');
-    return this.nc;
-  }
-
-  private mqtt(): MqttSession {
-    if (!this.session) throw new Error('NATS bus used before connect()');
-    return this.session;
+  private stream(): StreamMachineBus {
+    if (!this.bus) throw new Error('NATS bus used before connect()');
+    return this.bus;
   }
 }

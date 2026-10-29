@@ -41,6 +41,10 @@ export { NatsEventAdapter } from './lib/events/nats';
 export { InMemoryEventAdapter } from './lib/events/memory';
 export { SocketIOEventAdapter, type SocketIOAuthenticator } from './lib/events/socketio';
 export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishActivityEvent, publishWorkflowEvent, publishAgentEvent, publishKnowledgeEvent } from './lib/events/publish';
+export { messagingRegistry, MemoryMessagingProvider, DELIVERY } from './lib/messaging';
+export { NatsMessagingProvider } from './lib/messaging/nats/provider';
+export { renderNatsConf, type NatsConfOptions, type EdgeAccount, type NatsUser } from './lib/messaging/nats/render-conf';
+export { jsPermissions } from './lib/messaging/nats/permissions';
 export { telemetryRegistry } from './lib/telemetry';
 export { HoneycombTelemetryAdapter } from './lib/telemetry/honeycomb';
 export { loggerRegistry } from './lib/logger';
@@ -186,8 +190,9 @@ async function main() {
       themes: [midnightTheme],
     },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
-    events: config.EVENT_TRANSPORT === 'nats'
-      ? { nats: { url: config.NATS_URL, wsUrl: config.NATS_WS_URL || undefined, token: config.NATS_TOKEN || undefined } }
+    // Messaging from LT_MESSAGING / LT_NATS_* when set; otherwise the older EVENT_TRANSPORT=nats with NATS_*.
+    messaging: !process.env.LT_MESSAGING && config.EVENT_TRANSPORT === 'nats'
+      ? { nats: { url: config.NATS_URL, token: config.NATS_TOKEN || undefined, ws: { url: config.NATS_WS_URL || undefined } } }
       : undefined,
   });
 }

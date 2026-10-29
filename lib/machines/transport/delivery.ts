@@ -5,20 +5,16 @@
  * every machine message on the line, QoS 1 command egress, and retained reads.
  */
 
+import { DELIVERY } from '../../messaging/constants';
+import type { Delivery } from '../../../types/messaging';
 import type {
   EscalationEvent, EscalationFeed, InboundMessage, LinkConnectOptions, LinkWill, MachineBus, MachineLink, PublishOptions,
 } from '../../../types/machines';
 
 export type { EscalationEvent, EscalationFeed, InboundMessage, LinkConnectOptions, LinkWill, MachineBus, MachineLink, PublishOptions };
-export const DISPOSITION = {
-  /** Handled; do not deliver again. */
-  ACK: 'ack',
-  /** Not yet actionable (its row does not exist yet); deliver again later. */
-  NAK: 'nak',
-  /** Never actionable; drop it. */
-  TERM: 'term',
-} as const;
-export type Disposition = typeof DISPOSITION[keyof typeof DISPOSITION];
+/** What the gateway does with a machine message: the messaging capability's deliveries (nak: its row does not exist yet). */
+export const DISPOSITION = DELIVERY;
+export type Disposition = Delivery;
 
 /** MQTT filter match with `+` (one level) and `#` (the rest). */
 export function topicMatches(filter: string, topic: string): boolean {

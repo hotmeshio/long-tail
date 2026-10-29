@@ -11,6 +11,8 @@ Long Tail: the gateway reads the stream, sends requests through the broker,
            and resolves rows as the printer's bot
 ```
 
+The compose files here run a site NATS of its own. The same streams can live in Long Tail's messaging instead, with the bridge logging in to the line's edge account ([topology](../../../docs/machines.md#topology-and-identity)).
+
 ## What a print leaves on the row
 
 The printer reports about once a second. JetStream keeps all of it, and the print row gets only the milestones (the compose override turns lifecycle notes on, `MACHINE_LIFECYCLE=on`):

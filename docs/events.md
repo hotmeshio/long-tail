@@ -16,6 +16,13 @@ await start({
   events: { nats: { url: 'nats://localhost:4222' } },
 });
 
+// The same NATS as Long Tail's messaging, shared with the machine surface
+await start({
+  database: { connectionString: process.env.DATABASE_URL },
+  workers: [ ... ],
+  messaging: { nats: { url: 'nats://nats:4222', token: process.env.NATS_TOKEN, ws: { proxy: 'ws://nats:9222' } } },
+});
+
 // Custom adapters (multiple supported)
 await start({
   database: { connectionString: process.env.DATABASE_URL },
@@ -25,6 +32,32 @@ await start({
 ```
 
 `start()` handles adapter connection and graceful disconnection on shutdown automatically.
+
+## Messaging
+
+Messaging is one connection that Long Tail opens once and shares: events publish over its pub/sub, and the machine surface keeps the line's durable streams in it. NATS is the provider to deploy, and with JetStream enabled on the server it also provides durable streams. `start()` connects it before events and the machine surface, and closes it after both at shutdown. If it cannot connect, startup logs `messaging.provider.connect_failed` and continues, as events always have.
+
+Configure it in one of these ways, in this order of precedence:
+
+| Configuration | Meaning |
+|---|---|
+| `messaging.provider` | A provider of your own (`LTMessagingProvider`) |
+| `messaging.nats` | `{ url, token? \| user? + password?, ws? }`; `ws` is `{ url?, proxy?, token? }` for browsers |
+| `messaging.memory` | In process only, for tests and single-process development |
+| `LT_MESSAGING=nats` with `LT_NATS_URL`, `LT_NATS_TOKEN` or `LT_NATS_USER` and `LT_NATS_PASSWORD`, `LT_NATS_WS_URL`, `LT_NATS_WS_PROXY` | The same from the environment; `LT_MESSAGING=memory` for in process |
+| `events.nats` | The same NATS connection, configured as events have been |
+
+`events.nats` and `messaging.nats` configure the same connection, so an existing `events: { nats: { url, token, wsProxy } }` keeps working as it is. With none of these, Long Tail runs without messaging, events go over Socket.IO, and anything that asks for messaging (`messagingRegistry.pubsub` or `.streams`) throws, naming what to set.
+
+**One server, separate accounts.** A NATS server that only Long Tail and its browsers use needs only a token. When a site's machine broker also connects to it, give each party a NATS account so it reaches only its own subjects. `renderNatsConf` writes such a server's configuration:
+
+| Account | Who logs in | What it reaches |
+|---|---|---|
+| `LT` | Long Tail; optionally a subscribe-only dashboard user, and a standalone gateway user scoped by `jsPermissions` to its streams and consumer | Everything of Long Tail's, including the durable streams |
+| `EDGE_<site>_<line>` (`Machines.edgeAccountFor(line, root)`) | The machine broker's bridge, over MQTT only | Publishing the line's subjects; nothing else. `LT` imports exactly those subjects |
+| `SYS` | Monitoring | The server's own |
+
+The edge's subjects reach Long Tail's streams, and nothing of Long Tail's reaches the edge.
 
 ## Dashboard Transport Selection
 
@@ -162,15 +195,28 @@ The built-in `NatsEventAdapter` publishes events as JSON-encoded strings to NATS
 | Option          | Default                                      | Description                      |
 |-----------------|----------------------------------------------|----------------------------------|
 | `url`           | `process.env.NATS_URL` or `nats://localhost:4222` | NATS server URL             |
+| `token`         | `process.env.NATS_TOKEN`                     | NATS token                       |
+| `wsUrl`         | `process.env.NATS_WS_URL`                    | Public WebSocket URL for browsers |
+| `wsProxy`       |                                              | NATS WebSocket target that Long Tail proxies browsers to |
 | `subjectPrefix` | `lt.events`                                  | Prefix for NATS subject names    |
+| `pubsub`        |                                              | Long Tail's messaging; the adapter publishes over it instead of opening a connection of its own |
 
 ### Subject Format
 
-Events are published to `{subjectPrefix}.{event.type}`. A milestone event with the default prefix lands on:
+Events are published to `{subjectPrefix}.{event.type}`. Every built-in type starts with `system.`:
 
-```
-lt.events.milestone
-```
+| Event | Subject |
+|---|---|
+| Milestone | `lt.events.system.milestone.<workflowId>` |
+| Task | `lt.events.system.task.<taskId>.<action>` |
+| Escalation | `lt.events.system.escalation.<role>.<escalationId>.<action>` |
+| Activity | `lt.events.system.activity.<workflowId>.<activityName>.<action>` |
+| Workflow | `lt.events.system.workflow.<workflowId>.<action>` |
+| Agent | `lt.events.system.agent.<agentName>.<action>` |
+| Knowledge | `lt.events.system.knowledge.<domain>.<action>` |
+| File | `lt.events.system.file.<action>` |
+
+A role is written as one subject token: each run of characters other than letters, digits, `_` and `-` becomes `-`. Subscribe to `lt.events.system.escalation.<role>.>` for one role's escalations.
 
 ### Usage
 

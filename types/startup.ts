@@ -9,6 +9,7 @@ import type { LTOAuthStartConfig } from './oauth';
 import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
 import type { LTEventAdapter } from './events';
+import type { LTMessagingProvider } from './messaging';
 import type { DomainDictionary } from './domain-manifest';
 import type { LTLoggerAdapter } from './logger';
 import type { LineDef } from './machines';
@@ -519,7 +520,28 @@ export interface LTStartConfig {
     adapter?: LTTelemetryAdapter;
   };
 
-  /** Milestone event publishing. */
+  /**
+   * Messaging: pub/sub and durable streams, shared by events and the machine
+   * surface. NATS (with JetStream for durable streams) is the provider to
+   * deploy; LT_MESSAGING with LT_NATS_* configures the same from the
+   * environment. Omitted, Long Tail runs without it.
+   */
+  messaging?: {
+    /** A provider of your own; wins over everything else. */
+    provider?: LTMessagingProvider;
+    nats?: {
+      url: string;
+      token?: string;
+      user?: string;
+      password?: string;
+      /** How browsers reach events: a public WebSocket URL, or a NATS WebSocket target proxied through this server. */
+      ws?: { url?: string; proxy?: string; token?: string };
+    };
+    /** In-process only; for tests and single-process development. */
+    memory?: boolean;
+  };
+
+  /** Milestone event publishing. `events.nats` configures the same NATS connection as `messaging.nats`. */
   events?: {
     nats?: {
       url?: string;

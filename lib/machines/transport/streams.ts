@@ -1,11 +1,10 @@
 /**
- * The site's durable log. Machine events and telemetry each land in a
- * JetStream stream; the gateway reads events through a durable consumer, so
- * a restart or a link outage replays instead of losing.
+ * The line's durable log, as specs for the messaging capability. Machine
+ * events and telemetry each land in a stream; the gateway reads events through
+ * a durable consumer, so a restart or a link outage replays instead of losing.
  */
 
-import { AckPolicy, DeliverPolicy, nanos, StorageType, type ConsumerConfig, type JetStreamManager, type StreamConfig } from 'nats';
-
+import type { ConsumerSpec, StreamSpec } from '../../../types/messaging';
 import { GENERIC_CHANNELS, topicOf, type LineCodec } from '../protocol/codec';
 
 export const LINE_STREAM = {
@@ -20,8 +19,9 @@ const ACK_WAIT_MS = 30_000;
 export type StreamCodec = Pick<LineCodec, 'root' | 'channels' | 'topicFor'>;
 
 const GENERIC = (root: string): StreamCodec => ({ root, channels: GENERIC_CHANNELS });
+const codecOf = (codec: StreamCodec | string): StreamCodec => (typeof codec === 'string' ? GENERIC(codec) : codec);
 
-/** An MQTT filter as a NATS subject: levels become tokens, `+` becomes `*`, `#` becomes `>`. */
+/** An MQTT filter as a subject: levels become tokens, `+` becomes `*`, `#` becomes `>`. */
 export function filterToSubject(filter: string): string {
   return filter.split('/').map((level) => (level === '+' ? '*' : level === '#' ? '>' : level)).join('.');
 }
@@ -30,64 +30,26 @@ function subjectsFor(codec: StreamCodec, channels: string[], siteId?: string, li
   return channels.map((c) => filterToSubject(topicOf(codec, { siteId, lineId }, c)));
 }
 
-/** The site's streams, for every line under the codec's root; a root alone means the generic layout. */
-export function lineStreamConfigs(codec: StreamCodec | string): Partial<StreamConfig>[] {
-  const c = typeof codec === 'string' ? GENERIC(codec) : codec;
+/** The line streams, for every line under the codec's root; a root alone means the generic layout. */
+export function lineStreamSpecs(codec: StreamCodec | string): StreamSpec[] {
+  const c = codecOf(codec);
   return [
-    { name: LINE_STREAM.EVENTS, subjects: subjectsFor(c, c.channels.events), max_age: nanos(30 * DAY_MS), storage: StorageType.File },
-    { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor(c, c.channels.telemetry), max_age: nanos(3 * DAY_MS), storage: StorageType.File },
+    { name: LINE_STREAM.EVENTS, subjects: subjectsFor(c, c.channels.events), maxAgeMs: 30 * DAY_MS },
+    { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor(c, c.channels.telemetry), maxAgeMs: 3 * DAY_MS },
   ];
 }
 
 /** The telemetry subjects for one line, read live rather than replayed. */
 export function telemetrySubjects(codec: StreamCodec | string, siteId: string, lineId: string): string[] {
-  const c = typeof codec === 'string' ? GENERIC(codec) : codec;
+  const c = codecOf(codec);
   return subjectsFor(c, c.channels.telemetry, siteId, lineId);
 }
 
 /**
- * A durable consumer. It starts at new messages the first time (open rows
- * are reconciled at boot); after that its position survives restarts.
+ * One line's event consumer. It starts at new messages the first time (open
+ * rows are reconciled at boot); after that its position survives restarts.
  */
-export function durableConsumer(name: string, filterSubjects: string[]): Partial<ConsumerConfig> {
-  return {
-    durable_name: name,
-    ack_policy: AckPolicy.Explicit,
-    deliver_policy: DeliverPolicy.New,
-    ack_wait: nanos(ACK_WAIT_MS),
-    filter_subjects: filterSubjects,
-  };
-}
-
-export function lineEventConsumer(codec: StreamCodec | string, siteId: string, lineId: string, name: string): Partial<ConsumerConfig> {
-  const c = typeof codec === 'string' ? GENERIC(codec) : codec;
-  return durableConsumer(name, subjectsFor(c, c.channels.events, siteId, lineId));
-}
-
-/** Create or update each stream, then the consumer. Safe on every boot. */
-export async function ensureStreams(jsm: JetStreamManager, streams: Partial<StreamConfig>[]): Promise<void> {
-  for (const config of streams) {
-    try {
-      await jsm.streams.info(config.name!);
-      await jsm.streams.update(config.name!, config);
-    } catch (err: any) {
-      if (!/stream not found/i.test(err?.message ?? '')) throw err;
-      await jsm.streams.add(config);
-    }
-  }
-}
-
-export async function ensureConsumer(jsm: JetStreamManager, stream: string, config: Partial<ConsumerConfig>): Promise<void> {
-  let existing;
-  try {
-    existing = await jsm.consumers.info(stream, config.durable_name!);
-  } catch (err: any) {
-    if (!/consumer not found/i.test(err?.message ?? '')) throw err;
-    await jsm.consumers.add(stream, config);
-    return;
-  }
-  // The consumer keeps its position; only its subjects follow the codec's channels.
-  const want = [...(config.filter_subjects ?? [])].sort();
-  const have = [...(existing.config.filter_subjects ?? [])].sort();
-  if (want.join('|') !== have.join('|')) await jsm.consumers.update(stream, config.durable_name!, { filter_subjects: config.filter_subjects });
+export function lineEventConsumerSpec(codec: StreamCodec | string, siteId: string, lineId: string, name: string): ConsumerSpec {
+  const c = codecOf(codec);
+  return { name, filterSubjects: subjectsFor(c, c.channels.events, siteId, lineId), ackWaitMs: ACK_WAIT_MS, startAt: 'new' };
 }

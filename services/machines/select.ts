@@ -10,8 +10,11 @@ import { genericCodec, lineFilter, type LineCodec } from '../../lib/machines/pro
 import { MqttMachineBus } from '../../lib/machines/transport/mqtt-bus';
 import { MqttMachineLink } from '../../lib/machines/transport/mqtt-link';
 import { NatsMachineBus } from '../../lib/machines/transport/nats-bus';
+import { StreamMachineBus } from '../../lib/machines/transport/stream-bus';
 import { CallbackEscalationFeed } from '../../lib/machines/transport/callback-feed';
 import { CoreEscalationFeed } from '../../lib/machines/transport/nats-feed';
+import { PubSubEscalationFeed } from '../../lib/machines/transport/pubsub-feed';
+import { messagingRegistry } from '../../lib/messaging';
 import type { CallbackEventAdapter } from '../../lib/events/callback';
 import type { EscalationFeed, MachineBus, MachineLink } from '../../lib/machines/transport/delivery';
 
@@ -27,14 +30,25 @@ export function defaultCodec(config: MachineLineConfig, line?: LineDef): LineCod
   return genericCodec({ root: config.topicRoot, line });
 }
 
-/** The gateway's view of every machine on the line. */
-export function createMachineBus(config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config, line)): MachineBus {
+/** What the stream bus needs from Long Tail's messaging; the registry by default. */
+export type LineMessaging = Pick<typeof messagingRegistry, 'streams' | 'pubsub'>;
+
+/**
+ * The gateway's view of every machine on the line. With `nats`, events are read
+ * from Long Tail's messaging streams; MACHINE_SITE_NATS_URL instead names a NATS
+ * server of the site's own, which the bus connects to itself.
+ */
+export function createMachineBus(
+  config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config, line), messaging: LineMessaging = messagingRegistry,
+): MachineBus {
   switch (config.transport) {
-    case MACHINE_TRANSPORT.NATS:
-      return new NatsMachineBus({
-        natsUrl: config.siteNatsUrl!, user: config.siteNatsUser, password: config.siteNatsPassword,
-        mqtt: mqttOf(config), controllerId: controllerId(line), siteId: line.siteId, lineId: line.lineId, codec,
-      });
+    case MACHINE_TRANSPORT.NATS: {
+      const where = { mqtt: mqttOf(config), controllerId: controllerId(line), siteId: line.siteId, lineId: line.lineId, codec };
+      if (config.siteNatsUrl) {
+        return new NatsMachineBus({ natsUrl: config.siteNatsUrl, user: config.siteNatsUser, password: config.siteNatsPassword, ...where });
+      }
+      return new StreamMachineBus({ streams: messaging.streams, pubsub: messaging.pubsub, ...where });
+    }
     case MACHINE_TRANSPORT.MQTT:
       return new MqttMachineBus(mqttOf(config), controllerId(line), lineFilter(codec.root, line.siteId, line.lineId));
     default:
@@ -49,7 +63,9 @@ export function createEscalationFeed(config: MachineLineConfig, line: LineDef, c
       if (!callbacks) throw new Error('MACHINE_ESCALATION_FEED=in-process runs inside start({ machines })');
       return new CallbackEscalationFeed(callbacks);
     case ESCALATION_FEED.CORE:
-      return new CoreEscalationFeed({ natsUrl: config.ltNatsUrl!, token: config.ltNatsToken });
+      if (messagingRegistry.hasProvider) return new PubSubEscalationFeed(messagingRegistry.pubsub);
+      if (!config.ltNatsUrl) throw new Error('MACHINE_ESCALATION_FEED=core needs Long Tail messaging (LT_MESSAGING=nats) or NATS_URL');
+      return new CoreEscalationFeed({ natsUrl: config.ltNatsUrl, token: config.ltNatsToken });
     default:
       throw new Error(`MACHINE_ESCALATION_FEED=${config.feed} ${IN_PROCESS_ONLY}`);
   }

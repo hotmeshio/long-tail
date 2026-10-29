@@ -116,16 +116,16 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     ltBaseUrl: env.LT_BASE_URL ?? 'http://localhost:3000',
   };
   if (transport === MACHINE_TRANSPORT.NATS) {
-    config.siteNatsUrl = required(env, 'MACHINE_SITE_NATS_URL', transport);
+    // A site NATS of its own; without one, the streams are Long Tail's messaging.
+    config.siteNatsUrl = env.MACHINE_SITE_NATS_URL || undefined;
     config.siteNatsUser = env.MACHINE_SITE_NATS_USER;
     config.siteNatsPassword = env.MACHINE_SITE_NATS_PASSWORD;
     config.mqtt = mqttEndpoint(env, transport, 5);
   }
   if (transport === MACHINE_TRANSPORT.MQTT) config.mqtt = mqttEndpoint(env, transport, 5);
   if (feed === ESCALATION_FEED.CORE) {
-    config.ltNatsUrl = env.NATS_URL;
+    config.ltNatsUrl = env.NATS_URL || undefined;
     config.ltNatsToken = env.NATS_TOKEN;
-    if (!config.ltNatsUrl) throw new Error('MACHINE_ESCALATION_FEED=core needs NATS_URL (Long Tail NATS)');
   }
   return config;
 }
