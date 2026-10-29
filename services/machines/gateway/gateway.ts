@@ -74,6 +74,7 @@ export class MachineGateway {
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
     this.state.lifecycle = deps.settings.lifecycle === true;
+    this.state.retainedAlarms = this.codec.retainedAlarms === true;
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
     this.executor = new Executor({
@@ -178,15 +179,21 @@ export class MachineGateway {
   private async resync(): Promise<void> {
     const { line } = this.deps;
     const active = new Set<string>();
-    for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
-      for (const raw of this.decode(msg.topic, msg.payload, true)) {
-        if (!raw.parsed) continue;
-        const seen = await admitSender(this.admission, msg.topic, raw);
-        if (!('parsed' in seen) || !seen.parsed) continue;
-        if (seen.parsed.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed.ident.machineId, seen.parsed.key!));
-        await this.applyMachine(msg.topic, seen.parsed, seen.body);
+    this.state.readingRetained = true;
+    try {
+      for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
+        for (const raw of this.decode(msg.topic, msg.payload, true)) {
+          if (!raw.parsed) continue;
+          const seen = await admitSender(this.admission, msg.topic, raw);
+          if (!('parsed' in seen) || !seen.parsed) continue;
+          if (seen.parsed.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed.ident.machineId, seen.parsed.key!));
+          await this.applyMachine(msg.topic, seen.parsed, seen.body);
+        }
       }
+    } finally {
+      this.state.readingRetained = false;
     }
+    if (!this.state.retainedAlarms) return;
     for (const gone of alarmsClearedMeanwhile(this.state, active)) {
       this.state.alarms.delete(gone.key);
       await this.executor.apply([{ kind: 'resolve', as: CONTROLLER, rowId: gone.rowId, payload: { decision: DECISION.CLEARED, note: `cleared at ${gone.machineId} while the gateway was away` } }]);

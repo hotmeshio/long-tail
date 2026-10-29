@@ -8,7 +8,7 @@
  * A machine-command row is sent to its machine as the command it names.
  */
 
-import { COMMAND_STATUS, ROW_TYPE, controlCommandId, type CommandFacets, type HandoffFacets } from '../contracts';
+import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
 import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
@@ -109,7 +109,8 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
-  return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, cmdId: controlCommandId(id), args: c.args }];
+  const createdAt = event.data?.created_at ? Date.parse(event.data.created_at) : NaN;
+  return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, args: c.args, ...(Number.isFinite(createdAt) ? { createdAt } : {}) }];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {

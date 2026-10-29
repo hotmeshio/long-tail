@@ -78,8 +78,21 @@ function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>): H
   return row;
 }
 
+/** The unit an open handoff into `m` carries on `carrierId`, for a scan that read only the carrier. */
+function unitOnCarrier(state: GatewayState, m: string, carrierId: unknown): string | undefined {
+  if (typeof carrierId !== 'string') return undefined;
+  for (const r of state.open()) {
+    if (r.toMachine !== m) continue;
+    const unit = r.units.find((u) => u.carrierId === carrierId);
+    if (unit) return unit.unitId;
+  }
+  return undefined;
+}
+
 function planJob(state: GatewayState, m: string, b: Record<string, any>, at: string | undefined, ttl: number): Plan {
-  const unitId = b.unitId;
+  const unitId = typeof b.unitId === 'string' ? b.unitId : unitOnCarrier(state, m, b.carrierId);
+  // A carrier no open handoff here carries yet: its row may still be on the way.
+  if (unitId === undefined) return nak;
   // An event from an earlier attempt's job never touches a later attempt's row.
   const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(r.jobId, b.jobId);
   const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(r.senderJobId, b.jobId);
@@ -234,12 +247,29 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   if (b.software) link.software = b.software;
   const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
   if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(jobIds));
+  const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
+  const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
   const previous = link.bootId;
   link.bootId = b.bootId;
-  if (!previous || previous === b.bootId) return ack([answer]);
+  if (!previous || previous === b.bootId) return ack([...cleared, answer]);
   const held = new Set(jobIds);
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
   const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
-  return ack([answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
+  return ack([...cleared, answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
+}
+
+/** Alarm rows for `m` whose alarm its snapshot no longer lists: they cleared at the machine. */
+function alarmsNoLongerListed(state: GatewayState, m: string, listed: unknown[]): Action[] {
+  const active = new Set(listed.filter((id): id is string => typeof id === 'string'));
+  const actions: Action[] = [];
+  for (const [key, track] of [...state.alarms.entries()]) {
+    if (track.machineId !== m || active.has(track.alarmId)) continue;
+    state.alarms.delete(key);
+    actions.push(...noteResume(state, track, {}));
+    if (track.open && track.rowId) {
+      actions.push({ kind: 'resolve', as: CONTROLLER, rowId: track.rowId, payload: { decision: DECISION.CLEARED, note: `cleared at ${m}; its snapshot no longer lists it` } });
+    }
+  }
+  return actions;
 }

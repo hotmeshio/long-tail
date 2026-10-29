@@ -231,5 +231,6 @@ export interface CommandResolution {
 
 /** A row's dispatch command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
 export const dispatchCommandId = (escalationId: string, round = 1) => (round > 1 ? `${escalationId}:dispatch:r${round}` : `${escalationId}:dispatch`);
-export const controlCommandId = (escalationId: string) => `${escalationId}:command`;
+/** A command row's command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
+export const controlCommandId = (escalationId: string, round = 1) => (round > 1 ? `${escalationId}:command:r${round}` : `${escalationId}:command`);
 export const cancelCommandId = (escalationId: string) => `${escalationId}:cancel`;

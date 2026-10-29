@@ -99,3 +99,18 @@ describe('contract: alarms and replies', () => {
     expect(inspectMessage(ROOT, topic, msg({ cmdId: 'c1', status: 'accepted', reason: 'ok' }), true).violations).toContain('reply must not be retained');
   });
 });
+
+describe('contract: who a job event is about', () => {
+  const topic = machineTopic(ROOT, ident, CHANNEL.JOB);
+  const { jobId: _j, unitId: _u, ...carrierOnly } = JOB;
+
+  it('lets an arrival or a failed transfer name only the carrier the receiver read', () => {
+    expect(inspectMessage(ROOT, topic, msg({ ...carrierOnly, event: JOB_EVENT.ARRIVED })).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg({ ...carrierOnly, event: JOB_EVENT.TRANSFER_FAILED, failure: 'unreadable-id' })).violations).toEqual([]);
+  });
+
+  it('needs the unit and the job on every other job event, and on a scan with no carrier', () => {
+    expect(inspectMessage(ROOT, topic, msg(carrierOnly)).violations).toEqual(['started without a unitId', 'started without a jobId']);
+    expect(inspectMessage(ROOT, topic, msg({ ...carrierOnly, carrierId: null, event: JOB_EVENT.ARRIVED })).violations).toEqual(['arrived without a unitId', 'arrived without a jobId']);
+  });
+});

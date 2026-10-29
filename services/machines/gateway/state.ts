@@ -69,6 +69,10 @@ export class GatewayState {
   dispatchOnArrival = false;
   /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
   lifecycle = false;
+  /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
+  retainedAlarms = false;
+  /** Reading the broker's retained messages on taking the line; a snapshot read back may be older than its alarms. */
+  readingRetained = false;
   /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
   progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */

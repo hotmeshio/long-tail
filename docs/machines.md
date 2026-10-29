@@ -170,6 +170,8 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
 | `unsupported` | Not a command a row may ask for, not a machine on this line, or a command the line's codec has no message for; nothing was sent |
 
+A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation; once a round has mostly passed, the command goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments.
+
 The example's `machineCommand` workflow is this one step.
 
 ## The wire
@@ -185,6 +187,7 @@ interface LineCodec {
   dispatchOn?: 'created' | 'arrival';                     // when a handoff's job goes out
   strict?: boolean;                                       // broken messages go to a person, never acted on
   snapshotOnStart?: boolean;                              // ask every machine for a snapshot on taking the line
+  retainedAlarms?: boolean;                               // active alarms stay retained on the broker until they clear
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
@@ -201,6 +204,8 @@ interface LineCodec {
 - An alarm body may name the catalog edition its code comes from, `catalog: { domain, key, version }`. The alarm row then carries it as a lookup ref, so the row reads the code's meaning as of that edition.
 - Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
 - `snapshotOnStart: true` is for machines that keep no retained state and report only what changes. The gateway asks each machine for a snapshot once it takes the line, so it learns every machine's current job before it acts on a change.
+- `retainedAlarms: true` says active alarms stay retained on the broker until they clear, as in the line protocol. A gateway taking the line then reads every active alarm back, and an alarm row whose alarm is missing has cleared. Without it, a machine's snapshot lists its active alarms (`alarms`), and an alarm row whose alarm a snapshot the machine sends no longer lists resolves `cleared`; a snapshot read back from the broker is never used for this, since it may be older than the alarms.
+- A receiver that reads only the carrier may report `arrived`, or `transfer-failed` with `unreadable-id`, with `carrierId` and no `unitId` or `jobId`. The gateway finds the unit an open handoff into that machine carries on that carrier.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.

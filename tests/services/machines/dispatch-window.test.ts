@@ -6,6 +6,7 @@ import { identOf, machineById, stationRole } from '../../../lib/machines/line';
 import { CHANNEL, OP, REPLY_STATUS, buildEnvelope, lineFilter, machineTopic } from '../../../lib/machines/protocol';
 import { MemoryBroker, MemoryEscalationFeed, MemoryMachineBus } from '../../../lib/machines/transport';
 import { FakeLongTail } from '../../../services/machines/testing/fake-long-tail';
+import { commandRow, commandTarget } from '../../../services/machines/commands';
 import { until } from '../../../services/machines/testing/wait';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { GATEWAY_SETTINGS, facetsFor } from '../../helpers/machine-line-gateway-harness';
@@ -59,5 +60,39 @@ describe('a dispatch sent again', () => {
 
     expect(dispatches[1].cmdId).toBe(`${row.id}:dispatch`);
     expect(dispatches[1]).toEqual(dispatches[0]);
+  });
+});
+
+describe('a command sent again', () => {
+  let gateway: MachineGateway | undefined;
+  afterEach(async () => { await gateway?.stop(); });
+
+  it('by a gateway taking over the line is the same command with the same arguments', async () => {
+    const broker = new MemoryBroker();
+    const feed = new MemoryEscalationFeed(broker);
+    const lt = new FakeLongTail(feed);
+    const ident = identOf(DEFAULT_LINE, 'press-01');
+    const sent: { cmdId: string; args: Record<string, unknown> }[] = [];
+    broker.connect('press-hand');
+    broker.subscribe('press-hand', machineTopic(ROOT, ident, CHANNEL.CMD), (msg) => {
+      const cmd = JSON.parse(msg.payload.toString()).body;
+      if (cmd.op === OP.PAUSE) sent.push({ cmdId: cmd.cmdId, args: cmd.args });
+    });
+    const start = async () => {
+      gateway = new MachineGateway({
+        bus: new MemoryMachineBus(broker, lineFilter(ROOT, DEFAULT_LINE.siteId, DEFAULT_LINE.lineId)),
+        feed, lt, line: DEFAULT_LINE, settings: { ...GATEWAY_SETTINGS, replyTimeoutMs: 5_000, dispatchAttempts: 1 }, log: silentLog,
+      });
+      await gateway.start();
+    };
+    await start();
+    const row = lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.PAUSE));
+    await until(() => sent.length === 1);
+    await gateway!.stop();
+    await start();
+    await until(() => sent.length === 2);
+
+    expect(sent[1].cmdId).toBe(`${row.id}:command`);
+    expect(sent[1]).toEqual(sent[0]);
   });
 });

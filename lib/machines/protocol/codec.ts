@@ -68,6 +68,13 @@ export interface LineCodec {
    * a snapshot when it takes the line, so it knows every machine's job before acting on a change.
    */
   readonly snapshotOnStart?: boolean;
+  /**
+   * Active alarms stay retained on the broker until they clear, as in the line protocol. A takeover's
+   * retained read is then every active alarm, and an alarm row whose alarm is missing from it cleared
+   * while no gateway listened. Otherwise a machine's snapshot lists its active alarms, and an alarm it
+   * no longer lists has cleared.
+   */
+  readonly retainedAlarms?: boolean;
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
@@ -147,6 +154,7 @@ export function genericCodec(opts: GenericCodecOptions): LineCodec {
     channels: GENERIC_CHANNELS,
     unitsPerDispatch: opts.unitsPerDispatch ?? null,
     dispatchOn: opts.dispatchOn ?? DISPATCH_ON.CREATED,
+    retainedAlarms: true,
     decode(topic, payload, retained) {
       const seen = atMachine(inspectMessage(opts.root, topic, payload, retained), ids);
       if (!seen.parsed) return [];

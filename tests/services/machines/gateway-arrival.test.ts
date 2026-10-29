@@ -21,6 +21,12 @@ function scanIn(unitId: string, visitId: string, jobId = `${unitId}-press-01`): 
 
 const dispatches = () => rig.recorder.commands('press-01', OP.DISPATCH);
 
+/** The receiver reads only the carrier: no unit id, no job id. */
+function scanCarrier(body: Record<string, unknown>): void {
+  const ident = identOf(DEFAULT_LINE, 'press-01');
+  rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.JOB), JSON.stringify(buildEnvelope(ident, { orderRef: 'ORD-1', recipe: null, ...body })));
+}
+
 describe('dispatch on arrival', () => {
   it('sends the job once the unit is scanned in, with the scan, and the acceptance completes the handoff', async () => {
     rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, onArrival);
@@ -77,5 +83,23 @@ describe('dispatch on arrival', () => {
     expect(ended.resolver_payload).toMatchObject({ received: true });
     await until(() => dispatches().length, 2_000);
     expect(dispatches()[0].args.units[0].arrival).toMatchObject({ visitId: 'visit-9' });
+  });
+
+  it('a scan that reads only the carrier finds the unit the handoff carries on it', async () => {
+    rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, onArrival);
+    const row = rig.park('U1', null, 'press-01');
+    scanCarrier({ event: 'arrived', carrierId: 'CR-U1', visitId: 'visit-3' });
+    const ended = await rig.lt.ended(row.id);
+    expect(ended.resolver_payload).toMatchObject({ received: true, units: ['U1'] });
+    expect(dispatches()[0].args.units[0]).toMatchObject({ unitId: 'U1', arrival: { carrierId: 'CR-U1', visitId: 'visit-3' } });
+  });
+
+  it('a carrier the receiver could not read the unit on ends the handoff as unreadable-id', async () => {
+    rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, onArrival);
+    const row = rig.park('U1', null, 'press-01');
+    scanCarrier({ event: 'transfer-failed', carrierId: 'CR-U1', failure: 'unreadable-id' });
+    const ended = await rig.lt.ended(row.id);
+    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'unreadable-id' });
+    expect(dispatches()).toEqual([]);
   });
 });

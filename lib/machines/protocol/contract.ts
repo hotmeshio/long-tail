@@ -58,7 +58,7 @@ const BODY: Record<MessageKind, Schema> = {
     materials: { type: 'array', items: shape({ material: STR, lot: STR }) },
     startedAt: TS, endedAt: TS, durationMs: INT0, failure: oneOf(TRANSFER_FAILURE),
     percent: { type: 'number', minimum: 0, maximum: 100 }, remainingSec: INT0, detail: { type: 'object' },
-  }, ['peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'detail']),
+  }, ['jobId', 'unitId', 'peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'detail']),
   [MESSAGE_KIND.ALARM]: shape({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
     raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,
@@ -109,6 +109,9 @@ export function inspectMessage(root: string, topic: string, raw: string | Buffer
   return { parsed, body, violations };
 }
 
+/** Job events a receiver may report naming only the carrier it scanned. */
+const CARRIER_EVENTS: string[] = [JOB_EVENT.ARRIVED, JOB_EVENT.TRANSFER_FAILED];
+
 function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean): string[] {
   const out: string[] = [];
   const b: Record<string, any> = env.body ?? {};
@@ -117,6 +120,10 @@ function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean)
   if (s.site !== ident.siteId || s.line !== ident.lineId || s.machine !== ident.machineId) out.push('source disagrees with the topic');
   if (kind === MESSAGE_KIND.ALARM && b.alarmId !== key) out.push('alarmId disagrees with the topic');
   if (kind === MESSAGE_KIND.JOB) {
+    // A scan at a receiver may read only the carrier; every other job event names its unit and job.
+    const byCarrier = CARRIER_EVENTS.includes(b.event) && typeof b.carrierId === 'string';
+    if (b.unitId === undefined && !byCarrier) out.push(`${b.event} without a unitId`);
+    if (b.jobId === undefined && !byCarrier) out.push(`${b.event} without a jobId`);
     if (b.event === JOB_EVENT.FINISHED) {
       for (const field of ['result', 'measurements', 'materials', 'startedAt', 'endedAt']) {
         if (!(field in b)) out.push(`finished without ${field}`);

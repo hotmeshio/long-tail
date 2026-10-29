@@ -12,7 +12,7 @@
 
 import { setTimeout as sleep } from 'timers/promises';
 
-import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, type CommandResolution } from '../contracts';
+import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, controlCommandId, type CommandResolution } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
 import { identFor } from './registration';
 import { OP, REPLY_STATUS, isoTs, type LineCodec } from '../../../lib/machines/protocol';
@@ -20,6 +20,7 @@ import type { MachineBus } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { dispatchJobs, type DispatchJob } from './jobs';
+import { dispatchWindow } from './pacing';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { CommandReply, HeldJobs, ReplyWaiter } from './reply-waiter';
 import { DISPATCH_STATE, type GatewayState } from './state';
@@ -86,10 +87,13 @@ export class Dispatcher {
    * A machine-command row: send it, then resolve the row with the reply, as the
    * machine that gave it. The command expires when the asking ends, so one that
    * reaches a machine after its row resolved no-reply is refused, never run.
+   * Rounds of the asking count from the row's creation, so the command sent
+   * again by a new gateway is the same command with the same arguments.
    */
   async control(a: ControlAction): Promise<void> {
-    const expiresAt = Date.now() + this.d.replyTimeoutMs * this.d.dispatchAttempts;
-    const reply = await this.ask(a.machineId, a.op, a.cmdId, { ...a.args, expiresAt: isoTs(expiresAt) });
+    const now = Date.now();
+    const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, this.d.replyTimeoutMs * this.d.dispatchAttempts);
+    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) });
     // Timers may fire a little early; the command must have expired before the row says no-reply.
     if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1);
     const outcome: CommandResolution = reply
