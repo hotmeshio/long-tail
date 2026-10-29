@@ -84,6 +84,8 @@ services:
 
   postgres:
     image: postgres:latest
+    # An init process reaps strays; Postgres as PID 1 restarts every connection when one exits non-zero.
+    init: true
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -123,7 +125,7 @@ services:
       - max_connections=200
     shm_size: 512m
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
