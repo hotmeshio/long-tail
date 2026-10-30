@@ -17,18 +17,16 @@ describe('machine line config', () => {
     expect(c).toMatchObject({ siteNatsUser: 'gw', siteNatsPassword: 'pw', quietMs: 0, dispatchTtlMs: 1000 });
   });
 
-  it('nats needs the site NATS and the machine broker, and defaults to the core feed on MQTT 5', () => {
-    expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats' })).toThrow(/MACHINE_SITE_NATS_URL/);
-    expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222' })).toThrow(/MACHINE_MQTT_URL/);
-    const site = { MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883' };
-    expect(() => loadMachineLineConfig(site)).toThrow(/NATS_URL/);
-    const c = loadMachineLineConfig({ ...site, NATS_URL: 'nats://lt:4222' });
-    expect(c.feed).toBe('core');
-    expect(c.mqtt?.protocolVersion).toBe(5);
+  it('nats needs the machine broker; a site NATS of its own is optional, and the feed defaults to core on MQTT 5', () => {
+    expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats' })).toThrow(/MACHINE_MQTT_URL/);
+    const shared = loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_MQTT_URL: 'mqtts://site:8883' });
+    expect(shared).toMatchObject({ feed: 'core', siteNatsUrl: undefined });
+    const site = loadMachineLineConfig({ MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883', NATS_URL: 'nats://lt:4222' });
+    expect(site).toMatchObject({ feed: 'core', siteNatsUrl: 'nats://site:4222', ltNatsUrl: 'nats://lt:4222' });
+    expect(site.mqtt?.protocolVersion).toBe(5);
   });
 
-  it('mqtt defaults to MQTT 5 and the core feed, which needs Long Tail NATS', () => {
-    expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtts://b:8883' })).toThrow(/NATS_URL/);
+  it('mqtt defaults to MQTT 5 and the core feed', () => {
     const c = loadMachineLineConfig({ MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtts://b:8883', NATS_URL: 'nats://lt:4222' });
     expect(c).toMatchObject({ feed: 'core', ltNatsUrl: 'nats://lt:4222' });
     expect(c.mqtt?.protocolVersion).toBe(5);
@@ -38,6 +36,15 @@ describe('machine line config', () => {
     expect(() => loadMachineLineConfig({ MACHINE_TRANSPORT: 'carrier-pigeon' })).toThrow(/MACHINE_TRANSPORT/);
     expect(() => loadMachineLineConfig({ MACHINE_ESCALATION_FEED: 'jetstream' })).toThrow(/jetstream/);
     expect(() => loadMachineLineConfig({ MACHINE_REPLY_TIMEOUT_MS: '-1' })).toThrow();
+  });
+});
+
+describe('lifecycle notes', () => {
+  it('are off unless MACHINE_LIFECYCLE is on, with progress noted every 25 percent', () => {
+    expect(loadMachineLineConfig({})).toMatchObject({ lifecycle: false, progressStep: 25 });
+    expect(loadMachineLineConfig({ MACHINE_LIFECYCLE: 'on', MACHINE_PROGRESS_STEP: '10' })).toMatchObject({ lifecycle: true, progressStep: 10 });
+    expect(() => loadMachineLineConfig({ MACHINE_LIFECYCLE: 'yes' })).toThrow(/MACHINE_LIFECYCLE/);
+    expect(() => loadMachineLineConfig({ MACHINE_PROGRESS_STEP: '120' })).toThrow(/at most 100/);
   });
 });
 

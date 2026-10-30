@@ -14,9 +14,9 @@ import type { AddressBook } from './address-book';
 import { VERB_OUTCOME, type LineEscalations, type VerbResult } from './escalations';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
-import { Dispatcher } from './dispatcher';
+import { Dispatcher, GatewayStopped } from './dispatcher';
 import { failHandoff } from './plan-shared';
-import type { GatewayState } from './state';
+import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
@@ -68,11 +68,14 @@ export class Executor {
   stop(): void {
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
+    this.dispatcher.stop();
     this.d.replies.cancelAll();
   }
 
   private track(work: Promise<void>): void {
-    const tracked = work.catch((err) => this.d.log.error(GATEWAY_LOG.VERB_FAILED, { error: String(err?.message ?? err) }))
+    const tracked = work.catch((err) => {
+      if (!(err instanceof GatewayStopped)) this.d.log.error(GATEWAY_LOG.VERB_FAILED, { error: String(err?.message ?? err) });
+    })
       .finally(() => this.inflight.delete(tracked));
     this.inflight.add(tracked);
   }
@@ -113,16 +116,25 @@ export class Executor {
     }
   }
 
-  /** A dispatch's second reply: ready, or a failure to prepare that ends the handoff. */
+  /**
+   * A dispatch's second reply: ready, or a failure to prepare that ends the
+   * handoff. When the handoff into the machine has already ended, as one
+   * dispatched on arrival does at acceptance, the failure ends the handoff
+   * carrying the units out of it.
+   */
   private async lateReply(a: Extract<Action, { kind: 'settleReply' }>): Promise<void> {
-    const row = this.d.state.rowForDispatch(a.cmdId);
-    if (!row?.toMachine) return;
-    const context = { row: row.id, machine: row.toMachine, cmdId: a.cmdId, reason: a.reason };
-    if (a.status === REPLY_STATUS.COMPLETED) return this.d.log.info(GATEWAY_LOG.DISPATCH_READY, context);
+    const { state, log } = this.d;
+    const into = state.rowForDispatch(a.cmdId);
+    const m = into?.toMachine;
+    if (!into || !m) return;
+    const context = { row: into.id, machine: m, cmdId: a.cmdId, reason: a.reason };
+    if (a.status === REPLY_STATUS.COMPLETED) return log.info(GATEWAY_LOG.DISPATCH_READY, context);
     if (a.status !== REPLY_STATUS.FAILED) return;
-    this.d.log.warn(GATEWAY_LOG.DISPATCH_FAILED, context);
-    await this.apply(failHandoff(this.d.state, row, row.toMachine, {
-      received: false, errorCode: HANDOFF_ERROR.DISPATCH_FAILED, detail: `${row.toMachine} could not prepare the job: ${a.reason}`,
+    const row = into.ended ? onwardRow(state, into, m) : into;
+    log.warn(GATEWAY_LOG.DISPATCH_FAILED, { ...context, ...(into.ended ? { onward: row?.id ?? null } : {}) });
+    if (!row) return;
+    await this.apply(failHandoff(state, row, m, {
+      received: false, errorCode: HANDOFF_ERROR.DISPATCH_FAILED, detail: `${m} could not prepare the job: ${a.reason}`,
     }));
   }
 
@@ -210,4 +222,14 @@ export class Executor {
     if (!link.online) link.rowId = id;
     else await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.RESTORED, note: `${machineId} back online` });
   }
+}
+
+/** The open handoff out of `m` for units a closed handoff brought into it. */
+function onwardRow(state: GatewayState, into: HandoffRow, m: string): HandoffRow | undefined {
+  if (into.ended !== ROW_END.RESOLVED || into.dispatch !== DISPATCH_STATE.ACCEPTED) return undefined;
+  for (const u of into.units) {
+    const row = state.openFor(u.unitId, (r) => r.fromMachine === m);
+    if (row) return row;
+  }
+  return undefined;
 }

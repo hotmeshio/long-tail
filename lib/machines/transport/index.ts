@@ -6,6 +6,8 @@ export * from './streams';
 export * from './mqtt-session';
 export * from './mqtt-link';
 export * from './mqtt-bus';
+export * from './stream-bus';
 export * from './nats-bus';
 export * from './nats-feed';
+export * from './pubsub-feed';
 export * from './callback-feed';

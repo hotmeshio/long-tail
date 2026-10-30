@@ -38,15 +38,30 @@ function paramsOf(v: unknown): Record<string, unknown> | undefined {
 }
 
 function artifactOf(v: any): ArtifactRef | undefined {
-  return v && typeof v.url === 'string' && v.url && typeof v.sha256 === 'string' && v.sha256 ? { url: v.url, sha256: v.sha256 } : undefined;
+  if (!v || typeof v.url !== 'string' || !v.url || typeof v.sha256 !== 'string' || !v.sha256) return undefined;
+  return {
+    url: v.url, sha256: v.sha256,
+    ...(typeof v.id === 'string' && v.id ? { id: v.id } : {}),
+    ...(typeof v.contentType === 'string' && v.contentType ? { contentType: v.contentType } : {}),
+    ...(Number.isInteger(v.sizeBytes) && v.sizeBytes >= 0 ? { sizeBytes: v.sizeBytes } : {}),
+  };
+}
+
+function artifactsOf(v: unknown): ArtifactRef[] | undefined {
+  const list = Array.isArray(v) ? v.map(artifactOf).filter((a): a is ArtifactRef => !!a) : [];
+  return list.length ? list : undefined;
 }
 
 function unitsOf(v: unknown): HandoffUnit[] {
   if (!Array.isArray(v)) return [];
   return v.filter((u) => u && u.unitId).map((u) => {
     const artifact = artifactOf(u.artifact);
+    const artifacts = artifactsOf(u.artifacts);
     const parameters = paramsOf(u.parameters);
-    return { unitId: String(u.unitId), carrierId: str(u.carrierId), ...(artifact ? { artifact } : {}), ...(parameters ? { parameters } : {}) };
+    return {
+      unitId: String(u.unitId), carrierId: str(u.carrierId),
+      ...(artifact ? { artifact } : {}), ...(artifacts ? { artifacts } : {}), ...(parameters ? { parameters } : {}),
+    };
   });
 }
 

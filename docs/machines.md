@@ -21,7 +21,7 @@ await start({
 
 Transports come from the environment (see [Configuration](#configuration)). `mqtt` is an optional peer dependency; install it in the host when a line runs.
 
-For each line, one replica leads (a Postgres advisory lock held on its own connection), makes sure the line's bot accounts exist, and runs the gateway. Other replicas wait on the lock and take over when the leader's session ends.
+For each line, one replica leads (a Postgres advisory lock held on its own connection), makes sure the line's bot accounts exist, and runs the gateway. Other replicas wait on the lock and take over when the leader's session ends. A replica whose connection drops or is refused, as while Postgres restarts, contends again every 5 seconds.
 
 ## The line
 
@@ -58,7 +58,7 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | Facet | Meaning |
 |---|---|
 | `siteId`, `lineId` | The line; a gateway acts only on its own line's rows |
-| `units` | `[{ unitId, carrierId, artifact?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` (`{ url, sha256 }`) is its own file, such as a per-unit model; its `parameters` are its own settings |
+| `units` | `[{ unitId, carrierId, artifact?, artifacts?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` is its own file, such as a per-unit model, and `artifacts` its files when it has several; each is `{ url, sha256, id?, contentType?, sizeBytes? }`. Its `parameters` are its own settings |
 | `jobId`, `senderJobId` | The receiver's job and the sender's. Each open handoff into a machine names its own job; a second open row naming the same job there resolves `dispatch-refused`. A row for some of a sender job's units still receives their releases, however the codec split that job |
 | `fromMachine`, `toMachine` | Machine ids, or null for line entry and for a person |
 | `recipeId`, `recipeVersion`, `process` | What the receiver runs |
@@ -102,6 +102,22 @@ When a sender finishes a unit, the gateway records the release on the row and, i
 | `lots` | Every lot those units consumed, once each |
 
 Both are containment-searchable, so the rows that used a lot, and with them the units, are one query: `GET /escalations?facets={"lots":["LOT-7"]}`. A unit's whole path is every handoff row whose `units` holds it. The sender's full finished record stays on the row as its `released:<unit>` item. A codec maps its own lot fields into `materials`.
+
+### Job lifecycle on the row
+
+With `MACHINE_LIFECYCLE=on`, while a machine works a job, the gateway notes the job's milestones as items on the open row that holds it, as the machine's bot:
+- the dispatch into the machine, until its units arrive;
+- after that, the handoff out of the machine.
+
+| Item | When |
+|---|---|
+| `started:<unit>` | The machine reports `started` |
+| `progress:<unit>:<step>` | `progress` crosses a step of `MACHINE_PROGRESS_STEP` percent (25 by default, so 25, 50 and 75); the row's `progress` facet holds the latest `{ percent, remainingSec, stage, detail, at }` |
+| `stage:<unit>:<stage>` | `progress` names a `stage` the job has not reached before, for machines that report named steps rather than a percent |
+| `paused:<alarm>:<raisedAt>` | A stopping alarm is raised at the machine (the alarm row still goes to the operator role) |
+| `resumed:<alarm>:<raisedAt>` | The machine clears that alarm |
+
+Every other progress message stays in the stream, so an hour-long job leaves a handful of items on its row. A row parked with a limit on its items (`accumulate: { max }`) gets no notes, so they never take a slot its units need. Off, the rows hold only their releases and arrivals. A machine whose job runs before its units arrive, such as a printer whose part exists only once the print finishes, reports the arrival at the end, and the whole job lands on the one row. A `progress` job event may carry `percent` (0 to 100), `remainingSec`, a `stage` name and a `detail` object.
 
 ### Decisions on a failed handoff
 
@@ -155,6 +171,8 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
 | `unsupported` | Not a command a row may ask for, not a machine on this line, or a command the line's codec has no message for; nothing was sent |
 
+A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation, and a round begins only once the one before it has expired; a command sent in a later round goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments. Dispatches work the same way with `MACHINE_DISPATCH_TTL_MS`, counted from the row's creation, or for `dispatchOn: 'arrival'` from the last unit's arrival, so a machine never holds two valid commands for one row.
+
 The example's `machineCommand` workflow is this one step.
 
 ## The wire
@@ -169,6 +187,8 @@ interface LineCodec {
   unitsPerDispatch: number | null;                        // 1: one dispatch per unit
   dispatchOn?: 'created' | 'arrival';                     // when a handoff's job goes out
   strict?: boolean;                                       // broken messages go to a person, never acted on
+  snapshotOnStart?: boolean;                              // ask every machine for a snapshot on taking the line
+  retainedAlarms?: boolean;                               // active alarms stay retained on the broker until they clear
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
@@ -184,6 +204,10 @@ interface LineCodec {
 - `strict: true` holds a message with contract violations: it is confirmed, never acted on, and one `contract-violation` row shows it to the operator role. Without it, known fields are acted on and the violations are logged.
 - An alarm body may name the catalog edition its code comes from, `catalog: { domain, key, version }`. The alarm row then carries it as a lookup ref, so the row reads the code's meaning as of that edition.
 - Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
+- `snapshotOnStart: true` is for machines that keep no retained state and report only what changes. The gateway asks each machine for a snapshot once it takes the line, so it learns every machine's current job before it acts on a change.
+- `retainedAlarms: true` says active alarms stay retained on the broker until they clear, as in the line protocol. A gateway taking the line then reads every active alarm back, and an alarm row whose alarm is missing has cleared. Without it, a machine's snapshot lists its active alarms (`alarms`), and an alarm row whose alarm a snapshot the machine sends no longer lists resolves `cleared`; a snapshot read back from the broker is never used for this, since it may be older than the alarms.
+- A receiver that reads only the carrier may report `arrived`, or `transfer-failed` with `unreadable-id`, with `carrierId` and no `unitId` or `jobId`. The gateway finds the unit an open handoff into that machine carries on that carrier.
+- Each command reaches `encode` with `attempt`, how many times this gateway has sent that `cmdId`, and `retry`, true when the machine may already have it: sent earlier, or its row existed before this gateway took the line. A protocol with a retransmission flag sets it from `retry`.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.
@@ -213,20 +237,22 @@ A replica taking a line reads back its learned addresses, its open handoff, comm
 ## Topology and identity
 
 ```
- machines ──MQTT, TLS, client cert──▶ machine broker ──bridge──▶ site NATS
-                                         (Mosquitto)               JetStream
+ machines ──MQTT, TLS, client cert──▶ machine broker ──bridge──▶ NATS with JetStream
+                                         (Mosquitto)              (Long Tail's messaging, or a site NATS)
                                               ▲                        ▲
                                               └── gateway (commands)    └── gateway (streams, read only)
 ```
 
 - **Machines:** each machine logs in over MQTT 3.1.1 or 5 with its own certificate; the CN (`{site}-{line}-{address}`) is its username. The broker ACL lets it write only its own channels and read only its own commands. The line controller may command every machine on the line.
-- **Durable streams:** the bridge carries the line's topics one way, into the site NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer and may publish only JetStream requests and acks.
-- **Escalation events:** the gateway inside Long Tail reads them in process. The site NATS is a server of its own; Long Tail's events and NATS stay inside Long Tail.
+- **Durable streams:** the bridge carries the line's topics one way into NATS, where only the bridge may publish them. JetStream keeps `LINE_EVENTS` (30 days) and `LINE_TELEMETRY` (3 days). The gateway reads through a durable consumer, `<controller>-events`, and may publish only JetStream requests and acks for its own streams and consumer; it cannot delete or purge them.
+- **Where the streams live:** by default in Long Tail's messaging ([events](events.md#messaging)), whose NATS server must run JetStream. The bridge then logs in to that server's edge account for the line (`Machines.edgeAccountFor`), which may publish only the line's subjects, so the edge reaches nothing of Long Tail's. With `MACHINE_SITE_NATS_URL`, the streams live instead in a NATS server of the site's own (`Machines.renderSiteConf`), and Long Tail's NATS stays inside Long Tail. Either way the gateway reads the same streams under the same consumer name.
+- **Escalation events:** the gateway inside Long Tail reads them in process. A standalone gateway subscribes to them over Long Tail's messaging.
 - **Commands:** the gateway publishes commands to the machine broker at QoS 1, so they queue for a machine that is away.
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role. A row commands only the machine whose role it is on: cancelling a handoff withdraws the receiver's dispatch, and the sender's job is stopped only by a `cancel` command row on the sender's role.
 - **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
+- **Machines that host their own broker:** the machine broker connects out to each machine's broker with a Mosquitto bridge, carrying the machine's messages in and its commands out under the machine's level of the line's topics, and its codec reads them there. The bridge's notification topic, kept on the machine broker, is the machine's presence. `examples/workflows/bambu-printer` does this for 3D printers.
 
 ### Learned addresses
 
@@ -243,11 +269,11 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MACHINE_TRANSPORT` | | `nats` (site NATS streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
-| `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes to Long Tail's NATS (`NATS_URL`, `NATS_TOKEN`) |
+| `MACHINE_TRANSPORT` | | `nats` (durable streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
+| `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes over Long Tail's messaging, or to `NATS_URL` with `NATS_TOKEN` when the gateway has none |
 | `MACHINE_TOPIC_ROOT` | `line/v1` | The generic codec's root |
 | `MACHINE_LINE_CONFIG` | | Path of the line JSON |
-| `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | Site NATS for the streams |
+| `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | A site NATS of its own for the streams; unset, `nats` keeps them in Long Tail's messaging |
 | `MACHINE_MQTT_URL`, `_PROTOCOL` | `_PROTOCOL` 5 | Machine broker, for commands and retained reads; 4 for a broker that speaks only MQTT 3.1.1 |
 | `MACHINE_MQTT_CA`, `_CERT`, `_KEY` | | TLS files; `{clientId}` in a path picks each identity's certificate |
 | `MACHINE_REPLY_TIMEOUT_MS` | `5000` | Wait for a command reply |
@@ -256,6 +282,9 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 | `MACHINE_OFFLINE_DEBOUNCE_MS` | `15000` | Offline this long before a row |
 | `MACHINE_QUIET_MS` | `90000` | Silent this long before a row; `0` turns it off |
 | `MACHINE_RECEIPT_DELAY_MS` | `250` | How long confirmed message ids gather before a receipt goes out |
+| `MACHINE_LIFECYCLE` | `off` | `on` notes each job's start, progress steps and pauses on the row that holds it |
+| `MACHINE_PROGRESS_STEP` | `25` | With lifecycle notes on, progress is noted each time it crosses this many percent; `0` notes none |
+| `MACHINE_CODEC_MODULE` | | Development server only: a module whose `createCodec(line)` speaks the machines' protocol |
 
 ## Testing a codec or adapter
 

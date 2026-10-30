@@ -15,9 +15,14 @@ describe('site NATS config', () => {
     expect(conf).not.toContain('CN=site-1-line-1-press-01');
   });
 
-  it('lets the gateway read the streams by password, publishing only JetStream requests and acks', () => {
+  it('lets the gateway keep and read only its streams through its own consumer, by password', () => {
     expect(conf).toContain('{ user: "line-gateway", password: "gwpw", allowed_connection_types: ["STANDARD"],');
-    expect(conf).toContain('permissions: { publish: ["$JS.API.>","$JS.ACK.>","$JS.FC.>"], subscribe: ["_INBOX.>","line.v1.site-1.line-1.>"] }');
+    expect(conf).toContain('subscribe: ["_INBOX.>","line.v1.site-1.line-1.>"] }');
+    expect(conf).toContain('"$JS.API.STREAM.UPDATE.LINE_EVENTS"');
+    expect(conf).toContain('"$JS.API.CONSUMER.MSG.NEXT.LINE_EVENTS.line-controller-site-1-line-1-events"');
+    expect(conf).toContain('"$JS.ACK.LINE_EVENTS.line-controller-site-1-line-1-events.>"');
+    expect(conf).not.toContain('"$JS.API.>"');
+    expect(conf).not.toContain('STREAM.DELETE');
   });
 
   it('runs JetStream and MQTT over TLS with certificate login, as a server of its own', () => {

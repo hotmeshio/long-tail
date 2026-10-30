@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 
 import { loadMachineLineConfig } from '../../../services/machines/config';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
-import { CoreEscalationFeed, MqttMachineBus, MqttMachineLink, NatsMachineBus } from '../../../lib/machines/transport';
+import { CoreEscalationFeed, MqttMachineBus, MqttMachineLink, NatsMachineBus, PubSubEscalationFeed, StreamMachineBus } from '../../../lib/machines/transport';
+import { MemoryMessagingProvider, messagingRegistry } from '../../../lib/messaging';
 import { createEscalationFeed, createLinkFactory, createMachineBus } from '../../../services/machines/select';
 
 const NATS = { MACHINE_TRANSPORT: 'nats', MACHINE_SITE_NATS_URL: 'nats://site:4222', MACHINE_MQTT_URL: 'mqtts://site:8883', NATS_URL: 'nats://lt:4222' };
@@ -38,5 +39,23 @@ describe('transport selection', () => {
     const config = { ...loadMachineLineConfig(MQTT), mqtt: undefined };
     expect(() => createMachineBus(config, DEFAULT_LINE)).toThrow(/MACHINE_MQTT_URL/);
     expect(() => createLinkFactory(config)).toThrow(/MACHINE_MQTT_URL/);
+  });
+
+  describe('on Long Tail messaging', () => {
+    const SHARED = { MACHINE_TRANSPORT: 'nats', MACHINE_MQTT_URL: 'mqtts://site:8883' };
+    afterEach(() => messagingRegistry.clear());
+
+    it('reads machine events from Long Tail\'s streams when the site has no NATS of its own', () => {
+      messagingRegistry.register(new MemoryMessagingProvider());
+      const bus = createMachineBus(loadMachineLineConfig(SHARED), DEFAULT_LINE) as StreamMachineBus;
+      expect(bus).toBeInstanceOf(StreamMachineBus);
+      expect(bus.durableName).toBe('line-controller-site-1-line-1-events');
+      expect(createEscalationFeed(loadMachineLineConfig(SHARED), DEFAULT_LINE)).toBeInstanceOf(PubSubEscalationFeed);
+    });
+
+    it('fails loudly when neither Long Tail messaging nor a site NATS is configured', () => {
+      expect(() => createMachineBus(loadMachineLineConfig(SHARED), DEFAULT_LINE)).toThrow(/LT_MESSAGING=nats/);
+      expect(() => createEscalationFeed(loadMachineLineConfig(SHARED), DEFAULT_LINE)).toThrow(/LT_MESSAGING=nats/);
+    });
   });
 });

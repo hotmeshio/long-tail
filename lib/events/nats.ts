@@ -4,6 +4,10 @@ import { connect, NatsConnection, StringCodec, Subscription } from 'nats';
 import { config } from '../../modules/config';
 import { loggerRegistry } from '../logger';
 import type { LTEvent, LTEventAdapter } from '../../types';
+import type { LTMessage, LTMessagingProvider, LTSubscription } from '../../types/messaging';
+
+/** The part of Long Tail's messaging the adapter uses. */
+export type EventMessaging = Pick<LTMessagingProvider, 'connected' | 'pubsub'>;
 
 const sc = StringCodec();
 
@@ -19,6 +23,9 @@ const sc = StringCodec();
  * An `_originId` field prevents the publishing container from
  * re-dispatching its own events.
  *
+ * Given `messaging` (Long Tail's messaging, `start({ messaging })`), it publishes
+ * and bridges over that connection; otherwise it opens a connection of its own.
+ *
  * Usage:
  * ```typescript
  * import { eventRegistry, NatsEventAdapter } from '@hotmeshio/long-tail';
@@ -30,6 +37,8 @@ const sc = StringCodec();
 export class NatsEventAdapter implements LTEventAdapter {
   private nc: NatsConnection | null = null;
   private sub: Subscription | null = null;
+  private readonly messaging: EventMessaging | null;
+  private bridge: LTSubscription | null = null;
   private url: string;
   private _wsUrl: string | null;
   private _wsProxyTarget: string | null;
@@ -39,7 +48,8 @@ export class NatsEventAdapter implements LTEventAdapter {
   private originId = randomUUID();
   private callbackAdapter: LTEventAdapter | null = null;
 
-  constructor(options?: { url?: string; wsUrl?: string; wsProxy?: string; subjectPrefix?: string; token?: string }) {
+  constructor(options?: { url?: string; wsUrl?: string; wsProxy?: string; subjectPrefix?: string; token?: string; messaging?: EventMessaging }) {
+    this.messaging = options?.messaging ?? null;
     this.url = options?.url || config.NATS_URL;
     this._wsUrl = options?.wsUrl || config.NATS_WS_URL || null;
     this._wsProxyTarget = options?.wsProxy || null;
@@ -90,6 +100,10 @@ export class NatsEventAdapter implements LTEventAdapter {
   }
 
   async connect(): Promise<void> {
+    if (this.messaging) {
+      if (this.callbackAdapter) this.bridge = this.messaging.pubsub.subscribe(`${this.subjectPrefix}.>`, (m) => this.bridgeIn(m));
+      return;
+    }
     this.nc = await connect({
       servers: this.url,
       token: this.token,
@@ -118,15 +132,34 @@ export class NatsEventAdapter implements LTEventAdapter {
     }
   }
 
+  /** An event from another container, handed to the local callback adapter. */
+  private bridgeIn(m: LTMessage): void {
+    try {
+      const event = JSON.parse(m.payload) as LTEvent & { _originId?: string };
+      if (event._originId === this.originId) return;
+      this.callbackAdapter?.publish(event);
+    } catch {
+      // Malformed message, skip
+    }
+  }
+
   async publish(event: LTEvent): Promise<void> {
-    if (!this.nc) return;
     const subject = `${this.subjectPrefix}.${event.type}`;
     const enriched = { ...event, _originId: this.originId };
+    if (this.messaging) {
+      if (this.messaging.connected) await this.messaging.pubsub.publish(subject, JSON.stringify(enriched));
+      return;
+    }
+    if (!this.nc) return;
     this.nc.publish(subject, sc.encode(JSON.stringify(enriched)));
     loggerRegistry.info(`[lt-events:nats] published: ${subject} (origin=${this.originId.slice(0, 8)})`);
   }
 
   async disconnect(): Promise<void> {
+    if (this.bridge) {
+      await this.bridge.close();
+      this.bridge = null;
+    }
     if (this.sub) {
       this.sub.unsubscribe();
       this.sub = null;

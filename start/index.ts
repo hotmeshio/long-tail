@@ -3,6 +3,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { loggerRegistry } from '../lib/logger';
 import { telemetryRegistry } from '../lib/telemetry';
 import { eventRegistry } from '../lib/events';
+import { MESSAGING_LOG, messagingRegistry } from '../lib/messaging';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import { MachineSurface } from '../services/machines/surface';
 import { withMachineRoles } from '../services/machines/roles';
@@ -70,8 +71,12 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   // 2. Apply server/auth config
   await applyServerAuthConfig(startConfig);
 
-  // 3. Register adapters
+  // 3. Register adapters; messaging connects first, since events and machines use it.
+  // An unreachable NATS is logged and Long Tail starts, as events always have; what needs streams fails then.
   registerAdapters(startConfig);
+  await messagingRegistry.connect().catch((err) => {
+    loggerRegistry.error(`${MESSAGING_LOG.CONNECT_FAILED} ${err instanceof Error ? err.message : String(err)}`);
+  });
   loggerRegistry.info('[long-tail] starting...');
 
   // 4-5. Collect workers, run migrations, start workers, seed data
@@ -119,6 +124,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
     if (eventRegistry.hasAdapters) {
       await eventRegistry.disconnect();
     }
+    await messagingRegistry.disconnect();
     if (telemetryRegistry.hasAdapter) {
       await telemetryRegistry.disconnect();
     }

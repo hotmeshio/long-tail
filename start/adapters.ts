@@ -3,6 +3,8 @@ import { PinoLoggerAdapter } from '../lib/logger/pino';
 import { telemetryRegistry } from '../lib/telemetry';
 import { HoneycombTelemetryAdapter } from '../lib/telemetry/honeycomb';
 import { eventRegistry } from '../lib/events';
+import { messagingRegistry } from '../lib/messaging';
+import { MESSAGING_KIND, resolveMessaging } from '../lib/messaging/config';
 import { NatsEventAdapter } from '../lib/events/nats';
 import { SocketIOEventAdapter } from '../lib/events/socketio';
 import { CallbackEventAdapter } from '../lib/events/callback';
@@ -46,6 +48,10 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     telemetryRegistry.register(new HoneycombTelemetryAdapter(startConfig.telemetry.honeycomb));
   }
 
+  // Messaging: one provider shared by events and the machine surface.
+  const messaging = resolveMessaging(startConfig);
+  if (messaging.provider) messagingRegistry.register(messaging.provider);
+
   // Events — register the configured transport.
   // Socket.IO is the default for single-container ("nothing but Postgres").
   // When NATS or custom adapters are configured, Socket.IO is NOT registered —
@@ -55,8 +61,11 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     for (const adapter of startConfig.events.adapters) {
       eventRegistry.register(adapter);
     }
-  } else if (startConfig.events?.nats) {
-    eventRegistry.register(new NatsEventAdapter(startConfig.events.nats));
+  } else if (messaging.provider?.name === MESSAGING_KIND.NATS) {
+    eventRegistry.register(new NatsEventAdapter({
+      messaging: messaging.provider, wsUrl: messaging.ws.url, wsProxy: messaging.ws.proxy, token: messaging.ws.token,
+      subjectPrefix: startConfig.events?.nats?.subjectPrefix,
+    }));
   } else {
     eventRegistry.register(new SocketIOEventAdapter({
       authenticate: createSocketIOAuthenticator(startConfig),

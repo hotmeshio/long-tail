@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
+import { getPool } from '../../../lib/db';
 import { LineLeadership } from '../../../services/machines/leadership';
 import { sleep, until } from '../../../services/machines/testing/wait';
 
@@ -48,5 +49,50 @@ describe('line leadership', () => {
     contender(`test-line-b-${Date.now()}`, log, 'b');
     await until(() => log.length === 2, 5_000);
     expect(log.sort()).toEqual(['a', 'b']);
+  });
+
+  it('contends again when the database refuses the connection, as while it recovers', async () => {
+    let refusals = 2;
+    const lost: string[] = [];
+    const log: string[] = [];
+    const l = new LineLeadership(`test-line-refused-${Date.now()}`, {
+      retryMs: 10,
+      connect: async () => {
+        if (refusals-- > 0) throw new Error('the database system is not yet accepting connections');
+        return getPool().connect();
+      },
+    });
+    held.push(l);
+    void l.run(async () => { log.push('leading'); }, async (err) => { lost.push(err.message); });
+    await until(() => log.length === 1, 5_000);
+    expect(lost).toEqual(['the database system is not yet accepting connections', 'the database system is not yet accepting connections']);
+  });
+
+  it('never leads when stopped while its connection was still opening', async () => {
+    const log: string[] = [];
+    const l = new LineLeadership(`test-line-stop-early-${Date.now()}`, {
+      connect: async () => { await sleep(100); return getPool().connect(); },
+    });
+    void l.run(async () => { log.push('leading'); }, async () => undefined);
+    await sleep(20);
+    await l.stop();
+    await sleep(250);
+    expect(log).toEqual([]);
+  });
+
+  it('lets the lock go only after the lost leader has stopped', async () => {
+    const key = `test-line-lost-${Date.now()}`;
+    const log: string[] = [];
+    let finishStopping!: () => void;
+    const stopping = new Promise<void>((r) => { finishStopping = r; });
+    const first = new LineLeadership(key, { retryMs: 60_000 });
+    held.push(first);
+    void first.run(async () => { log.push('first'); throw new Error('reconcile failed'); }, async () => { log.push('first stopping'); await stopping; });
+    await until(() => log.includes('first stopping'), 5_000);
+    contender(key, log, 'second');
+    await sleep(300);
+    expect(log).toEqual(['first', 'first stopping']);
+    finishStopping();
+    await until(() => log.includes('second'), 5_000);
   });
 });

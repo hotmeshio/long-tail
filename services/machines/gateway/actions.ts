@@ -26,7 +26,7 @@ export type Action =
   | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; receivedOnAccept?: boolean }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   /** A host's machine-command row: send the command, resolve the row with the reply. */
-  | { kind: 'control'; rowId: string; machineId: string; op: string; cmdId: string; args: Record<string, any> }
+  | { kind: 'control'; rowId: string; machineId: string; op: string; args: Record<string, any>; createdAt?: number }
   | { kind: 'claim'; as: Actor; rowId: string }
   /** `metadata` is merged into the row's metadata in the same statement. */
   | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; metadata?: Record<string, any>; complete?: Completion }

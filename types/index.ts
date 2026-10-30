@@ -185,6 +185,18 @@ export type {
 } from './startup';
 
 export type {
+  LTMessage,
+  LTSubscription,
+  LTPubSub,
+  LTStreams,
+  LTStreamMessage,
+  LTConsumeOptions,
+  LTMessagingProvider,
+  StreamSpec,
+  ConsumerSpec,
+} from './messaging';
+
+export type {
   LTMcpTransportType,
   LTMcpServerRecord,
   LTMcpServerStatus,

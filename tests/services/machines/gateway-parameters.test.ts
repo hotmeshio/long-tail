@@ -52,4 +52,16 @@ describe('dispatch: parameters and per-unit files', () => {
     expect(ended.resolver_payload).toMatchObject({ received: true });
     expect(rig.recorder.commands('press-01', OP.DISPATCH)).toHaveLength(1);
   });
+
+  it('a unit with several files sends them all, each with its id, type and size, and satisfies a machine that requires an artifact', async () => {
+    const line = { ...DEFAULT_LINE, machines: DEFAULT_LINE.machines.map((m) => (m.machineId === 'press-01' ? { ...m, requireArtifact: true } : m)) };
+    rig = await startRig({}, {}, line);
+    const files = [
+      { url: 'https://files/S1.step', sha256: 'ab'.repeat(32), id: 'ART-1', contentType: 'model/step', sizeBytes: 2048 },
+      { url: 'https://files/S1.nc', sha256: 'cd'.repeat(32), id: 'ART-2', contentType: 'text/plain', sizeBytes: 512 },
+    ];
+    const row = rig.lt.park(stationRole('bond'), { ...facetsFor('S1', null, 'press-01'), units: [{ unitId: 'S1', carrierId: 'CR-S1', artifacts: files }] });
+    expect((await rig.lt.ended(row.id, 3_000)).resolver_payload).toMatchObject({ received: true });
+    expect(rig.recorder.commands('press-01', OP.DISPATCH)[0].args.units[0].artifacts).toEqual(files);
+  });
 });

@@ -30,9 +30,32 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
   };
 }
 
+/**
+ * The validity round a dispatch belongs to. Rounds of one validity period count
+ * from when the dispatch became due, and a round begins only when the one
+ * before it has expired, so a machine never holds two valid commands for one
+ * row. Within a round a dispatch sent again, by a retry, a restarted machine or
+ * a restarted gateway, is the same command with the same arguments; a new round
+ * is a new command, never an old one with changed arguments.
+ */
+export function dispatchWindow(dueAt: number, now: number, ttlMs: number): { round: number; expiresAt: number } {
+  const round = Math.max(1, Math.floor((now - dueAt) / ttlMs) + 1);
+  return { round, expiresAt: dueAt + round * ttlMs };
+}
+
+/** The later of a row's due time and an arrival's time; an unreadable time leaves it as it was. */
+export function latestArrival(dueAt: number | undefined, at: unknown): number | undefined {
+  const t = typeof at === 'string' ? Date.parse(at) : NaN;
+  if (!Number.isFinite(t)) return dueAt;
+  return dueAt === undefined ? t : Math.max(dueAt, t);
+}
+
 export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
+  const now = Date.now();
+  row.createdAt ??= now;
+  const { round, expiresAt } = dispatchWindow(row.dueAt ?? row.createdAt, now, dispatchTtlMs);
   return {
-    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id), args: dispatchArgs(row, Date.now() + dispatchTtlMs),
+    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id, round), args: dispatchArgs(row, expiresAt),
     ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { receivedOnAccept: true } : {}),
   };
 }
@@ -48,7 +71,7 @@ export function softwareRefusal(state: GatewayState, line: LineDef, machineId: s
 /** A machine that requires an artifact is never sent a handoff without one: the job's, or one for every unit. */
 export function artifactRefusal(line: LineDef, row: HandoffRow): string | null {
   if (!machineById(line, row.toMachine!).requireArtifact || (row.artifactUrl && row.artifactSha256)) return null;
-  if (row.units.every((u) => u.artifact)) return null;
+  if (row.units.every((u) => u.artifact || u.artifacts?.length)) return null;
   return `${row.toMachine} requires an artifact (url and sha256), for the job or for every unit; the row has none`;
 }
 

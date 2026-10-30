@@ -8,7 +8,7 @@
  * A machine-command row is sent to its machine as the command it names.
  */
 
-import { COMMAND_STATUS, ROW_TYPE, controlCommandId, type CommandFacets, type HandoffFacets } from '../contracts';
+import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
 import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
@@ -29,10 +29,19 @@ const STATUS_FOR_VERB: Record<string, string> = {
   [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
 };
 
+/** The metadata key an accumulator row parked with an item limit carries. */
+const ACCUMULATE_MAX = 'accumulate_max';
+
 const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION];
 
-function handoffRow(id: string, role: string, facets: HandoffFacets, metadata?: Record<string, any>): HandoffRow {
-  return { ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata) };
+function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
+  const metadata = data?.metadata;
+  const capped = metadata?.[ACCUMULATE_MAX] != null;
+  const createdAt = data?.created_at ? new Date(data.created_at).getTime() : NaN;
+  return {
+    ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata),
+    ...(capped ? { capped } : {}), ...(Number.isFinite(createdAt) ? { createdAt } : {}),
+  };
 }
 
 /** Rows for another line belong to that line's gateway. */
@@ -100,7 +109,8 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
-  return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, cmdId: controlCommandId(id), args: c.args }];
+  const createdAt = event.data?.created_at ? new Date(event.data.created_at).getTime() : NaN;
+  return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, args: c.args, ...(Number.isFinite(createdAt) ? { createdAt } : {}) }];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {
@@ -116,7 +126,7 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
     if (state.isClosed(id) || !facets) return [];
-    state.index(handoffRow(id, event.role, facets, event.data?.metadata));
+    state.index(handoffRow(id, event.role, facets, event.data));
     const row = state.get(id)!;
     // The units now wait on the sender as this row's sender job, when the sender holds them under it.
     if (row.fromMachine) for (const u of row.units) if (heldUnder(state, row.fromMachine, u.unitId, row.senderJobId)) state.letGo(row.fromMachine, u.unitId);

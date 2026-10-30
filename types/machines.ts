@@ -4,8 +4,10 @@
  * lib/machines and services/machines.
  */
 
+import type { Delivery } from './messaging';
+
 /** What a consumer tells the transport about one delivered message. */
-export type MachineDisposition = 'ack' | 'nak' | 'term';
+export type MachineDisposition = Delivery;
 
 /** A machine's place on the site. Each machine is one MQTT client. */
 export interface MachineIdent {

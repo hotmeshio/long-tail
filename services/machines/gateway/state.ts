@@ -29,6 +29,14 @@ export interface HandoffRow extends HandoffFacets {
   trace?: TraceEntry[];
   /** Each unit's arrival event, as its receiver reported it (dispatch on arrival). */
   arrivals?: Record<string, Record<string, any>>;
+  /** Lifecycle item keys already on the row (lifecycle.ts). */
+  noted?: string[];
+  /** Parked with a limit on its items, which lifecycle notes must never use up. */
+  capped?: boolean;
+  /** When the row was created (epoch ms). */
+  createdAt?: number;
+  /** When its last unit arrived (epoch ms, dispatch on arrival); its dispatch windows count from here, else from createdAt. */
+  dueAt?: number;
 }
 
 export interface AlarmTrack {
@@ -39,6 +47,8 @@ export interface AlarmTrack {
   rowId?: string;
   /** Created and not yet resolved by anyone. */
   open: boolean;
+  /** Rows the alarm paused, noted again when it clears. */
+  noted?: string[];
 }
 
 export interface LinkTrack {
@@ -59,6 +69,16 @@ export class GatewayState {
   unitsPerDispatch: number | null = null;
   /** Jobs go to a receiver once its units arrive there, from the codec. */
   dispatchOnArrival = false;
+  /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
+  lifecycle = false;
+  /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
+  retainedAlarms = false;
+  /** Reading the broker's retained messages on taking the line; a snapshot read back may be older than its alarms. */
+  readingRetained = false;
+  /** When this gateway took the line (epoch ms); a command for an older row may have been sent by an earlier one. */
+  takenAt = 0;
+  /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
+  progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
   /** Units at each machine that arrived and have not left: machine → unit → job. */
@@ -90,7 +110,10 @@ export class GatewayState {
     const existing = this.openRows.get(row.id);
     // An event may carry metadata older than what the gateway already wrote: keep both traces.
     this.openRows.set(row.id, existing
-      ? { ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals }
+      ? {
+        ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals,
+        dueAt: existing.dueAt, noted: existing.noted ?? row.noted,
+      }
       : row);
   }
 
@@ -177,10 +200,10 @@ export class GatewayState {
     }
   }
 
-  /** The open row an accepted dispatch command belongs to. */
+  /** The row a dispatch command belongs to, open or recently closed. */
   rowForDispatch(cmdId: string): HandoffRow | undefined {
     const rowId = this.dispatches.get(cmdId);
-    return rowId ? this.openRows.get(rowId) : undefined;
+    return rowId ? this.openRows.get(rowId) ?? this.closedRows.get(rowId) : undefined;
   }
 
   /** Track a machine-command row; false when it is already tracked or has ended. */

@@ -2,8 +2,10 @@ import { config } from './modules/config';
 import { loggerRegistry } from './lib/logger';
 import { midnightTheme } from './themes/midnight';
 
+import * as path from 'path';
 import { start } from './start';
 import { loadLine as loadMachineLine } from './lib/machines/line';
+import type { LTMachinesConfig } from './types/startup';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
 
@@ -39,6 +41,10 @@ export { NatsEventAdapter } from './lib/events/nats';
 export { InMemoryEventAdapter } from './lib/events/memory';
 export { SocketIOEventAdapter, type SocketIOAuthenticator } from './lib/events/socketio';
 export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishActivityEvent, publishWorkflowEvent, publishAgentEvent, publishKnowledgeEvent } from './lib/events/publish';
+export { messagingRegistry, MemoryMessagingProvider, DELIVERY } from './lib/messaging';
+export { NatsMessagingProvider } from './lib/messaging/nats/provider';
+export { renderNatsConf, type NatsConfOptions, type EdgeAccount, type NatsUser } from './lib/messaging/nats/render-conf';
+export { jsPermissions } from './lib/messaging/nats/permissions';
 export { telemetryRegistry } from './lib/telemetry';
 export { HoneycombTelemetryAdapter } from './lib/telemetry/honeycomb';
 export { loggerRegistry } from './lib/logger';
@@ -175,7 +181,7 @@ async function main() {
     // Machines resolve rows over MQTT when a line and a transport are configured
     // (docker-compose.machines.yml sets both).
     machines: process.env.MACHINE_TRANSPORT && process.env.MACHINE_LINE_CONFIG
-      ? { lines: [loadMachineLine(process.env.MACHINE_LINE_CONFIG)] }
+      ? machinesFromEnv(process.env.MACHINE_LINE_CONFIG, process.env.MACHINE_CODEC_MODULE)
       : undefined,
     branding: {
       ...(process.env.WHITE_LABEL ? { appName: process.env.WHITE_LABEL } : {}),
@@ -184,10 +190,20 @@ async function main() {
       themes: [midnightTheme],
     },
     telemetry: honeycombKey ? { honeycomb: { apiKey: honeycombKey } } : undefined,
-    events: config.EVENT_TRANSPORT === 'nats'
-      ? { nats: { url: config.NATS_URL, wsUrl: config.NATS_WS_URL || undefined, token: config.NATS_TOKEN || undefined } }
+    // Messaging from LT_MESSAGING / LT_NATS_* when set; otherwise the older EVENT_TRANSPORT=nats with NATS_*.
+    messaging: !process.env.LT_MESSAGING && config.EVENT_TRANSPORT === 'nats'
+      ? { nats: { url: config.NATS_URL, token: config.NATS_TOKEN || undefined, ws: { url: config.NATS_WS_URL || undefined } } }
       : undefined,
   });
+}
+
+/** The configured line, spoken to by the codec MACHINE_CODEC_MODULE names (its `createCodec(line)`), or the generic one. */
+function machinesFromEnv(lineConfig: string, codecModule?: string): LTMachinesConfig {
+  const line = loadMachineLine(lineConfig);
+  if (!codecModule) return { lines: [line] };
+  const { createCodec } = require(path.resolve(codecModule));
+  if (typeof createCodec !== 'function') throw new Error(`MACHINE_CODEC_MODULE=${codecModule} exports no createCodec(line)`);
+  return { lines: [line], codec: createCodec(line) };
 }
 
 // Run server when executed directly

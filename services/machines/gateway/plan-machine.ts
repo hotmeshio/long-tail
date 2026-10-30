@@ -2,10 +2,11 @@
  * Machine messages to gateway actions: the escalation verbs a person would
  * perform, performed for the machine. Each unit's arrival and the sender's
  * finished record accumulate on the handoff row, and the last expected item
- * resolves it. A failure on either side resolves it with an error. Alarms that
- * stop work and machines that go dark or quiet become rows for people. A
- * restarted machine gets back the dispatches it lost. Everything else stays
- * in the stream.
+ * resolves it. A failure on either side resolves it with an error. A job's
+ * start, its progress steps, and the alarms that pause it are noted on the row
+ * that holds it (lifecycle.ts). Alarms that stop work and machines that go
+ * dark or quiet become rows for people. A restarted machine gets back the
+ * dispatches it lost. Everything else stays in the stream.
  *
  * A message whose row does not exist yet is nak'd and arrives again; one whose
  * row already closed is acked, so a replay never resolves anything twice.
@@ -16,11 +17,12 @@ import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type E
 import { DISPOSITION } from '../../../lib/machines/transport';
 import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../types/escalation';
 import { CONTROLLER, type Action, type Plan } from './actions';
-import { dispatchAction } from './pacing';
+import { dispatchAction, latestArrival } from './pacing';
 import { failHandoff } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
+import { noteJobEvent, notePause, noteResume } from './lifecycle';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
-import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
+import { DISPATCH_STATE, type AlarmTrack, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
 const nak: Plan = { actions: [], disposition: DISPOSITION.NAK };
@@ -71,13 +73,27 @@ function ownsJob(jobId: string | null, reported: unknown): boolean {
 }
 
 /** Keep the receiver's arrival event for the unit, to go out with its dispatch. */
-function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>): HandoffRow {
+function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>, at: string): HandoffRow {
   row.arrivals = { ...row.arrivals, [unitId]: b };
+  row.dueAt = latestArrival(row.dueAt, at);
   return row;
 }
 
+/** The unit an open handoff into `m` carries on `carrierId`, for a scan that read only the carrier. */
+function unitOnCarrier(state: GatewayState, m: string, carrierId: unknown): string | undefined {
+  if (typeof carrierId !== 'string') return undefined;
+  for (const r of state.open()) {
+    if (r.toMachine !== m) continue;
+    const unit = r.units.find((u) => u.carrierId === carrierId);
+    if (unit) return unit.unitId;
+  }
+  return undefined;
+}
+
 function planJob(state: GatewayState, m: string, b: Record<string, any>, at: string | undefined, ttl: number): Plan {
-  const unitId = b.unitId;
+  const unitId = typeof b.unitId === 'string' ? b.unitId : unitOnCarrier(state, m, b.carrierId);
+  // A carrier no open handoff here carries yet: its row may still be on the way.
+  if (unitId === undefined) return nak;
   // An event from an earlier attempt's job never touches a later attempt's row.
   const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(r.jobId, b.jobId);
   const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(r.senderJobId, b.jobId);
@@ -97,13 +113,14 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     const early = row.fromMachine ? releasedEarly(state, row, unitId) : [];
     if (row.fromMachine) state.letGo(row.fromMachine, unitId);
     const units = row.units.map((u) => u.unitId);
+    const arrivedAt = at ?? new Date().toISOString();
     const complete = row.dispatch === DISPATCH_STATE.ARRIVING
-      ? { keys: units.map(itemKeys.arrived), then: [dispatchAction(withArrival(row, unitId, b), m, ttl)] }
+      ? { keys: units.map(itemKeys.arrived), then: [dispatchAction(withArrival(row, unitId, b, arrivedAt), m, ttl)] }
       : { keys: units.map(itemKeys.arrived), payload: { received: true, receiver: m, units } };
     return ack([...early, {
       kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.arrived(unitId),
       payload: {
-        unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: at ?? new Date().toISOString(),
+        unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: arrivedAt,
         ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { arrival: b } : {}),
       },
       complete,
@@ -143,6 +160,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: HANDOFF_ERROR.WITHDRAWN, detail: `${m} gave up ${b.jobId}` }));
   }
 
+  if (b.event === JOB_EVENT.STARTED || b.event === JOB_EVENT.PROGRESS) return ack(noteJobEvent(state, m, b, at));
+
   return ack();
 }
 
@@ -165,8 +184,9 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
   if (!env || b.active === false) {
     const track = state.alarms.get(key);
     state.alarms.delete(key);
-    if (!track?.rowId || !track.open) return ack();
-    return ack([{
+    const resumed = track ? noteResume(state, track, b) : [];
+    if (!track?.rowId || !track.open) return ack(resumed);
+    return ack([...resumed, {
       kind: 'resolve', as: CONTROLLER, rowId: track.rowId,
       payload: { decision: DECISION.CLEARED, clearedBy: b.clearedBy ?? null, note: `cleared at ${m}${b.clearedBy ? ` by ${b.clearedBy}` : ''}` },
     }]);
@@ -177,8 +197,9 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
   const superseded: Action[] = known?.rowId && known.open
     ? [{ kind: 'resolve', as: CONTROLLER, rowId: known.rowId, payload: { decision: DECISION.CLEARED, note: `${m} raised ${alarmId} again; this one ended` } }]
     : [];
-  state.alarms.set(key, { machineId: m, alarmId, raisedAt: b.raisedAt, open: true });
-  return ack([...superseded, {
+  const track: AlarmTrack = { machineId: m, alarmId, raisedAt: b.raisedAt, open: true };
+  state.alarms.set(key, track);
+  return ack([...superseded, ...notePause(state, track, b), {
     kind: 'createAlarmRow', machineId: m, alarmId,
     row: {
       type: ROW_TYPE.ALARM, subtype: b.level, role: LINE_ROLE.OPERATOR, priority: b.level === LEVEL.EMERGENCY ? 1 : 2,
@@ -228,12 +249,29 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   if (b.software) link.software = b.software;
   const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
   if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(jobIds));
+  const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
+  const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
   const previous = link.bootId;
   link.bootId = b.bootId;
-  if (!previous || previous === b.bootId) return ack([answer]);
+  if (!previous || previous === b.bootId) return ack([...cleared, answer]);
   const held = new Set(jobIds);
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
   const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
-  return ack([answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
+  return ack([...cleared, answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
+}
+
+/** Alarm rows for `m` whose alarm its snapshot no longer lists: they cleared at the machine. */
+function alarmsNoLongerListed(state: GatewayState, m: string, listed: unknown[]): Action[] {
+  const active = new Set(listed.filter((id): id is string => typeof id === 'string'));
+  const actions: Action[] = [];
+  for (const [key, track] of [...state.alarms.entries()]) {
+    if (track.machineId !== m || active.has(track.alarmId)) continue;
+    state.alarms.delete(key);
+    actions.push(...noteResume(state, track, {}));
+    if (track.open && track.rowId) {
+      actions.push({ kind: 'resolve', as: CONTROLLER, rowId: track.rowId, payload: { decision: DECISION.CLEARED, note: `cleared at ${m}; its snapshot no longer lists it` } });
+    }
+  }
+  return actions;
 }

@@ -7,7 +7,7 @@
 
 import { connect, type NatsConnection, type Subscription } from 'nats';
 
-import { payloadOf } from './nats-durable';
+import { payloadOf } from '../../messaging/nats/streams';
 import { LocalRedelivery, SerialQueue } from './serial';
 import { toEscalationEvent, type Disposition, type EscalationEvent, type EscalationFeed } from './delivery';
 

@@ -35,6 +35,10 @@ export const LINE_ROLE = {
 export interface ArtifactRef {
   url: string;
   sha256: string;
+  /** The host's id for the file. */
+  id?: string;
+  contentType?: string;
+  sizeBytes?: number;
 }
 
 export interface HandoffUnit {
@@ -42,6 +46,8 @@ export interface HandoffUnit {
   carrierId: string | null;
   /** This unit's own file, when each unit has one (a per-unit model or toolpath). */
   artifact?: ArtifactRef;
+  /** This unit's files, when it has several. */
+  artifacts?: ArtifactRef[];
   /** Parameters for this unit alone, sent to the machine as given. */
   parameters?: Record<string, unknown>;
 }
@@ -81,6 +87,11 @@ const ARRIVED_PREFIX = 'arrived:';
 export const itemKeys = {
   released: (unitId: string) => `${RELEASED_PREFIX}${unitId}`,
   arrived: (unitId: string) => `${ARRIVED_PREFIX}${unitId}`,
+  started: (unitId: string) => `started:${unitId}`,
+  progress: (unitId: string, step: number) => `progress:${unitId}:${step}`,
+  stage: (unitId: string, stage: string) => `stage:${unitId}:${stage}`,
+  paused: (alarmId: string, raisedAt: string) => `paused:${alarmId}:${raisedAt}`,
+  resumed: (alarmId: string, raisedAt: string) => `resumed:${alarmId}:${raisedAt}`,
 };
 
 /** The unit an arrival item names; null for any other item. */
@@ -146,6 +157,9 @@ export interface TraceEntry {
  * containment-searchable, e.g. `{ lots: ['LOT-7'] }`.
  */
 export const TRACE_FACET = { TRACE: 'trace', LOTS: 'lots' } as const;
+
+/** The facet a row holding a job carries while it runs: its latest noted progress. */
+export const LIFECYCLE_FACET = { PROGRESS: 'progress' } as const;
 
 /** What resolves a handoff row, from a machine or from a person's form. */
 export interface HandoffResolution {
@@ -222,6 +236,8 @@ export interface CommandResolution {
   reason?: string;
 }
 
-export const dispatchCommandId = (escalationId: string) => `${escalationId}:dispatch`;
-export const controlCommandId = (escalationId: string) => `${escalationId}:command`;
+/** A row's dispatch command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
+export const dispatchCommandId = (escalationId: string, round = 1) => (round > 1 ? `${escalationId}:dispatch:r${round}` : `${escalationId}:dispatch`);
+/** A command row's command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
+export const controlCommandId = (escalationId: string, round = 1) => (round > 1 ? `${escalationId}:command:r${round}` : `${escalationId}:command`);
 export const cancelCommandId = (escalationId: string) => `${escalationId}:cancel`;
