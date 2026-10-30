@@ -11,7 +11,7 @@ import type { AddressBook } from './address-book';
 import type { Action } from './actions';
 import type { LineEscalations } from './escalations';
 import { dispatchJobs } from './jobs';
-import { dispatchAction } from './pacing';
+import { dispatchAction, latestArrival } from './pacing';
 import { DISPATCH_STATE, type GatewayState } from './state';
 
 export interface RestoredRows {
@@ -85,6 +85,7 @@ export async function arrivalsOnRows(state: GatewayState, lt: LineEscalations, d
     }
     const byUnit = new Map(items.filter((i) => arrivedUnit(i.itemKey)).map((i) => [i.payload.unitId, i.payload]));
     row.arrivals = Object.fromEntries(units.map((u) => [u, byUnit.get(u)?.arrival ?? { unitId: u, carrierId: byUnit.get(u)?.carrierId ?? null }]));
+    for (const arrival of byUnit.values()) row.dueAt = latestArrival(row.dueAt, arrival.at);
     actions.push(dispatchAction(row, to, dispatchTtlMs));
   }
   return actions;

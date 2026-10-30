@@ -37,7 +37,7 @@ const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
   const metadata = data?.metadata;
   const capped = metadata?.[ACCUMULATE_MAX] != null;
-  const createdAt = data?.created_at ? Date.parse(data.created_at) : NaN;
+  const createdAt = data?.created_at ? new Date(data.created_at).getTime() : NaN;
   return {
     ...facets, id, role, dispatch: DISPATCH_STATE.NONE, trace: readTrace(metadata),
     ...(capped ? { capped } : {}), ...(Number.isFinite(createdAt) ? { createdAt } : {}),
@@ -109,7 +109,7 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
-  const createdAt = event.data?.created_at ? Date.parse(event.data.created_at) : NaN;
+  const createdAt = event.data?.created_at ? new Date(event.data.created_at).getTime() : NaN;
   return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, args: c.args, ...(Number.isFinite(createdAt) ? { createdAt } : {}) }];
 }
 

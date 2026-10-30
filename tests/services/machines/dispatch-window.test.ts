@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { MachineGateway } from '../../../services/machines/gateway/gateway';
 import { silentLog } from '../../../services/machines/gateway/log';
-import { dispatchWindow } from '../../../services/machines/gateway/pacing';
+import { dispatchWindow, latestArrival } from '../../../services/machines/gateway/pacing';
 import { identOf, machineById, stationRole } from '../../../lib/machines/line';
 import { CHANNEL, OP, REPLY_STATUS, buildEnvelope, genericCodec, lineFilter, machineTopic, type MachineCommand } from '../../../lib/machines/protocol';
 import { MemoryBroker, MemoryEscalationFeed, MemoryMachineBus } from '../../../lib/machines/transport';
@@ -15,15 +15,27 @@ import { ROOT } from '../../helpers/machine-line-fixtures';
 const TTL = 60_000;
 
 describe('dispatch windows', () => {
-  it('counts rounds of the validity period from the row\'s creation, moving to the next round past its middle', () => {
+  it('counts rounds of the validity period from when the dispatch became due', () => {
     expect(dispatchWindow(0, 0, TTL)).toEqual({ round: 1, expiresAt: TTL });
-    expect(dispatchWindow(0, 29_000, TTL)).toEqual({ round: 1, expiresAt: TTL });
-    expect(dispatchWindow(0, 31_000, TTL)).toEqual({ round: 2, expiresAt: 2 * TTL });
-    expect(dispatchWindow(0, 95_000, TTL)).toEqual({ round: 3, expiresAt: 3 * TTL });
-    for (const now of [0, 29_000, 31_000, 95_000, 200_000]) {
-      const { expiresAt } = dispatchWindow(0, now, TTL);
-      expect(expiresAt - now).toBeGreaterThanOrEqual(TTL / 2);
+    expect(dispatchWindow(0, 59_000, TTL)).toEqual({ round: 1, expiresAt: TTL });
+    expect(dispatchWindow(0, 60_000, TTL)).toEqual({ round: 2, expiresAt: 2 * TTL });
+    expect(dispatchWindow(0, 125_000, TTL)).toEqual({ round: 3, expiresAt: 3 * TTL });
+    expect(dispatchWindow(5_000, 0, TTL)).toEqual({ round: 1, expiresAt: 5_000 + TTL });
+  });
+
+  it('begins a round only once the round before it has expired, so two never hold at once', () => {
+    for (let now = 0; now < 5 * TTL; now += 7_000) {
+      const { round, expiresAt } = dispatchWindow(0, now, TTL);
+      expect(expiresAt).toBeGreaterThan(now);
+      if (round > 1) expect(dispatchWindow(0, 0, TTL).expiresAt + (round - 2) * TTL).toBeLessThanOrEqual(now);
     }
+  });
+
+  it('takes a row\'s due time from its latest readable arrival', () => {
+    expect(latestArrival(undefined, '2026-10-30T10:00:00.000Z')).toBe(Date.parse('2026-10-30T10:00:00.000Z'));
+    expect(latestArrival(Date.parse('2026-10-30T10:00:05.000Z'), '2026-10-30T10:00:00.000Z')).toBe(Date.parse('2026-10-30T10:00:05.000Z'));
+    expect(latestArrival(7, 'not a time')).toBe(7);
+    expect(latestArrival(undefined, undefined)).toBeUndefined();
   });
 });
 

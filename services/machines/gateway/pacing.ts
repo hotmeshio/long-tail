@@ -32,21 +32,28 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
 
 /**
  * The validity round a dispatch belongs to. Rounds of one validity period count
- * from the row's creation, and a dispatch in the second half of a round takes
- * the next, so a machine always has at least half a period to start. Within a
- * round a dispatch sent again, by a retry, a restarted machine or a restarted
- * gateway, is the same command with the same arguments; a new round is a new
- * command, never an old one with changed arguments.
+ * from when the dispatch became due, and a round begins only when the one
+ * before it has expired, so a machine never holds two valid commands for one
+ * row. Within a round a dispatch sent again, by a retry, a restarted machine or
+ * a restarted gateway, is the same command with the same arguments; a new round
+ * is a new command, never an old one with changed arguments.
  */
-export function dispatchWindow(createdAt: number, now: number, ttlMs: number): { round: number; expiresAt: number } {
-  const round = Math.max(1, Math.floor((now - createdAt + ttlMs / 2) / ttlMs) + 1);
-  return { round, expiresAt: createdAt + round * ttlMs };
+export function dispatchWindow(dueAt: number, now: number, ttlMs: number): { round: number; expiresAt: number } {
+  const round = Math.max(1, Math.floor((now - dueAt) / ttlMs) + 1);
+  return { round, expiresAt: dueAt + round * ttlMs };
+}
+
+/** The later of a row's due time and an arrival's time; an unreadable time leaves it as it was. */
+export function latestArrival(dueAt: number | undefined, at: unknown): number | undefined {
+  const t = typeof at === 'string' ? Date.parse(at) : NaN;
+  if (!Number.isFinite(t)) return dueAt;
+  return dueAt === undefined ? t : Math.max(dueAt, t);
 }
 
 export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs: number): Action {
   const now = Date.now();
   row.createdAt ??= now;
-  const { round, expiresAt } = dispatchWindow(row.createdAt, now, dispatchTtlMs);
+  const { round, expiresAt } = dispatchWindow(row.dueAt ?? row.createdAt, now, dispatchTtlMs);
   return {
     kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id, round), args: dispatchArgs(row, expiresAt),
     ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { receivedOnAccept: true } : {}),

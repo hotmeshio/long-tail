@@ -54,10 +54,27 @@ function took(reply: CommandReply | null): boolean {
 /** Most command ids whose sends are counted; the oldest are forgotten first. */
 const SENT_REMEMBERED = 10_000;
 
+/** Ends a dispatch or command still running when the gateway stops; the next leader takes it up from the row. */
+export class GatewayStopped extends Error {
+  constructor() {
+    super('the gateway stopped');
+  }
+}
+
 export class Dispatcher {
   private readonly sent = new Map<string, number>();
+  private readonly stopping = new AbortController();
 
   constructor(private readonly d: DispatcherDeps) {}
+
+  /** Work still running sends nothing more and changes no row. */
+  stop(): void {
+    this.stopping.abort();
+  }
+
+  private live(): void {
+    if (this.stopping.signal.aborted) throw new GatewayStopped();
+  }
 
   /** This send's attempt number, and whether the machine may have the command already. */
   private countSend(cmdId: string, since?: number): { attempt: number; retry: boolean } {
@@ -70,6 +87,7 @@ export class Dispatcher {
 
   /** False when the codec has no message for the command. `since` is when the command's row was created. */
   async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<boolean> {
+    this.live();
     const wires = this.d.codec.encode(identFor(this.d.state, this.d.line, machineId), { cmdId, op, args, ...this.countSend(cmdId, since) });
     for (const wire of wires) await this.d.bus.publish(wire.topic, wire.payload);
     return wires.length > 0;
@@ -78,11 +96,13 @@ export class Dispatcher {
   /** Publish and wait for the reply, asking again with the same id; null when none came. */
   async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<CommandReply | null> {
     for (let attempt = 1; attempt <= this.d.dispatchAttempts; attempt++) {
+      this.live();
       const waiting = this.d.replies.wait(cmdId, this.d.replyTimeoutMs);
       if (!await this.publish(machineId, op, cmdId, args, since)) {
         this.d.replies.settle({ cmdId, status: COMMAND_STATUS.UNSUPPORTED, reason: `the line's codec has no ${op} command` });
       }
       const reply = await waiting;
+      this.live();
       if (reply) return reply;
     }
     return null;
@@ -109,7 +129,8 @@ export class Dispatcher {
     const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, this.d.replyTimeoutMs * this.d.dispatchAttempts);
     const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt);
     // Timers may fire a little early; the command must have expired before the row says no-reply.
-    if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1);
+    if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1, undefined, { signal: this.stopping.signal }).catch(() => undefined);
+    this.live();
     const outcome: CommandResolution = reply
       ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason }
       : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };
@@ -135,6 +156,7 @@ export class Dispatcher {
     const refused = replies.find((r) => r && !took(r));
     const silent = jobs.filter((_, i) => !replies[i]);
     const held = !refused && silent.length ? await this.heldJobs(a.machineId, a.cmdId) : null;
+    this.live();
     const reconciled = !!held && silent.every((j) => held.has(j.jobId));
     const row = state.get(a.rowId);
     if (!refused && (!silent.length || reconciled)) {
@@ -162,6 +184,7 @@ export class Dispatcher {
 
   /** The units were already at the machine: its acceptance completes the handoff. */
   private async received(a: DispatchAction): Promise<void> {
+    this.live();
     const units = (a.args.units as { unitId: string }[]).map((u) => u.unitId);
     this.check(a.rowId, 'resolve', await this.d.lt.resolve(a.machineId, a.rowId, { received: true, receiver: a.machineId, units }));
     this.d.state.close(a.rowId);
@@ -169,6 +192,7 @@ export class Dispatcher {
 
   /** Ask a silent machine what it holds; null when it cannot say or does not answer in time. */
   private async heldJobs(machineId: string, cmdId: string): Promise<HeldJobs | null> {
+    this.live();
     const waiting = this.d.replies.waitSnapshot(machineId, this.d.replyTimeoutMs);
     if (!await this.publish(machineId, OP.SNAPSHOT, `${cmdId}:status`, {})) this.d.replies.settleSnapshot(machineId, null);
     return waiting;

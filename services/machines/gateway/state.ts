@@ -33,8 +33,10 @@ export interface HandoffRow extends HandoffFacets {
   noted?: string[];
   /** Parked with a limit on its items, which lifecycle notes must never use up. */
   capped?: boolean;
-  /** When the row was created (epoch ms); its dispatch windows count from here. */
+  /** When the row was created (epoch ms). */
   createdAt?: number;
+  /** When its last unit arrived (epoch ms, dispatch on arrival); its dispatch windows count from here, else from createdAt. */
+  dueAt?: number;
 }
 
 export interface AlarmTrack {
@@ -108,7 +110,10 @@ export class GatewayState {
     const existing = this.openRows.get(row.id);
     // An event may carry metadata older than what the gateway already wrote: keep both traces.
     this.openRows.set(row.id, existing
-      ? { ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals }
+      ? {
+        ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals,
+        dueAt: existing.dueAt, noted: existing.noted ?? row.noted,
+      }
       : row);
   }
 
@@ -195,10 +200,10 @@ export class GatewayState {
     }
   }
 
-  /** The open row an accepted dispatch command belongs to. */
+  /** The row a dispatch command belongs to, open or recently closed. */
   rowForDispatch(cmdId: string): HandoffRow | undefined {
     const rowId = this.dispatches.get(cmdId);
-    return rowId ? this.openRows.get(rowId) : undefined;
+    return rowId ? this.openRows.get(rowId) ?? this.closedRows.get(rowId) : undefined;
   }
 
   /** Track a machine-command row; false when it is already tracked or has ended. */

@@ -106,6 +106,7 @@ export class MachineGateway {
   async stop(): Promise<void> {
     if (this.quietTimer) clearInterval(this.quietTimer);
     this.executor.stop();
+    await this.executor.idle();
     await this.receipts.flush();
     await this.deps.feed.close();
     await this.deps.bus.close();

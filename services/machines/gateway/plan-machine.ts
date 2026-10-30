@@ -17,7 +17,7 @@ import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type E
 import { DISPOSITION } from '../../../lib/machines/transport';
 import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../types/escalation';
 import { CONTROLLER, type Action, type Plan } from './actions';
-import { dispatchAction } from './pacing';
+import { dispatchAction, latestArrival } from './pacing';
 import { failHandoff } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
 import { noteJobEvent, notePause, noteResume } from './lifecycle';
@@ -73,8 +73,9 @@ function ownsJob(jobId: string | null, reported: unknown): boolean {
 }
 
 /** Keep the receiver's arrival event for the unit, to go out with its dispatch. */
-function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>): HandoffRow {
+function withArrival(row: HandoffRow, unitId: string, b: Record<string, any>, at: string): HandoffRow {
   row.arrivals = { ...row.arrivals, [unitId]: b };
+  row.dueAt = latestArrival(row.dueAt, at);
   return row;
 }
 
@@ -112,13 +113,14 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     const early = row.fromMachine ? releasedEarly(state, row, unitId) : [];
     if (row.fromMachine) state.letGo(row.fromMachine, unitId);
     const units = row.units.map((u) => u.unitId);
+    const arrivedAt = at ?? new Date().toISOString();
     const complete = row.dispatch === DISPATCH_STATE.ARRIVING
-      ? { keys: units.map(itemKeys.arrived), then: [dispatchAction(withArrival(row, unitId, b), m, ttl)] }
+      ? { keys: units.map(itemKeys.arrived), then: [dispatchAction(withArrival(row, unitId, b, arrivedAt), m, ttl)] }
       : { keys: units.map(itemKeys.arrived), payload: { received: true, receiver: m, units } };
     return ack([...early, {
       kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.arrived(unitId),
       payload: {
-        unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: at ?? new Date().toISOString(),
+        unitId, carrierId: b.carrierId ?? null, from: b.peer ?? null, at: arrivedAt,
         ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { arrival: b } : {}),
       },
       complete,

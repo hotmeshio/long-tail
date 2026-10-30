@@ -67,4 +67,32 @@ describe('line leadership', () => {
     await until(() => log.length === 1, 5_000);
     expect(lost).toEqual(['the database system is not yet accepting connections', 'the database system is not yet accepting connections']);
   });
+
+  it('never leads when stopped while its connection was still opening', async () => {
+    const log: string[] = [];
+    const l = new LineLeadership(`test-line-stop-early-${Date.now()}`, {
+      connect: async () => { await sleep(100); return getPool().connect(); },
+    });
+    void l.run(async () => { log.push('leading'); }, async () => undefined);
+    await sleep(20);
+    await l.stop();
+    await sleep(250);
+    expect(log).toEqual([]);
+  });
+
+  it('lets the lock go only after the lost leader has stopped', async () => {
+    const key = `test-line-lost-${Date.now()}`;
+    const log: string[] = [];
+    let finishStopping!: () => void;
+    const stopping = new Promise<void>((r) => { finishStopping = r; });
+    const first = new LineLeadership(key, { retryMs: 60_000 });
+    held.push(first);
+    void first.run(async () => { log.push('first'); throw new Error('reconcile failed'); }, async () => { log.push('first stopping'); await stopping; });
+    await until(() => log.includes('first stopping'), 5_000);
+    contender(key, log, 'second');
+    await sleep(300);
+    expect(log).toEqual(['first', 'first stopping']);
+    finishStopping();
+    await until(() => log.includes('second'), 5_000);
+  });
 });

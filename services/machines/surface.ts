@@ -41,6 +41,8 @@ export function surfaceConfig(env: Env): MachineLineConfig {
 
 class LineRun {
   private gateway?: MachineGateway;
+  private leading?: Promise<void>;
+  private stopped = false;
   private readonly leadership: LineLeadership;
 
   constructor(private readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog) {
@@ -50,14 +52,17 @@ class LineRun {
   start(): void {
     const where = { site: this.line.siteId, line: this.line.lineId };
     this.log.info(GATEWAY_LOG.STANDBY, where);
-    this.leadership.run(() => this.lead(), async (err) => {
+    this.leadership.run(() => (this.leading = this.lead()), async (err) => {
       this.log.warn(GATEWAY_LOG.LEADERSHIP_LOST, { ...where, error: err.message });
       await this.gateway?.stop();
       this.gateway = undefined;
     }).catch((err) => this.log.error(GATEWAY_LOG.START_FAILED, { ...where, error: err.message }));
   }
 
+  /** A gateway still starting finishes first, so none is left running after stop. */
   async stop(): Promise<void> {
+    this.stopped = true;
+    await this.leading?.catch(() => undefined);
     await this.gateway?.stop();
     await this.leadership.stop();
   }
@@ -65,6 +70,7 @@ class LineRun {
   private async lead(): Promise<void> {
     // 1. Identities, 2. gateway on the line's bus and feed, 3. reconcile and consume (gateway.start)
     const ids = await ensureLineBots(this.line);
+    if (this.stopped) return;
     const userFor = (as: string) => {
       const id = ids.get(as);
       if (!id) throw new Error(`no bot for "${as}" on ${this.line.siteId}/${this.line.lineId}`);

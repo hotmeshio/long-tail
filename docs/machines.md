@@ -171,7 +171,7 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
 | `unsupported` | Not a command a row may ask for, not a machine on this line, or a command the line's codec has no message for; nothing was sent |
 
-A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation; once a round has mostly passed, the command goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments.
+A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation, and a round begins only once the one before it has expired; a command sent in a later round goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments. Dispatches work the same way with `MACHINE_DISPATCH_TTL_MS`, counted from the row's creation, or for `dispatchOn: 'arrival'` from the last unit's arrival, so a machine never holds two valid commands for one row.
 
 The example's `machineCommand` workflow is this one step.
 
