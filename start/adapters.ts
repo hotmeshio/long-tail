@@ -63,7 +63,7 @@ export function registerAdapters(startConfig: LTStartConfig): void {
     }
   } else if (messaging.provider?.name === MESSAGING_KIND.NATS) {
     eventRegistry.register(new NatsEventAdapter({
-      pubsub: messaging.provider.pubsub, wsUrl: messaging.ws.url, wsProxy: messaging.ws.proxy, token: messaging.ws.token,
+      messaging: messaging.provider, wsUrl: messaging.ws.url, wsProxy: messaging.ws.proxy, token: messaging.ws.token,
       subjectPrefix: startConfig.events?.nats?.subjectPrefix,
     }));
   } else {

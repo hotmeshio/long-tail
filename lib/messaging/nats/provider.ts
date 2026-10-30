@@ -7,6 +7,8 @@
 import { connect, type NatsConnection, type Subscription } from 'nats';
 
 import type { LTMessage, LTMessagingProvider, LTPubSub, LTStreams, LTSubscription, Subject } from '../../../types/messaging';
+import { loggerRegistry } from '../../logger';
+import { MESSAGING_LOG } from '../constants';
 import { NatsStreams, payloadOf } from './streams';
 
 export interface NatsMessagingOptions {
@@ -64,15 +66,18 @@ export class NatsMessagingProvider implements LTMessagingProvider {
     this.durable = null;
   }
 
-  /** Streams when the account has JetStream; null when the server answers without it. */
+  /** Streams when the account has JetStream; null otherwise, and pub/sub still serves. */
   private async jetStream(nc: NatsConnection): Promise<LTStreams | null> {
     try {
       const jsm = await nc.jetstreamManager();
       await jsm.getAccountInfo();
       return new NatsStreams(jsm, nc.jetstream());
     } catch (err: any) {
-      if (/jetstream not enabled|503|no responders/i.test(String(err?.message ?? err?.code ?? ''))) return null;
-      throw err;
+      const reason = String(err?.message ?? err?.code ?? err);
+      if (!/jetstream not enabled|503|no responders/i.test(reason)) {
+        loggerRegistry.warn(`${MESSAGING_LOG.STREAMS_UNAVAILABLE} provider=${this.name} reason=${reason}`);
+      }
+      return null;
     }
   }
 

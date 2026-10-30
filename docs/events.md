@@ -199,7 +199,7 @@ The built-in `NatsEventAdapter` publishes events as JSON-encoded strings to NATS
 | `wsUrl`         | `process.env.NATS_WS_URL`                    | Public WebSocket URL for browsers |
 | `wsProxy`       |                                              | NATS WebSocket target that Long Tail proxies browsers to |
 | `subjectPrefix` | `lt.events`                                  | Prefix for NATS subject names    |
-| `pubsub`        |                                              | Long Tail's messaging; the adapter publishes over it instead of opening a connection of its own |
+| `messaging`     |                                              | Long Tail's messaging; the adapter publishes over it instead of opening a connection of its own, and skips publishing while it is disconnected |
 
 ### Subject Format
 

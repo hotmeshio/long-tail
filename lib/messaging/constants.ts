@@ -19,6 +19,7 @@ export const MESSAGING_LOG = {
   CONNECTED: 'messaging.provider.connected',
   DISCONNECTED: 'messaging.provider.disconnected',
   CONNECT_FAILED: 'messaging.provider.connect_failed',
+  STREAMS_UNAVAILABLE: 'messaging.provider.streams_unavailable',
 } as const;
 
 /** Subjects Long Tail itself publishes under. */
