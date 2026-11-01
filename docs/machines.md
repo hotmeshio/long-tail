@@ -86,7 +86,7 @@ The gateway dispatches to `toMachine` when the row is created, or, under a codec
 { received: true, receiver: 'cut-01', units: ['U1', 'U2'] }
 ```
 
-When a handoff ends without every unit (a failure, a timeout, a cancel), the gateway withdraws only the jobs none of whose units reached the receiver, so nothing queued for an absent unit runs later. A job some of whose units already arrived is under way: it stays, and what happens to it is the workflow's next decision. A workflow that wants it stopped parks a `cancel` command row (see Commands).
+When a handoff ends without every unit (a failure, a timeout, a cancel), the gateway withdraws only the jobs it sent whose units never reached the receiver, so nothing queued for an absent unit runs later; a job that never went out, because the row was waiting for room or for its units to arrive, leaves the receiver nothing to withdraw. A job some of whose units already arrived is under way: it stays, and what happens to it is the workflow's next decision. A workflow that wants it stopped parks a `cancel` command row (see Commands).
 
 `Machines.handoffProgress(units, items)` reads where a handoff's units stand from its items (a row's items, or `$accumulated` on a finished wait): `{ released, arrived, missing }`. A workflow reads it to decide what a split means for its own process.
 
