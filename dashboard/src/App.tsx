@@ -11,6 +11,7 @@ import { RequireRole } from './components/layout/RequireRole';
 import { RequireInvocable } from './components/layout/RequireInvocable';
 import { RequireAI } from './components/layout/RequireAI';
 import { RequireFeature } from './components/layout/RequireFeature';
+import { RequireMachines } from './components/layout/RequireMachines';
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
@@ -169,6 +170,14 @@ const FilesPage = lazy(() =>
 );
 const KnowledgePage = lazy(() =>
   import('./pages/knowledge').then((m) => ({ default: m.KnowledgePage })),
+);
+
+// Lines (ops and builder tiers, only when the deployment declares machine lines)
+const LinesPage = lazy(() =>
+  import('./pages/lines/LinesPage').then((m) => ({ default: m.LinesPage })),
+);
+const LinePage = lazy(() =>
+  import('./pages/lines/LinePage').then((m) => ({ default: m.LinePage })),
 );
 
 // Home page (overview)
@@ -380,6 +389,20 @@ const router = createBrowserRouter([
       { path: 'pace', element: <Lazy><OperationsPage /></Lazy> },
       { path: 'trends', element: <Lazy><OperationsPage /></Lazy> },
       { path: 'operations', element: <Navigate to="/pace" replace /> },
+
+      // Lines: the machine surface, reachable only when settings carry machines.
+      {
+        element: <RequireRole roleTypes={['admin', 'superadmin']} roleNames={['engineer']} />,
+        children: [
+          {
+            element: <RequireMachines />,
+            children: [
+              { path: 'lines', element: <Lazy><LinesPage /></Lazy> },
+              { path: 'lines/:siteId/:lineId', element: <Lazy><LinePage /></Lazy> },
+            ],
+          },
+        ],
+      },
 
       // Admin: Accounts (admin type, superadmin, or engineer — scoped view for non-builders)
       {
