@@ -8,7 +8,7 @@
 import { HANDOFF_ERROR, ROW_TYPE } from '../contracts';
 import type { OpenRowQuery } from '../rows';
 import { operatorRole, type LineDef } from '../../../lib/machines/line';
-import { JOB_EVENT, MESSAGE_KIND, type Inspection } from '../../../lib/machines/protocol';
+import { JOB_EVENT, MESSAGE_KIND, isUnreadableRead, type Inspection } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type InboundMessage } from '../../../lib/machines/transport';
 import type { WireAction } from '../../../types/machines-view';
 import type { Action } from './actions';
@@ -106,6 +106,11 @@ export async function holdViolation(ctx: AdmissionContext, msg: InboundMessage, 
 export function isArrival(seen: Inspection): boolean {
   const event = seen.body?.body?.event;
   return seen.parsed?.kind === MESSAGE_KIND.JOB && (event === JOB_EVENT.ARRIVED || event === JOB_EVENT.TRANSFER_FAILED);
+}
+
+/** An arrival that read no id at all: no row can ever claim it, so it goes to a person on its first delivery. */
+export function isUnreadableArrival(seen: Inspection): boolean {
+  return seen.parsed?.kind === MESSAGE_KIND.JOB && isUnreadableRead(seen.body?.body ?? {});
 }
 
 /**

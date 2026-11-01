@@ -11,7 +11,7 @@ import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
 import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
-import { admitSender, holdArrival, holdViolation, isArrival, type AdmissionContext, type Applied } from './admission';
+import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
@@ -286,8 +286,9 @@ export class MachineGateway {
       let applied = seen.violations.length && this.codec.strict
         ? await holdViolation(this.admission, msg, seen)
         : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
-      // An arrival still waiting for its row after every delivery is shown to a person instead.
-      if (applied.disposition === DISPOSITION.NAK && !applied.failed && msg.deliveries >= MAX_DELIVERIES && isArrival(seen)) {
+      // An arrival still waiting for its row after every delivery is shown to a person instead; one that read no id at once.
+      const waited = msg.deliveries >= MAX_DELIVERIES || isUnreadableArrival(seen);
+      if (applied.disposition === DISPOSITION.NAK && !applied.failed && waited && isArrival(seen)) {
         applied = await holdArrival(this.admission, msg, seen);
       }
       failed ||= applied.failed;

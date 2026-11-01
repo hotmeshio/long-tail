@@ -112,6 +112,11 @@ export function inspectMessage(root: string, topic: string, raw: string | Buffer
 /** Job events a receiver may report naming only the carrier it scanned. */
 const CARRIER_EVENTS: string[] = [JOB_EVENT.ARRIVED, JOB_EVENT.TRANSFER_FAILED];
 
+/** A receiver's report that it could read no id at all: a transfer failure on the read, naming no unit and no carrier. */
+export function isUnreadableRead(b: Record<string, any>): boolean {
+  return b.event === JOB_EVENT.TRANSFER_FAILED && b.failure === TRANSFER_FAILURE.UNREADABLE_ID && b.unitId === undefined && typeof b.carrierId !== 'string';
+}
+
 function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean): string[] {
   const out: string[] = [];
   const b: Record<string, any> = env.body ?? {};
@@ -120,8 +125,8 @@ function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean)
   if (s.site !== ident.siteId || s.line !== ident.lineId || s.machine !== ident.machineId) out.push('source disagrees with the topic');
   if (kind === MESSAGE_KIND.ALARM && b.alarmId !== key) out.push('alarmId disagrees with the topic');
   if (kind === MESSAGE_KIND.JOB) {
-    // A scan at a receiver may read only the carrier; every other job event names its unit and job.
-    const byCarrier = CARRIER_EVENTS.includes(b.event) && typeof b.carrierId === 'string';
+    // A scan at a receiver may read only the carrier, or nothing at all when the read failed; every other job event names its unit and job.
+    const byCarrier = CARRIER_EVENTS.includes(b.event) && (typeof b.carrierId === 'string' || isUnreadableRead(b));
     if (b.unitId === undefined && !byCarrier) out.push(`${b.event} without a unitId`);
     if (b.jobId === undefined && !byCarrier) out.push(`${b.event} without a jobId`);
     if (b.event === JOB_EVENT.FINISHED) {

@@ -4,6 +4,8 @@ import { CHANNEL, DISPATCH_ON, JOB_EVENT, TRANSFER_FAILURE, buildEnvelope, gener
 import { identOf, operatorRole } from '../../../lib/machines/line';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { HANDOFF_ERROR, ROW_TYPE } from '../../../services/machines/contracts';
+import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
+import { RecordingLog } from '../../../services/machines/testing/recording-log';
 import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 
@@ -11,6 +13,7 @@ let rig: LineRig;
 afterEach(async () => rig?.stop());
 
 const onArrival = { codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL }) };
+const strict = { codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL, strict: true }) };
 
 function scan(body: Record<string, unknown>): void {
   const ident = identOf(DEFAULT_LINE, 'press-01');
@@ -50,5 +53,32 @@ describe('an arrival no handoff expects', () => {
     await rig.lt.ended(row.id);
     await sleep(200);
     expect(unmatchedRows()).toHaveLength(0);
+  });
+});
+
+describe('an arrival that read no id at all', () => {
+  const unreadable = { event: JOB_EVENT.TRANSFER_FAILED, failure: TRANSFER_FAILURE.UNREADABLE_ID, carrierId: null };
+
+  it('goes to a person on its first delivery, under a strict codec too, with no violation held', async () => {
+    const log = new RecordingLog();
+    rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, { ...strict, log });
+    scan(unreadable);
+    await until(() => unmatchedRows().length === 1);
+    expect(unmatchedRows()[0].metadata).toMatchObject({ machineId: 'press-01', carrierId: null, unitId: null, event: JOB_EVENT.TRANSFER_FAILED });
+    expect(rig.lt.ofType(ROW_TYPE.CONTRACT_VIOLATION)).toHaveLength(0);
+    expect(log.of(GATEWAY_LOG.UNMATCHED)).toHaveLength(0);
+    expect(log.of(GATEWAY_LOG.CONTRACT_VIOLATION)).toHaveLength(0);
+  });
+
+  it('is shown once per machine until a person resolves it', async () => {
+    rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, strict);
+    scan(unreadable);
+    scan(unreadable);
+    await until(() => unmatchedRows().length === 1);
+    await sleep(200);
+    expect(unmatchedRows()).toHaveLength(1);
+    rig.lt.personResolves(unmatchedRows()[0].id, { decision: 'rescan' });
+    scan(unreadable);
+    await until(() => unmatchedRows().length === 2);
   });
 });

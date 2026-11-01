@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { CHANNEL, JOB_EVENT, alarmTopic, buildEnvelope, inspectMessage, machineTopic } from '../../../lib/machines/protocol';
+import { CHANNEL, JOB_EVENT, TRANSFER_FAILURE, alarmTopic, buildEnvelope, inspectMessage, machineTopic } from '../../../lib/machines/protocol';
 
 const ROOT = 'line/v1';
 const ident = { siteId: 'site-1', lineId: 'line-1', machineId: 'press-01' };
@@ -151,3 +151,19 @@ describe('contract: the least a machine must say', () => {
   });
 });
 
+
+describe('contract: a receiver that read no id', () => {
+  const topic = machineTopic(ROOT, ident, CHANNEL.JOB);
+
+  it('may report the failed read naming neither unit nor carrier', () => {
+    const unreadable = { event: JOB_EVENT.TRANSFER_FAILED, failure: TRANSFER_FAILURE.UNREADABLE_ID, carrierId: null, orderRef: 'ORD-1', recipe: null };
+    expect(inspectMessage(ROOT, topic, msg(unreadable)).violations).toEqual([]);
+  });
+
+  it('every other arrival without a unit names the carrier it read', () => {
+    const arrived = inspectMessage(ROOT, topic, msg({ event: JOB_EVENT.ARRIVED, carrierId: null, orderRef: 'ORD-1', recipe: null })).violations;
+    expect(arrived).toContain('arrived without a unitId');
+    const jam = inspectMessage(ROOT, topic, msg({ event: JOB_EVENT.TRANSFER_FAILED, failure: TRANSFER_FAILURE.JAM, carrierId: null, orderRef: 'ORD-1', recipe: null })).violations;
+    expect(jam).toContain('transfer-failed without a unitId');
+  });
+});
