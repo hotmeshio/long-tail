@@ -33,7 +33,14 @@ export interface MachineSurfaceOptions {
   callbacks?: CallbackEventAdapter;
   log?: GatewayLog;
   codec?: LineCodec;
+  /** A codec for one line, keyed `<siteId>/<lineId>`; every other line uses `codec`. */
+  codecs?: Record<string, LineCodec>;
   rows?: HandoffRowAdapter;
+}
+
+/** The codec a line runs on: its own, the surface's, or the generic line protocol. */
+export function codecFor(opts: Pick<MachineSurfaceOptions, 'codec' | 'codecs'>, config: MachineLineConfig, line: LineDef): LineCodec {
+  return opts.codecs?.[keyOf(line.siteId, line.lineId)] ?? opts.codec ?? defaultCodec(config, line);
 }
 
 /** A message to dry-run against a line. */
@@ -99,7 +106,7 @@ class LineRun {
 
   constructor(readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog) {
     this.leadership = new LineLeadership(`lt-machine-line:${line.siteId}/${line.lineId}`);
-    this.codec = opts.codec ?? defaultCodec(config, line);
+    this.codec = codecFor(opts, config, line);
   }
 
   start(): void {

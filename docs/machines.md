@@ -16,12 +16,13 @@ await start({
   machines: {
     lines: [Machines.loadLine('/etc/line.json')],   // code lines; [] when every line comes through the API
     codec: myCodec,     // optional: the machines' wire protocol (default: the generic line protocol)
+    codecs: { 'site-1/line-2': otherCodec },   // optional: a codec of its own for one line
     rows: myRows,       // optional: how your rows read as handoffs (default: the standard handoff facets)
   },
 });
 ```
 
-Transports come from the environment (see [Configuration](#configuration)). `mqtt` is an optional peer dependency; install it in the host when a line runs. Declaring `machines` opens the dashboard's [Lines view](#lines-view), with or without code lines.
+`codec` is the protocol every line speaks; `codecs` gives one line a protocol of its own, keyed `<siteId>/<lineId>`, so a print farm and a finishing line on different protocols run on one surface. A line declared through the API runs on `codec` unless `codecs` names it. Transports come from the environment (see [Configuration](#configuration)). `mqtt` is an optional peer dependency; install it in the host when a line runs. Declaring `machines` opens the dashboard's [Lines view](#lines-view), with or without code lines.
 
 The registry keeps each line's definition, who declared it (`source`: `code` or `api`), and a `version` that advances once per change. Ownership follows `configSource`, as roles do:
 
@@ -327,7 +328,7 @@ The built-in `long-tail-machines` server offers the same surface to agents, gate
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role. A row commands only the machine whose role it is on: cancelling a handoff withdraws the receiver's dispatch, and the sender's job is stopped only by a `cancel` command row on the sender's role.
-- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(lines, codec)` render the configuration from one line or several on the same broker and site NATS: one bridge identity per line, one gateway user allowed every line's streams, and each line's stations and controller in the ACL. The ACL takes its topics from the codec's channels.
+- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(lines, codec)` render the configuration from one line or several on the same broker and site NATS: one bridge identity per line, one gateway user allowed every line's streams, and each line's stations and controller in the ACL. The ACL takes its topics from the codec's channels. Lines on different protocols pass a resolver instead of one codec, `renderMosquittoAcl(lines, (line) => codecOf(line))`, and a `root` resolver to `renderSiteConf` and `renderMosquittoConf`, so each line's bridge, subjects and ACL follow its own codec.
 - **Machines that host their own broker:** the machine broker connects out to each machine's broker with a Mosquitto bridge, carrying the machine's messages in and its commands out under the machine's level of the line's topics, and its codec reads them there. The bridge's notification topic, kept on the machine broker, is the machine's presence. `examples/workflows/bambu-printer` does this for 3D printers.
 
 ### Learned addresses

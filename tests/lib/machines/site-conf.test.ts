@@ -32,3 +32,17 @@ describe('site NATS config', () => {
     expect(conf).not.toMatch(/leafnodes/);
   });
 });
+
+describe('lines under different roots', () => {
+  it('gives each line\'s bridge and the gateway the subjects of that line\'s root', () => {
+    const second = { ...DEFAULT_LINE, lineId: 'line-2' };
+    const two = renderSiteConf([DEFAULT_LINE, second], {
+      root: (line) => (line.lineId === 'line-2' ? 'cell/v2' : 'line/v1'),
+      gatewayUser: 'line-gateway', gatewayPassword: 'gwpw', certDir: '/etc/site/certs', storeDir: '/data',
+    });
+    expect(two).toContain('permissions: { publish: ["line.v1.site-1.line-1.>"], subscribe: { deny: [">"] } }');
+    expect(two).toContain('permissions: { publish: ["cell.v2.site-1.line-2.>"], subscribe: { deny: [">"] } }');
+    expect(two).toContain('subscribe: ["_INBOX.>","line.v1.site-1.line-1.>","cell.v2.site-1.line-2.>"] }');
+  });
+});
+
