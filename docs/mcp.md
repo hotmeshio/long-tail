@@ -11,6 +11,7 @@ Your agents speak MCP. Long Tail makes their tool calls durable and exposes huma
 - [Connecting an Agent to Long Tail](#connecting-an-agent-to-long-tail) — the `/mcp` endpoint, service accounts, multi-environment `.mcp.json`, example prompts
 - [Connecting Long Tail Instances](#connecting-long-tail-instances): one instance calling another's tools over MCP
 - [Human Queue Server](#human-queue-server) — escalation as MCP tools
+- [Machines Server](#machines-server): the machine surface as MCP tools
 - [Document Vision Server](#document-vision-server): AI tools as MCP tools
 - [Server Registration Lifecycle](#server-registration-lifecycle) — two paths, startup sequence, when things connect
 - [External MCP Servers](#external-mcp-servers) — Path B: dashboard/API registration
@@ -422,6 +423,23 @@ const work = await client.callTool({
 
 The Human Queue handles the people side. The Vision server handles the AI side, wrapping model capabilities as MCP tools.
 
+## Machines Server
+
+The machines server is a built-in MCP server over the [machine surface](machines.md): the lines a deployment runs, their health, the wire, and the registry that declares them. It is listed when `start({ machines })` runs a surface; without one its reads answer `declared: false`.
+
+### Tools
+
+| Tool | Purpose | Who |
+|------|---------|-----|
+| `list_machine_lines` | The lines index: every line with its health (machines, offline, quiet, alarms, people, work in flight), searched by site, line, machine, process, role or address, narrowed to a site or to lines needing attention, sorted and paged | any caller |
+| `get_machine_line` | One line as its leader sees it (links, held units, open rows, alarms, the last snapshot's jobs, contested claims), or `leading: false` from a replica standing by; always with the line's summary and the command ops its codec allows | any caller |
+| `inspect_machine_message` | A dry run of one wire message on the leader's state: what the codec reads and what the gateway would do, nothing applied | any caller |
+| `send_machine_command` | Parks a `machine-command` row on the machine's role as the caller, so that role's write access decides; the gateway resolves the row with the machine's reply, and reading the row gives the outcome | any caller |
+| `declare_machine_line` | Declares or updates a line in the registry: validated, versioned, its roles applied, run on every replica; a stale `version` is a conflict | administrators |
+| `retire_machine_line` | Removes a line from the registry; every replica stops it, its roles and bot accounts stay | administrators |
+
+Read-scoped callers (`mcp:read`, or a read-only exposure) see the three reads only. The tools mirror the [routes](machines.md#routes) under `/api/machines`.
+
 ## Document Vision Server
 
 The Vision server (`system/mcp-servers/vision.ts`, server ID `long-tail-vision`) wraps LLM vision calls as MCP tools. Zod schemas sit at module level, and `createVisionServer()` returns a fresh `McpServer` instance per call because the MCP SDK allows one transport per server. Full parameter reference: [Vision tools](api/mcp/vision.md).
@@ -826,6 +844,7 @@ Long Tail ships with built-in MCP servers. For descriptions, see the [architectu
 |--------|------|
 | `long-tail-db-query` | database, query, analytics |
 | `long-tail-human-queue` | escalation, human-queue, routing |
+| `long-tail-machines` | machines, lines, mqtt, factory |
 | `mcp-workflows-longtail` | workflows, compiled, deterministic |
 | `long-tail-workflow-compiler` | compilation, yaml, codegen |
 | `long-tail-translation` | translation, language, text-processing |

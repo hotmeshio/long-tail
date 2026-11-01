@@ -173,6 +173,7 @@ Long Tail ships with the following built-in servers:
 |--------|---------|
 | `long-tail-db-query` | Query tasks, escalations, process summaries, system health |
 | `long-tail-human-queue` | Route work to humans, check resolution, claim/resolve, escalate-and-wait |
+| `long-tail-machines` | The lines index with health, a line as its leader sees it, a wire dry run, machine-command rows, declare and retire lines |
 | `mcp-workflows-longtail` | Discover and invoke compiled workflow tools |
 | `long-tail-workflow-compiler` | Convert executions to YAML, deploy, list |
 | `long-tail-translation` | Translate content between languages |

@@ -216,7 +216,7 @@ Events are published to `{subjectPrefix}.{event.type}`. Every built-in type star
 | Knowledge | `lt.events.system.knowledge.<domain>.<action>` |
 | File | `lt.events.system.file.<action>` |
 
-A role is written as one subject token: each run of characters other than letters, digits, `_` and `-` becomes `-`. Subscribe to `lt.events.system.escalation.<role>.>` for one role's escalations.
+A role is written as one subject token: each run of characters other than letters, digits, `_` and `-` becomes `-`. Subscribe to `lt.events.system.escalation.<role>.>` for one role's escalations. The machine surface publishes under `lt.events.machine.` ([machine surface events](#machine-surface-events)).
 
 ### Usage
 
@@ -359,6 +359,39 @@ class WebhookEventAdapter implements LTEventAdapter {
   async disconnect(): Promise<void> {}
 }
 ```
+
+## Machine surface events
+
+A deployment that declares lines ([machines](machines.md)) publishes three event families under `machine.`, with the site, line and machine written as subject tokens the way roles are.
+
+| Event | Subject | Carries |
+|---|---|---|
+| Wire | `lt.events.machine.wire.<site>.<line>.<machine\|unknown>.<in\|out>` | One record per message a line's gateway reads (`in`) and per command, snapshot request or receipt it sends (`out`) |
+| Log | `lt.events.machine.log.<site>.<line>.<event>` | One per gateway log entry: its level, the event name and its context; `<event>` is the log event without its `machine_gateway.` prefix as one token |
+| Line | `lt.events.machine.line.<site>.<line>.<declared\|retired>` | A change to the line registry: the site, line, `source` (`code` or `api`), `version` and `action` |
+
+The wire record is the event's `data`:
+
+```typescript
+interface WireEvent {
+  type: 'machine.wire'; siteId: string; lineId: string; machineId: string | null; address: string | null;
+  direction: 'in' | 'out'; channel: string; topic: string; id: string | null; at: string; retained: boolean;
+  kind: 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'cmd' | 'reply' | 'receipt' | 'unknown';
+  event: string | null;    // job event, alarm action, command op, reply status
+  summary: string;         // one line from the kind, the event and the ids the body names
+  violations: string[];    // what the contract check found
+  actions: { verb: 'claim' | 'accumulate' | 'resolve' | 'create-row' | 'refuse' | 'hold' | 'unmatched' | 'unreadable' | 'ack' | 'none'; rowId?: string; itemKey?: string; detail?: string }[];
+  payload?: unknown;       // the raw wire payload
+}
+```
+
+`actions` is what the gateway did with the message: the verbs it performed on rows with their row ids (`claim`, `accumulate` with its `itemKey`, `resolve`, `create-row`), a verb Long Tail refused (`refuse`), a message held for a person under a strict codec (`hold`), one no row claimed (`unmatched`), one the codec or the planner could not read (`unreadable`), one admitted with nothing to do (`ack`), and `none` with a `detail` for everything else. Telemetry messages are many and join the wire record only with `MACHINE_WIRE_TELEMETRY=on`.
+
+A line event names a line and nothing more: each replica reads the registry row back and follows what the row says, so the row, never the event, decides whether a line runs.
+
+In a browser, builders receive every event whole. Anyone else receives `machine.wire` without `payload`, and `machine.log` and `machine.line` with their type and routing fields only, the same filter escalation events pass through on both the Socket.IO path and the NATS WebSocket proxy. A browser connected straight to a NATS WebSocket listener bypasses that filter, so production runs the proxy.
+
+The dashboard's line page subscribes to `lt.events.machine.wire.<site>.<line>.>`; the Lines index refreshes on `lt.events.machine.line.>` and `lt.events.machine.log.>`. A subscriber on `lt.events.>` sees all three families.
 
 ## When Events Fire
 

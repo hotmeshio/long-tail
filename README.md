@@ -67,7 +67,7 @@ Three kinds of resolver answer the same row:
 
 - **People**, on the [dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md): the role's versioned form is their UI.
 - **Systems and agents**, over the [API](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md) and MCP: the same find, claim and resolve verbs, as a service account.
-- **Machines**, over [MQTT](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md): a line's gateway claims and resolves as each machine, and the protocol lands on the row as data.
+- **Machines**, over [MQTT](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md): a line's gateway claims and resolves as each machine, and the protocol lands on the row as data; the dashboard's Lines view watches the wire, and lines are declared in code or through the API.
 
 Activities are plain functions:
 
@@ -253,7 +253,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](https
 | [Schema Enforcement](https://github.com/hotmeshio/long-tail/blob/main/docs/schema-enforcement.md) | form_schema as an enforced API contract on every resolve surface |
 | [Code-Owned Configuration](https://github.com/hotmeshio/long-tail/blob/main/docs/code-owned-configuration.md) | `configSource` — declared config compared and applied at every boot |
 | [Faceted Routing](https://github.com/hotmeshio/long-tail/blob/main/docs/faceted-routing.md) | Query and atomically claim the queue by facets; dispatcher pattern |
-| [Machines](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md) | `start({ machines })`: machines resolve escalation rows over MQTT, as people do with forms |
+| [Machines](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md) | `start({ machines })`: machines resolve escalation rows over MQTT, as people do with forms; the Lines view, the line registry API and the machines MCP server |
 | [SDK](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](https://github.com/hotmeshio/long-tail/blob/main/docs/architecture.md) | Project structure, conventions, discovery |
 | [Cloud](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |
