@@ -1,13 +1,15 @@
 /**
  * The gateway as a process: log in to Long Tail, make sure every machine has
- * its bot account, then join the line's bus and Long Tail's escalation feed.
+ * its bot account, then join each line's bus and Long Tail's escalation feed.
+ * MACHINE_LINE_CONFIG names one line or several; one gateway runs per line.
  */
 
 import { loadMachineLineConfig } from '../../../../services/machines/config';
-import { loadLine } from '../line';
+import { loadLines } from '../line';
 import { createEscalationFeed, createMachineBus } from '../../../../services/machines/select';
 import type { Actor } from '../../../../services/machines/gateway/actions';
 import { MachineGateway } from '../../../../services/machines/gateway/gateway';
+import type { LineDef } from '../../../../lib/machines/line';
 import { HttpLineEscalations, LtHttp } from '../../../../services/machines/gateway/lt-http';
 import { adminToken, provisionIdentities } from '../../../../services/machines/gateway/provision';
 
@@ -26,21 +28,16 @@ async function loginWhenReady(http: LtHttp): Promise<string> {
   }
 }
 
-async function main(): Promise<void> {
-  // 1. Config and line
-  const config = loadMachineLineConfig();
-  const line = loadLine(config.lineConfigPath);
-
-  // 2. Identities: one bot per machine plus the controller
-  const http = new LtHttp(config.ltBaseUrl);
-  const tokens = await provisionIdentities(http, await loginWhenReady(http), line);
+async function startLine(http: LtHttp, admin: string, config: ReturnType<typeof loadMachineLineConfig>, line: LineDef): Promise<MachineGateway> {
+  // 1. Identities: one bot per machine plus the controller
+  const tokens = await provisionIdentities(http, admin, line);
   const tokenFor = (as: Actor) => {
     const token = tokens.get(as);
     if (!token) throw new Error(`no Long Tail identity for "${as}" on ${line.siteId}/${line.lineId}`);
     return token;
   };
 
-  // 3. Bus, feed and gateway
+  // 2. Bus, feed and gateway
   const gateway = new MachineGateway({
     bus: createMachineBus(config, line),
     feed: createEscalationFeed(config, line),
@@ -53,13 +50,26 @@ async function main(): Promise<void> {
       offlineDebounceMs: config.offlineDebounceMs,
       dispatchTtlMs: config.dispatchTtlMs,
       quietMs: config.quietMs,
+      receiptDelayMs: config.receiptDelayMs,
+      lifecycle: config.lifecycle,
       progressStep: config.progressStep,
     },
   });
   await gateway.start();
+  return gateway;
+}
+
+async function main(): Promise<void> {
+  // 1. Config and lines, 2. one gateway per line
+  const config = loadMachineLineConfig();
+  const lines = loadLines(config.lineConfigPath);
+  const http = new LtHttp(config.ltBaseUrl);
+  const admin = await loginWhenReady(http);
+  const gateways: MachineGateway[] = [];
+  for (const line of lines) gateways.push(await startLine(http, admin, config, line));
 
   const stop = async () => {
-    await gateway.stop();
+    for (const gateway of gateways) await gateway.stop();
     process.exit(0);
   };
   process.once('SIGTERM', stop);

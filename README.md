@@ -63,6 +63,12 @@ The `reviewer` role owns a versioned form schema. The platform renders it as the
 
 Two surfaces, one model. A `proxyActivity` targets a machine: call it, get a result. `conditional` targets the external world — a reviewer, an operator, a factory cell. It suspends the workflow and writes a single escalation row carrying everything needed to route the work: the `role` that should act, its `type` and `priority`, and any `metadata` to display or filter on. People work that row through an RBAC-scoped surface — find it, claim it, resolve it — from the dashboard, the API, or MCP, and resolving it resumes the workflow exactly where it paused.
 
+Three kinds of resolver answer the same row:
+
+- **People**, on the [dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md): the role's versioned form is their UI.
+- **Systems and agents**, over the [API](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md) and MCP: the same find, claim and resolve verbs, as a service account.
+- **Machines**, over [MQTT](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md): a line's gateway claims and resolves as each machine, and the protocol lands on the row as data; the dashboard's Lines view watches the wire, and lines are declared in code or through the API.
+
 Activities are plain functions:
 
 ```typescript
@@ -76,7 +82,7 @@ export async function analyzeContent(content: string) {
 
 The non-deterministic queue has qualities the deterministic one never needed:
 
-- **RBAC is intrinsic.** The queue is a role; permission lives in the queue itself. Any member answers — a person in the dashboard, a service account through the API — and the workflow is indifferent to which.
+- **RBAC is intrinsic.** The queue is a role; permission lives in the queue itself. Any member answers — a person in the dashboard, a service account through the API, a machine over MQTT — and the workflow is indifferent to which.
 - **The form is data.** A versioned JSON Schema on the role renders the resolver's UI — fields, validation, conditionals, layout — with zero frontend code. Assign an escalation to one named user with self scope and you have a just-in-time form: one person, one item, one auditable edition.
 - **Claims are locks.** A claim is a TTL window with an extend prompt before it lapses and a resolve guard behind it — the platform rejects a submission against an expired claim atomically, in the same statement that settles the row. Stale work cannot land.
 - **Cancel is home.** Cancellation is a first-class settlement, not an exception. When the pressure no longer applies, the waiting flow sees `null` and reconciles to a modeled resting state. Handled is broader than resolved — timeout, cancel, and hop-onward are all endings the loop was built to reach.
@@ -170,6 +176,7 @@ const lt = await start({
   telemetry: { honeycomb: { apiKey: process.env.HNY } },
   logging: { pino: { level: 'info' } },
   maintenance: true,
+  machines: { lines: [Machines.loadLine('/etc/line.json')] },  // rows resolved over MQTT; the dashboard gains a Lines view
 });
 ```
 
@@ -246,7 +253,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](https
 | [Schema Enforcement](https://github.com/hotmeshio/long-tail/blob/main/docs/schema-enforcement.md) | form_schema as an enforced API contract on every resolve surface |
 | [Code-Owned Configuration](https://github.com/hotmeshio/long-tail/blob/main/docs/code-owned-configuration.md) | `configSource` — declared config compared and applied at every boot |
 | [Faceted Routing](https://github.com/hotmeshio/long-tail/blob/main/docs/faceted-routing.md) | Query and atomically claim the queue by facets; dispatcher pattern |
-| [Machines](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md) | `start({ machines })`: machines resolve escalation rows over MQTT, as people do with forms |
+| [Machines](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md) | `start({ machines })`: machines resolve escalation rows over MQTT, as people do with forms; the Lines view, the line registry API and the machines MCP server |
 | [SDK](https://github.com/hotmeshio/long-tail/blob/main/docs/sdk.md) | Embedded usage, `createClient`, event subscriptions |
 | [Architecture](https://github.com/hotmeshio/long-tail/blob/main/docs/architecture.md) | Project structure, conventions, discovery |
 | [Cloud](https://github.com/hotmeshio/long-tail/blob/main/docs/cloud.md) | AWS ECS, GCP Cloud Run, Docker |

@@ -185,5 +185,8 @@ CLAUDE.md
 # Planning and brainstorming docs (never checked in)
 /docs/donotcommit/
 
+# Local-only example work (never checked in)
+/examples/donotcommit/
+
 # Site deployment files from other branches (local only, never checked in)
 /deploy/

@@ -331,3 +331,4 @@ export type {
   MqttEndpoint,
 } from './machines';
 
+export type * from './machines-view';

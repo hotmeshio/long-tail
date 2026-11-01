@@ -7,5 +7,8 @@ export * from './gateway';
 export * from './roles';
 export * from './identities';
 export * from './surface';
+export * from './registry';
+export * from './registry-sync';
 export * from './rows';
 export * from '../../lib/machines';
+export type * from '../../types/machines-view';

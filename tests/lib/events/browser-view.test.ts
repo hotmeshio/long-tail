@@ -18,7 +18,19 @@ const milestone: LTEvent = {
   milestones: [{ name: 'ai_review', value: 'approved' }] as any, data: { result: 'secret' },
 };
 
+const lineChange: LTEvent = {
+  type: 'machine.line.site-1.line-1.declared', timestamp: 't', source: 'machine-gateway',
+  data: { siteId: 'site-1', lineId: 'line-1', source: 'api', version: 3, action: 'declared' },
+};
+
 describe('eventForViewer', () => {
+  it('a line change reaches anyone else as a routing type alone', () => {
+    const seen = eventForViewer(lineChange, { builder: false });
+    expect(seen.type).toBe(lineChange.type);
+    expect(seen).not.toHaveProperty('data');
+    expect(eventForViewer(lineChange, { builder: true })).toBe(lineChange);
+  });
+
   it('a builder receives events whole', () => {
     expect(eventForViewer(escalation, { builder: true })).toBe(escalation);
     expect(eventForViewer(milestone, { builder: true })).toBe(milestone);
@@ -33,6 +45,28 @@ describe('eventForViewer', () => {
   it('every other event arrives without data and milestones', () => {
     const seen = eventForViewer(milestone, { builder: false });
     expect(seen).toEqual({ type: 'system.milestone.wf-1', timestamp: 't', workflowId: 'wf-1' });
+  });
+});
+
+describe('machine wire events', () => {
+  const wire: LTEvent = {
+    type: 'machine.wire.site-1.line-1.press-01.in', timestamp: 't', source: 'machine-gateway',
+    data: {
+      type: 'machine.wire', siteId: 'site-1', lineId: 'line-1', machineId: 'press-01', direction: 'in', kind: 'job', event: 'arrived',
+      summary: 'job arrived U1', violations: [], actions: [{ verb: 'accumulate', rowId: 'h1', itemKey: 'arrived:U1' }],
+      payload: { v: '1', body: { event: 'arrived', unitId: 'U1', measurements: [{ name: 'secret', value: 1 }] } },
+    },
+  };
+
+  it('a builder receives the raw payload', () => {
+    expect(eventForViewer(wire, { builder: true })).toBe(wire);
+  });
+
+  it('anyone else receives the record without the payload', () => {
+    const seen = eventForViewer(wire, { builder: false });
+    expect(seen.data).not.toHaveProperty('payload');
+    expect(seen.data).toMatchObject({ kind: 'job', event: 'arrived', summary: 'job arrived U1', actions: [{ verb: 'accumulate', rowId: 'h1', itemKey: 'arrived:U1' }] });
+    expect(seen.type).toBe(wire.type);
   });
 });
 

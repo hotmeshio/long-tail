@@ -6,7 +6,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { ADDRESSING, loadLine as loadLineFrom, validateLine, type LineDef } from '../../../lib/machines/line';
+import { ADDRESSING, loadLine as loadLineFrom, loadLines as loadLinesFrom, validateLine, type LineDef } from '../../../lib/machines/line';
 
 export const DEMO_LINE_PATH = join(__dirname, 'demo-line.json');
 
@@ -15,6 +15,11 @@ export const DEFAULT_LINE: LineDef = loadLineFrom(DEMO_LINE_PATH);
 /** The line at `path`, or the demo line. */
 export function loadLine(path?: string): LineDef {
   return loadLineFrom(path, DEFAULT_LINE);
+}
+
+/** Every line in `paths` (comma-separated), or the demo line. */
+export function loadLines(paths?: string): LineDef[] {
+  return loadLinesFrom(paths, DEFAULT_LINE);
 }
 
 /** Station → the permanent address of the machine at it (MACHINE_LINE_ADDRESSES), for a line that learns them. */

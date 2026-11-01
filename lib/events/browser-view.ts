@@ -4,14 +4,16 @@ import type { LTUserStatus } from '../../types/user';
 /**
  * What a browser receives of an event. Builders receive events whole. Anyone
  * else receives enough to route and refresh: escalation events keep their
- * routing fields, and every other event arrives without `data` and
- * `milestones`. Full records are read through the scoped API, by id.
+ * routing fields, machine wire events keep everything but the raw payload,
+ * and every other event arrives without `data` and `milestones`. Full
+ * records are read through the scoped API, by id.
  *
  * Server-side consumers (agent triggers, callbacks) are unaffected: this view
  * applies only where events leave for a browser.
  */
 
 const ESCALATION_SUBJECT = 'system.escalation.';
+const MACHINE_WIRE_SUBJECT = 'machine.wire.';
 const ACTIVE_ACCOUNT: LTUserStatus = 'active';
 
 /** Escalation event fields a browser needs to route a refresh and follow a claim. */
@@ -36,6 +38,10 @@ export function eventForViewer(event: LTEvent, viewer: BrowserViewer): LTEvent {
       if (data[key] !== undefined) kept[key] = data[key];
     }
     return { ...rest, data: kept };
+  }
+  if (typeof event.type === 'string' && event.type.startsWith(MACHINE_WIRE_SUBJECT) && data) {
+    const { payload: _payload, ...wire } = data;
+    return { ...rest, data: wire };
   }
   return rest;
 }

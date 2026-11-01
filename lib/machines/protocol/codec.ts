@@ -79,6 +79,12 @@ export interface LineCodec {
    * no longer lists has cleared.
    */
   readonly retainedAlarms?: boolean;
+  /**
+   * Commands of the machines' own, beyond the line protocol's control ops, that a machine-command row
+   * may ask for. Each is sent through `encode` and the row resolves with the reply. Every entry is a
+   * non-empty string; the gateway refuses a codec whose entries are not.
+   */
+  readonly rowOps?: readonly string[];
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
@@ -88,6 +94,15 @@ export interface LineCodec {
    * machines that keep an outbox until confirmed. Absent: no receipts are sent.
    */
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];
+}
+
+/** The codec's own row ops, each a non-empty string; anything else is a misconfigured codec and throws. */
+export function declaredRowOps(codec: Pick<LineCodec, 'rowOps'>): readonly string[] {
+  const ops = codec.rowOps ?? [];
+  if (!Array.isArray(ops) || ops.some((op) => typeof op !== 'string' || !op)) {
+    throw new Error('codec.rowOps must be a list of non-empty strings');
+  }
+  return ops;
 }
 
 export const DISPATCH_ON = { CREATED: 'created', ARRIVAL: 'arrival' } as const;

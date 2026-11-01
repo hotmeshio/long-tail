@@ -41,7 +41,7 @@ const ENVELOPE = shape({
 const RECIPE = { anyOf: [shape({ id: STR, version: STR }), { type: 'null' }] };
 
 const BODY: Record<MessageKind, Schema> = {
-  [MESSAGE_KIND.PRESENCE]: shape({ online: BOOL, software: STR }, ['software']),
+  [MESSAGE_KIND.PRESENCE]: shape({ online: BOOL, software: STR, sessionId: STR, reason: STR }, ['software', 'sessionId', 'reason']),
   [MESSAGE_KIND.SNAPSHOT]: shape({
     bootId: STR, software: STR, mode: oneOf(MODE), enabled: BOOL, recipe: RECIPE,
     jobs: { type: 'array', items: shape({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
@@ -66,7 +66,7 @@ const BODY: Record<MessageKind, Schema> = {
   }),
   [MESSAGE_KIND.TELEMETRY]: shape({ readings: { type: 'object', additionalProperties: NUM } }),
   [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
-  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR }),
+  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR }, ['code']),
   [MESSAGE_KIND.REPORT]: { type: 'object' },
 };
 

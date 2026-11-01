@@ -50,6 +50,8 @@ export interface HandoffUnit {
   artifacts?: ArtifactRef[];
   /** Parameters for this unit alone, sent to the machine as given. */
   parameters?: Record<string, unknown>;
+  /** The host's references for this unit, by name; sent to the machine as given and searchable on the row. */
+  refs?: Record<string, string>;
 }
 
 /** Metadata on a handoff row. Everything a dispatch needs rides here. */
@@ -74,6 +76,8 @@ export interface HandoffFacets {
   attempt: number;
   /** Parameters for the job, sent to the machine as given; what they mean is between the host and its codec. */
   parameters?: Record<string, unknown>;
+  /** The host's references for the job, by name (an order, a batch, a ticket); sent to the machine as given and searchable on the row. */
+  refs?: Record<string, string>;
 }
 
 const RELEASED_PREFIX = 'released:';
@@ -172,8 +176,12 @@ export interface HandoffResolution {
   /** The machine that reported the error, when it is not the one resolving. */
   reportedBy?: string;
   errorCode?: HandoffErrorCode;
+  /** On `sender-rejected`, how the sender finished the unit: reject, hold, scrap or rework. */
+  result?: string;
   reason?: string | null;
   detail?: string;
+  /** The machine's structured code for a refusal or failure, when its reply carried one. */
+  code?: string;
 }
 
 /** Decisions on line-operator rows: failed handoffs, alarms, dark machines, contested registrations. */
@@ -234,6 +242,8 @@ export interface CommandResolution {
   op: string;
   status: CommandStatus;
   reason?: string;
+  /** The machine's structured code for the outcome, when its reply carried one. */
+  code?: string;
 }
 
 /** A row's dispatch command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */

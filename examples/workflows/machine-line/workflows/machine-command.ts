@@ -8,7 +8,6 @@
 import { conditional } from '../../../../services/orchestrator/condition';
 import { commandRow, type CommandTarget } from '../../../../services/machines/commands';
 import { COMMAND_STATUS, type CommandResolution } from '../../../../services/machines/contracts';
-import type { Op } from '../../../../lib/machines/protocol';
 import type { LTEnvelope } from '../../../../types';
 
 export const MACHINE_COMMAND_WORKFLOW = 'machineCommand';
@@ -16,7 +15,8 @@ export const MACHINE_COMMAND_WORKFLOW = 'machineCommand';
 export interface MachineCommandInput extends CommandTarget {
   /** Names this request; part of the signal key. */
   requestKey: string;
-  op: Op;
+  /** A control op, `snapshot`, or one the line's codec declares. */
+  op: string;
   args?: Record<string, unknown>;
   /** How long to wait for the row to resolve. */
   timeout?: string;

@@ -37,6 +37,13 @@ function paramsOf(v: unknown): Record<string, unknown> | undefined {
   return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : undefined;
 }
 
+/** Named references with string values; other values are dropped, and an empty set is no refs. */
+function refsOf(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const refs = Object.fromEntries(Object.entries(v as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
+  return Object.keys(refs).length ? refs : undefined;
+}
+
 function artifactOf(v: any): ArtifactRef | undefined {
   if (!v || typeof v.url !== 'string' || !v.url || typeof v.sha256 !== 'string' || !v.sha256) return undefined;
   return {
@@ -58,9 +65,10 @@ function unitsOf(v: unknown): HandoffUnit[] {
     const artifact = artifactOf(u.artifact);
     const artifacts = artifactsOf(u.artifacts);
     const parameters = paramsOf(u.parameters);
+    const refs = refsOf(u.refs);
     return {
       unitId: String(u.unitId), carrierId: str(u.carrierId),
-      ...(artifact ? { artifact } : {}), ...(artifacts ? { artifacts } : {}), ...(parameters ? { parameters } : {}),
+      ...(artifact ? { artifact } : {}), ...(artifacts ? { artifacts } : {}), ...(parameters ? { parameters } : {}), ...(refs ? { refs } : {}),
     };
   });
 }
@@ -85,6 +93,7 @@ export function readHandoffFacets(md: Record<string, any> = {}): HandoffFacets |
     artifactSha256: str(md.artifactSha256),
     attempt: Number(md.attempt ?? 1),
     ...(paramsOf(md.parameters) ? { parameters: paramsOf(md.parameters) } : {}),
+    ...(refsOf(md.refs) ? { refs: refsOf(md.refs) } : {}),
   };
 }
 

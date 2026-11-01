@@ -24,6 +24,8 @@ interface FilterBarProps {
   actions?: ReactNode;
   /** Count for the folded Filters button's badge (active, non-default filters). */
   activeFilterCount?: number;
+  /** Inside a boxed section: a plain header row with a bottom rule, nothing sticky, no band of its own. */
+  embedded?: boolean;
 }
 
 /**
@@ -60,7 +62,7 @@ function LiveChildren({ store }: { store: { current: LiveChildrenStore } }) {
   return <>{children}</>;
 }
 
-export function FilterBar({ children, actions, activeFilterCount }: FilterBarProps) {
+export function FilterBar({ children, actions, activeFilterCount, embedded = false }: FilterBarProps) {
   // Outside the shell (tests, standalone surfaces) there is no panel to fold
   // into — the fold button becomes inert and inline mode carries the day.
   const shellPanel = useShellPanelOptional();
@@ -100,8 +102,8 @@ export function FilterBar({ children, actions, activeFilterCount }: FilterBarPro
   useEffect(() => () => closePanel?.(FILTERS_PANEL_KEY), [closePanel]);
 
   return (
-    <div className="sticky top-0 z-20 bg-surface pt-3 pb-3">
-      <div className="bg-surface-sunken border border-surface-border rounded-[var(--lt-radius-section)] px-4 py-2.5 @container/filters">
+    <div className={embedded ? 'shrink-0' : 'sticky top-0 z-20 bg-surface pt-3 pb-3'}>
+      <div className={`@container/filters ${embedded ? 'px-3 py-2 border-b border-surface-border' : 'bg-surface-sunken border border-surface-border rounded-[var(--lt-radius-section)] px-4 py-2.5'}`}>
         {/* One row, one actions slot. The children swap geometry: inline
             controls at @filters width, one Filters button below it. */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">

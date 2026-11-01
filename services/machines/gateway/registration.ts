@@ -111,7 +111,7 @@ export function planRegistrationRow(state: GatewayState, line: LineDef, event: E
   const md = event.data?.metadata ?? {};
   if (typeof md.machineId !== 'string' || typeof md.address !== 'string') return [];
   if (event.verb === 'created') {
-    state.raiseClaim(md.address, md.machineId);
+    state.raiseClaim(md.address, md.machineId, event.escalationId);
     return [];
   }
   state.settleClaim(md.address, md.machineId);

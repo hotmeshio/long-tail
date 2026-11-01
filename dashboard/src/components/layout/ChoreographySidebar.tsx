@@ -1,4 +1,4 @@
-import { Zap, Bot, Radio, Gauge, TrendingUp } from 'lucide-react';
+import { Zap, Bot, Radio, Gauge, TrendingUp, Factory } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import type { ViewAsRole } from '../../lib/view-as';
 
@@ -22,6 +22,7 @@ export function ChoreographySidebar({
   isOps = false,
   viewAs = null,
   canSeePaceBoard = false,
+  showLines = false,
 }: {
   aiEnabled?: boolean;
   isBuilder?: boolean;
@@ -30,11 +31,15 @@ export function ChoreographySidebar({
   // The Pace Board is a cross-role view — admins and superadmins only. Engineers
   // are builders and see everything else here, but not this.
   canSeePaceBoard?: boolean;
+  // Lines are an opt-in surface: the entry renders only when the deployment
+  // declares machine lines, for the ops and builder tiers that read them.
+  showLines?: boolean;
 }) {
   const boardEntries: NavEntry[] = [
     { to: '/pace', label: 'Pace Board', icon: Gauge },
     { to: '/trends', label: 'Trend Board', icon: TrendingUp },
   ];
+  const lineEntries: NavEntry[] = showLines ? [{ to: '/lines', label: 'Lines', icon: Factory }] : [];
 
   // Operator or engineer view: their work lives in the Task Queues section
   // (shell) and the home Claimed card — but the Pace Board, when public,
@@ -45,12 +50,13 @@ export function ChoreographySidebar({
 
   if (!isBuilder) {
     // Admin/ops only (not builder) — pace board
-    return <SidebarNav heading="Monitor" entries={canSeePaceBoard ? boardEntries : []} />;
+    return <SidebarNav heading="Monitor" entries={[...(canSeePaceBoard ? boardEntries : []), ...lineEntries]} />;
   }
 
   // Full builder view — the Pace Board only for tiers that can read it.
   const entries: NavEntry[] = [
     ...(canSeePaceBoard ? boardEntries : []),
+    ...lineEntries,
     { to: '/topics', label: 'Event Topics', icon: Radio },
     { to: '/agents', label: aiEnabled ? 'Agents' : 'Automations', icon: Bot },
     { to: '/capabilities', label: 'Capabilities', icon: Zap },

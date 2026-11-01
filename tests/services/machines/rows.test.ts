@@ -46,6 +46,18 @@ describe('readHandoffFacets', () => {
     });
   });
 
+  it('keeps the job\'s and each unit\'s refs with string values, dropping the rest', () => {
+    const md = {
+      ...facetsFor(['U1', 'U2'], null, 'press-01'),
+      refs: { orderId: 'ORD-1', batch: 7, ticket: null },
+      units: [{ unitId: 'U1', carrierId: null, refs: { lineItem: 'LI-1' } }, { unitId: 'U2', carrierId: null, refs: { lineItem: 2 } }],
+    };
+    const facets = readHandoffFacets(md)!;
+    expect(facets.refs).toEqual({ orderId: 'ORD-1' });
+    expect(facets.units).toEqual([{ unitId: 'U1', carrierId: null, refs: { lineItem: 'LI-1' } }, { unitId: 'U2', carrierId: null }]);
+    expect(readHandoffFacets({ ...md, refs: ['ORD-1'] })).not.toHaveProperty('refs');
+  });
+
   it('is null without the line, the job or any unit', () => {
     const md = facetsFor('U1', null, 'press-01') as unknown as Record<string, any>;
     for (const key of ['siteId', 'lineId', 'jobId']) expect(readHandoffFacets({ ...md, [key]: undefined })).toBeNull();

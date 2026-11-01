@@ -39,7 +39,7 @@ Minting one manifest or the other per order is all it takes to run a share of or
 A handoff that ends without a receipt (refusal, no reply, jam, wrong carrier, unreadable id, reject, timeout) parks a `line-operator` row. Its `decisions` facet lists what the operator may choose:
 - For a failure in the move itself, the units are still on the line: `retry` dispatches the same hop again as a new job, `manual` hands them to a person from where they stopped, and `scrap` ends the route.
 - When the sender finished the units as reject, hold, scrap or rework, they are off the line for good: the row offers `manual` (a person takes them from the sender) and `scrap`. Any other answer gets a new row that says so.
-- A cancelled handoff first stops the sender's job with a `cancel` command row on the sender's role, so the units come to rest there, then asks the operator.
+- A cancelled handoff first stops the sender's job with a `stop` command row on the sender's role (the job is started work; its units are there), so the units come to rest there, then asks the operator. A partial arrival withdraws the receiver's job with a `cancel` row, since a job not every unit reached never started.
 
 ## Run it
 
@@ -50,11 +50,20 @@ MIX=50 UNITS=8 npm run machine:line       # half automated, half manual, same fa
 FAULT=jam npm run machine:line            # a jam at the first machine; the operator retries
 ```
 
-The machines override adds:
-- `machine-site`: development certificates, plus `site.conf`, `mosquitto.conf` and the broker ACL, all rendered from the line into the gitignored `deploy/machine-site/`;
-- `site-nats`: JetStream for the line's topics, a server of its own;
-- `machine-broker`: Mosquitto, MQTT 5 with client certificates, bridged into `site-nats`;
-- `machine-mock`: the simulated line, with drills on `:8090`.
+The machines override declares two sites, each with a line, on one broker and one site NATS: the factory line (`site-1/line-1`, [`factory-line.json`](factory-line.json)) and the south line (`site-2/line-1`, [`factory-line-south.json`](factory-line-south.json), three machines). `MACHINE_LINE_CONFIG` names both, separated by a comma; Long Tail leads both lines, and the dashboard's Lines view lists them. It adds:
+- `machine-site`: development certificates for every line's machines, controller and bridge, plus `site.conf`, `mosquitto.conf` and the broker ACL, all rendered from the lines into the gitignored `deploy/machine-site/`;
+- `site-nats`: JetStream for the lines' topics, a server of its own;
+- `machine-broker`: Mosquitto, MQTT 5 with client certificates, one bridge per line into `site-nats`;
+- `machine-mock`: the simulated factory line, with drills on `:8090`;
+- `machine-mock-south`: the simulated south line, with drills on `:8091`.
+
+The driver runs one line at a time; point it at the south line with its own manifests and drill server:
+
+```bash
+MACHINE_LINE_CONFIG=examples/workflows/machine-line/factory-line-south.json \
+MACHINE_MANIFESTS=examples/workflows/machine-line/route-manifests-south.json \
+SIM_URL=http://localhost:8091 npm run machine:line
+```
 
 ### Learned addresses
 
@@ -66,7 +75,7 @@ docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compos
 ```
 
 - Each mock machine speaks as its permanent address from [`factory-line-addresses.json`](factory-line-addresses.json), with a certificate whose common name is that address.
-- `machine-site` renders `line.json`, the line as Long Tail knows it (stations only, `addressing: "learned"`), and an ACL of `pattern` rules on `%u`.
+- `machine-site` renders `line.json`, the line as Long Tail knows it (stations only, `addressing: "learned"`), and an ACL of `pattern` rules on `%u`. This run is the factory line alone; the south mock stays out of it.
 - Long Tail binds each station to the machine that claims it as its first messages arrive, and keeps the binding on the station's bot account. The driver and its drills run unchanged.
 
 Long Tail runs the gateway in process. `--profile standalone-gateway` runs it as its own service over the HTTP API instead (`gateway/main.ts`). Adding the override to a stack that already ran needs `up -d --build -V` once, so the containers pick up the `mqtt` dependency. When a host port is taken, set `LT_NATS_PORT` and point the driver at it with `NATS_URL`.
@@ -82,9 +91,9 @@ The driver mints routes from either manifest and plays the people:
 
 | Path | What it holds |
 |---|---|
-| [`factory-line.json`](factory-line.json), [`demo-line.json`](demo-line.json) | The factory, and the small three-machine line the tests use |
+| [`factory-line.json`](factory-line.json), [`factory-line-south.json`](factory-line-south.json), [`demo-line.json`](demo-line.json) | The factory, the south site's line, and the small three-machine line the tests use |
 | [`factory-line-addresses.json`](factory-line-addresses.json) | Each factory station's machine address, for the learned-address run |
-| [`route-manifests.json`](route-manifests.json), [`manifests.ts`](manifests.ts) | The two manifests, the roles people work, the even percentage split |
+| [`route-manifests.json`](route-manifests.json), [`route-manifests-south.json`](route-manifests-south.json), [`manifests.ts`](manifests.ts) | The two manifests per line, the roles people work, the even percentage split |
 | [`workflows/`](workflows/) | `machineUnitRoute` and its pure route planning (machine and person steps); `machineCommand`, one step that asks a machine to start, stop, pause, resume or change over |
 | [`site/setup.ts`](site/setup.ts) | Certificates and broker configuration for the compose run |
 | [`mock/`](mock/) | The simulated line: machines speaking the generic protocol, with drills for jams, refusals, outages and restarts; [`mock/main.ts`](mock/main.ts) runs it as a process |

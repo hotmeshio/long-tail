@@ -1,9 +1,10 @@
 /**
  * Prepare the site: a development CA; server certificates for the machine
  * broker and the site NATS; client certificates for each machine, the
- * gateway and the bridge; and site.conf, mosquitto.conf and the broker ACL
- * rendered from the line. Certificates already on disk are kept; the
- * configuration is rendered again on every run.
+ * gateway and the bridge of every line; and site.conf, mosquitto.conf and
+ * the broker ACL rendered from the lines (MACHINE_LINE_CONFIG, one path or
+ * several). Certificates already on disk are kept; the configuration is
+ * rendered again on every run.
  *
  * With MACHINE_LINE_ADDRESSES (station → permanent address) the line learns
  * its addresses: each machine's certificate names its address as its CN, the
@@ -20,8 +21,8 @@ import { join } from 'path';
 import { loadMachineLineConfig } from '../../../../services/machines/config';
 import { clientIds, controllerId, identOf, type LineDef } from '../../../../lib/machines/line';
 import { clientIdOf } from '../../../../lib/machines/protocol/envelope';
-import { learnedLine, loadLine, readAddresses, withAddresses } from '../line';
-import { bridgeId, renderSiteConf } from '../../../../lib/machines/site/site-conf';
+import { learnedLine, loadLines, readAddresses, withAddresses } from '../line';
+import { bridgeId, linesOf, renderSiteConf, type Lines } from '../../../../lib/machines/site/site-conf';
 import { renderMosquittoAcl, renderMosquittoConf } from '../../../../lib/machines/site/mosquitto-conf';
 import { genericCodec, type LineCodec } from '../../../../lib/machines/protocol/codec';
 
@@ -52,8 +53,9 @@ export interface SiteOptions {
   brokerExtra?: string;
 }
 
-/** The development CA, server and client certificates, site.conf, and the broker's mosquitto.conf and ACL for `line`. */
-export function prepareSite(line: LineDef, opts: SiteOptions): { certDir: string } {
+/** The development CA, server and client certificates, site.conf, and the broker's mosquitto.conf and ACL for `lines`. */
+export function prepareSite(lines: Lines, opts: SiteOptions): { certDir: string } {
+  const list = linesOf(lines);
   // 1. Output directories
   const certDir = join(opts.dir, 'certs');
   const brokerDir = join(opts.dir, 'mosquitto');
@@ -66,38 +68,44 @@ export function prepareSite(line: LineDef, opts: SiteOptions): { certDir: string
   }
   issue(certDir, 'server', NATS_NAMES[0], `subjectAltName=${sansOf(NATS_NAMES)}\nextendedKeyUsage=serverAuth\n`);
   issue(certDir, 'broker', BROKER_NAMES[0], `subjectAltName=${sansOf(BROKER_NAMES)}\nextendedKeyUsage=serverAuth\n`);
-  for (const id of [...clientIds(line), controllerId(line), bridgeId(line)]) issue(certDir, id, id, 'extendedKeyUsage=clientAuth\n');
+  for (const line of list) {
+    for (const id of [...clientIds(line), controllerId(line), bridgeId(line)]) issue(certDir, id, id, 'extendedKeyUsage=clientAuth\n');
+  }
 
   // 3. site.conf for the site NATS, mosquitto.conf and acl for the machine broker
-  writeFileSync(join(opts.dir, 'site.conf'), renderSiteConf(line, {
+  writeFileSync(join(opts.dir, 'site.conf'), renderSiteConf(list, {
     root: opts.root,
     gatewayUser: process.env.MACHINE_SITE_NATS_USER ?? 'line-gateway',
     gatewayPassword: process.env.MACHINE_SITE_NATS_PASSWORD ?? 'dev_gateway_secret',
     certDir: process.env.MACHINE_SITE_CERT_MOUNT ?? '/etc/site/certs',
     storeDir: '/data',
   }));
-  const brokerConf = renderMosquittoConf(line, {
+  const brokerConf = renderMosquittoConf(list, {
     root: opts.root, certDir: '/certs', siteNats: process.env.MACHINE_SITE_NATS_MQTT ?? 'site-nats:8883', aclFile: '/mosquitto/config/acl',
   });
   writeFileSync(join(brokerDir, 'mosquitto.conf'), opts.brokerExtra ? `${brokerConf}\n${opts.brokerExtra}` : brokerConf);
-  writeFileSync(join(brokerDir, 'acl'), renderMosquittoAcl(line, opts.codec ?? genericCodec({ root: opts.root })));
+  writeFileSync(join(brokerDir, 'acl'), renderMosquittoAcl(list, opts.codec ?? genericCodec({ root: opts.root })));
   return { certDir };
 }
 
 function main(): void {
   const config = loadMachineLineConfig({ ...process.env, MACHINE_TRANSPORT: 'memory', MACHINE_ESCALATION_FEED: 'memory' });
   const addresses = readAddresses(process.env.MACHINE_LINE_ADDRESSES);
-  const machines = withAddresses(loadLine(config.lineConfigPath), addresses);
-  const line = addresses ? learnedLine(machines) : machines;
+  const machines = loadLines(config.lineConfigPath).map((line) => withAddresses(line, addresses));
+  const lines = addresses ? machines.map(learnedLine) : machines;
   const dir = process.env.MACHINE_SITE_DIR ?? 'deploy/machine-site';
-  const { certDir } = prepareSite(line, { dir, root: config.topicRoot });
+  const { certDir } = prepareSite(lines, { dir, root: config.topicRoot });
   // A machine whose address the line learns is known to the broker by its address alone.
   if (addresses) {
-    for (const m of machines.machines) issue(certDir, clientIdOf(identOf(machines, m.machineId)), m.address!, 'extendedKeyUsage=clientAuth\n');
-    writeFileSync(join(dir, 'line.json'), `${JSON.stringify(line, null, 2)}\n`);
+    for (const line of machines) {
+      for (const m of line.machines) issue(certDir, clientIdOf(identOf(line, m.machineId)), m.address!, 'extendedKeyUsage=clientAuth\n');
+    }
+    // The lines as Long Tail knows them: line.json for one line, one file per line otherwise.
+    if (lines.length === 1) writeFileSync(join(dir, 'line.json'), `${JSON.stringify(lines[0], null, 2)}\n`);
+    else for (const line of lines) writeFileSync(join(dir, `${line.siteId}-${line.lineId}.json`), `${JSON.stringify(line, null, 2)}\n`);
   }
-  const identities = (addresses ? machines.machines.length : clientIds(line).length) + 2;
-  console.log(JSON.stringify({ level: 'info', event: 'machine_site.ready', dir, identities, addressing: line.addressing ?? 'declared' }));
+  const identities = lines.reduce((n, line, i) => n + (addresses ? machines[i].machines.length : clientIds(line).length) + 2, 0);
+  console.log(JSON.stringify({ level: 'info', event: 'machine_site.ready', dir, lines: lines.map((l) => `${l.siteId}/${l.lineId}`), identities, addressing: lines[0].addressing ?? 'declared' }));
 }
 
 if (require.main === module) main();

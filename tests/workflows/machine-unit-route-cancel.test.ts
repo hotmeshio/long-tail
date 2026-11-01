@@ -10,8 +10,8 @@ import { OP } from '../../lib/machines/protocol';
 import { eventually, startWorkflowRig, type WorkflowRig } from '../helpers/machine-line-workflow-rig';
 
 // A cancelled handoff withdraws only the receiver's dispatch: a row commands
-// the machine whose role it is on. Stopping the sender's job is this
-// workflow's policy, through a cancel command row on the sender's role.
+// the machine whose role it is on. Stopping the sender's started job is this
+// workflow's policy, through a stop command row on the sender's role.
 
 let rig: WorkflowRig;
 beforeAll(async () => {
@@ -30,7 +30,7 @@ describe('machine unit route: a cancelled handoff', () => {
 
     await escalationService.cancelEscalation(intoCut.id);
     const stop = await rig.rowBySignal(signalKeys.jobStop(routeKey, 1, 1), 30_000);
-    expect(stop).toMatchObject({ type: 'machine-command', subtype: OP.CANCEL, role: machineRole(machineById(rig.line, 'press-01')) });
+    expect(stop).toMatchObject({ type: 'machine-command', subtype: OP.STOP, role: machineRole(machineById(rig.line, 'press-01')) });
     expect((stop.metadata as any).args).toEqual({ jobId: senderJob });
     await eventually(async () => rig.harness.line.machine('press-01').cell.jobs.get(senderJob)?.status === 'done');
 

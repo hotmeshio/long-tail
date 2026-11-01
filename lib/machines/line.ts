@@ -1,6 +1,7 @@
 /**
  * The line: site, line and the machines on it, in route order, read from a
- * JSON file (MACHINE_LINE_CONFIG) or passed in by the host.
+ * JSON file or passed in by the host. MACHINE_LINE_CONFIG names one file, or
+ * several separated by commas.
  */
 
 import { readFileSync } from 'fs';
@@ -57,6 +58,20 @@ export function loadLine(path: string | undefined, fallback?: LineDef): LineDef 
     return validateLine(fallback);
   }
   return validateLine(JSON.parse(readFileSync(path, 'utf8')) as LineDef);
+}
+
+/** Every line in `paths`, a comma-separated list of JSON files (MACHINE_LINE_CONFIG); each site and line once. */
+export function loadLines(paths: string | undefined, fallback?: LineDef): LineDef[] {
+  const list = (paths ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (!list.length) return [loadLine(undefined, fallback)];
+  const lines = list.map((p) => loadLine(p));
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const key = `${line.siteId}/${line.lineId}`;
+    if (seen.has(key)) throw new Error(`line ${key} is declared twice in MACHINE_LINE_CONFIG`);
+    seen.add(key);
+  }
+  return lines;
 }
 
 export function identOf(line: LineDef, machineId: string): MachineIdent {

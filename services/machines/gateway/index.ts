@@ -8,3 +8,6 @@ export * from './provision';
 export * from './state';
 export * from './address-book';
 export * from './registration';
+export * from './wire';
+export * from './project';
+export * from './inspect';

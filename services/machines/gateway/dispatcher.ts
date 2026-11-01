@@ -12,7 +12,7 @@
 
 import { setTimeout as sleep } from 'timers/promises';
 
-import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, controlCommandId, type CommandResolution } from '../contracts';
+import { COMMAND_STATUS, HANDOFF_ERROR, cancelCommandId, controlCommandId, type CommandResolution, type HandoffResolution } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
 import { identFor } from './registration';
 import { OP, REPLY_STATUS, isoTs, type LineCodec } from '../../../lib/machines/protocol';
@@ -24,6 +24,7 @@ import { dispatchWindow } from './pacing';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { CommandReply, HeldJobs, ReplyWaiter } from './reply-waiter';
 import { DISPATCH_STATE, type GatewayState } from './state';
+import type { WireRecorder } from './wire';
 
 export interface DispatcherDeps {
   bus: MachineBus;
@@ -35,6 +36,8 @@ export interface DispatcherDeps {
   replyTimeoutMs: number;
   dispatchAttempts: number;
   log: GatewayLog;
+  /** Records each command the gateway sends, for the line's wire view. */
+  wire?: Pick<WireRecorder, 'command'>;
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
@@ -49,6 +52,11 @@ function fromMachine(reply: CommandReply | null): reply is CommandReply {
 /** The machine took the work: recorded it, or already has it ready. */
 function took(reply: CommandReply | null): boolean {
   return reply?.status === REPLY_STATUS.ACCEPTED || reply?.status === REPLY_STATUS.COMPLETED;
+}
+
+/** The reply's structured code for a resolution, when it carried one. */
+function withCode(reply: CommandReply): { code?: string } {
+  return reply.code ? { code: reply.code } : {};
 }
 
 /** Most command ids whose sends are counted; the oldest are forgotten first. */
@@ -88,8 +96,13 @@ export class Dispatcher {
   /** False when the codec has no message for the command. `since` is when the command's row was created. */
   async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<boolean> {
     this.live();
-    const wires = this.d.codec.encode(identFor(this.d.state, this.d.line, machineId), { cmdId, op, args, ...this.countSend(cmdId, since) });
-    for (const wire of wires) await this.d.bus.publish(wire.topic, wire.payload);
+    const ident = identFor(this.d.state, this.d.line, machineId);
+    const command = { cmdId, op, args, ...this.countSend(cmdId, since) };
+    const wires = this.d.codec.encode(ident, command);
+    for (const wire of wires) {
+      await this.d.bus.publish(wire.topic, wire.payload);
+      this.d.wire?.command(ident, command, wire);
+    }
     return wires.length > 0;
   }
 
@@ -132,7 +145,7 @@ export class Dispatcher {
     if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1, undefined, { signal: this.stopping.signal }).catch(() => undefined);
     this.live();
     const outcome: CommandResolution = reply
-      ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason }
+      ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason, ...withCode(reply) }
       : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };
     const context = { row: a.rowId, machine: a.machineId, op: a.op, status: outcome.status, reason: outcome.reason };
     if (outcome.accepted) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
@@ -171,8 +184,8 @@ export class Dispatcher {
     if (!row) return;
     row.dispatch = DISPATCH_STATE.REFUSED;
     const unanswered = `${a.machineId} sent no reply after ${this.d.dispatchAttempts} attempts`;
-    const resolution = refused
-      ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${refused.status}: ${refused.reason}` }
+    const resolution: HandoffResolution = refused
+      ? { received: false, errorCode: HANDOFF_ERROR.DISPATCH_REFUSED, detail: `${a.machineId} ${refused.status}: ${refused.reason}`, ...withCode(refused) }
       : { received: false, errorCode: HANDOFF_ERROR.NO_REPLY, detail: held ? `${unanswered} and does not hold the job` : `${unanswered}; its state is unknown` };
     log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { row: a.rowId, machine: a.machineId, ...resolution });
     const ended = await lt.resolve(fromMachine(refused ?? null) ? a.machineId : CONTROLLER, a.rowId, resolution);

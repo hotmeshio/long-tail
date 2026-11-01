@@ -1,3 +1,5 @@
+import { publishMachineLogEvent } from '../../../lib/events/publish';
+
 export const GATEWAY_LOG = {
   STARTED: 'machine_gateway.started',
   RECONCILED: 'machine_gateway.reconciled',
@@ -46,3 +48,21 @@ export const consoleLog: GatewayLog = {
 };
 
 export const silentLog: GatewayLog = { info: () => undefined, warn: () => undefined, error: () => undefined };
+
+type LogLevel = 'info' | 'warn' | 'error';
+
+/** Each entry published as `machine.log.<site>.<line>.<event>` with its context, for the line's dashboard view. */
+export function eventsLog(line: { siteId: string; lineId: string }, publish: typeof publishMachineLogEvent = publishMachineLogEvent): GatewayLog {
+  const emit = (level: LogLevel) => (event: GatewayLogEvent, context?: Record<string, unknown>) => {
+    publish({ siteId: line.siteId, lineId: line.lineId, level, event, context }).catch(() => undefined);
+  };
+  return { info: emit('info'), warn: emit('warn'), error: emit('error') };
+}
+
+/** Every entry goes to each log in turn. */
+export function composeLogs(...logs: GatewayLog[]): GatewayLog {
+  const each = (level: LogLevel) => (event: GatewayLogEvent, context?: Record<string, unknown>) => {
+    for (const log of logs) log[level](event, context);
+  };
+  return { info: each('info'), warn: each('warn'), error: each('error') };
+}

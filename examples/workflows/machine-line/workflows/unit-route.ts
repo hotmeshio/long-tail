@@ -8,9 +8,10 @@
  * sender, so those rows offer only manual and scrap.
  *
  * What to do with split units is this workflow's policy, not the platform's:
- * it stops the receiver's job through a machine-command row, so the units that
- * arrived come to rest, and a person collects each group where it stopped. A
- * cancelled handoff stops the sender's job the same way.
+ * it withdraws the receiver's job through a machine-command row (`cancel`: the
+ * job never started, since not every unit arrived), so the units that arrived
+ * come to rest, and a person collects each group where it stopped. A cancelled
+ * handoff stops the sender's started job the same way (`stop` with the job).
  */
 
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
@@ -40,12 +41,12 @@ async function handoff(input: UnitRouteInput, hop: Hop, attempt: number, senderA
   return readHopOutcome(result as Record<string, any> | null, input.units.map((u) => u.unitId));
 }
 
-/** Stop a station's job for the route, through a command row on its role, so the units there come to rest. */
-async function stopJob(input: UnitRouteInput, hop: Hop, attempt: number, step: RouteStep | null, jobAttempt: number): Promise<void> {
+/** End a station's job for the route through a command row on its role: `stop` for started work, `cancel` for a job still queued. */
+async function stopJob(input: UnitRouteInput, hop: Hop, attempt: number, step: RouteStep | null, jobAttempt: number, op: typeof OP.STOP | typeof OP.CANCEL): Promise<void> {
   if (!isMachineStep(step)) return;
   const target = { siteId: input.siteId, lineId: input.lineId, machineId: step.machineId, role: roleOf(input, step) };
   await conditional(signalKeys.jobStop(input.routeKey, hop.index, attempt), {
-    ...commandRow(target, OP.CANCEL, { jobId: jobIdFor(input.routeKey, step, jobAttempt) }),
+    ...commandRow(target, op, { jobId: jobIdFor(input.routeKey, step, jobAttempt) }),
     workflowType: UNIT_ROUTE_WORKFLOW,
   });
 }
@@ -110,11 +111,12 @@ export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
         senderAttempt = attempt;
         break;
       }
-      if (outcome.errorCode === HANDOFF_ERROR.CANCELLED) await stopJob(input, hop, attempt, hop.from, senderAttempt);
+      // The sender's job is started work: its units are there. The receiver's never started: not every unit arrived.
+      if (outcome.errorCode === HANDOFF_ERROR.CANCELLED) await stopJob(input, hop, attempt, hop.from, senderAttempt, OP.STOP);
       const { decision, note } = await askOperator(input, hop, attempt, senderAttempt, outcome);
       if (decision === DECISION.RETRY) continue;
       if (outcome.errorCode === HANDOFF_ERROR.PARTIAL_ARRIVAL && hop.to) {
-        await stopJob(input, hop, attempt, hop.to, attempt);
+        await stopJob(input, hop, attempt, hop.to, attempt, OP.CANCEL);
         if (decision === DECISION.SCRAP) return { type: 'return' as const, data: { status: 'scrapped', at: stationName(hop.from, 'entry'), note, history } };
         const pickups = await collectSplit(input, hops.length, splitGroups(input, hop, outcome));
         return { type: 'return' as const, data: { status: 'manual', at: stationName(hop.from, 'entry'), received: pickups.every((p) => p.received), pickups, note, history } };

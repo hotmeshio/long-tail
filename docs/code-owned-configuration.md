@@ -66,6 +66,7 @@ The domain dictionary's override lives beside its declaration:
 | Scan schemes | `scanSchemes[]` | whole scheme + its rules (one ownership unit; `enabled` is declarative here) | — |
 | Domain dictionary | `mcp.domainDictionary` (inline) or `mcp.domainDictionaryPath` | whole document (version bumps once per change) | — |
 | Graph workflows | `graphWorkflows[]` | always compare-and-apply: description/schema sync, redeploy on YAML version bump | run history |
+| Machine lines | `machines.lines[]` | the whole line definition (`lt_machine_lines`; version bumps once per change) | lines declared through the API, their bot accounts, their rows |
 
 `certified` on a workflow profile is explicit-only under code ownership: an
 omitted flag registers the workflow as **not** certified. (The db-owned seed
@@ -133,6 +134,10 @@ declaration are reported as `version/category` orphans. The pass runs whether
 or not the dashboard scan affordances (`features.scanCodes`) are enabled —
 declaring schemes states intent.
 
+## Machine lines
+
+Lines ([machines](machines.md#declaration)) follow the dial too. Each row of `lt_machine_lines` keeps the line's definition, who declared it (`source`: `code` from `start({ machines })`, `api` from `PUT /api/machines/lines/:siteId/:lineId`), and a `version` that advances once per change. Db-owned, a code line is inserted when absent and left as it is afterwards, with a drift warning when the declaration differs. Code-owned, a code line is written whenever its declaration differs, advancing the version once, and dashboard or API edits to it are replaced at the next deploy. Boot then runs every enabled line the registry holds, code and API lines alike, and never deletes one: a line declared in code before and not now is reported and left standing, and a line leaves the registry only through `DELETE /api/machines/lines/:siteId/:lineId`.
+
 ## The boot report
 
 Each surface logs one line summarizing its pass:
@@ -140,6 +145,7 @@ Each surface logs one line summarizing its pass:
 ```
 [long-tail] config apply (workflows): applied 2, unchanged 31, db-owned 0
 [long-tail] config apply (roles): applied 1, unchanged 11, db-owned 0, orphans: [old-station]
+[lt-machines] lines: applied 2, unchanged 0, db-owned 0
 ```
 
 Orphans — database records of a declared surface with no matching declaration

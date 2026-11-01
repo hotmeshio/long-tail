@@ -32,6 +32,18 @@ describe('dispatch: parameters and per-unit files', () => {
     ]);
   });
 
+  it('the job\'s refs and each unit\'s reach the machine with the dispatch', async () => {
+    rig = await startRig();
+    const row = rig.lt.park(stationRole('bond'), {
+      ...facetsFor('V1', null, 'press-01'), refs: { orderId: 'ORD-9', batch: 'B-2' },
+      units: [{ unitId: 'V1', carrierId: 'CR-V1', refs: { lineItem: 'LI-4' } }],
+    });
+    expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ received: true });
+    const [dispatch] = rig.recorder.commands('press-01', OP.DISPATCH);
+    expect(dispatch.args.refs).toEqual({ orderId: 'ORD-9', batch: 'B-2' });
+    expect(dispatch.args.units[0].refs).toEqual({ lineItem: 'LI-4' });
+  });
+
   it('one unit\'s file failing its checksum fails the dispatch, naming the unit', async () => {
     rig = await startRig();
     const good = rig.line.payloads.put(Buffer.from('model Q1'));

@@ -51,6 +51,7 @@ function ShellLayout() {
   setDisplayTimeZone(settings?.display?.timeZone);
   const aiOverride = getAiOverride();
   const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
+  const showLines = !!settings?.machines;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -113,7 +114,7 @@ function ShellLayout() {
         >
           {/* Nav */}
           <nav className="flex-1 px-3 pt-[36px] pb-4 space-y-2 overflow-y-auto overflow-x-hidden">
-            <ShellNavSections aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
+            <ShellNavSections aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} showLines={showLines} />
           </nav>
 
           {/* Collapse / Expand toggle */}
@@ -171,6 +172,7 @@ function ShellLayout() {
           isOps={isOps}
           viewAs={viewAs}
           canSeePaceBoard={canSeePaceBoard}
+          showLines={showLines}
         />
       )}
 

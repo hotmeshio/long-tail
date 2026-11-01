@@ -37,9 +37,26 @@ export interface ArmedResult {
   reason?: string;
 }
 
-export type Reply = { status: ReplyStatus; reason: string };
+export type Reply = { status: ReplyStatus; reason: string; code?: string };
+/** Why a machine will not do something, with its structured code. */
+export type Refusal = { reason: string; code: string };
+
+/** Structured codes the mock puts on a refused or failed reply, beside the reason text. */
+export const REFUSAL_CODE = {
+  EXPIRED: 'expired',
+  UNKNOWN_OP: 'unknown-op',
+  MISSING_ARGS: 'missing-args',
+  MODE: 'mode',
+  RECIPE_NOT_HELD: 'recipe-not-held',
+  JOB_STATE: 'job-state',
+  QUEUE_FULL: 'queue-full',
+  ARTIFACT: 'artifact',
+  UNKNOWN_JOB: 'unknown-job',
+  NO_ALARM: 'no-alarm',
+} as const;
 
 export const CANCELLED_REASON = 'cancelled';
+export const STOPPED_REASON = 'stopped';
 /** Modes in which a machine takes no new work. */
 const REFUSING_MODES: string[] = [MODE.MAINTENANCE, MODE.EMERGENCY_STOP];
 
@@ -64,25 +81,25 @@ export class Cell {
   async dispatch(a: Record<string, any>): Promise<Reply> {
     const missing = ['jobId', 'orderRef', 'recipe'].filter((k) => !a[k]);
     if (!Array.isArray(a.units) || a.units.length === 0) missing.push('units');
-    if (missing.length) return { status: REPLY_STATUS.REFUSED, reason: `missing ${missing.join(', ')}` };
-    if (REFUSING_MODES.includes(this.m.mode)) return { status: REPLY_STATUS.REFUSED, reason: `${this.m.def.machineId} is in ${this.m.mode}` };
+    if (missing.length) return { status: REPLY_STATUS.REFUSED, reason: `missing ${missing.join(', ')}`, code: REFUSAL_CODE.MISSING_ARGS };
+    if (REFUSING_MODES.includes(this.m.mode)) return { status: REPLY_STATUS.REFUSED, reason: `${this.m.def.machineId} is in ${this.m.mode}`, code: REFUSAL_CODE.MODE };
     const { id: recipeId, version } = a.recipe;
     if (!this.m.recipes[recipeId]?.includes(String(version))) {
-      return { status: REPLY_STATUS.REFUSED, reason: `recipe ${recipeId} v${version} is not held` };
+      return { status: REPLY_STATUS.REFUSED, reason: `recipe ${recipeId} v${version} is not held`, code: REFUSAL_CODE.RECIPE_NOT_HELD };
     }
     const existing = this.jobs.get(a.jobId);
     if (existing) {
-      if (existing.status !== JOB_STATUS.QUEUED) return { status: REPLY_STATUS.REFUSED, reason: `job ${a.jobId} is ${existing.status}` };
+      if (existing.status !== JOB_STATUS.QUEUED) return { status: REPLY_STATUS.REFUSED, reason: `job ${a.jobId} is ${existing.status}`, code: REFUSAL_CODE.JOB_STATE };
       this.expectUnits(existing);
       return { status: REPLY_STATUS.ACCEPTED, reason: 'job already queued' };
     }
-    if (this.jobs.size >= this.m.settings.queueCapacity) return { status: REPLY_STATUS.REFUSED, reason: 'queue full' };
+    if (this.jobs.size >= this.m.settings.queueCapacity) return { status: REPLY_STATUS.REFUSED, reason: 'queue full', code: REFUSAL_CODE.QUEUE_FULL };
     const artifact = await this.m.payloads.verify(a.artifact?.url, a.artifact?.sha256);
-    if (!artifact.ok) return { status: REPLY_STATUS.FAILED, reason: artifact.detail };
+    if (!artifact.ok) return { status: REPLY_STATUS.FAILED, reason: artifact.detail, code: REFUSAL_CODE.ARTIFACT };
     for (const u of a.units) {
       if (!u.artifact) continue;
       const own = await this.m.payloads.verify(u.artifact.url, u.artifact.sha256);
-      if (!own.ok) return { status: REPLY_STATUS.FAILED, reason: `${u.unitId}: ${own.detail}` };
+      if (!own.ok) return { status: REPLY_STATUS.FAILED, reason: `${u.unitId}: ${own.detail}`, code: REFUSAL_CODE.ARTIFACT };
     }
     const job: Job = {
       jobId: a.jobId, orderRef: a.orderRef, recipe: { id: recipeId, version: String(version) }, from: a.from ?? null,
@@ -95,15 +112,24 @@ export class Cell {
     return { status: REPLY_STATUS.ACCEPTED, reason: `queued ${job.jobId}` };
   }
 
+  /** Stop: a running job stops at a safe point and finishes on hold; a job not running is refused. */
+  async stop(jobId: string): Promise<Reply> {
+    const job = this.jobs.get(jobId);
+    if (!job) return { status: REPLY_STATUS.REFUSED, reason: `unknown job ${jobId}`, code: REFUSAL_CODE.UNKNOWN_JOB };
+    if (job.status !== JOB_STATUS.RUNNING) return { status: REPLY_STATUS.REFUSED, reason: `job ${jobId} is ${job.status}`, code: REFUSAL_CODE.JOB_STATE };
+    await this.finish(job, { result: JOB_RESULT.HOLD, reason: STOPPED_REASON });
+    return { status: REPLY_STATUS.ACCEPTED, reason: `stopped ${jobId} at a safe point; units held` };
+  }
+
   /** Cancel: a queued job is withdrawn; a running one stops at a safe point and finishes on hold. */
   async cancel(jobId: string): Promise<Reply> {
     const job = this.jobs.get(jobId);
-    if (!job) return { status: REPLY_STATUS.REFUSED, reason: `unknown job ${jobId}` };
+    if (!job) return { status: REPLY_STATUS.REFUSED, reason: `unknown job ${jobId}`, code: REFUSAL_CODE.UNKNOWN_JOB };
     if (job.status === JOB_STATUS.RUNNING) {
       await this.finish(job, { result: JOB_RESULT.HOLD, reason: CANCELLED_REASON });
       return { status: REPLY_STATUS.ACCEPTED, reason: `stopped ${jobId} at a safe point; units held` };
     }
-    if (job.status !== JOB_STATUS.QUEUED) return { status: REPLY_STATUS.REFUSED, reason: `job ${jobId} is ${job.status}` };
+    if (job.status !== JOB_STATUS.QUEUED) return { status: REPLY_STATUS.REFUSED, reason: `job ${jobId} is ${job.status}`, code: REFUSAL_CODE.JOB_STATE };
     await this.withdraw(job);
     return { status: REPLY_STATUS.ACCEPTED, reason: `withdrew ${jobId}` };
   }

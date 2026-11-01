@@ -10,7 +10,7 @@
 
 import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
-import { CONTROL_OPS, OP, type Op } from '../../../lib/machines/protocol';
+import { CONTROL_OPS, OP } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
@@ -90,7 +90,8 @@ function commandRefusal(state: GatewayState, line: LineDef, c: CommandFacets, ro
   if (!onLine(line, c.machineId)) return `${c.machineId} is not on ${line.siteId}/${line.lineId}`;
   const own = machineRole(machineById(line, c.machineId));
   if (role !== own) return `commands for ${c.machineId} are parked on ${own}, not ${role}`;
-  if (!CONTROL_OPS.includes(c.op as Op)) return `${c.op} is not a command a row may ask for; one of ${CONTROL_OPS.join(', ')}`;
+  const allowed = rowOps(state);
+  if (!allowed.includes(c.op)) return `${c.op} is not a command a row may ask for; one of ${allowed.join(', ')}`;
   if (c.op === OP.CANCEL && typeof c.args.jobId !== 'string') return `${OP.CANCEL} needs args.jobId, the job to withdraw or stop`;
   if (!reachable(state, line, c.machineId)) return `${c.machineId} has not registered an address yet`;
   return null;
@@ -104,13 +105,18 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   }
   if (event.verb !== VERB.CREATED && event.verb !== VERB.CLAIMED) return [];
   const c = readCommandFacets(event.data?.metadata);
-  if (!c || !state.trackCommand(id)) return [];
+  if (!c || !state.trackCommand(id, c.machineId)) return [];
   const refusal = commandRefusal(state, line, c, event.role);
   if (refusal) {
     return [{ kind: 'resolve', as: CONTROLLER, rowId: id, payload: { accepted: false, machineId: c.machineId, op: c.op, status: COMMAND_STATUS.UNSUPPORTED, reason: refusal } }];
   }
   const createdAt = event.data?.created_at ? new Date(event.data.created_at).getTime() : NaN;
   return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, args: c.args, ...(Number.isFinite(createdAt) ? { createdAt } : {}) }];
+}
+
+/** The ops a machine-command row may ask for: the control ops, a snapshot, and the codec's own. */
+function rowOps(state: GatewayState): string[] {
+  return [...CONTROL_OPS, OP.SNAPSHOT, ...state.rowOps];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {

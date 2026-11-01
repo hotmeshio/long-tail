@@ -1,12 +1,12 @@
 /**
  * Commands as rows. A host asks a machine to start, stop, pause, resume,
- * change over or cancel a job by parking a machine-command row on the machine's role, from a
- * workflow step or through the API, the same way it asks a person for
+ * change over, cancel a job, report a snapshot, or do anything its codec
+ * declares (`rowOps`), by parking a machine-command row on the machine's role,
+ * from a workflow step or through the API, the same way it asks a person for
  * anything. The gateway sends the command and resolves the row with the
  * machine's reply (CommandResolution), so the step reads the outcome as data.
  */
 
-import type { Op } from '../../lib/machines/protocol';
 import { machineById, machineRole, type LineDef } from '../../lib/machines/line';
 import { ROW_TYPE, type CommandFacets } from './contracts';
 
@@ -23,7 +23,7 @@ export function commandTarget(line: LineDef, machineId: string): CommandTarget {
 }
 
 /** The row that asks a machine for `op`: pass it to conditional(), or create it through the API. */
-export function commandRow(target: CommandTarget, op: Op, args: Record<string, unknown> = {}) {
+export function commandRow(target: CommandTarget, op: string, args: Record<string, unknown> = {}) {
   const metadata: CommandFacets = { siteId: target.siteId, lineId: target.lineId, machineId: target.machineId, op, args };
   const recipe = args.recipe as { id?: string; version?: string } | undefined;
   return {

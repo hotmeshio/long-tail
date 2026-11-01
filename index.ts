@@ -4,7 +4,7 @@ import { midnightTheme } from './themes/midnight';
 
 import * as path from 'path';
 import { start } from './start';
-import { loadLine as loadMachineLine } from './lib/machines/line';
+import { loadLines as loadMachineLines } from './lib/machines/line';
 import type { LTMachinesConfig } from './types/startup';
 
 // ─── Package Exports ─────────────────────────────────────────────────────────
@@ -197,13 +197,17 @@ async function main() {
   });
 }
 
-/** The configured line, spoken to by the codec MACHINE_CODEC_MODULE names (its `createCodec(line)`), or the generic one. */
+/**
+ * The configured lines (MACHINE_LINE_CONFIG, one path or several), spoken to by
+ * the generic codec, or for one line by the codec MACHINE_CODEC_MODULE names (its `createCodec(line)`).
+ */
 function machinesFromEnv(lineConfig: string, codecModule?: string): LTMachinesConfig {
-  const line = loadMachineLine(lineConfig);
-  if (!codecModule) return { lines: [line] };
+  const lines = loadMachineLines(lineConfig);
+  if (!codecModule) return { lines };
+  if (lines.length > 1) throw new Error('MACHINE_CODEC_MODULE speaks for one line; MACHINE_LINE_CONFIG names several');
   const { createCodec } = require(path.resolve(codecModule));
   if (typeof createCodec !== 'function') throw new Error(`MACHINE_CODEC_MODULE=${codecModule} exports no createCodec(line)`);
-  return { lines: [line], codec: createCodec(line) };
+  return { lines, codec: createCodec(lines[0]) };
 }
 
 // Run server when executed directly

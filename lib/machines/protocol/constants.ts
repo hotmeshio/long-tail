@@ -89,7 +89,7 @@ export const OP = {
   CANCEL: 'cancel',
   /** Take work: begin or continue the queue. */
   START: 'start',
-  /** Finish the current unit, then take no more; the queue is kept. */
+  /** Finish the current unit, then take no more; the queue is kept. With `args.jobId`, stop that job at a safe point and hold its units. */
   STOP: 'stop',
   /** Halt at the next safe point, holding the current unit; nothing new starts. */
   PAUSE: 'pause',

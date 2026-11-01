@@ -20,6 +20,7 @@ import { CLAUDE_CODE_TOOLS } from './seed/tool-manifests-workflows';
 import { ADMIN_TOOLS } from './seed/tool-manifests-admin';
 import { KNOWLEDGE_TOOLS } from './seed/tool-manifests-knowledge';
 import { EVENTS_TOOLS } from './seed/tool-manifests-events';
+import { MACHINE_TOOLS } from './seed/tool-manifests-machines';
 
 // Example connectors — loaded conditionally (not in npm package)
 let GMAIL_TOOLS: any[] = [];
@@ -273,6 +274,19 @@ export const builtinMcpServerFactories: Record<string, McpServerFactoryEntry> = 
         'Exchange output: { status, data, headers, elapsed_ms, validated }. API response is in .data field. ' +
         'For auth, prefer credential_provider over manual token wiring.',
       toolManifest: SCHEMA_EXCHANGE_TOOLS,
+    },
+  },
+  'long-tail-machines': {
+    factory: () => import('./mcp-servers/machines').then((m) => m.createMachinesServer()),
+    config: {
+      description: 'The machine surface: the lines index with health, a line as its leader sees it, a wire message dry run, machine-command rows, and the registry\'s declare and retire.',
+      tags: ['machines', 'lines', 'mqtt', 'factory'],
+      category: 'Data',
+      compileHints:
+        'list_machine_lines answers which lines need attention; get_machine_line reads one line. ' +
+        'send_machine_command parks a machine-command row that the gateway resolves with the machine\'s reply; ' +
+        'read the row to learn the outcome. declare_machine_line and retire_machine_line change the registry and need admin.',
+      toolManifest: MACHINE_TOOLS,
     },
   },
   'long-tail-events': {

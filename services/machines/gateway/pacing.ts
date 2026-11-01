@@ -27,6 +27,7 @@ export function dispatchArgs(row: HandoffRow, expiresAt: number): Record<string,
     expiresAt: isoTs(expiresAt),
     ...(row.artifactUrl ? { artifact: { url: row.artifactUrl, sha256: row.artifactSha256 } } : {}),
     ...(row.parameters ? { parameters: row.parameters } : {}),
+    ...(row.refs ? { refs: row.refs } : {}),
   };
 }
 

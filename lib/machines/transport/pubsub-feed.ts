@@ -30,8 +30,12 @@ export class PubSubEscalationFeed implements EscalationFeed {
     });
   }
 
-  async close(): Promise<void> {
+  async unsubscribe(): Promise<void> {
     await this.sub?.close();
     await this.redelivery.stop();
+  }
+
+  async close(): Promise<void> {
+    await this.unsubscribe();
   }
 }

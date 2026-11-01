@@ -141,6 +141,8 @@ export interface MachineBus {
   /** Reliable delivery, so a command queues for a machine that is away. */
   publish(topic: string, payload: string, opts?: { retain?: boolean }): Promise<void>;
   retained(filter: string): Promise<InboundMessage[]>;
+  /** Stop delivering messages; a message still being handled finishes. Publishing stays open until close(). */
+  unsubscribe(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -157,6 +159,8 @@ export interface EscalationEvent {
 export interface EscalationFeed {
   connect(): Promise<void>;
   consume(handler: (event: EscalationEvent) => Promise<MachineDisposition>): Promise<void>;
+  /** Stop delivering events; an event still being handled finishes. */
+  unsubscribe(): Promise<void>;
   close(): Promise<void>;
 }
 

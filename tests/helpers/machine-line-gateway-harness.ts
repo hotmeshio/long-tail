@@ -48,7 +48,7 @@ export function facetsFor(units: string | string[], from: string | null, to: str
 }
 
 /** `gatewayLine`: the line as the gateway knows it, when it differs from the mock's (a line that learns addresses). */
-export type RigSeams = Pick<GatewayDeps, 'rows' | 'codec' | 'log' | 'addresses'> & { gatewayLine?: LineDef };
+export type RigSeams = Pick<GatewayDeps, 'rows' | 'codec' | 'log' | 'addresses' | 'wire'> & { gatewayLine?: LineDef };
 
 export async function startRig(
   mock: Partial<MockSettings> = {}, gw: Partial<GatewaySettings> = {}, line: LineDef = DEFAULT_LINE, seams: RigSeams = {},

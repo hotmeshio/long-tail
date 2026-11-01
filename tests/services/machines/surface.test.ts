@@ -20,8 +20,13 @@ describe('machine surface configuration', () => {
     expect(() => surfaceConfig({ MACHINE_TRANSPORT: 'memory' })).toThrow(/MACHINE_TRANSPORT=nats or mqtt/);
   });
 
-  it('refuses to start with no lines or an incomplete transport', () => {
-    expect(() => MachineSurface.start({ lines: [], env: { MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtt://b' } })).toThrow(/at least one line/);
+  it('refuses an incomplete transport, and starts empty until the registry fills it', async () => {
     expect(() => MachineSurface.start({ lines: [DEFAULT_LINE], env: { MACHINE_TRANSPORT: 'mqtt' } })).toThrow(/MACHINE_MQTT_URL/);
+    const surface = MachineSurface.start({ lines: [], env: { MACHINE_TRANSPORT: 'mqtt', MACHINE_MQTT_URL: 'mqtt://b' } });
+    expect(surface.describeLines()).toEqual([]);
+    expect(surface.findLine('site-1', 'line-1')).toBeUndefined();
+    expect(surface.commandOps('site-1', 'line-1')).toEqual([]);
+    expect(await surface.retire('site-1', 'line-1')).toBe(false);
+    await surface.stop();
   });
 });

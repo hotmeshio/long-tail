@@ -5,7 +5,7 @@
  */
 
 import { OP, REPLY_STATUS, type Envelope } from '../../../../lib/machines/protocol';
-import type { Reply } from './cell';
+import { REFUSAL_CODE, type Reply } from './cell';
 import type { MockMachine } from './machine';
 
 export const REPLY_MODE = { NORMAL: 'normal', DROP: 'drop' } as const;
@@ -30,7 +30,7 @@ export class CommandHandler {
     const cmdId = body?.cmdId;
     if (!body || typeof cmdId !== 'string') return;
     const prior = this.done.get(cmdId);
-    if (prior) return this.reply(cmdId, { status: prior.status, reason: `${prior.reason} (repeat)` });
+    if (prior) return this.reply(cmdId, { ...prior, reason: `${prior.reason} (repeat)` });
     const outcome = await this.run(body.op, body.args ?? {});
     this.done.set(cmdId, outcome);
     await this.reply(cmdId, outcome);
@@ -38,7 +38,7 @@ export class CommandHandler {
 
   private async run(op: string, a: Record<string, any>): Promise<Reply> {
     if (a.expiresAt && Date.parse(a.expiresAt) < Date.now()) {
-      return { status: REPLY_STATUS.REFUSED, reason: `expired at ${a.expiresAt}` };
+      return { status: REPLY_STATUS.REFUSED, reason: `expired at ${a.expiresAt}`, code: REFUSAL_CODE.EXPIRED };
     }
     switch (op) {
       case OP.DISPATCH:
@@ -50,6 +50,7 @@ export class CommandHandler {
         await this.m.enable(true);
         return { status: REPLY_STATUS.ACCEPTED, reason: op === OP.START ? 'started' : 'resumed' };
       case OP.STOP:
+        if (typeof a.jobId === 'string') return this.m.cell.stop(a.jobId);
         await this.m.enable(false);
         return { status: REPLY_STATUS.ACCEPTED, reason: 'finishing the current unit; queue kept' };
       case OP.PAUSE:
@@ -58,26 +59,26 @@ export class CommandHandler {
       case OP.CHANGEOVER: {
         const refused = await this.m.changeover(a.recipe);
         return refused
-          ? { status: REPLY_STATUS.REFUSED, reason: refused }
+          ? { status: REPLY_STATUS.REFUSED, ...refused }
           : { status: REPLY_STATUS.ACCEPTED, reason: `changing over to ${a.recipe.id} v${a.recipe.version}` };
       }
       case OP.ACKNOWLEDGE_ALARM: {
         const ok = await this.m.alarms.acknowledge(a.alarmId, a.by ?? 'line-controller');
         return ok
           ? { status: REPLY_STATUS.ACCEPTED, reason: `acknowledged ${a.alarmId}` }
-          : { status: REPLY_STATUS.REFUSED, reason: `no active alarm ${a.alarmId}` };
+          : { status: REPLY_STATUS.REFUSED, reason: `no active alarm ${a.alarmId}`, code: REFUSAL_CODE.NO_ALARM };
       }
       case OP.SNAPSHOT:
         await this.m.publishSnapshot();
         return { status: REPLY_STATUS.ACCEPTED, reason: 'snapshot published' };
       default:
-        return { status: REPLY_STATUS.REFUSED, reason: `unknown op ${op}` };
+        return { status: REPLY_STATUS.REFUSED, reason: `unknown op ${op}`, code: REFUSAL_CODE.UNKNOWN_OP };
     }
   }
 
   private async reply(cmdId: string, outcome: Reply): Promise<void> {
     if (this.replyMode === REPLY_MODE.DROP) return;
-    const send = () => this.m.publishReply({ cmdId, status: outcome.status, reason: outcome.reason });
+    const send = () => this.m.publishReply({ cmdId, status: outcome.status, reason: outcome.reason, ...(outcome.code ? { code: outcome.code } : {}) });
     if (this.replyDelayMs > 0) this.m.timers.after(this.replyDelayMs, () => void send());
     else await send();
   }

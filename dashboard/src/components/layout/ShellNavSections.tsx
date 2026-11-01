@@ -13,16 +13,18 @@ export interface ShellNavSectionsProps {
   isOps: boolean;
   viewAs: ViewAsRole | null;
   canSeePaceBoard: boolean;
+  /** The deployment declares machine lines; the Lines entry renders. */
+  showLines?: boolean;
 }
 
 /**
  * The navigation sections, shared verbatim by the ≥lg rail and the below-lg
  * drawer — one nav, two homes.
  */
-export function ShellNavSections({ aiEnabled, isBuilder, isOps, viewAs, canSeePaceBoard }: ShellNavSectionsProps) {
+export function ShellNavSections({ aiEnabled, isBuilder, isOps, viewAs, canSeePaceBoard, showLines }: ShellNavSectionsProps) {
   return (
     <>
-      <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} />
+      <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} showLines={showLines} />
       <PinnedViewsSidebar />
       {!isBuilder && <ToolsSidebar />}
       {isBuilder && <OrchestrationSidebar />}

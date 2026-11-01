@@ -37,7 +37,7 @@ export function planMachineMessage(state: GatewayState, parsed: ParsedTopic, env
 function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: Envelope | null, b: Record<string, any>, ttl: number): Plan {
   switch (parsed.kind) {
     case MESSAGE_KIND.REPLY:
-      return ack([{ kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason }]);
+      return ack([{ kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason, ...(typeof b.code === 'string' ? { code: b.code } : {}) }]);
     case MESSAGE_KIND.JOB:
       return planJob(state, m, b, env?.at, ttl);
     case MESSAGE_KIND.ALARM:
@@ -137,7 +137,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     const released = releasedAction(row, m, b);
     if (b.result === JOB_RESULT.OK) return ack([released]);
     return ack([released, ...failHandoff(state, row, m, {
-      received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, reason: b.reason ?? null, detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
+      received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, result: b.result, reason: b.reason ?? null,
+      detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
     })]);
   }
 
@@ -197,7 +198,7 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
   const superseded: Action[] = known?.rowId && known.open
     ? [{ kind: 'resolve', as: CONTROLLER, rowId: known.rowId, payload: { decision: DECISION.CLEARED, note: `${m} raised ${alarmId} again; this one ended` } }]
     : [];
-  const track: AlarmTrack = { machineId: m, alarmId, raisedAt: b.raisedAt, open: true };
+  const track: AlarmTrack = { machineId: m, alarmId, raisedAt: b.raisedAt, level: b.level, open: true };
   state.alarms.set(key, track);
   return ack([...superseded, ...notePause(state, track, b), {
     kind: 'createAlarmRow', machineId: m, alarmId,
@@ -222,20 +223,26 @@ function catalogEnvelope(catalog: unknown): { envelope?: string } {
 
 function planPresence(state: GatewayState, m: string, b: Record<string, any>): Plan {
   const link = state.link(m);
+  const session = typeof b.sessionId === 'string' ? b.sessionId : undefined;
   if (b.online !== true) {
     if (link.online) link.since = Date.now();
     link.online = false;
+    link.reason = typeof b.reason === 'string' ? b.reason : undefined;
     if (link.rowId || link.watching) return ack();
     link.watching = true;
     return ack([{ kind: 'watchOffline', machineId: m }]);
   }
   if (b.software) link.software = b.software;
   const wasOffline = !link.online;
+  // A new session while online: the machine reconnected before its offline presence was heard.
+  const reconnected = !!session && !!link.sessionId && session !== link.sessionId;
   link.online = true;
   link.watching = false;
+  link.reason = undefined;
+  if (session) link.sessionId = session;
   const actions: Action[] = [];
   // Back from a drop: ask for the full state rather than wait for the next heartbeat.
-  if (wasOffline) actions.push({ kind: 'command', machineId: m, op: OP.SNAPSHOT, cmdId: `${m}:resync:${link.since}`, args: {} });
+  if (wasOffline || reconnected) actions.push({ kind: 'command', machineId: m, op: OP.SNAPSHOT, cmdId: `${m}:resync:${session ?? link.since}`, args: {} });
   if (link.rowId) {
     actions.push({ kind: 'resolve', as: CONTROLLER, rowId: link.rowId, payload: { decision: DECISION.RESTORED, note: `${m} back online` } });
     link.rowId = undefined;
@@ -248,7 +255,10 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   const link = state.link(m);
   if (b.software) link.software = b.software;
   const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
-  if (Array.isArray(b.jobs)) state.keepHeld(m, new Set(jobIds));
+  if (Array.isArray(b.jobs)) {
+    state.keepHeld(m, new Set(jobIds));
+    link.jobs = b.jobs;
+  }
   const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
   const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
