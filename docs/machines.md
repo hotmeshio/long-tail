@@ -218,6 +218,8 @@ interface LineCodec {
 - A reply is `accepted` (recorded), and a machine that prepares its jobs may later reply `completed` (ready) or `failed` under the same `cmdId`. A failure after acceptance ends the handoff as `dispatch-failed`. When no reply comes, the gateway asks the machine for its snapshot before deciding.
 - `receipt` confirms the messages the gateway is done with, for machines that resend an event until it is confirmed. `decode` marks each such message with a `receiptId`. The ids go out per machine in batches of up to 100 after `MACHINE_RECEIPT_DELAY_MS`, including messages already applied. A message still waiting for its row is confirmed once it lands.
 - `strict: true` holds a message with contract violations: it is confirmed, never acted on, and one `contract-violation` row shows it to the operator role. Without it, known fields are acted on and the violations are logged.
+- An alarm body may say `needsPerson: true`: the row is raised whatever the level, and the row's level stays the machine's. Stopping levels raise a row on their own.
+- A snapshot needs only `mode`, `enabled`, `jobs` and `alarms`; `bootId`, `software`, `recipe` and `cycles` are read when present. A job event needs no `orderRef`; the row already knows its order. A codec for machines that spread these over several messages fills in what it has.
 - An alarm body may name the catalog edition its code comes from, `catalog: { domain, key, version }`. The alarm row then carries it as a lookup ref, so the row reads the code's meaning as of that edition.
 - Event channels go to the durable stream and telemetry channels are read live. A machine reads its commands on the command channels. The broker ACL is rendered from these channels, so a codec with its own topics gets its own ACL. Unknown body fields are allowed and known ones are checked. Payloads may be up to 256 KB.
 - `snapshotOnStart: true` is for machines that keep no retained state and report only what changes. The gateway asks each machine for a snapshot once it takes the line, so it learns every machine's current job before it acts on a change.
@@ -234,9 +236,9 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | Channel | Purpose |
 |---|---|
 | `presence` (retained) | Birth and will, with the software version, a `sessionId` per connection, and on a goodbye the `reason` |
-| `snapshot` (retained) | Mode, recipe, jobs, alarms, counters, boot id |
+| `snapshot` (retained) | Mode, enabled, jobs and alarms; recipe, counters, software and boot id when the machine keeps them |
 | `job` | Per unit: `queued`, `ready`, `arrived`, `bound`, `started`, `progress`, `finished`, `released`, `transfer-failed`, `withdrawn` |
-| `alarm/<id>` (retained while active) | Raise, acknowledgement, clear (with who cleared it) |
+| `alarm/<id>` (retained while active) | Raise, acknowledgement, clear (with who cleared it); `needsPerson: true` on an alarm of any level asks for a person |
 | `telemetry` | Readings |
 | `report/<name>` | Production, availability, inventory and other reporting, kept in the stream |
 | `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop` (with `jobId`: that job, at a safe point), `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `completed`, `refused`, `failed`, with a `reason` and an optional `code`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
@@ -245,7 +247,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 
 | Row | Raised when | Resolved when |
 |---|---|---|
-| `line-alarm` | A stopping alarm (critical or emergency) is raised | The machine clears it (with who cleared it). If a person resolves it first, the gateway sends `ack-alarm` |
+| `line-alarm` | A stopping alarm (critical or emergency) is raised, or one the machine flags `needsPerson`, at the level the machine said | The machine clears it (with who cleared it). If a person resolves it first, the gateway sends `ack-alarm` |
 | `machine-offline` | Presence goes offline past a debounce; the row's `reason` is the machine's, when its goodbye gave one | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |

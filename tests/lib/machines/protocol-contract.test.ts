@@ -120,3 +120,28 @@ describe('contract: who a job event is about', () => {
     expect(inspectMessage(ROOT, topic, msg({ ...carrierOnly, carrierId: null, event: JOB_EVENT.ARRIVED })).violations).toEqual(['arrived without a unitId', 'arrived without a jobId']);
   });
 });
+
+describe('contract: the least a machine must say', () => {
+  it('accepts a snapshot of mode, enabled, jobs and alarms alone', () => {
+    const topic = machineTopic(ROOT, ident, CHANNEL.SNAPSHOT);
+    expect(inspectMessage(ROOT, topic, msg({ mode: 'idle', enabled: true, jobs: [], alarms: [] }), true).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg({ mode: 'idle', enabled: true, jobs: [], alarms: [], cycles: -1 }), true).violations.join()).toMatch(/cycles/);
+  });
+
+  it('accepts a job event with no order reference', () => {
+    const topic = machineTopic(ROOT, ident, CHANNEL.JOB);
+    expect(inspectMessage(ROOT, topic, msg({ event: JOB_EVENT.ARRIVED, jobId: 'j1', unitId: 'U1', recipe: null, carrierId: 'CR-1' })).violations).toEqual([]);
+  });
+
+  it('accepts an alarm that asks for a person, and flags the flag when it is not a boolean', () => {
+    const topic = alarmTopic(ROOT, ident, 'A-1');
+    const alarm = {
+      alarmId: 'A-1', code: 'W-7', level: 'warning', text: 'Bin low', active: true, raisedAt: '2026-01-01T00:00:00.000Z',
+      clearedAt: null, clearedBy: null, ackedBy: null, ackedAt: null, zone: null, autoClears: false, action: null, jobId: null,
+    };
+    expect(inspectMessage(ROOT, topic, msg({ ...alarm, needsPerson: true }), true).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg(alarm), true).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg({ ...alarm, needsPerson: 'yes' }), true).violations.join()).toMatch(/needsPerson/);
+  });
+});
+

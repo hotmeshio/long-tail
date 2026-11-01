@@ -192,7 +192,9 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
       payload: { decision: DECISION.CLEARED, clearedBy: b.clearedBy ?? null, note: `cleared at ${m}${b.clearedBy ? ` by ${b.clearedBy}` : ''}` },
     }]);
   }
-  if (!STOPPING_LEVELS.includes(b.level)) return ack();
+  // A stopping level needs a person; so does any alarm the machine flags, at the level it said.
+  const stopping = STOPPING_LEVELS.includes(b.level);
+  if (!stopping && b.needsPerson !== true) return ack();
   const known = state.alarms.get(key);
   if (known && (!known.raisedAt || !b.raisedAt || known.raisedAt === b.raisedAt)) return ack();
   const superseded: Action[] = known?.rowId && known.open
@@ -200,7 +202,7 @@ function planAlarm(state: GatewayState, parsed: ParsedTopic, alarmId: string, en
     : [];
   const track: AlarmTrack = { machineId: m, alarmId, raisedAt: b.raisedAt, level: b.level, open: true };
   state.alarms.set(key, track);
-  return ack([...superseded, ...notePause(state, track, b), {
+  return ack([...superseded, ...(stopping ? notePause(state, track, b) : []), {
     kind: 'createAlarmRow', machineId: m, alarmId,
     row: {
       type: ROW_TYPE.ALARM, subtype: b.level, role: LINE_ROLE.OPERATOR, priority: b.level === LEVEL.EMERGENCY ? 1 : 2,
@@ -262,6 +264,8 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
   const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
   const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
+  // A snapshot without a boot id says nothing about restarts.
+  if (typeof b.bootId !== 'string') return ack([...cleared, answer]);
   const previous = link.bootId;
   link.bootId = b.bootId;
   if (!previous || previous === b.bootId) return ack([...cleared, answer]);
