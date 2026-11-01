@@ -56,6 +56,7 @@ For each line, one replica leads (a Postgres advisory lock held on its own conne
 | `addressing` | `declared` (default): each address is `machines[].address`, or the station's id. `learned`: a station with no `address` learns it from the machine that claims it. See [Learned addresses](#learned-addresses) |
 | `roles.exit` | The role of the person who receives units at the end of a route. Default `line-exit` |
 | `roles.operator` | The role that gets failed handoffs, stopping alarms, and offline or quiet machines. Default `line-operator` |
+| `roles.quality` | The role that decides units a machine finished on hold: release, rework or scrap. Default `line-quality` |
 | `roles.receivers` | Other roles of people who take units straight from a machine. Machine bots join these roles and the exit role, so they can record their releases on those rows |
 | `machines[].allowedSoftware` | Versions the line accepts. A machine reporting another version is refused before any dispatch |
 | `machines[].queueDepth` | Most jobs the machine is sent or holds at once. Unset: no limit. See [Pacing](#pacing) |
@@ -134,7 +135,7 @@ Every other progress message stays in the stream, so an hour-long job leaves a h
 
 ### Decisions on a failed handoff
 
-`Machines.handoffDecisions(errorCode)` gives a default set of decisions for a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit. After a `partial-arrival` (a timeout once only some units arrived) the units are split between two stations, and a retry of the same hop would ask the sender for units it no longer holds, so the default offers `manual` and `scrap`. A workflow is free to offer its own decisions instead, such as moving only the missing units on; the platform reports the facts and does not choose.
+`Machines.handoffDecisions(errorCode)` gives a default set of decisions for a failed handoff. A failure in the move leaves the units on the line, so `retry`, `manual` and `scrap` all fit. Units the sender finished as not ok (`sender-rejected`) leave the line and never re-enter it, so only `manual` and `scrap` fit; units finished on hold (`result: hold`) are the exception, and the example route asks the quality role instead (`Machines.HOLD_DECISIONS`: `release`, `rework`, `scrap`), sending the decision to the holding machine as the command the codec declares for it (`dispositionOp`) when it declares one. After a `partial-arrival` (a timeout once only some units arrived) the units are split between two stations, and a retry of the same hop would ask the sender for units it no longer holds, so the default offers `manual` and `scrap`. A workflow is free to offer its own decisions instead, such as moving only the missing units on; the platform reports the facts and does not choose.
 
 The example route's policy for a split: it stops the receiver's job with a `cancel` command row, then a person collects each group of units where it stopped.
 
@@ -252,6 +253,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
 | `handoff-error` (`unmatched-arrival`) | A machine reports an arrival no open handoff into it expects (a carrier no row carries, or one it could not read), once every delivery has passed. One row per machine and carrier, holding the raw arrival, so the unit is re-scanned or routed | A person resolves it; the next such arrival raises a row again |
+| `quality-hold` | The example route's row for units a machine finished on hold (`sender-rejected` with `result: hold`), on the quality role | A person answers `release` (the hop runs again from the holding machine), `rework` with an optional `station` (the route runs again from that station), or `scrap` |
 | `machine-registration` | On a line that learns addresses, an address claims a station bound to another address, or an address bound to one station claims another | A person resolves it with `{ decision: 'approve' }`, which binds the station to the claimant, or `reject` |
 
 A replica taking a line reads back its learned addresses, its open handoff, command, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.

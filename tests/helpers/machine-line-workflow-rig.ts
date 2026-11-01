@@ -74,7 +74,7 @@ export async function startWorkflowRig(opts: { taskQueue: string; dispatchOn?: D
   for (const [actor, id] of await ensureLineBots(line)) users.set(actor, id);
   const person = await userService.createUser({
     external_id: `line-person-${Date.now()}`,
-    roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }],
+    roles: [{ role: 'line-exit', type: 'member' }, { role: 'line-operator', type: 'member' }, { role: 'line-quality', type: 'member' }],
   });
 
   const harness = await startHarness({ msPerSec: 2, ...opts.mock }, machines, REAL_ORCHESTRATOR_BROKER);

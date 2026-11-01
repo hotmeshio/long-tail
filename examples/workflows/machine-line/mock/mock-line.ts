@@ -138,4 +138,9 @@ export class MockLine {
   unload(machineId: string, input: { unitId: string }): Promise<boolean> {
     return this.machine(machineId).cell.unload(input.unitId);
   }
+
+  /** A quality decision on a unit the machine finished on hold: release, rework or scrap. */
+  dispose(machineId: string, input: { unitId: string; decision: string }): Promise<boolean> {
+    return this.machine(machineId).cell.dispose(input.unitId, input.decision);
+  }
 }

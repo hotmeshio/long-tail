@@ -32,6 +32,9 @@ export interface Job {
   startedAt?: number;
 }
 
+/** What a quality decision may do with a held unit. */
+export const DISPOSITION = { RELEASE: 'release', REWORK: 'rework', SCRAP: 'scrap' } as const;
+
 export interface ArmedResult {
   result: JobResult;
   reason?: string;
@@ -255,6 +258,20 @@ export class Cell {
       this.jobs.delete(job.jobId);
     }
     this.m.floor.poke();
+  }
+
+  /**
+   * A quality decision on a unit finished on hold: release and rework let it
+   * leave toward the next receiver that is ready; scrap takes it off the line.
+   */
+  async dispose(unitId: string, decision: string): Promise<boolean> {
+    const job = this.station;
+    const unit = job?.units.find((u) => u.unitId === unitId);
+    if (!job || !unit || unit.status !== UNIT_STATUS.DONE || unit.result === JOB_RESULT.OK) return false;
+    if (decision === DISPOSITION.SCRAP) return this.unload(unitId);
+    unit.result = JOB_RESULT.OK;
+    this.m.floor.hold(this.m, job, unitId, this.m.def.carrier === CARRIER_ROLE.RELEASE ? null : unit.carrierId);
+    return true;
   }
 
   /** An operator takes a finished or held unit off the line. */

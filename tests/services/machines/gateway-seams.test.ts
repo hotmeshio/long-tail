@@ -87,7 +87,7 @@ describe('gateway seams: role names from the line', () => {
   });
 
   it('declares and assigns the line\'s own role names', () => {
-    expect(machineRoleConfigs(named).map((r) => r.role)).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector', 'supervisor']);
+    expect(machineRoleConfigs(named).map((r) => r.role)).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector', 'supervisor', 'line-quality']);
     const [controller, press] = lineIdentities(named);
     expect(press.roles).toEqual(['press-cell', 'line-trim', 'line-inspect', 'inspector']);
     expect(controller.roles).toContain('supervisor');

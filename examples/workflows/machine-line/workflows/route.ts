@@ -48,6 +48,10 @@ export interface UnitRouteInput {
   operatorTimeout?: string;
   /** The role of the person who receives units at the end of the route; line-exit by default. */
   exitRole?: string;
+  /** The role of the people who decide units a machine finished on hold; line-quality by default. */
+  qualityRole?: string;
+  /** The command the line's codec declares for a hold decision (`rowOps`); the decision is sent to the holding machine as that command. */
+  dispositionOp?: string;
 }
 
 /** Every machine on the line in order, each on its first recipe at the newest version. */
@@ -145,6 +149,8 @@ export interface HopOutcome {
   received: boolean;
   errorCode?: HandoffErrorCode;
   detail?: string;
+  /** On `sender-rejected`: how the sender finished the units (reject, hold, scrap, rework). */
+  result?: string;
   arrived?: string[];
   missing?: string[];
 }
@@ -155,10 +161,19 @@ export function readHopOutcome(result: Record<string, any> | null, units: readon
   if (result.received === true) return { received: true };
   const { arrived, missing } = handoffProgress(units, result.$accumulated ?? []);
   if (result.$trigger !== 'timeout') {
-    return { received: false, errorCode: result.errorCode, detail: result.detail ?? result.reason ?? undefined, arrived, missing };
+    const held = typeof result.result === 'string' ? { result: result.result } : {};
+    return { received: false, errorCode: result.errorCode, detail: result.detail ?? result.reason ?? undefined, ...held, arrived, missing };
   }
   // A timeout after some units arrived has split them between two stations.
   return arrived.length
     ? { received: false, errorCode: HANDOFF_ERROR.PARTIAL_ARRIVAL, detail: `${arrived.join(', ')} arrived; the rest did not before the timeout`, arrived, missing }
     : { received: false, errorCode: HANDOFF_ERROR.HANDOFF_TIMEOUT, detail: 'no receipt before the timeout', arrived, missing };
 }
+
+/** The hop to run again for a rework from `station`: the hop into it, or the hop that is holding when it names none on the route. */
+export function reworkHop(hops: Hop[], holding: Hop, station?: string): Hop {
+  if (!station) return holding;
+  const into = hops.find((h) => h.index <= holding.index && isMachineStep(h.to) && h.to.machineId === station);
+  return into ?? holding;
+}
+

@@ -1,15 +1,16 @@
 /**
  * The roles a line needs, as code-owned role declarations: one station role
  * per process (a machine resolves the handoffs into it), the exit role (a
- * person receives finished units) and the operator role (a person decides
- * failed handoffs and closes alarm and machine rows). Each role owns its
- * form; only the operator role enforces it on the server, because handoff
- * rows also collect machine records the gateway already validates.
+ * person receives finished units), the operator role (a person decides
+ * failed handoffs and closes alarm and machine rows) and the quality role
+ * (a person decides units finished on hold). Each role owns its form; the
+ * operator and quality roles enforce it on the server, since handoff rows
+ * also collect machine records the gateway already validates.
  */
 
 import type { LTRoleConfig } from '../../types/startup';
-import { exitRole, machineRole, operatorRole, type LineDef } from '../../lib/machines/line';
-import { HANDOFF_FORM_SCHEMA, OPERATOR_FORM_SCHEMA } from './forms';
+import { exitRole, machineRole, operatorRole, qualityRole, type LineDef } from '../../lib/machines/line';
+import { HANDOFF_FORM_SCHEMA, OPERATOR_FORM_SCHEMA, QUALITY_FORM_SCHEMA } from './forms';
 
 const BOARD = { sla_minutes: 10, target_per_hour: 60, priority_threshold_minutes: 10, ops_visible: true };
 
@@ -41,6 +42,14 @@ export function machineRoleConfigs(line: LineDef): LTRoleConfig[] {
       title: 'Line operator',
       description: 'Failed handoffs, stopping alarms, and machines that went dark or quiet.',
       form_schema: OPERATOR_FORM_SCHEMA,
+      enforce_schema: true,
+      ...BOARD,
+    },
+    {
+      role: qualityRole(line),
+      title: 'Line quality',
+      description: 'Units a machine finished on hold: release, rework or scrap.',
+      form_schema: QUALITY_FORM_SCHEMA,
       enforce_schema: true,
       ...BOARD,
     },

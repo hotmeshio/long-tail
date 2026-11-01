@@ -28,6 +28,7 @@ const ROUTES: Record<string, Handler> = {
   network: (l, m, b) => l.network(m, b),
   config: (l, m, b) => l.config(m, b),
   unload: (l, m, b) => l.unload(m, b),
+  disposition: (l, m, b) => l.dispose(m, b),
 };
 
 function send(res: ServerResponse, status: number, body: unknown, type = 'application/json'): void {
