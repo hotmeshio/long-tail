@@ -8,6 +8,7 @@ vi.mock('../../../lib/storage', () => {
     listWithPrefixes: vi.fn(),
     getMetadata: vi.fn(),
     getSignedUrl: vi.fn(),
+    write: vi.fn(),
   };
   return {
     getStorageBackend: () => mockBackend,
@@ -129,3 +130,46 @@ describe('generateSignedUrl', () => {
     expect(result.error).toContain('No credentials');
   });
 });
+
+describe('uploadFile', () => {
+  const bytes = Buffer.from('hello');
+  const digest = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+
+  it('stores the bytes with their digest and answers it', async () => {
+    mockBackend.write.mockResolvedValue({ ref: 'a.txt', size: 5 });
+    const result = await filesApi.uploadFile({ path: 'a.txt', buffer: bytes });
+    expect(result.status).toBe(200);
+    expect(result.data.sha256).toBe(digest);
+    expect(mockBackend.write).toHaveBeenCalledWith('a.txt', bytes, { sha256: digest });
+  });
+
+  it('accepts the digest the caller names when it matches', async () => {
+    mockBackend.write.mockResolvedValue({ ref: 'a.txt', size: 5 });
+    const result = await filesApi.uploadFile({ path: 'a.txt', buffer: bytes, sha256: digest.toUpperCase() });
+    expect(result.status).toBe(200);
+  });
+
+  it('refuses bytes that differ from the digest named, storing nothing', async () => {
+    const wrong = '0'.repeat(64);
+    const result = await filesApi.uploadFile({ path: 'a.txt', buffer: bytes, sha256: wrong });
+    expect(result.status).toBe(422);
+    expect(result.data).toMatchObject({ path: 'a.txt', expected: wrong, actual: digest });
+    expect(mockBackend.write).not.toHaveBeenCalled();
+  });
+
+  it('refuses a digest that is not 64 hex characters', async () => {
+    const result = await filesApi.uploadFile({ path: 'a.txt', buffer: bytes, sha256: 'abc' });
+    expect(result.status).toBe(400);
+    expect(mockBackend.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('getFileMetadata', () => {
+  it('carries the stored digest when the backend knows it', async () => {
+    mockBackend.getMetadata.mockResolvedValue({ size: 5, modified_at: '2026-01-01T00:00:00Z', content_type: 'text/plain', sha256: 'f'.repeat(64) });
+    const result = await filesApi.getFileMetadata({ filePath: 'a.txt' });
+    expect(result.status).toBe(200);
+    expect(result.data.sha256).toBe('f'.repeat(64));
+  });
+});
+

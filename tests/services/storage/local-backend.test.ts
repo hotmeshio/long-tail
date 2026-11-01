@@ -135,3 +135,13 @@ describe('LocalStorageBackend — new methods', () => {
     });
   });
 });
+
+describe('LocalStorageBackend digests', () => {
+  it('reports the stored bytes\' own SHA-256', async () => {
+    const backend = new LocalStorageBackend();
+    await backend.write('digest/hello.txt', Buffer.from('hello'), { sha256: '0'.repeat(64) });
+    const meta = await backend.getMetadata('digest/hello.txt');
+    expect(meta.sha256).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+  });
+});
+

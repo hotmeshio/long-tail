@@ -495,7 +495,7 @@ Accessible at `/files` (builder-only: superadmin or the `engineer` role). Browse
 
 The backend is selected by the `LT_STORAGE_BACKEND` env var — `local` (filesystem) or `s3` (S3-compatible, including MinIO). The same interface serves every backend; only env changes.
 
-**API:** `GET /api/file-browser/browse?prefix=<path>` lists. `POST /api/file-browser/upload?path=<path>` uploads raw bytes. `GET /api/file-browser/download/<path>` downloads; `DELETE /api/file-browser/delete/<path>` removes; `POST /api/file-browser/signed-url` mints a link. Token-scoped serving is at `GET /api/files/<path>?token=<jwt>`.
+**API:** `GET /api/file-browser/browse?prefix=<path>` lists. `POST /api/file-browser/upload?path=<path>[&sha256=<hex>]` uploads raw bytes; the stored object keeps the bytes' SHA-256, the response carries it, and a `sha256` the caller names is checked first, 422 when the bytes differ and nothing stored. `GET /api/file-browser/metadata/<path>` reports the digest beside size and type. `GET /api/file-browser/download/<path>` downloads; `DELETE /api/file-browser/delete/<path>` removes; `POST /api/file-browser/signed-url` mints a link. Token-scoped serving is at `GET /api/files/<path>?token=<jwt>`.
 
 ### Knowledge
 
