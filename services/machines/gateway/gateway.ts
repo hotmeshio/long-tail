@@ -11,7 +11,7 @@ import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
 import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
-import { admitSender, holdViolation, type AdmissionContext, type Applied } from './admission';
+import { admitSender, holdArrival, holdViolation, isArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
@@ -96,7 +96,7 @@ export class MachineGateway {
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
-    this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace() };
+    this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace(), openRows: (q) => deps.lt.listOpen(q) };
     this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log, wire: this.wire });
   }
 
@@ -276,9 +276,13 @@ export class MachineGateway {
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
       }
-      const applied = seen.violations.length && this.codec.strict
+      let applied = seen.violations.length && this.codec.strict
         ? await holdViolation(this.admission, msg, seen)
         : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
+      // An arrival still waiting for its row after every delivery is shown to a person instead.
+      if (applied.disposition === DISPOSITION.NAK && !applied.failed && msg.deliveries >= MAX_DELIVERIES && isArrival(seen)) {
+        applied = await holdArrival(this.admission, msg, seen);
+      }
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
       this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, msg.deliveries);

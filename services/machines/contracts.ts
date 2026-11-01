@@ -136,6 +136,8 @@ export const HANDOFF_ERROR = {
   SOFTWARE_UNSUPPORTED: 'software-unsupported',
   WITHDRAWN: 'withdrawn',
   CANCELLED: 'cancelled',
+  /** An arrival no open handoff into the machine expects, shown to the operator role once per machine and carrier. */
+  UNMATCHED_ARRIVAL: 'unmatched-arrival',
   ...TRANSFER_FAILURE,
 } as const;
 export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];

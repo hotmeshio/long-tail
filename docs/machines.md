@@ -249,6 +249,7 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `machine-offline` | Presence goes offline past a debounce; the row's `reason` is the machine's, when its goodbye gave one | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
+| `handoff-error` (`unmatched-arrival`) | A machine reports an arrival no open handoff into it expects (a carrier no row carries, or one it could not read), once every delivery has passed. One row per machine and carrier, holding the raw arrival, so the unit is re-scanned or routed | A person resolves it; the next such arrival raises a row again |
 | `machine-registration` | On a line that learns addresses, an address claims a station bound to another address, or an address bound to one station claims another | A person resolves it with `{ decision: 'approve' }`, which binds the station to the claimant, or `reject` |
 
 A replica taking a line reads back its learned addresses, its open handoff, command, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
@@ -278,7 +279,7 @@ interface WireEvent {
 }
 ```
 
-`actions` is what the gateway did with the message: the verbs it performed on rows, with the row ids (`claim`, `accumulate` with its `itemKey`, `resolve`, `create-row`), a verb Long Tail refused (`refuse`), a message held for a person under a strict codec (`hold`), one no row claimed after every delivery (`unmatched`), one the codec or the planner could not read (`unreadable`), one admitted with nothing to do (`ack`), and `none` with a `detail` for everything else: a message waiting for its row, a dispatch or command that went out because of it (the send is its own `out` record), an address no station claims. A record of a message read back from the broker on taking the line says `retained: true`.
+`actions` is what the gateway did with the message: the verbs it performed on rows, with the row ids (`claim`, `accumulate` with its `itemKey`, `resolve`, `create-row`), a verb Long Tail refused (`refuse`), a message held for a person under a strict codec (`hold`), one no row claimed after every delivery (`unmatched`; an arrival then goes to a person as a `handoff-error` row), one the codec or the planner could not read (`unreadable`), one admitted with nothing to do (`ack`), and `none` with a `detail` for everything else: a message waiting for its row, a dispatch or command that went out because of it (the send is its own `out` record), an address no station claims. A record of a message read back from the broker on taking the line says `retained: true`.
 
 Telemetry messages are read live and are many: they join the wire record only with `MACHINE_WIRE_TELEMETRY=on`.
 

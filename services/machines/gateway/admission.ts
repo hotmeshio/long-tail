@@ -5,9 +5,10 @@
  * person instead of acted on.
  */
 
-import { ROW_TYPE } from '../contracts';
+import { HANDOFF_ERROR, ROW_TYPE } from '../contracts';
+import type { OpenRowQuery } from '../rows';
 import { operatorRole, type LineDef } from '../../../lib/machines/line';
-import type { Inspection } from '../../../lib/machines/protocol';
+import { JOB_EVENT, MESSAGE_KIND, type Inspection } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type InboundMessage } from '../../../lib/machines/transport';
 import type { WireAction } from '../../../types/machines-view';
 import type { Action } from './actions';
@@ -38,6 +39,8 @@ export interface AdmissionContext {
   log: GatewayLog;
   /** Send waiting handoffs that may now go out. */
   pace(): Promise<void>;
+  /** The controller's pending rows of a type, for the rows shown to people once. */
+  openRows(query: OpenRowQuery): Promise<Record<string, any>[]>;
 }
 
 function from(sender: Sender): Applied['sender'] {
@@ -98,3 +101,42 @@ export async function holdViolation(ctx: AdmissionContext, msg: InboundMessage, 
     return { disposition: DISPOSITION.NAK, failed: true, actions: [] };
   }
 }
+
+/** A job arrival: a scan, or a transfer that failed on the carrier read. */
+export function isArrival(seen: Inspection): boolean {
+  const event = seen.body?.body?.event;
+  return seen.parsed?.kind === MESSAGE_KIND.JOB && (event === JOB_EVENT.ARRIVED || event === JOB_EVENT.TRANSFER_FAILED);
+}
+
+/**
+ * An arrival no open handoff into the machine expects, after every delivery:
+ * a person sees it on one handoff-error row per machine and carrier, with the
+ * raw arrival, so the unit can be re-scanned or routed. Resolving the row lets
+ * the next such arrival raise one again.
+ */
+export async function holdArrival(ctx: AdmissionContext, msg: InboundMessage, seen: Inspection): Promise<Applied> {
+  const { ident } = seen.parsed!;
+  const body = seen.body?.body ?? {};
+  const carrierId = typeof body.carrierId === 'string' ? body.carrierId : null;
+  const unitId = typeof body.unitId === 'string' ? body.unitId : null;
+  const detail = `no handoff into ${ident.machineId} expects ${carrierId ? `carrier ${carrierId}` : 'an unreadable carrier'}`;
+  try {
+    const open = await ctx.openRows({ type: ROW_TYPE.HANDOFF_ERROR, role: operatorRole(ctx.line) });
+    const shown = open.find((r) => r.metadata?.errorCode === HANDOFF_ERROR.UNMATCHED_ARRIVAL && r.metadata?.machineId === ident.machineId && (r.metadata?.carrierId ?? null) === carrierId);
+    if (shown) return { disposition: DISPOSITION.ACK, failed: false, actions: [{ verb: 'unmatched', rowId: shown.id, detail: `${detail} (already shown to a person)` }] };
+    const [made] = await ctx.executor.apply([{ kind: 'createRow', row: {
+      type: ROW_TYPE.HANDOFF_ERROR, role: operatorRole(ctx.line), priority: 2,
+      description: `${ident.machineId} reports an arrival no handoff expects: ${carrierId ? `carrier ${carrierId}` : 'the carrier could not be read'}`,
+      metadata: {
+        siteId: ident.siteId, lineId: ident.lineId, machineId: ident.machineId, errorCode: HANDOFF_ERROR.UNMATCHED_ARRIVAL,
+        carrierId, unitId, event: body.event, topic: msg.topic, messageId: seen.body?.id ?? null, arrival: body,
+      },
+      escalation_payload: msg.payload,
+    } }]);
+    return { disposition: DISPOSITION.ACK, failed: false, actions: [{ verb: 'create-row', rowId: made?.rowId, detail }] };
+  } catch (err: any) {
+    if (!(err instanceof GatewayStopped)) ctx.log.error(GATEWAY_LOG.VERB_FAILED, { topic: msg.topic, error: err.message });
+    return { disposition: DISPOSITION.NAK, failed: true, actions: [] };
+  }
+}
+
