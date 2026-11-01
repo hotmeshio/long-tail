@@ -65,8 +65,8 @@ function SiteHeading({ group }: { group: SiteGroup }) {
  */
 export function LinesPage() {
   const navigate = useNavigate();
-  const { isOps, isBuilder } = useAccess();
-  const canDeclare = isOps || isBuilder;
+  const { canAdminister } = useAccess();
+  const canDeclare = canAdminister;
   const shell = useShellPanelOptional();
   const invalidate = useThrottledInvalidation('LIST');
   const { filters, setFilter, pagination } = useFilterParams({

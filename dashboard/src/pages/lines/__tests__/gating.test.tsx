@@ -69,7 +69,7 @@ describe('RequireMachines', () => {
   });
 
   it('renders the route when settings carry machines', () => {
-    mocks.settings.data = { telemetry: { traceUrl: null }, machines: { lines: [] } };
+    mocks.settings.data = { telemetry: { traceUrl: null }, machines: { declared: 1 } };
     renderGate();
     expect(screen.getByText('Lines page')).toBeInTheDocument();
   });

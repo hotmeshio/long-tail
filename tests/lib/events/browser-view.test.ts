@@ -18,7 +18,19 @@ const milestone: LTEvent = {
   milestones: [{ name: 'ai_review', value: 'approved' }] as any, data: { result: 'secret' },
 };
 
+const lineChange: LTEvent = {
+  type: 'machine.line.site-1.line-1.declared', timestamp: 't', source: 'machine-gateway',
+  data: { siteId: 'site-1', lineId: 'line-1', source: 'api', version: 3, action: 'declared' },
+};
+
 describe('eventForViewer', () => {
+  it('a line change reaches anyone else as a routing type alone', () => {
+    const seen = eventForViewer(lineChange, { builder: false });
+    expect(seen.type).toBe(lineChange.type);
+    expect(seen).not.toHaveProperty('data');
+    expect(eventForViewer(lineChange, { builder: true })).toBe(lineChange);
+  });
+
   it('a builder receives events whole', () => {
     expect(eventForViewer(escalation, { builder: true })).toBe(escalation);
     expect(eventForViewer(milestone, { builder: true })).toBe(milestone);

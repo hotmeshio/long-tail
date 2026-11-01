@@ -109,7 +109,8 @@ describe('machines routes', () => {
     expect((await fetch(`${ctx.BASE}/machines/lines?sort=sideways`, { headers: authHeaders(ctx.builderToken) })).status).toBe(400);
 
     const settings = await (await fetch(`${ctx.BASE}/settings`)).json();
-    expect(settings.machines.lines[0].machines.map((m: any) => m.machineId)).toEqual(['press-01', 'cut-01', 'inspect-01']);
+    expect(settings.machines).toEqual({ declared: 1 });
+    expect(JSON.stringify(settings)).not.toContain('press-01');
   });
 
   it('a pending row for a person puts the line in need of attention; attention sorts first and filters', async () => {
@@ -135,6 +136,7 @@ describe('machines routes', () => {
     expect((await del(ctx.builderToken, 'a')).status).toBe(204);
     expect(runs).toContain(`retire ${OTHER_SITE}/a`);
     expect((await del(ctx.builderToken, 'a')).status).toBe(404);
+    expect((await del(ctx.builderToken, 'a b')).status).toBe(404);
     const body = await (await fetch(`${ctx.BASE}/machines/lines?site=${OTHER_SITE}`, { headers: authHeaders(ctx.builderToken) })).json();
     expect(body.lines.map((l: any) => l.lineId)).toEqual(['b']);
   });
@@ -143,12 +145,16 @@ describe('machines routes', () => {
     registerMachineSurface(surface(true));
     const led = await fetch(`${ctx.BASE}${LINE_PATH}`, { headers: authHeaders(ctx.builderToken) });
     expect(led.status).toBe(200);
-    expect(await led.json()).toMatchObject({ leading: true, takenAt: '2026-03-01T08:00:00.000Z' });
+    const view = await led.json();
+    expect(view).toMatchObject({ leading: true, takenAt: '2026-03-01T08:00:00.000Z' });
+    expect(view.summary.machines.map((m: any) => m.machineId)).toEqual(['press-01', 'cut-01', 'inspect-01']);
 
     registerMachineSurface(surface(false));
     const standby = await fetch(`${ctx.BASE}${LINE_PATH}`, { headers: authHeaders(ctx.builderToken) });
     expect(standby.status).toBe(200);
-    expect(await standby.json()).toEqual({ siteId, lineId, leading: false });
+    const waiting = await standby.json();
+    expect(waiting).toMatchObject({ siteId, lineId, leading: false });
+    expect(waiting.summary.machines[0]).toMatchObject({ machineId: 'press-01', role: COMMAND_ROLE });
     expect((await fetch(`${ctx.BASE}/machines/lines/${siteId}/nowhere`, { headers: authHeaders(ctx.builderToken) })).status).toBe(404);
   });
 

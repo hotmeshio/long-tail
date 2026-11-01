@@ -25,10 +25,10 @@ describe('settings and the machine surface', () => {
     expect(settings.data).not.toHaveProperty('machines');
   });
 
-  it('lists the declared lines when the surface runs', async () => {
+  it('counts the lines this replica runs when the surface runs, and says nothing more', async () => {
     registerMachineSurface(surface());
     const settings = await getSettings();
-    expect(settings.data.machines).toEqual({ lines: [summarizeLine(DEFAULT_LINE, { rowOps: ['probe'] })] });
-    expect(settings.data.machines.lines[0].machines[0]).toMatchObject({ machineId: 'press-01', role: 'line-bond', rowOps: ['probe'] });
+    expect(settings.data.machines).toEqual({ declared: 1 });
+    expect(JSON.stringify(settings.data)).not.toContain('press-01');
   });
 });

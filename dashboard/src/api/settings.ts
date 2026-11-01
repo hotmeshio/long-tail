@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { LT_BASE } from '../lib/base-path';
-import type { LineSummary } from './machines';
 
 export interface AppSettings {
   telemetry: {
@@ -53,8 +52,8 @@ export interface AppSettings {
     /** Deployment-registered themes (metadata only; CSS arrives via /api/settings/custom.css). */
     themes?: Array<{ id: string; label: string; swatch: string; dark?: boolean }>;
   };
-  /** Declared machine lines; present only when start() was given machines. */
-  machines?: { lines: LineSummary[] };
+  /** Present only when the server runs a machine surface: how many lines this replica runs. */
+  machines?: { declared: number };
   /** Deployment display: an IANA time zone every dashboard date renders in (null = the browser's). */
   display?: { timeZone: string | null };
   environment?: {

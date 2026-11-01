@@ -77,6 +77,16 @@ export interface LineView {
   contested: ContestedClaimView[];
 }
 
+/** A replica that is not leading the line answers this. */
+export interface StandingByView {
+  siteId: string;
+  lineId: string;
+  leading: false;
+}
+
+/** The line view route's answer: the leader's view or standing by, with the line's summary from every replica. */
+export type LineViewResponse = (LineView | StandingByView) & { summary: LineSummary };
+
 export type WireDirection = 'in' | 'out';
 
 export type WireKind = 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'cmd' | 'reply' | 'receipt' | 'unknown';

@@ -69,8 +69,12 @@ function wrapper({ children }: { children: ReactNode }) {
 
 function setLine(count: number) {
   const machines = declare(count);
-  mocks.settings.data = { machines: { lines: [{ siteId: SITE, lineId: LINE, machines }] } };
-  mocks.line.data = { siteId: SITE, lineId: LINE, leading: true, takenAt: null, machines: machines.map((m) => machineView(m.machineId, m.process)), contested: [] };
+  mocks.settings.data = { machines: { declared: 1 } };
+  mocks.line.data = {
+    siteId: SITE, lineId: LINE, leading: true, takenAt: null, contested: [],
+    machines: machines.map((m) => machineView(m.machineId, m.process)),
+    summary: { siteId: SITE, lineId: LINE, machines },
+  };
 }
 
 beforeEach(() => {

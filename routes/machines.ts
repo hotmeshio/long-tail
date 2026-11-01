@@ -4,10 +4,11 @@ import * as escalationsApi from '../api/escalations';
 import { requireAdmin, requireRoleManager } from '../modules/auth';
 import { getMachineSurface } from '../modules/machines';
 import { commandRow, commandTarget } from '../services/machines/commands';
-import { LineVersionConflict, getLineWithHealth, listLines, listSites, type LineListQuery, type LineRecordWithHealth } from '../services/machines/registry';
+import { LineVersionConflict, getLineWithHealth, listLines, listSites, type LineListQuery } from '../services/machines/registry';
 import { declareLine, retireLine } from '../services/machines/registry-sync';
-import { summarizeLine, type LineSurface } from '../services/machines/surface';
-import type { LineIndex, LineIndexRow } from '../types/machines-view';
+import { emptyLineHealth, lineSummaryOf, toLineIndexRow, wirePayloadOf } from '../services/machines/line-index';
+import { isTopicLevel } from '../lib/machines/protocol/topics';
+import type { LineIndex, LineViewResponse } from '../types/machines-view';
 
 const router = Router();
 
@@ -30,17 +31,19 @@ function lineOf(req: { params: Record<string, string | string[]> }) {
   return { surface, siteId, lineId, line };
 }
 
-/** The raw wire payload as a string: a JSON body is serialized, text passes through. */
-function payloadOf(body: unknown): string {
-  if (typeof body === 'string') return body;
-  if (body === undefined || body === null) return '';
-  return JSON.stringify(body);
-}
-
 const SORTS = new Set(['attention', 'site', 'updated']);
+/** The longest search a person types; anything past it is cut, never an error. */
+const QUERY_MAX_CHARS = 200;
 
 function queryString(v: unknown): string | undefined {
-  return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, QUERY_MAX_CHARS) : undefined;
+}
+
+/** The line a path names, when both tokens could name a line at all. */
+function pathLine(req: { params: Record<string, string | string[]> }): { siteId: string; lineId: string } | null {
+  const siteId = req.params.siteId;
+  const lineId = req.params.lineId;
+  return isTopicLevel(siteId) && isTopicLevel(lineId) ? { siteId, lineId } : null;
 }
 
 function queryBoolean(v: unknown): boolean | undefined {
@@ -52,19 +55,6 @@ function queryInt(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** A registry row as the index shows it: the surface's own summary when it runs the line, the stored definition otherwise. */
-function toIndexRow(surface: LineSurface, record: LineRecordWithHealth): LineIndexRow {
-  const running = surface.findLine(record.siteId, record.lineId);
-  const summary = running
-    ? surface.describeLines().find((l) => l.siteId === record.siteId && l.lineId === record.lineId) ?? summarizeLine(record.definition, {})
-    : summarizeLine(record.definition, {});
-  return {
-    ...summary,
-    source: record.source, version: record.version, enabled: record.enabled, updatedAt: record.updatedAt,
-    leading: surface.describeLine(record.siteId, record.lineId) !== null,
-    health: record.health,
-  };
-}
 
 router.get('/lines', requireRoleManager, async (req, res) => {
   const surface = getMachineSurface();
@@ -83,7 +73,7 @@ router.get('/lines', requireRoleManager, async (req, res) => {
   };
   const [page, sites] = await Promise.all([listLines(query), listSites()]);
   const body: LineIndex = {
-    lines: page.lines.map((record) => toIndexRow(surface, record)),
+    lines: page.lines.map((record) => toLineIndexRow(surface, record)),
     total: page.total, sites, limit: page.limit, offset: page.offset,
   };
   res.status(200).json(body);
@@ -95,8 +85,12 @@ router.put('/lines/:siteId/:lineId', requireAdmin, async (req, res) => {
     res.status(404).json({ error: NO_LINES });
     return;
   }
-  const siteId = String(req.params.siteId);
-  const lineId = String(req.params.lineId);
+  const named = pathLine(req);
+  if (!named) {
+    res.status(400).json({ error: 'siteId and lineId must be topic levels' });
+    return;
+  }
+  const { siteId, lineId } = named;
   const definition = req.body?.definition;
   if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
     res.status(400).json({ error: 'definition is required' });
@@ -113,8 +107,8 @@ router.put('/lines/:siteId/:lineId', requireAdmin, async (req, res) => {
   }
   try {
     const record = await declareLine(surface, definition, version);
-    const stored = (await getLineWithHealth(siteId, lineId)) ?? { ...record, health: emptyHealth(record.definition.machines.length) };
-    res.status(200).json({ line: toIndexRow(surface, stored) });
+    const stored = (await getLineWithHealth(siteId, lineId)) ?? { ...record, health: emptyLineHealth(record.definition.machines.length) };
+    res.status(200).json({ line: toLineIndexRow(surface, stored) });
   } catch (err) {
     if (err instanceof LineVersionConflict) {
       res.status(409).json({ error: err.message });
@@ -130,8 +124,12 @@ router.delete('/lines/:siteId/:lineId', requireAdmin, async (req, res) => {
     res.status(404).json({ error: NO_LINES });
     return;
   }
-  const siteId = String(req.params.siteId);
-  const lineId = String(req.params.lineId);
+  const named = pathLine(req);
+  if (!named) {
+    res.status(404).json({ error: 'no such line' });
+    return;
+  }
+  const { siteId, lineId } = named;
   const record = await retireLine(surface, siteId, lineId);
   if (!record) {
     res.status(404).json({ error: `no line ${siteId}/${lineId}` });
@@ -140,9 +138,6 @@ router.delete('/lines/:siteId/:lineId', requireAdmin, async (req, res) => {
   res.status(204).end();
 });
 
-function emptyHealth(machines: number): LineRecordWithHealth['health'] {
-  return { machines, offline: 0, quiet: 0, alarms: 0, people: 0, handoff: 0, command: 0, attention: false };
-}
 
 router.get('/lines/:siteId/:lineId', requireRoleManager, (req, res) => {
   const { surface, siteId, lineId, line } = lineOf(req);
@@ -150,7 +145,11 @@ router.get('/lines/:siteId/:lineId', requireRoleManager, (req, res) => {
     res.status(404).json({ error: surface ? `no line ${siteId}/${lineId}` : NO_LINES });
     return;
   }
-  res.status(200).json(surface.describeLine(siteId, lineId) ?? { siteId, lineId, leading: false });
+  const body: LineViewResponse = {
+    ...(surface.describeLine(siteId, lineId) ?? { siteId, lineId, leading: false }),
+    summary: lineSummaryOf(surface, siteId, lineId, line),
+  };
+  res.status(200).json(body);
 });
 
 router.post('/lines/:siteId/:lineId/inspect', requireRoleManager, (req, res) => {
@@ -164,7 +163,7 @@ router.post('/lines/:siteId/:lineId/inspect', requireRoleManager, (req, res) => 
     res.status(400).json({ error: 'topic is required' });
     return;
   }
-  const result = surface.inspect(siteId, lineId, { topic, payload: payloadOf(req.body?.payload), retained: req.body?.retained === true });
+  const result = surface.inspect(siteId, lineId, { topic, payload: wirePayloadOf(req.body?.payload), retained: req.body?.retained === true });
   if (!result) {
     res.status(409).json({ error: NOT_LEADING });
     return;

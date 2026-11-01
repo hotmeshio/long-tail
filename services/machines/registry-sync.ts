@@ -11,6 +11,7 @@ import { publishMachineLineEvent } from '../../lib/events/publish';
 import { withConfigLock } from '../../lib/db/config-lock';
 import { loggerRegistry } from '../../lib/logger';
 import type { LineDef } from '../../lib/machines/line';
+import { isTopicLevel } from '../../lib/machines/protocol/topics';
 import type { LTEvent } from '../../types';
 import { applyRoleConfig } from '../role/seed';
 import { applyDeclaredLines, declareApiLine, deleteLine, getLine, listEnabledLines, type LineApplyReport, type LineRecord } from './registry';
@@ -54,22 +55,24 @@ export async function syncDeclaredLines(lines: LineDef[], codeOwned: boolean): P
   return { report, lines: enabled.map((r) => r.definition) };
 }
 
-/** Follow registry changes other replicas publish; the surface ignores a line it already runs unchanged. */
+/**
+ * Follow registry changes other replicas publish. The event only names the
+ * line: the registry row is read again and decides, so a stray or stale
+ * event cannot stop a line the registry still holds. The surface ignores a
+ * line it already runs unchanged.
+ */
 export function watchLineRegistry(surface: LineSurface, callbacks: CallbackEventAdapter): () => void {
   return callbacks.on(LINE_EVENTS, (event: LTEvent) => {
-    const data = (event.data ?? {}) as { siteId?: string; lineId?: string; action?: string };
-    if (typeof data.siteId !== 'string' || typeof data.lineId !== 'string') return;
-    void follow(surface, data.siteId, data.lineId, data.action).catch((err) => {
-      loggerRegistry.warn(`${LOG} following ${data.siteId}/${data.lineId} failed: ${err instanceof Error ? err.message : String(err)}`);
+    const data = (event.data ?? {}) as { siteId?: unknown; lineId?: unknown };
+    if (!isTopicLevel(data.siteId) || !isTopicLevel(data.lineId)) return;
+    const { siteId, lineId } = data;
+    void follow(surface, siteId, lineId).catch((err) => {
+      loggerRegistry.warn(`${LOG} following ${siteId}/${lineId} failed: ${err instanceof Error ? err.message : String(err)}`);
     });
   });
 }
 
-async function follow(surface: LineSurface, siteId: string, lineId: string, action: string | undefined): Promise<void> {
-  if (action === LINE_ACTION.RETIRED) {
-    await surface.retire(siteId, lineId);
-    return;
-  }
+async function follow(surface: LineSurface, siteId: string, lineId: string): Promise<void> {
   const record = await getLine(siteId, lineId);
   if (!record || !record.enabled) {
     await surface.retire(siteId, lineId);

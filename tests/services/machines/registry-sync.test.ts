@@ -5,7 +5,7 @@ import { getPool } from '../../../lib/db';
 import { CallbackEventAdapter } from '../../../lib/events/callback';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import type { LineDef } from '../../../lib/machines/line';
-import { declareApiLine, getLine } from '../../../services/machines/registry';
+import { declareApiLine, deleteLine, getLine } from '../../../services/machines/registry';
 import { declareLine, retireLine, syncDeclaredLines, watchLineRegistry } from '../../../services/machines/registry-sync';
 import type { LineSurface } from '../../../services/machines/surface';
 import { until } from '../../../services/machines/testing';
@@ -63,7 +63,7 @@ describe('registry sync', () => {
     expect(await getLine(SITE, 'a')).toBeNull();
   });
 
-  it('another replica\'s event makes this one read the row and follow: declared, changed, retired', async () => {
+  it('another replica\'s event makes this one read the row and follow; the row decides, not the event', async () => {
     const calls: string[] = [];
     const surface = fakeSurface(calls);
     const callbacks = new CallbackEventAdapter();
@@ -89,11 +89,16 @@ describe('registry sync', () => {
 
     await event('retired', 'b');
     await until(() => calls.length === 4);
-    expect(calls[3]).toBe(`retire ${SITE}/b`);
+    expect(calls[3]).toBe(`unchanged ${SITE}/b`);
+
+    await deleteLine(SITE, 'b');
+    await event('retired', 'b');
+    await until(() => calls.length === 5);
+    expect(calls[4]).toBe(`retire ${SITE}/b`);
 
     await event('declared', 'gone');
-    await until(() => calls.length === 5);
-    expect(calls[4]).toBe(`retire ${SITE}/gone`);
+    await until(() => calls.length === 6);
+    expect(calls[5]).toBe(`retire ${SITE}/gone`);
     off();
   });
 
@@ -101,6 +106,6 @@ describe('registry sync', () => {
     await declareApiLine(line('api-only'));
     const { report, lines } = await syncDeclaredLines([line('code')], true);
     expect(report.applied).toEqual([`${SITE}/code`]);
-    expect(lines.filter((l) => l.siteId === SITE).map((l) => l.lineId).sort()).toEqual(['api-only', 'b', 'code']);
+    expect(lines.filter((l) => l.siteId === SITE).map((l) => l.lineId).sort()).toEqual(['api-only', 'code']);
   });
 });

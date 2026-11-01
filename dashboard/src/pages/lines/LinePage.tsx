@@ -7,7 +7,6 @@ import {
   type LineSummaryMachine,
   type WireEvent,
 } from '../../api/machines';
-import { useSettings } from '../../api/settings';
 import { PageHeader } from '../../components/common/layout/PageHeader';
 import { useAccess } from '../../hooks/useAccess';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
@@ -69,7 +68,6 @@ function useLineRefresh(siteId: string, lineId: string, roles: string[]) {
 /** One line: the machines region, the tape section, the machine and wire panels. */
 export function LinePage() {
   const { siteId = '', lineId = '' } = useParams<{ siteId: string; lineId: string }>();
-  const { data: settings } = useSettings();
   const { isOps, isBuilder } = useAccess();
   const canAct = isOps || isBuilder;
   const { data: line, isLoading, error } = useLine(siteId, lineId);
@@ -79,10 +77,7 @@ export function LinePage() {
   const [attentionOnly, setAttentionOnly] = useState(false);
   const { userPatterns, addPattern } = useEventFeedPatterns();
 
-  const summary = useMemo(
-    () => settings?.machines?.lines.find((l) => l.siteId === siteId && l.lineId === lineId) ?? null,
-    [settings, siteId, lineId],
-  );
+  const summary = line?.summary ?? null;
   // The summary is line order; the view, when leading, enriches each tile.
   const machines = useMemo<StripMachine[]>(() => {
     const views = new Map((line?.machines ?? []).map((m) => [m.machineId, m]));

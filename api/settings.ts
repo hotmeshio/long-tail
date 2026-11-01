@@ -48,7 +48,8 @@ function resolveNatsWsUrl(
  * environment block (long-tail + HotMesh versions, Node env/version).
  *
  * @param req — the incoming HTTP request, used to derive NATS WS URL from headers when proxying
- * `machines` is present only when `start({ machines })` declared lines.
+ * `machines` is present only when `start({ machines })` runs a surface; it carries the
+ * number of lines this replica runs and nothing else, since the settings are public.
  *
  * @returns `{ status: 200, data: { telemetry, escalation, events, auth, ai, features, search, branding, display, environment, machines? } }`
  */
@@ -107,7 +108,7 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
           nodeVersion: process.version,
           eventTransport: transport,
         },
-        ...(machines ? { machines: { lines: machines.describeLines() } } : {}),
+        ...(machines ? { machines: { declared: machines.describeLines().length } } : {}),
       },
     };
   } catch (err: any) {

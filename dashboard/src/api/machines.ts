@@ -75,6 +75,8 @@ export interface LineView {
   takenAt: string | null;
   machines: MachineView[];
   contested: ContestedAddress[];
+  /** The line as every replica describes it, leading or standing by. */
+  summary?: LineSummary;
 }
 
 export type WireDirection = 'in' | 'out';
@@ -293,6 +295,7 @@ export async function fetchLine(siteId: string, lineId: string): Promise<LineVie
     takenAt: data.takenAt ?? null,
     machines: data.machines ?? [],
     contested: data.contested ?? [],
+    ...(data.summary ? { summary: data.summary } : {}),
   };
 }
 

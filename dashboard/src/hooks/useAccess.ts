@@ -34,6 +34,9 @@ export function useAccess() {
   // engineer or operator. View-as simulates the target tier faithfully:
   // an admin view keeps the bulk tools a real admin has.
   const canBulk = viewAs ? viewAs === 'admin' : realCanBulk;
+  // Administering (declaring lines, retiring them) is the server's admin
+  // capability: superadmin or the admin role type, the same tier as bulk.
+  const canAdminister = canBulk;
 
-  return { isBuilder, isOps, canBulk, viewAs, realIsBuilder };
+  return { isBuilder, isOps, canBulk, canAdminister, viewAs, realIsBuilder };
 }

@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
-  access: { isBuilder: false, isOps: true, canBulk: false },
+  access: { isBuilder: false, isOps: true, canBulk: true, canAdminister: true },
   setPanel: vi.fn(),
   closePanel: vi.fn(),
 }));
@@ -58,6 +58,7 @@ beforeEach(() => {
   mocks.setPanel.mockReset();
   mocks.access.isOps = true;
   mocks.access.isBuilder = false;
+  mocks.access.canAdminister = true;
 });
 
 describe('LinesPage', () => {
@@ -112,7 +113,8 @@ describe('LinesPage', () => {
   });
 
   it('keeps the declare tools from operators', async () => {
-    mocks.access.isOps = false;
+    mocks.access.isOps = true;
+    mocks.access.canAdminister = false;
     mocks.apiFetch.mockResolvedValue(index([line('north', 'line-1')]));
     render(<LinesPage />, { wrapper });
     await waitFor(() => expect(screen.getByText('north · line-1')).toBeInTheDocument());
