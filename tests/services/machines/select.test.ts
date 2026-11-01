@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 
 import { loadMachineLineConfig } from '../../../services/machines/config';
+import { genericCodec } from '../../../lib/machines/protocol';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { CoreEscalationFeed, MqttMachineBus, MqttMachineLink, NatsMachineBus, PubSubEscalationFeed, StreamMachineBus } from '../../../lib/machines/transport';
 import { MemoryMessagingProvider, messagingRegistry } from '../../../lib/messaging';
@@ -21,6 +22,15 @@ describe('transport selection', () => {
     const config = loadMachineLineConfig(MQTT);
     expect(createMachineBus(config, DEFAULT_LINE)).toBeInstanceOf(MqttMachineBus);
     expect(createEscalationFeed(config, DEFAULT_LINE)).toBeInstanceOf(CoreEscalationFeed);
+  });
+
+  it('hands the bus every codec on the site, so the streams keep all their subjects', () => {
+    const config = loadMachineLineConfig(NATS);
+    const codec = genericCodec({ root: 'line/v1' });
+    const other = genericCodec({ root: 'acme/v2' });
+    const bus = createMachineBus(config, DEFAULT_LINE, codec, undefined, [codec, other]) as NatsMachineBus;
+    expect(bus).toBeInstanceOf(NatsMachineBus);
+    expect((bus as unknown as { opts: { siteCodecs: unknown[] } }).opts.siteCodecs).toEqual([codec, other]);
   });
 
   it('names the gateway durable after the line controller', () => {

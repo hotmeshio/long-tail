@@ -14,13 +14,15 @@ export function cancelJobs(
 }
 
 /**
- * Withdraw a dispatch that may still sit in the receiver's queue. A job some
- * of whose units already reached the receiver is under way: it stays, and
- * what happens to it is the workflow's next decision (a machine-command row).
+ * Withdraw a dispatch that may still sit in the receiver's queue: one sent or
+ * accepted. A job that never went out (the row waiting for room, or for its
+ * units to arrive) leaves the receiver nothing to withdraw. A job some of whose
+ * units already reached the receiver is under way: it stays, and what happens
+ * to it is the workflow's next decision (a machine-command row).
  */
 export function cancelDispatch(state: GatewayState, row: HandoffRow): Action[] {
   const to = row.toMachine;
-  if (!to || row.dispatch === DISPATCH_STATE.NONE || row.dispatch === DISPATCH_STATE.REFUSED) return [];
+  if (!to || (row.dispatch !== DISPATCH_STATE.PENDING && row.dispatch !== DISPATCH_STATE.ACCEPTED)) return [];
   return cancelJobs(state, row, to, row.jobId, '', (job) => job.units.some((u) => state.heldJob(to, u.unitId) === job.jobId));
 }
 

@@ -41,7 +41,8 @@ export async function getEntry(input: {
 export async function getEntryVersion(input: {
   domain: string;
   key: string;
-  version: number;
+  /** An edition number, or the label an edition carries. */
+  version: number | string;
 }): Promise<LTApiResult> {
   try {
     const result = await knowledgeService.getKnowledgeVersion(input.domain, input.key, input.version);
@@ -72,6 +73,7 @@ export async function storeEntry(input: {
   data: Record<string, any>;
   tags?: string[];
   replace?: boolean;
+  label?: string;
 }): Promise<LTApiResult> {
   try {
     const result = await knowledgeActivity.storeKnowledge(input);

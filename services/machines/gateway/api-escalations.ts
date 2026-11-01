@@ -11,6 +11,9 @@ import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
 import type { OpenRowQuery } from '../rows';
 
+/** A row that was never given items (one parked by hand) answers 400; it holds none. */
+const NO_ITEMS_STATUS = 400;
+
 export class ApiLineEscalations implements LineEscalations {
   constructor(private readonly userFor: (as: Actor) => string) {}
 
@@ -48,6 +51,7 @@ export class ApiLineEscalations implements LineEscalations {
 
   async items(id: string): Promise<RowItem[]> {
     const result = await escalationApi.getEscalationItems({ id }, this.auth(CONTROLLER));
+    if (result.status === NO_ITEMS_STATUS) return [];
     if (result.status >= 300) throw new Error(`items failed ${result.status}: ${result.error}`);
     return (result.data as any).items.map((i: any) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
   }

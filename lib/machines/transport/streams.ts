@@ -30,13 +30,36 @@ function subjectsFor(codec: StreamCodec, channels: string[], siteId?: string, li
   return channels.map((c) => filterToSubject(topicOf(codec, { siteId, lineId }, c)));
 }
 
-/** The line streams, for every line under the codec's root; a root alone means the generic layout. */
-export function lineStreamSpecs(codec: StreamCodec | string): StreamSpec[] {
-  const c = codecOf(codec);
+/**
+ * The site's streams: every line under each codec's root, since lines on
+ * different protocols share one site NATS. A root alone means the generic
+ * layout; several codecs give the union of their subjects, in order.
+ */
+export function lineStreamSpecs(codecs: StreamCodec | string | (StreamCodec | string)[]): StreamSpec[] {
+  const list = (Array.isArray(codecs) ? codecs : [codecs]).map(codecOf);
+  const union = (channel: 'events' | 'telemetry') => [...new Set(list.flatMap((c) => subjectsFor(c, c.channels[channel])))];
   return [
-    { name: LINE_STREAM.EVENTS, subjects: subjectsFor(c, c.channels.events), maxAgeMs: 30 * DAY_MS },
-    { name: LINE_STREAM.TELEMETRY, subjects: subjectsFor(c, c.channels.telemetry), maxAgeMs: 3 * DAY_MS },
+    { name: LINE_STREAM.EVENTS, subjects: union('events'), maxAgeMs: 30 * DAY_MS },
+    { name: LINE_STREAM.TELEMETRY, subjects: union('telemetry'), maxAgeMs: 3 * DAY_MS },
   ];
+}
+
+/** Whether a stream subject pattern keeps everything a consumer filter would read. */
+export function subjectCovers(stream: string, filter: string): boolean {
+  const s = stream.split('.');
+  const f = filter.split('.');
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '>') return f.length > i;
+    if (i >= f.length) return false;
+    if (f[i] === '>') return false;
+    if (s[i] !== '*' && s[i] !== f[i]) return false;
+  }
+  return s.length === f.length;
+}
+
+/** The consumer's filter subjects the stream keeps nothing of. */
+export function uncoveredSubjects(stream: Pick<StreamSpec, 'subjects'>, filters: string[]): string[] {
+  return filters.filter((f) => !stream.subjects.some((s) => subjectCovers(s, f)));
 }
 
 /** The telemetry subjects for one line, read live rather than replayed. */

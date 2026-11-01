@@ -36,6 +36,12 @@ describe('Long Tail HTTP client', () => {
     expect(err).toMatchObject({ status: 500, body: { error: 'boom' }, context: { method: 'POST', path: '/escalations/e1/accumulate' } });
   });
 
+  it('reads a row that holds no items as empty, so a row parked by hand costs the line nothing', async () => {
+    server = await new FakeLtServer().on('GET', /e1\/items$/, () => ({ status: 400, body: { error: 'Escalation holds no items' } })).start();
+    expect(await client(server).items('e1')).toEqual([]);
+    expect(await client(server).itemKeys('e1')).toEqual([]);
+  });
+
   it('times out with AbortController and reports no status', async () => {
     server = await new FakeLtServer().on('GET', /items$/, () => new Promise((r) => setTimeout(() => r({ status: 200, body: { items: [] } }), 200))).start();
     const err = await client(server, 30).itemKeys('e1').catch((e) => e);

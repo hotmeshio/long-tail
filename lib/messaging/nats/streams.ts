@@ -44,6 +44,17 @@ export async function ensureStream(jsm: JetStreamManager, spec: StreamSpec): Pro
   await jsm.streams.update(spec.name, config);
 }
 
+/** The stream as JetStream holds it, or null when there is none. */
+export async function describeStream(jsm: JetStreamManager, name: string): Promise<StreamSpec | null> {
+  try {
+    const info = await jsm.streams.info(name);
+    return { name, subjects: info.config.subjects ?? [], maxAgeMs: Math.round((info.config.max_age ?? 0) / 1_000_000) };
+  } catch (err: any) {
+    if (/stream not found/i.test(err?.message ?? '')) return null;
+    throw err;
+  }
+}
+
 /** Create the consumer, or move an existing one to the spec's subjects without losing its place. */
 export async function ensureConsumer(jsm: JetStreamManager, stream: string, spec: ConsumerSpec): Promise<void> {
   let existing;
@@ -72,6 +83,10 @@ export class NatsStreams implements LTStreams {
 
   ensureConsumer(stream: string, spec: ConsumerSpec): Promise<void> {
     return ensureConsumer(this.jsm, stream, spec);
+  }
+
+  describeStream(name: string): Promise<StreamSpec | null> {
+    return describeStream(this.jsm, name);
   }
 
   async append(subject: Subject, payload: string): Promise<void> {

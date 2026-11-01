@@ -96,10 +96,14 @@ describe('assertLookupRefs (creation-path contract)', () => {
     expect(() => assertLookupRefs([{ domain: 'c', key: 'k' }, { domain: 'c', key: 'j', version: 'current' }])).not.toThrow();
   });
 
-  it('rejects a zero, float, or unknown version', () => {
-    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 0 }])).toThrow(/positive integer, 'current', or absent/);
+  it('accepts a ref that pins an edition by its label', () => {
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 'rev-2' }, { domain: 'c', key: 'j', version: '1.0' }])).not.toThrow();
+  });
+
+  it('rejects a zero, float, or empty version', () => {
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 0 }])).toThrow(/positive integer, an edition label, 'current', or absent/);
     expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 1.5 }])).toThrow(/positive integer/);
-    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: 'latest' }])).toThrow(/positive integer/);
+    expect(() => assertLookupRefs([{ domain: 'c', key: 'k', version: '' }])).toThrow(/positive integer/);
   });
 
   it('rejects missing identity, empty alias, and non-array shapes', () => {

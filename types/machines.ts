@@ -87,7 +87,7 @@ export interface LineDef {
    * units straight from a machine. Machine bots join the exit and receiver
    * roles so they can record their releases on those rows.
    */
-  roles?: { exit?: string; operator?: string; receivers?: string[] };
+  roles?: { exit?: string; operator?: string; quality?: string; receivers?: string[] };
   siteId: string;
   lineId: string;
   machines: MachineDef[];

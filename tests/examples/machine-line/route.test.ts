@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { hopFacets, hopRow, pickupRow, planHops, readHopOutcome, type RouteStep, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
+import { hopFacets, hopRow, pickupRow, planHops, readHopOutcome, reworkHop, type RouteStep, type UnitRouteInput } from '../../../examples/workflows/machine-line/workflows/route';
 
 const INPUT: UnitRouteInput = {
   siteId: 'site-1',
@@ -110,3 +110,23 @@ describe('unit route: reading a finished handoff', () => {
     expect(outcome).toMatchObject({ errorCode: 'jam', arrived: ['U1'], missing: ['U2'] });
   });
 });
+
+describe('unit route: units finished on hold', () => {
+  it('reads how the sender finished the units off a sender-rejected row', () => {
+    const units = ['U1'];
+    const held = readHopOutcome({ $trigger: 'resolve', received: false, errorCode: 'sender-rejected', result: 'hold', reason: 'edge out of range', $accumulated: [] }, units);
+    expect(held).toMatchObject({ received: false, errorCode: 'sender-rejected', result: 'hold', detail: 'edge out of range' });
+    expect('result' in readHopOutcome({ $trigger: 'resolve', received: false, errorCode: 'jam', $accumulated: [] }, units)).toBe(false);
+  });
+
+  it('reworks from the hop into the station named, or from the holding hop', () => {
+    const hops = planHops(INPUT.steps);
+    const holding = hops[2];
+    expect(reworkHop(hops, holding, 'press-01')).toBe(hops[0]);
+    expect(reworkHop(hops, holding, 'cut-01')).toBe(hops[1]);
+    expect(reworkHop(hops, holding)).toBe(holding);
+    expect(reworkHop(hops, holding, 'nowhere')).toBe(holding);
+    expect(reworkHop(hops, hops[0], 'cut-01')).toBe(hops[0]);
+  });
+});
+

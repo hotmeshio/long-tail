@@ -36,3 +36,21 @@ export const OPERATOR_FORM_SCHEMA = {
     clearedBy: { type: 'string', default: '', description: 'Who cleared it at the machine, when the machine reports it' },
   },
 };
+
+export const QUALITY_FORM_SCHEMA = {
+  title: 'Quality decision',
+  description: 'Units a machine finished on hold: release them to continue, send them back to a station for rework, or scrap them.',
+  'x-lt-order': ['decision', 'station', 'note'],
+  required: ['decision'],
+  properties: {
+    decision: {
+      type: 'string',
+      enum: [DECISION.RELEASE, DECISION.REWORK, DECISION.SCRAP],
+      default: DECISION.RELEASE,
+      description: 'Release, rework or scrap',
+    },
+    station: { type: 'string', default: '', description: 'For rework: the station the units run again from; the holding station when empty' },
+    note: { type: 'string', format: 'textarea', default: '', description: 'What was found' },
+  },
+};
+

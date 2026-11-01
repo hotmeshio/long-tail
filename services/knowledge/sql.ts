@@ -1,10 +1,16 @@
 export const GET_KNOWLEDGE_VERSION = `
-  SELECT domain, key, version, data, tags, change_summary, created_at
+  SELECT domain, key, version, label, data, tags, change_summary, created_at
   FROM lt_knowledge_versions
   WHERE domain = $1 AND key = $2 AND version = $3`;
 
+/** The edition a label names, when one does. */
+export const GET_KNOWLEDGE_VERSION_BY_LABEL = `
+  SELECT version
+  FROM lt_knowledge_versions
+  WHERE domain = $1 AND key = $2 AND label = $3`;
+
 export const LIST_KNOWLEDGE_VERSIONS = `
-  SELECT v.version, v.change_summary, v.created_at,
+  SELECT v.version, v.label, v.change_summary, v.created_at,
          (v.version = k.current_version) AS is_current
   FROM lt_knowledge_versions v
   JOIN lt_knowledge k ON k.domain = v.domain AND k.key = v.key

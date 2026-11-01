@@ -15,12 +15,14 @@ An escalation can reference **versioned knowledge lookups** — enumerated lists
 |-------|----------|---------|
 | `domain` | yes | Knowledge domain |
 | `key` | yes | Entry key within the domain |
-| `version` | no | An edition to pin. Absent or `"current"`, the ref follows the newest edition |
+| `version` | no | An edition to pin, by its number or by the label it carries. Absent or `"current"`, the ref follows the newest edition |
 | `as` | no | The ref's form-context address, when the key alone is ambiguous |
 
 **Current refs** (no `version`, or `"current"`) read the entry's newest edition. A pending row reads the edition in force when its form renders, so a row that stays open for days shows today's list. A resolved or cancelled row reads the edition that was current when it closed, so its history shows the list its work was done against. Form schemas stay pinned (`schemaVersion`); the lists they read follow the knowledge entry.
 
 **Pinned refs** (`version: N`) name an immutable edition: every escalation created against edition 2 renders edition 2 forever, however the entry evolves afterward. Pin when the form must read one exact edition.
+
+**Labelled refs** (`version: "rev-b"`) name an edition by the label the write that minted it gave (`label` on `storeEntry`, `store_knowledge` and `append_knowledge`). A label names one edition of an entry for good, so a ref that carries the label a machine or a document quotes, such as a catalog revision, reads the right edition without knowing its number. A whole-number label no edition carries, `"2"`, reads edition 2. A label nothing carries resolves to nothing: the row is created all the same and its lookup answers `missing: true` until an edition with that label exists.
 
 A value picked from a current list is validated against the edition in force at submit, so an option removed while the form was open is refused with the canonical 422 and the person picks again.
 
@@ -42,7 +44,7 @@ const decision = await conditional<CascadeResolverV1>(signalId, {
 });
 ```
 
-The refs fold into `envelope.lookups` as a pure transform — a wait with refs costs exactly what one without does. A malformed ref (missing field, a version that is not a positive integer or `"current"`) throws before the row is written; over the HTTP create surface the same validation answers with a 400.
+The refs fold into `envelope.lookups` as a pure transform — a wait with refs costs exactly what one without does. A malformed ref (missing field, a version that is neither a positive integer, a non-empty label nor `"current"`) throws before the row is written; over the HTTP create surface the same validation answers with a 400.
 
 ## Pinning on a Workflow Config
 
@@ -63,7 +65,7 @@ const fleetToolsConfig: LTWorkerConfig = {
 
 The Invoke Tool page fetches `GET /api/workflows/:type/input-lookups` each time the form opens; the grant is the invoke predicate, so whoever may start the workflow reads exactly the entries the config names. The invoke API resolves the same refs into the gate, so a value outside the edition is refused with the canonical 422. The registry detail page edits the refs under **Lookups** in its Invocation column; the preview renders against the resolved editions.
 
-The refs are checked twice on save. Shape first: a missing `domain` or `key`, a `version` that is not a positive integer or `"current"`, or an empty `as` answers `400` with the field named. Existence second: a ref with no edition behind it answers `400` naming the editions that do (`Lookup ref fleet/serial-numbers v3 names no edition (editions: v1, v2)`; a current ref to an entry with no editions says `current`), from `PUT /api/workflows/:type/config` and from the MCP `upsert_workflow_config` tool alike. On the worker boot path a malformed ref fails the boot; a ref whose edition is not yet written logs a warning, since seeds commonly run after registration. At run time the resolver holds each edition in memory once read (editions are immutable; a current ref first looks up which edition is newest), a missing edition answers `missing: true` for that ref without failing the batch, the Invoke Tool page shows which editions are unavailable, and the fields that read them follow the `x-lt-options` rules: a plain path falls back to the typed input, an interpolated path stays a disabled select and fails closed.
+The refs are checked twice on save. Shape first: a missing `domain` or `key`, a `version` that is neither a positive integer, a label nor `"current"`, or an empty `as` answers `400` with the field named. Existence second: a ref with no edition behind it answers `400` naming the editions that do (`Lookup ref fleet/serial-numbers v3 names no edition (editions: v1, v2)`; a current ref to an entry with no editions says `current`), from `PUT /api/workflows/:type/config` and from the MCP `upsert_workflow_config` tool alike. On the worker boot path a malformed ref fails the boot; a ref whose edition is not yet written logs a warning, since seeds commonly run after registration. At run time the resolver holds each edition in memory once read (editions are immutable; a current ref first looks up which edition is newest), a missing edition answers `missing: true` for that ref without failing the batch, the Invoke Tool page shows which editions are unavailable, and the fields that read them follow the `x-lt-options` rules: a plain path falls back to the typed input, an interpolated path stays a disabled select and fails closed.
 
 ## Versioning
 
@@ -73,7 +75,7 @@ Every knowledge entry carries a `current_version`, and every write that changes 
 2. **Current refs follow** — every pending row with a current ref shows the new edition on its next render. Nothing to repin.
 3. **Pinned rows keep their edition** — an escalation pinned to v1 renders v1's list even after v5 exists. Repin the literal (and evolve the resolver payload type) when a pinned form should move.
 
-Inspect the lineage with `GET /api/knowledge/entry/versions?domain=catalog&key=materials`, `ltc kb versions catalog materials`, or the `list_knowledge_versions` MCP tool. Fetch a specific edition with `?version=N` on the entry endpoint.
+A write may name the edition it leaves current with `label` (`storeEntry`, `store_knowledge`, `append_knowledge`); the label stays with that edition, and a second edition of the entry cannot take it. Inspect the lineage with `GET /api/knowledge/entry/versions?domain=catalog&key=materials`, `ltc kb versions catalog materials`, or the `list_knowledge_versions` MCP tool; each edition lists its label. Fetch a specific edition with `?version=N` or `?version=<label>` on the entry endpoint, or `version` on `get_knowledge`.
 
 ## The Grant
 

@@ -6,13 +6,14 @@ import { machineRoleConfigs, withMachineRoles } from '../../../services/machines
 describe('machine line roles', () => {
   it('chains the station roles in route order into exit, with the operator beside them', () => {
     const roles = machineRoleConfigs(DEFAULT_LINE);
-    expect(roles.map((r) => r.role)).toEqual(['line-bond', 'line-trim', 'line-inspect', 'line-exit', 'line-operator']);
-    expect(roles.map((r) => r.parent_role)).toEqual([undefined, 'line-bond', 'line-trim', 'line-inspect', undefined]);
+    expect(roles.map((r) => r.role)).toEqual(['line-bond', 'line-trim', 'line-inspect', 'line-exit', 'line-operator', 'line-quality']);
+    expect(roles.map((r) => r.parent_role)).toEqual([undefined, 'line-bond', 'line-trim', 'line-inspect', undefined, undefined]);
     expect(roles.find((r) => r.role === 'line-exit')?.upstream_roles).toEqual(['line-operator']);
   });
 
-  it('enforces the form only on the operator role', () => {
-    expect(machineRoleConfigs(DEFAULT_LINE).filter((r) => r.enforce_schema).map((r) => r.role)).toEqual(['line-operator']);
+  it('enforces the form on the operator and quality roles, which people answer', () => {
+    expect(machineRoleConfigs(DEFAULT_LINE).filter((r) => r.enforce_schema).map((r) => r.role)).toEqual(['line-operator', 'line-quality']);
+    expect(machineRoleConfigs({ ...DEFAULT_LINE, roles: { quality: 'qa' } }).map((r) => r.role)).toContain('qa');
   });
 
   it('keeps every role the host declared and adds only the missing ones, once across lines', () => {
@@ -21,6 +22,6 @@ describe('machine line roles', () => {
     const merged = withMachineRoles(host, [DEFAULT_LINE, second]);
     expect(merged.filter((r) => r.role === 'line-exit')).toEqual(host);
     expect(merged.map((r) => r.role).filter((r) => r === 'line-bond')).toHaveLength(1);
-    expect(merged).toHaveLength(5);
+    expect(merged).toHaveLength(6);
   });
 });

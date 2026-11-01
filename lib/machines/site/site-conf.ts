@@ -13,8 +13,15 @@ import { toSubject } from '../protocol';
 import { jsPermissions } from '../../messaging/nats/permissions';
 import { LINE_STREAM } from '../transport/streams';
 
+/** One topic root for every line, or a root per line (lines on different codecs). */
+export type TopicRoot = string | ((line: LineDef) => string);
+
+export function rootOf(root: TopicRoot, line: LineDef): string {
+  return typeof root === 'string' ? root : root(line);
+}
+
 export interface SiteConfOptions {
-  root: string;
+  root: TopicRoot;
   gatewayUser: string;
   gatewayPassword: string;
   certDir: string;
@@ -55,7 +62,7 @@ function serverName(lines: LineDef[]): string {
 export function renderSiteConf(lines: Lines, opts: SiteConfOptions): string {
   const list = linesOf(lines);
   if (!list.length) throw new Error('renderSiteConf needs at least one line');
-  const baseOf = (line: LineDef) => toSubject(`${opts.root}/${line.siteId}/${line.lineId}`);
+  const baseOf = (line: LineDef) => toSubject(`${rootOf(opts.root, line)}/${line.siteId}/${line.lineId}`);
   const bridge = list.map((line) => [
     `    { user: ${q(`CN=${bridgeId(line)}`)}, allowed_connection_types: ["MQTT"],`,
     `      permissions: { publish: [${q(`${baseOf(line)}.>`)}], subscribe: { deny: [">"] } } }`,

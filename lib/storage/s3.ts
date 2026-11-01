@@ -14,7 +14,10 @@ import {
 import { getSignedUrl as s3GetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'stream';
 
-import type { StorageBackend } from './types';
+import type { StorageBackend, WriteOptions } from './types';
+
+/** The object metadata key the digest is kept under. */
+const SHA256_METADATA = 'sha256';
 import { mimeFromPath } from './mime';
 
 const STAGING_DIR = path.join(os.tmpdir(), 'lt-staging');
@@ -79,12 +82,13 @@ export class S3StorageBackend implements StorageBackend {
     }
   }
 
-  async write(key: string, data: Buffer): Promise<{ ref: string; size: number }> {
+  async write(key: string, data: Buffer, options?: WriteOptions): Promise<{ ref: string; size: number }> {
     await this.bucketReady;
     await this.client.send(new PutObjectCommand({
       Bucket: this.bucket,
       Key: normalizeKey(key),
       Body: data,
+      ...(options?.sha256 ? { Metadata: { [SHA256_METADATA]: options.sha256 } } : {}),
     }));
     return { ref: key, size: data.length };
   }
@@ -214,16 +218,18 @@ export class S3StorageBackend implements StorageBackend {
     };
   }
 
-  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string }> {
+  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string; sha256?: string }> {
     await this.bucketReady;
     const resp = await this.client.send(new HeadObjectCommand({
       Bucket: this.bucket,
       Key: normalizeKey(key),
     }));
+    const sha256 = resp.Metadata?.[SHA256_METADATA];
     return {
       size: resp.ContentLength || 0,
       modified_at: resp.LastModified?.toISOString() || new Date().toISOString(),
       content_type: resp.ContentType || mimeFromPath(key),
+      ...(sha256 ? { sha256 } : {}),
     };
   }
 

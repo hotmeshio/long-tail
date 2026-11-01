@@ -10,10 +10,10 @@
 import { addressOf, clientIdOf } from '../protocol/envelope';
 import { topicOf, type LineCodec } from '../protocol/codec';
 import { controllerId, identOf, learnsAddress, type LineDef } from '../line';
-import { bridgeId, linesOf, type Lines } from './site-conf';
+import { bridgeId, linesOf, rootOf, type Lines, type TopicRoot } from './site-conf';
 
 export interface MosquittoConfOptions {
-  root: string;
+  root: TopicRoot;
   /** Certificate directory as the broker sees it. */
   certDir: string;
   /** Where the site NATS MQTT listener is, host:port. */
@@ -34,7 +34,7 @@ remote_clientid ${bridgeId(line)}
 cleansession false
 try_private false
 notifications false
-topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
+topic ${rootOf(opts.root, line)}/${line.siteId}/${line.lineId}/# out 1
 `;
 }
 
@@ -68,14 +68,20 @@ ${list.map((line) => bridgeBlock(line, opts)).join('\n')}`;
  * the channels under its own name (%u), so its certificate's common name must be its address. On a line
  * that also declares addresses, a certificate named for a declared address is denied that station's channels.
  */
-export function renderMosquittoAcl(lines: Lines, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+export type AclCodec = Pick<LineCodec, 'root' | 'channels' | 'topicFor'>;
+
+/** One codec for every line, or the codec of each line. */
+export type AclCodecs = AclCodec | ((line: LineDef) => AclCodec);
+
+export function renderMosquittoAcl(lines: Lines, codec: AclCodecs): string {
   const list = linesOf(lines);
   if (!list.length) throw new Error('renderMosquittoAcl needs at least one line');
-  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${list.map((line) => aclRules(line, codec)).join('\n\n')}\n`;
+  const codecOf = (line: LineDef) => (typeof codec === 'function' ? codec(line) : codec);
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${list.map((line) => aclRules(line, codecOf(line))).join('\n\n')}\n`;
 }
 
 /** One line's rules: its stations, its controller, and the shadows a learning line needs. */
-function aclRules(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+function aclRules(line: LineDef, codec: AclCodec): string {
   const { siteId, lineId } = line;
   const { events, telemetry, commands } = codec.channels;
   const own = (address: string, channels: string[]) => channels.map((c) => topicOf(codec, { siteId, lineId, address }, c));

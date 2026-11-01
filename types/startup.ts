@@ -222,6 +222,8 @@ export interface LTMachinesConfig {
   declareRoles?: boolean;
   /** The machines' wire protocol; the generic line protocol under MACHINE_TOPIC_ROOT by default. */
   codec?: LineCodec;
+  /** A codec for one line, keyed `<siteId>/<lineId>`; every other line, code or API declared, uses `codec`. */
+  codecs?: Record<string, LineCodec>;
   /** Reads the host's rows into machine handoffs; the standard handoff facets by default. */
   rows?: HandoffRowAdapter;
 }

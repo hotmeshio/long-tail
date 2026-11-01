@@ -12,15 +12,24 @@
  * job never started, since not every unit arrived), so the units that arrived
  * come to rest, and a person collects each group where it stopped. A cancelled
  * handoff stops the sender's started job the same way (`stop` with the job).
+ *
+ * Units a machine finished on hold wait for the quality role: release runs
+ * the hop again from the holding machine, rework runs the route again from a
+ * station it names (the holding machine by default), scrap ends the route.
+ * When the line's codec declares a disposition command, the decision is also
+ * sent to the holding machine as a command row on its role.
  */
 
 import { conditional, conditionalAccumulator } from '../../../../services/orchestrator/condition';
-import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, handoffDecisions, signalKeys, type HandoffUnit, type OperatorResolution } from '../../../../services/machines/contracts';
+import {
+  DECISION, HANDOFF_ERROR, HOLD_DECISIONS, LINE_ROLE, ROW_TYPE, handoffDecisions, signalKeys,
+  type HandoffUnit, type OperatorResolution, type QualityResolution,
+} from '../../../../services/machines/contracts';
 import { commandRow } from '../../../../services/machines/commands';
-import { OP } from '../../../../lib/machines/protocol';
+import { JOB_RESULT, OP } from '../../../../lib/machines/protocol';
 import type { LTEnvelope } from '../../../../types';
 import {
-  UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, isMachineStep, jobIdFor, pickupRow, planHops, readHopOutcome, roleOf,
+  UNIT_ROUTE_WORKFLOW, hopFacets, hopRow, isMachineStep, jobIdFor, pickupRow, planHops, readHopOutcome, reworkHop, roleOf,
   type Hop, type HopOutcome, type RouteStep, type UnitRouteInput,
 } from './route';
 
@@ -91,6 +100,40 @@ async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, sen
   }
 }
 
+/** Ask the quality role what to do with units the sender finished on hold. */
+async function askQuality(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt: number, outcome: HopOutcome): Promise<QualityResolution> {
+  const where = stationName(hop.from, 'line entry');
+  let refused = '';
+  for (let round = 1; ; round++) {
+    const answer = await conditional<QualityResolution>(signalKeys.hold(input.routeKey, hop.index, attempt, round), {
+      role: input.qualityRole ?? LINE_ROLE.QUALITY,
+      type: ROW_TYPE.QUALITY_HOLD,
+      subtype: JOB_RESULT.HOLD,
+      description: `${refused}${input.units.map((u) => u.unitId).join(', ')} held at ${where}. ${outcome.detail ?? ''} Choose ${HOLD_DECISIONS.join(', ')}.`.replace(/\s+/g, ' ').trim(),
+      priority: 1,
+      workflowType: UNIT_ROUTE_WORKFLOW,
+      metadata: {
+        ...hopFacets(input, hop, attempt, senderAttempt), errorCode: outcome.errorCode, result: outcome.result, detail: outcome.detail ?? null, decisions: HOLD_DECISIONS, round,
+      } as Record<string, unknown>,
+      timeout: input.operatorTimeout ?? OPERATOR_TIMEOUT,
+    });
+    if (!answer) return { decision: DECISION.SCRAP, note: 'no decision before the timeout' };
+    if (HOLD_DECISIONS.includes(answer.decision)) return answer;
+    refused = `${answer.decision} is not available here. `;
+  }
+}
+
+/** Tell the holding machine the decision, when its codec has a command for it. */
+async function sendDisposition(input: UnitRouteInput, hop: Hop, attempt: number, senderAttempt: number, quality: QualityResolution): Promise<void> {
+  if (!input.dispositionOp || !isMachineStep(hop.from)) return;
+  const target = { siteId: input.siteId, lineId: input.lineId, machineId: hop.from.machineId, role: roleOf(input, hop.from) };
+  const args = { jobId: jobIdFor(input.routeKey, hop.from, senderAttempt), unitIds: input.units.map((u) => u.unitId), decision: quality.decision, note: quality.note ?? null };
+  await conditional(signalKeys.disposition(input.routeKey, hop.index, attempt), {
+    ...commandRow(target, input.dispositionOp, args),
+    workflowType: UNIT_ROUTE_WORKFLOW,
+  });
+}
+
 function stationName(step: RouteStep | null, end = 'exit'): string {
   if (!step) return end;
   return isMachineStep(step) ? step.machineId : step.role;
@@ -103,13 +146,38 @@ export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
 
   // The attempt that brought the units to the current sender: its job is the one to release them.
   let senderAttempt = 1;
-  for (const hop of hops) {
-    for (let attempt = 1; ; attempt++) {
+  // Every attempt of a hop mints a fresh signal key, across reruns of the hop after a rework.
+  const attempts = new Map<number, number>();
+  const nextAttempt = (hop: Hop) => {
+    const n = (attempts.get(hop.index) ?? 0) + 1;
+    attempts.set(hop.index, n);
+    return n;
+  };
+  for (let h = 0; h < hops.length; ) {
+    const hop = hops[h];
+    let next = h + 1;
+    for (;;) {
+      const attempt = nextAttempt(hop);
       const outcome = await handoff(input, hop, attempt, senderAttempt);
       history.push({ hop: hop.index, to: stationName(hop.to), attempt, ...outcome });
       if (outcome.received) {
         senderAttempt = attempt;
         break;
+      }
+      if (outcome.errorCode === HANDOFF_ERROR.SENDER_REJECTED && outcome.result === JOB_RESULT.HOLD && hop.from) {
+        const quality = await askQuality(input, hop, attempt, senderAttempt, outcome);
+        await sendDisposition(input, hop, attempt, senderAttempt, quality);
+        history.push({ hop: hop.index, held: true, decision: quality.decision, station: quality.station ?? null });
+        if (quality.decision === DECISION.RELEASE) continue;
+        if (quality.decision === DECISION.REWORK) {
+          // The units run again from the station named, carried there from the holding machine.
+          const again = reworkHop(hops, hop, quality.station);
+          if (again.index === hop.index) continue;
+          hops[again.index] = { ...again, from: hop.from };
+          next = again.index;
+          break;
+        }
+        return { type: 'return' as const, data: { status: 'scrapped', at: stationName(hop.from, 'entry'), note: quality.note, history } };
       }
       // The sender's job is started work: its units are there. The receiver's never started: not every unit arrived.
       if (outcome.errorCode === HANDOFF_ERROR.CANCELLED) await stopJob(input, hop, attempt, hop.from, senderAttempt, OP.STOP);
@@ -129,6 +197,7 @@ export async function machineUnitRoute(envelope: LTEnvelope): Promise<any> {
       }
       return { type: 'return' as const, data: { status: 'scrapped', at: stationName(hop.from, 'entry'), note, history } };
     }
+    h = next;
   }
   return { type: 'return' as const, data: { status: 'complete', units: input.units.map((u) => u.unitId), history } };
 }

@@ -70,7 +70,7 @@ export class GatewayStopped extends Error {
 }
 
 export class Dispatcher {
-  private readonly sent = new Map<string, number>();
+  private readonly sent = new Map<string, { attempt: number; issuedAt: number }>();
   private readonly stopping = new AbortController();
 
   constructor(private readonly d: DispatcherDeps) {}
@@ -84,20 +84,25 @@ export class Dispatcher {
     if (this.stopping.signal.aborted) throw new GatewayStopped();
   }
 
-  /** This send's attempt number, and whether the machine may have the command already. */
-  private countSend(cmdId: string, since?: number): { attempt: number; retry: boolean } {
-    const attempt = (this.sent.get(cmdId) ?? 0) + 1;
+  /**
+   * This send's attempt number, whether the machine may have the command already, and when it was
+   * issued: the time given (a round's start, the same for every gateway), else the first send's.
+   */
+  private countSend(cmdId: string, since?: number, issuedAt?: number): { attempt: number; retry: boolean; issuedAt: string } {
+    const before = this.sent.get(cmdId);
+    const record = { attempt: (before?.attempt ?? 0) + 1, issuedAt: issuedAt ?? before?.issuedAt ?? Date.now() };
     this.sent.delete(cmdId);
-    this.sent.set(cmdId, attempt);
+    this.sent.set(cmdId, record);
     if (this.sent.size > SENT_REMEMBERED) this.sent.delete(this.sent.keys().next().value!);
-    return { attempt, retry: attempt > 1 || (since !== undefined && since < this.d.state.takenAt) };
+    const retry = record.attempt > 1 || (since !== undefined && since < this.d.state.takenAt);
+    return { attempt: record.attempt, retry, issuedAt: isoTs(record.issuedAt) };
   }
 
   /** False when the codec has no message for the command. `since` is when the command's row was created. */
-  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<boolean> {
+  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number, issuedAt?: number): Promise<boolean> {
     this.live();
     const ident = identFor(this.d.state, this.d.line, machineId);
-    const command = { cmdId, op, args, ...this.countSend(cmdId, since) };
+    const command = { cmdId, op, args, ...this.countSend(cmdId, since, issuedAt) };
     const wires = this.d.codec.encode(ident, command);
     for (const wire of wires) {
       await this.d.bus.publish(wire.topic, wire.payload);
@@ -107,11 +112,11 @@ export class Dispatcher {
   }
 
   /** Publish and wait for the reply, asking again with the same id; null when none came. */
-  async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number): Promise<CommandReply | null> {
+  async ask(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number, issuedAt?: number): Promise<CommandReply | null> {
     for (let attempt = 1; attempt <= this.d.dispatchAttempts; attempt++) {
       this.live();
       const waiting = this.d.replies.wait(cmdId, this.d.replyTimeoutMs);
-      if (!await this.publish(machineId, op, cmdId, args, since)) {
+      if (!await this.publish(machineId, op, cmdId, args, since, issuedAt)) {
         this.d.replies.settle({ cmdId, status: COMMAND_STATUS.UNSUPPORTED, reason: `the line's codec has no ${op} command` });
       }
       const reply = await waiting;
@@ -139,8 +144,9 @@ export class Dispatcher {
    */
   async control(a: ControlAction): Promise<void> {
     const now = Date.now();
-    const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, this.d.replyTimeoutMs * this.d.dispatchAttempts);
-    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt);
+    const ttlMs = this.d.replyTimeoutMs * this.d.dispatchAttempts;
+    const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, ttlMs);
+    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt, expiresAt - ttlMs);
     // Timers may fire a little early; the command must have expired before the row says no-reply.
     if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1, undefined, { signal: this.stopping.signal }).catch(() => undefined);
     this.live();
@@ -165,19 +171,31 @@ export class Dispatcher {
     // Known before any reply, so a failure that follows an acceptance finds its row.
     for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
     const since = state.get(a.rowId)?.createdAt;
-    const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units }, since)));
+    const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units }, since, a.issuedAt)));
     const refused = replies.find((r) => r && !took(r));
     const silent = jobs.filter((_, i) => !replies[i]);
     const held = !refused && silent.length ? await this.heldJobs(a.machineId, a.cmdId) : null;
     this.live();
     const reconciled = !!held && silent.every((j) => held.has(j.jobId));
+    if (a.ended) {
+      this.resent(a, jobs, refused ?? null, !refused && (!silent.length || reconciled));
+      return;
+    }
     const row = state.get(a.rowId);
     if (!refused && (!silent.length || reconciled)) {
       if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
+      for (const job of jobs) state.rememberSent(a.machineId, job.jobId, a.rowId);
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
       this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
-      if (a.receivedOnAccept) await this.received(a);
+      if (!a.receivedOnAccept) return;
+      const preparing = jobs.filter((job, i) => replies[i]?.status === REPLY_STATUS.ACCEPTED && replies[i]?.preparing).map((job) => `${a.cmdId}${job.suffix}`);
+      if (!preparing.length) {
+        await this.received(a);
+        return;
+      }
+      if (row) row.awaitingReady = new Set(preparing);
+      log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: preparing });
       return;
     }
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
@@ -195,7 +213,14 @@ export class Dispatcher {
     await this.withdraw(a, jobs.filter((_, i) => !replies[i] || took(replies[i])));
   }
 
-  /** The units were already at the machine: its acceptance completes the handoff. */
+  /** A job sent again after the machine restarted, for a row that already ended: the reply is only logged. */
+  private resent(a: DispatchAction, jobs: DispatchJob[], refused: CommandReply | null, taken: boolean): void {
+    const context = { row: a.rowId, machine: a.machineId, jobs: jobs.map((j) => j.jobId), resent: true };
+    if (taken) this.d.log.info(GATEWAY_LOG.DISPATCHED, { ...context, reason: 'sent again after a restart' });
+    else this.d.log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { ...context, reason: refused ? `${refused.status}: ${refused.reason}` : 'no reply' });
+  }
+
+  /** The units were already at the machine: a job it has taken and is ready for completes the handoff. */
   private async received(a: DispatchAction): Promise<void> {
     this.live();
     const units = (a.args.units as { unitId: string }[]).map((u) => u.unitId);

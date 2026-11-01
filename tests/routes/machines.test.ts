@@ -6,7 +6,7 @@ import { registerMachineSurface } from '../../modules/machines';
 import { commandOpsOf, summarizeLine, type LineSurface, type WireProbe } from '../../services/machines/surface';
 import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import type { LineDef } from '../../lib/machines/line';
-import type { InspectResult, LineView } from '../../types/machines-view';
+import type { InspectResult, LineView, WireEvent } from '../../types/machines-view';
 
 const ctx = setupRouteTest(4653);
 
@@ -27,6 +27,7 @@ function surface(leading: boolean): LineSurface {
     describeLines: () => [summarizeLine(DEFAULT_LINE, { rowOps: ['probe'] })],
     describeLine: (s, l) => (leading && declared(s, l) ? view : null),
     inspect: (s, l, probe) => (leading && declared(s, l) ? planned(probe) : null),
+    wire: (s, l, query = {}) => (leading && declared(s, l) ? WIRE.filter((e) => !query.machine || e.machineId === query.machine).slice(0, query.limit ?? WIRE.length) : null),
     findLine: (s, l) => (declared(s, l) ? DEFAULT_LINE : undefined),
     commandOps: () => commandOpsOf({ rowOps: ['probe'] }),
     declare: async (line: LineDef) => { runs.push(`declare ${line.siteId}/${line.lineId}`); return 'started'; },
@@ -36,6 +37,13 @@ function surface(leading: boolean): LineSurface {
 
 /** What the fake surface was asked to run or stop. */
 const runs: string[] = [];
+
+const wireEvent = (machineId: string, event: string, at: string): WireEvent => ({
+  type: 'machine.wire', siteId, lineId, machineId, address: machineId, direction: 'in', channel: 'job', topic: `line/v1/${siteId}/${lineId}/${machineId}/job`,
+  id: `${machineId}-${event}`, at, retained: false, kind: 'job', event, summary: `job ${event}`, violations: [], actions: [], payload: { secret: true },
+});
+/** The leader's window, newest first. */
+const WIRE: WireEvent[] = [wireEvent('cut-01', 'started', '2026-03-01T08:00:02.000Z'), wireEvent('press-01', 'arrived', '2026-03-01T08:00:01.000Z')];
 const OTHER_SITE = 'site-9';
 const otherLine = (lineId: string, machines = DEFAULT_LINE.machines): LineDef => ({ ...DEFAULT_LINE, siteId: OTHER_SITE, lineId, machines });
 
@@ -192,5 +200,28 @@ describe('machines routes', () => {
     expect(rowId).toMatch(/^[0-9a-f-]{36}$/);
     const row = await (await fetch(`${ctx.BASE}/escalations/${rowId}`, { headers: authHeaders(ctx.builderToken) })).json();
     expect(row).toMatchObject({ role: COMMAND_ROLE, type: 'machine-command', subtype: 'probe', metadata: { siteId, lineId, machineId: 'press-01', op: 'probe', args: { depth: 2 } } });
+  });
+
+  describe('the wire window', () => {
+    it('reads the leader\'s last events newest first, narrowed by the query, with the payload for builders only', async () => {
+      registerMachineSurface(surface(true));
+      const all = await (await fetch(`${ctx.BASE}${LINE_PATH}/wire`, { headers: authHeaders(ctx.builderToken) })).json();
+      expect(all).toMatchObject({ siteId, lineId, leading: true });
+      expect(all.events.map((e: WireEvent) => e.machineId)).toEqual(['cut-01', 'press-01']);
+      expect(all.events[0].payload).toEqual({ secret: true });
+      const one = await (await fetch(`${ctx.BASE}${LINE_PATH}/wire?machine=press-01&limit=1`, { headers: authHeaders(ctx.builderToken) })).json();
+      expect(one.events.map((e: WireEvent) => e.machineId)).toEqual(['press-01']);
+      const ops = await (await fetch(`${ctx.BASE}${LINE_PATH}/wire`, { headers: authHeaders(ctx.adminToken) })).json();
+      expect(ops.events).toHaveLength(2);
+      expect(ops.events[0]).not.toHaveProperty('payload');
+    });
+
+    it('answers an empty window from a replica standing by, and refuses a query it cannot read', async () => {
+      registerMachineSurface(surface(false));
+      const standing = await (await fetch(`${ctx.BASE}${LINE_PATH}/wire`, { headers: authHeaders(ctx.builderToken) })).json();
+      expect(standing).toEqual({ siteId, lineId, leading: false, events: [] });
+      expect((await fetch(`${ctx.BASE}${LINE_PATH}/wire?direction=sideways`, { headers: authHeaders(ctx.builderToken) })).status).toBe(400);
+      expect((await fetch(`${ctx.BASE}/machines/lines/${siteId}/nowhere/wire`, { headers: authHeaders(ctx.builderToken) })).status).toBe(404);
+    });
   });
 });

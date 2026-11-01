@@ -103,3 +103,28 @@ describe('machine broker ACL, a line that learns addresses', () => {
     expect(() => renderMosquittoAcl(line, genericCodec({ root: 'line/v1' }))).toThrow(/broker user name/);
   });
 });
+
+describe('lines on different codecs', () => {
+  const second = { ...DEFAULT_LINE, lineId: 'line-2' };
+  const other = { root: 'cell/v2', channels: { events: ['state'], telemetry: ['readings/#'], commands: ['control'] } };
+  const codecOf = (line: { lineId: string }) => (line.lineId === 'line-2' ? other : genericCodec({ root: 'line/v1' }));
+
+  it('renders each line\'s ACL from its own codec', () => {
+    const acl = renderMosquittoAcl([DEFAULT_LINE, second], codecOf);
+    const press1 = acl.split('\n\n').find((b) => b.includes('user site-1-line-1-press-01'))!;
+    const press2 = acl.split('\n\n').find((b) => b.includes('user site-1-line-2-press-01'))!;
+    expect(press1).toContain('topic write line/v1/site-1/line-1/press-01/job');
+    expect(press2).toContain('topic write cell/v2/site-1/line-2/press-01/state');
+    expect(press2).toContain('topic read cell/v2/site-1/line-2/press-01/control');
+    expect(press2).not.toContain('/job');
+  });
+
+  it('bridges each line under its own root', () => {
+    const conf = renderMosquittoConf([DEFAULT_LINE, second], {
+      root: (line) => codecOf(line).root, certDir: '/certs', siteNats: 'site-nats:8883', aclFile: '/acl',
+    });
+    expect(conf).toContain('topic line/v1/site-1/line-1/# out 1');
+    expect(conf).toContain('topic cell/v2/site-1/line-2/# out 1');
+  });
+});
+

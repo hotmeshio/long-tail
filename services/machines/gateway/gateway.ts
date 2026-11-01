@@ -11,7 +11,7 @@ import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
 import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
-import { admitSender, holdViolation, type AdmissionContext, type Applied } from './admission';
+import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
@@ -29,6 +29,7 @@ import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
 import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
+import { WireWindow } from './wire-window';
 
 export interface GatewaySettings {
   topicRoot: string;
@@ -47,6 +48,8 @@ export interface GatewaySettings {
   progressStep?: number;
   /** Record telemetry messages on the wire too; off unless set. */
   wireTelemetry?: boolean;
+  /** How many of the latest wire events the gateway keeps for reading over HTTP; 500 by default. */
+  wireWindow?: number;
 }
 
 export interface GatewayDeps {
@@ -76,6 +79,8 @@ export class MachineGateway {
   private readonly addresses: AddressBook;
   private readonly admission: AdmissionContext;
   private readonly wire: WireRecorder;
+  /** The line's last wire events, newest first on read. */
+  readonly window: WireWindow;
   private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
@@ -89,14 +94,16 @@ export class MachineGateway {
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
-    this.wire = new WireRecorder(deps.line, deps.wire ?? publishMachineWireEvent, { telemetry: deps.settings.wireTelemetry === true });
+    this.window = new WireWindow(deps.settings.wireWindow);
+    const sink = deps.wire ?? publishMachineWireEvent;
+    this.wire = new WireRecorder(deps.line, (event) => { this.window.push(event); sink(event); }, { telemetry: deps.settings.wireTelemetry === true });
     this.executor = new Executor({
       addresses: this.addresses, wire: this.wire,
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
-    this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace() };
+    this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace(), openRows: (q) => deps.lt.listOpen(q) };
     this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log, wire: this.wire });
   }
 
@@ -276,9 +283,14 @@ export class MachineGateway {
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
       }
-      const applied = seen.violations.length && this.codec.strict
+      let applied = seen.violations.length && this.codec.strict
         ? await holdViolation(this.admission, msg, seen)
         : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
+      // An arrival still waiting for its row after every delivery is shown to a person instead; one that read no id at once.
+      const waited = msg.deliveries >= MAX_DELIVERIES || isUnreadableArrival(seen);
+      if (applied.disposition === DISPOSITION.NAK && !applied.failed && waited && isArrival(seen)) {
+        applied = await holdArrival(this.admission, msg, seen);
+      }
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
       this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, msg.deliveries);

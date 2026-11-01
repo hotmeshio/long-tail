@@ -50,6 +50,10 @@ class MemoryStreams implements LTStreams {
     else this.streams.set(spec.name, { spec, messages: [], seq: 0, consumers: new Map(), wake: new Set() });
   }
 
+  async describeStream(name: string): Promise<StreamSpec | null> {
+    return this.streams.get(name)?.spec ?? null;
+  }
+
   async ensureConsumer(stream: string, spec: ConsumerSpec): Promise<void> {
     const s = this.stream(stream);
     const existing = s.consumers.get(spec.name);

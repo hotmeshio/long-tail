@@ -181,6 +181,7 @@ export function plannedAction(a: Action): WireAction {
     case 'watchOffline': return { verb: 'none', detail: `watching ${a.machineId} for an offline row` };
     case 'settleReply': return { verb: 'ack', detail: `${a.status} ${a.cmdId}` };
     case 'settleSnapshot': return { verb: 'ack', detail: `${a.machineId} holds ${count(a.jobIds.length, 'job')}` };
+    case 'unrecoverable': return { verb: 'none', detail: `${a.machineId} lost ${a.jobs.join(', ')}; nothing remembered to send again` };
     case 'bindAddress': return { verb: 'ack', detail: `bind ${a.machineId} to ${a.address}` };
     case 'refuseBinding': return { verb: 'refuse', detail: a.reason };
   }

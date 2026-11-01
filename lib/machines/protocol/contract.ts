@@ -47,7 +47,7 @@ const BODY: Record<MessageKind, Schema> = {
     jobs: { type: 'array', items: shape({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
     alarms: { type: 'array', items: STR },
     cycles: INT0,
-  }),
+  }, ['bootId', 'software', 'recipe', 'cycles']),
   [MESSAGE_KIND.JOB]: shape({
     event: oneOf(JOB_EVENT), jobId: STR, unitId: STR, orderRef: STR, recipe: RECIPE, carrierId: STR_N, peer: STR_N,
     result: oneOf(JOB_RESULT), reason: STR_N,
@@ -58,15 +58,15 @@ const BODY: Record<MessageKind, Schema> = {
     materials: { type: 'array', items: shape({ material: STR, lot: STR }) },
     startedAt: TS, endedAt: TS, durationMs: INT0, failure: oneOf(TRANSFER_FAILURE),
     percent: { type: 'number', minimum: 0, maximum: 100 }, remainingSec: INT0, stage: STR, detail: { type: 'object' },
-  }, ['jobId', 'unitId', 'peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'stage', 'detail']),
+  }, ['jobId', 'unitId', 'orderRef', 'peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'stage', 'detail']),
   [MESSAGE_KIND.ALARM]: shape({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
     raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,
-    zone: STR_N, autoClears: BOOL, action: STR_N, jobId: STR_N,
-  }),
+    zone: STR_N, autoClears: BOOL, action: STR_N, jobId: STR_N, needsPerson: BOOL,
+  }, ['needsPerson']),
   [MESSAGE_KIND.TELEMETRY]: shape({ readings: { type: 'object', additionalProperties: NUM } }),
   [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
-  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR }, ['code']),
+  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR, preparing: BOOL }, ['code', 'preparing']),
   [MESSAGE_KIND.REPORT]: { type: 'object' },
 };
 
@@ -112,6 +112,11 @@ export function inspectMessage(root: string, topic: string, raw: string | Buffer
 /** Job events a receiver may report naming only the carrier it scanned. */
 const CARRIER_EVENTS: string[] = [JOB_EVENT.ARRIVED, JOB_EVENT.TRANSFER_FAILED];
 
+/** A receiver's report that it could read no id at all: a transfer failure on the read, naming no unit and no carrier. */
+export function isUnreadableRead(b: Record<string, any>): boolean {
+  return b.event === JOB_EVENT.TRANSFER_FAILED && b.failure === TRANSFER_FAILURE.UNREADABLE_ID && b.unitId === undefined && typeof b.carrierId !== 'string';
+}
+
 function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean): string[] {
   const out: string[] = [];
   const b: Record<string, any> = env.body ?? {};
@@ -120,8 +125,8 @@ function crossFieldRules(parsed: ParsedTopic, env: Envelope, retained?: boolean)
   if (s.site !== ident.siteId || s.line !== ident.lineId || s.machine !== ident.machineId) out.push('source disagrees with the topic');
   if (kind === MESSAGE_KIND.ALARM && b.alarmId !== key) out.push('alarmId disagrees with the topic');
   if (kind === MESSAGE_KIND.JOB) {
-    // A scan at a receiver may read only the carrier; every other job event names its unit and job.
-    const byCarrier = CARRIER_EVENTS.includes(b.event) && typeof b.carrierId === 'string';
+    // A scan at a receiver may read only the carrier, or nothing at all when the read failed; every other job event names its unit and job.
+    const byCarrier = CARRIER_EVENTS.includes(b.event) && (typeof b.carrierId === 'string' || isUnreadableRead(b));
     if (b.unitId === undefined && !byCarrier) out.push(`${b.event} without a unitId`);
     if (b.jobId === undefined && !byCarrier) out.push(`${b.event} without a jobId`);
     if (b.event === JOB_EVENT.FINISHED) {

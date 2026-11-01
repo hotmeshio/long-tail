@@ -145,4 +145,26 @@ describe('File browser routes', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  // ── Upload digests ────────────────────────────────────────────────────────
+
+  describe('upload digests', () => {
+    const digest = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+
+    it('stores bytes whose digest matches and answers it', async () => {
+      const res = await fetch(`${ctx.BASE}/file-browser/upload?path=digests/hello.txt&sha256=${digest}`, {
+        method: 'POST', headers: { ...authHeaders(ctx.builderToken), 'Content-Type': 'text/plain' }, body: 'hello',
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ path: 'digests/hello.txt', size: 5, sha256: digest });
+    });
+
+    it('refuses bytes that differ from the digest named with 422', async () => {
+      const res = await fetch(`${ctx.BASE}/file-browser/upload?path=digests/other.txt&sha256=${'0'.repeat(64)}`, {
+        method: 'POST', headers: { ...authHeaders(ctx.builderToken), 'Content-Type': 'text/plain' }, body: 'hello',
+      });
+      expect(res.status).toBe(422);
+      expect(await res.json()).toMatchObject({ expected: '0'.repeat(64), actual: digest });
+    });
+  });
 });

@@ -22,8 +22,11 @@ export interface CreateRowInput {
 }
 
 export type Action =
-  /** `receivedOnAccept`: the units are already at the machine, so its acceptance completes the handoff. */
-  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; receivedOnAccept?: boolean }
+  /**
+   * `receivedOnAccept`: the units are already at the machine, so its acceptance completes the handoff.
+   * `ended`: the row already resolved; the job is sent again for units the machine still holds, and no verb touches the row.
+   */
+  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; issuedAt?: number; receivedOnAccept?: boolean; ended?: boolean }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   /** A host's machine-command row: send the command, resolve the row with the reply. */
   | { kind: 'control'; rowId: string; machineId: string; op: string; args: Record<string, any>; createdAt?: number }
@@ -35,13 +38,15 @@ export type Action =
   /** A row for a person, raised by the controller. */
   | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
-  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string }
+  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string; preparing?: boolean }
   /** A machine reported the jobs it holds: answers a status query in flight. */
   | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] }
   /** Bind a station to the address that claims it, and keep the binding in the address book. `by`: who approved it, when someone did. */
   | { kind: 'bindAddress'; machineId: string; address: string; by?: string }
   /** An approved registration the gateway will not bind, and why. */
-  | { kind: 'refuseBinding'; machineId: string; address: string; reason: string };
+  | { kind: 'refuseBinding'; machineId: string; address: string; reason: string }
+  /** Jobs a restarted machine lost that this gateway cannot send again: nothing of them is remembered. */
+  | { kind: 'unrecoverable'; machineId: string; jobs: string[] };
 
 /** Once the row holds every one of `keys`: resolve it with `payload`, or run `then` instead. */
 export interface Completion {

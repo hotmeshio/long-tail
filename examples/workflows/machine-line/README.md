@@ -38,7 +38,8 @@ Minting one manifest or the other per order is all it takes to run a share of or
 
 A handoff that ends without a receipt (refusal, no reply, jam, wrong carrier, unreadable id, reject, timeout) parks a `line-operator` row. Its `decisions` facet lists what the operator may choose:
 - For a failure in the move itself, the units are still on the line: `retry` dispatches the same hop again as a new job, `manual` hands them to a person from where they stopped, and `scrap` ends the route.
-- When the sender finished the units as reject, hold, scrap or rework, they are off the line for good: the row offers `manual` (a person takes them from the sender) and `scrap`. Any other answer gets a new row that says so.
+- When the sender finished the units as reject, scrap or rework, they are off the line for good: the row offers `manual` (a person takes them from the sender) and `scrap`. Any other answer gets a new row that says so.
+- When the sender finished the units on hold, a `line-quality` row asks for `release` (the hop runs again from the holding machine), `rework` with an optional `station` (the route runs again from that station, the units carried there from the holding machine) or `scrap`. With `dispositionOp` set to the command the line's codec declares for it, the decision also goes to the holding machine as a command row on its role. The mock's `disposition` drill (`{ unitId, decision }`) plays the person who lets a held unit go.
 - A cancelled handoff first stops the sender's job with a `stop` command row on the sender's role (the job is started work; its units are there), so the units come to rest there, then asks the operator. A partial arrival withdraws the receiver's job with a `cancel` row, since a job not every unit reached never started.
 
 ## Run it

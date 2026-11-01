@@ -98,4 +98,15 @@ describe('the wire record', () => {
     const waiting = await until(() => events.find((e) => e.kind === 'job' && e.event === 'arrived' && e.summary.includes('U7')));
     expect(waiting.actions).toEqual([{ verb: 'none', detail: 'waiting for its row (delivery 1)' }]);
   });
+
+  it('keeps the last events in the leader\'s window, newest first', async () => {
+    rig = await startRig({}, { wireWindow: 50 }, DEFAULT_LINE, { wire: () => undefined });
+    const row = await rig.handoff('U1', null, 'press-01');
+    expect(row.status).toBe('resolved');
+    const window = rig.gateway.window.read();
+    expect(window.length).toBeLessThanOrEqual(50);
+    expect(new Date(window[0].at).getTime()).toBeGreaterThanOrEqual(new Date(window[window.length - 1].at).getTime());
+    expect(rig.gateway.window.read({ direction: 'out', kind: 'cmd', machine: 'press-01' })[0]).toMatchObject({ event: 'dispatch', machineId: 'press-01' });
+  });
 });
+

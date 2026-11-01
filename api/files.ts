@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { getStorageBackend } from '../lib/storage';
 import { mimeFromPath } from '../lib/storage/mime';
 import { publishFileEvent } from '../lib/events/publish';
@@ -54,12 +55,30 @@ export async function deleteFile(input: {
   }
 }
 
+const SHA256_HEX = /^[0-9a-f]{64}$/i;
+
+/**
+ * Stores the bytes with their SHA-256. A caller that names the digest it
+ * expects gets 422 when the bytes received differ, and nothing is stored.
+ */
 export async function uploadFile(input: {
   path: string;
   buffer: Buffer;
+  sha256?: string;
 }): Promise<LTApiResult> {
+  if (input.sha256 !== undefined && !SHA256_HEX.test(input.sha256)) {
+    return { status: 400, error: 'sha256 must be 64 hex characters' };
+  }
+  const sha256 = createHash('sha256').update(input.buffer).digest('hex');
+  if (input.sha256 && input.sha256.toLowerCase() !== sha256) {
+    return {
+      status: 422,
+      error: 'sha256 does not match the bytes received',
+      data: { error: 'sha256 does not match the bytes received', path: input.path, expected: input.sha256.toLowerCase(), actual: sha256 },
+    };
+  }
   try {
-    const result = await getStorageBackend().write(input.path, input.buffer);
+    const result = await getStorageBackend().write(input.path, input.buffer, { sha256 });
     const contentType = mimeFromPath(input.path);
     publishFileEvent({
       type: 'file.stored',
@@ -69,7 +88,7 @@ export async function uploadFile(input: {
     });
     return {
       status: 200,
-      data: { path: input.path, size: result.size, content_type: contentType },
+      data: { path: input.path, size: result.size, content_type: contentType, sha256 },
     };
   } catch (err: any) {
     return { status: 500, error: err.message };

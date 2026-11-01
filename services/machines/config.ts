@@ -40,6 +40,8 @@ export interface MachineLineConfig {
   progressStep: number;
   /** Telemetry messages are published as wire events too; off by default, since they are read live and many. */
   wireTelemetry: boolean;
+  /** How many of the line's last wire events the leader keeps for GET .../wire. */
+  wireWindow: number;
   ltBaseUrl: string;
 }
 
@@ -114,6 +116,7 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     lifecycle: oneOf('MACHINE_LIFECYCLE', env.MACHINE_LIFECYCLE || SWITCH.OFF, Object.values(SWITCH)) === SWITCH.ON,
     progressStep: percentStep(env, 'MACHINE_PROGRESS_STEP', 25),
     wireTelemetry: oneOf('MACHINE_WIRE_TELEMETRY', env.MACHINE_WIRE_TELEMETRY || SWITCH.OFF, Object.values(SWITCH)) === SWITCH.ON,
+    wireWindow: Math.max(1, int(env, 'MACHINE_WIRE_WINDOW', 500)),
     ltBaseUrl: env.LT_BASE_URL ?? 'http://localhost:3000',
   };
   if (transport === MACHINE_TRANSPORT.NATS) {

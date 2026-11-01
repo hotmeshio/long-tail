@@ -124,7 +124,7 @@ describe('admin workflow config MCP tools', () => {
       input_lookups: [{ domain: 'fleet', key: 'serial-numbers', version: 1.5 }],
     });
     expect(result.isError).toBe(true);
-    expect(parse(result).error).toMatch(/positive integer, 'current', or absent/);
+    expect(parse(result).error).toMatch(/positive integer/);
     expect(mockUpsertWorkflowConfig).not.toHaveBeenCalled();
   });
 

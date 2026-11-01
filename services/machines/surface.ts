@@ -14,7 +14,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { learnsAddress, machineRole, type LineDef } from '../../lib/machines/line';
 import { CONTROL_OPS, OP, declaredRowOps, type LineCodec } from '../../lib/machines/protocol';
 import type { InboundMessage } from '../../lib/machines/transport';
-import type { InspectResult, LineSummary, LineView } from '../../types/machines-view';
+import type { InspectResult, LineSummary, LineView, WireEvent, WireWindowQuery } from '../../types/machines-view';
 import { ESCALATION_FEED, MACHINE_TRANSPORT, loadMachineLineConfig, type MachineLineConfig } from './config';
 import { ApiLineEscalations } from './gateway/api-escalations';
 import { MachineGateway } from './gateway/gateway';
@@ -33,7 +33,14 @@ export interface MachineSurfaceOptions {
   callbacks?: CallbackEventAdapter;
   log?: GatewayLog;
   codec?: LineCodec;
+  /** A codec for one line, keyed `<siteId>/<lineId>`; every other line uses `codec`. */
+  codecs?: Record<string, LineCodec>;
   rows?: HandoffRowAdapter;
+}
+
+/** The codec a line runs on: its own, the surface's, or the generic line protocol. */
+export function codecFor(opts: Pick<MachineSurfaceOptions, 'codec' | 'codecs'>, config: MachineLineConfig, line: LineDef): LineCodec {
+  return opts.codecs?.[keyOf(line.siteId, line.lineId)] ?? opts.codec ?? defaultCodec(config, line);
 }
 
 /** A message to dry-run against a line. */
@@ -47,6 +54,8 @@ export interface LineSurface {
   describeLine(siteId: string, lineId: string): LineView | null;
   /** A dry run of one message; null when this replica is not leading the line. */
   inspect(siteId: string, lineId: string, probe: WireProbe): InspectResult | null;
+  /** The leader's last wire events, newest first; null when this replica is not leading the line. */
+  wire(siteId: string, lineId: string, query?: WireWindowQuery): WireEvent[] | null;
   /** The declared line, or undefined. */
   findLine(siteId: string, lineId: string): LineDef | undefined;
   /** The ops a machine-command row on this line may ask for. */
@@ -97,9 +106,13 @@ class LineRun {
   private readonly leadership: LineLeadership;
   readonly codec: LineCodec;
 
-  constructor(readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog) {
+  constructor(
+    readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog,
+    /** The codecs of every line on this line's site, read when the gateway starts. */
+    private readonly siteCodecs: () => LineCodec[] = () => [],
+  ) {
     this.leadership = new LineLeadership(`lt-machine-line:${line.siteId}/${line.lineId}`);
-    this.codec = opts.codec ?? defaultCodec(config, line);
+    this.codec = codecFor(opts, config, line);
   }
 
   start(): void {
@@ -138,7 +151,7 @@ class LineRun {
     };
     const { config, line, codec } = this;
     this.gateway = new MachineGateway({
-      bus: createMachineBus(config, line, codec),
+      bus: createMachineBus(config, line, codec, undefined, this.siteCodecs()),
       codec,
       rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
@@ -150,6 +163,7 @@ class LineRun {
         topicRoot: config.topicRoot, replyTimeoutMs: config.replyTimeoutMs, dispatchAttempts: config.dispatchAttempts,
         offlineDebounceMs: config.offlineDebounceMs, dispatchTtlMs: config.dispatchTtlMs, quietMs: config.quietMs,
         receiptDelayMs: config.receiptDelayMs, lifecycle: config.lifecycle, progressStep: config.progressStep, wireTelemetry: config.wireTelemetry,
+        wireWindow: config.wireWindow,
       },
     });
     await this.gateway.start();
@@ -205,6 +219,10 @@ export class MachineSurface implements LineSurface {
     return this.run(siteId, lineId)?.leader()?.inspect(probe) ?? null;
   }
 
+  wire(siteId: string, lineId: string, query: WireWindowQuery = {}): WireEvent[] | null {
+    return this.run(siteId, lineId)?.leader()?.window.read(query) ?? null;
+  }
+
   findLine(siteId: string, lineId: string): LineDef | undefined {
     return this.run(siteId, lineId)?.line;
   }
@@ -214,8 +232,13 @@ export class MachineSurface implements LineSurface {
     return run ? commandOpsOf(run.codec) : [];
   }
 
+  /** The codecs every line on a site runs, so one site's streams keep all their subjects. */
+  codecsOnSite(siteId: string): LineCodec[] {
+    return [...new Set([...this.runs.values()].filter((run) => run.line.siteId === siteId).map((run) => run.codec))];
+  }
+
   private begin(line: LineDef): void {
-    const run = new LineRun(line, this.config, this.opts, composeLogs(this.log, eventsLog(line)));
+    const run = new LineRun(line, this.config, this.opts, composeLogs(this.log, eventsLog(line)), () => this.codecsOnSite(line.siteId));
     this.runs.set(keyOf(line.siteId, line.lineId), run);
     run.start();
   }

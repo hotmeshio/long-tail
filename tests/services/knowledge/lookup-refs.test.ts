@@ -37,4 +37,11 @@ describe('describeMissingLookupRefs', () => {
     expect(await describeMissingLookupRefs([{ domain: 'fleet', key: 'tables' }]))
       .toEqual(['Lookup ref fleet/tables current names no edition (no knowledge entry fleet/tables)']);
   });
+
+  it('names a label that no edition carries', async () => {
+    mockSnapshot.mockResolvedValue(null);
+    mockQuery.mockResolvedValue({ rows: [{ version: 1 }] });
+    expect(await describeMissingLookupRefs([{ domain: 'fleet', key: 'codes', version: 'rev-9' }]))
+      .toEqual(['Lookup ref fleet/codes label "rev-9" names no edition (editions: v1)']);
+  });
 });

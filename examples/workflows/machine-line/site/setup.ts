@@ -23,8 +23,8 @@ import { clientIds, controllerId, identOf, type LineDef } from '../../../../lib/
 import { clientIdOf } from '../../../../lib/machines/protocol/envelope';
 import { learnedLine, loadLines, readAddresses, withAddresses } from '../line';
 import { bridgeId, linesOf, renderSiteConf, type Lines } from '../../../../lib/machines/site/site-conf';
-import { renderMosquittoAcl, renderMosquittoConf } from '../../../../lib/machines/site/mosquitto-conf';
-import { genericCodec, type LineCodec } from '../../../../lib/machines/protocol/codec';
+import { renderMosquittoAcl, renderMosquittoConf, type AclCodecs } from '../../../../lib/machines/site/mosquitto-conf';
+import { genericCodec } from '../../../../lib/machines/protocol/codec';
 
 const DAYS = '825';
 const NATS_NAMES = ['site-nats', 'localhost'];
@@ -48,7 +48,7 @@ export interface SiteOptions {
   dir: string;
   root: string;
   /** Decides the ACL's topics; the generic line protocol when absent. */
-  codec?: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>;
+  codec?: AclCodecs;
   /** Appended to mosquitto.conf, e.g. bridges to brokers the machines host themselves. */
   brokerExtra?: string;
 }

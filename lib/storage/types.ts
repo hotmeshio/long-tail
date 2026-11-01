@@ -1,6 +1,11 @@
+export interface WriteOptions {
+  /** The SHA-256 of `data`, hex, kept with the object. */
+  sha256?: string;
+}
+
 export interface StorageBackend {
   /** Write data to storage. Returns the key and size. */
-  write(key: string, data: Buffer): Promise<{ ref: string; size: number }>;
+  write(key: string, data: Buffer, options?: WriteOptions): Promise<{ ref: string; size: number }>;
 
   /** Read data from storage. Returns the raw buffer and size. */
   read(key: string): Promise<{ data: Buffer; size: number }>;
@@ -43,6 +48,8 @@ export interface StorageBackend {
     size: number;
     modified_at: string;
     content_type: string;
+    /** The object's SHA-256, hex, when the backend knows it. */
+    sha256?: string;
   }>;
 
   /** Generate a time-limited signed URL for unauthenticated file access. */

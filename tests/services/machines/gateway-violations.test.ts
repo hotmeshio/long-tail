@@ -15,7 +15,7 @@ afterEach(async () => rig?.stop());
 const ident = identOf(DEFAULT_LINE, 'press-01');
 const rowsOf = (type: string) => [...rig.lt.rows.values()].filter((r) => r.type === type);
 
-/** An arrival that names its unit but breaks the contract: no order or recipe. */
+/** An arrival that names its unit but breaks the contract: no recipe. */
 const broken = buildEnvelope(ident, { event: 'arrived', jobId: 'U1-press-01', unitId: 'U1', carrierId: 'CR-U1' });
 const send = () => rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.JOB), JSON.stringify(broken));
 
@@ -29,7 +29,7 @@ describe('contract violations', () => {
     await sleep(30);
     expect(rowsOf(ROW_TYPE.CONTRACT_VIOLATION)).toHaveLength(1);
     expect(held).toMatchObject({ role: 'line-operator', metadata: { machineId: 'press-01', kind: 'job', messageId: broken.id } });
-    expect(held.metadata.violations.join(' ')).toMatch(/orderRef/);
+    expect(held.metadata.violations.join(' ')).toMatch(/recipe/);
     expect(JSON.parse(held.escalation_payload!).id).toBe(broken.id);
     expect(rig.lt.rows.get(row.id)!.items).toEqual([]);
   });

@@ -99,6 +99,7 @@ router.get('/download/{*filePath}', requireBuilder, async (req, res) => {
  * POST /api/file-browser/upload
  * Upload a file to storage.
  * Query: ?path=images/photo.png (target path including filename)
+ *        &sha256=<hex> (optional; the upload is refused with 422 when the bytes differ)
  * Body: raw file bytes (Content-Type should match the file type)
  */
 router.post('/upload', requireBuilder, async (req, res) => {
@@ -118,7 +119,8 @@ router.post('/upload', requireBuilder, async (req, res) => {
         res.status(400).json({ error: 'Empty file body' });
         return;
       }
-      const result = await api.uploadFile({ path: targetPath, buffer });
+      const sha256 = typeof req.query.sha256 === 'string' ? req.query.sha256 : undefined;
+      const result = await api.uploadFile({ path: targetPath, buffer, sha256 });
       res.status(result.status).json(result.data ?? { error: result.error });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -8,7 +8,9 @@ import { LineVersionConflict, getLineWithHealth, listLines, listSites, type Line
 import { declareLine, retireLine } from '../services/machines/registry-sync';
 import { emptyLineHealth, lineSummaryOf, toLineIndexRow, wirePayloadOf } from '../services/machines/line-index';
 import { isTopicLevel } from '../lib/machines/protocol/topics';
-import type { LineIndex, LineViewResponse } from '../types/machines-view';
+import { viewerFor } from '../lib/events/browser-view';
+import { isWireDirection, isWireKind } from '../services/machines/gateway/wire-window';
+import type { LineIndex, LineViewResponse, LineWireResponse, WireEvent, WireWindowQuery } from '../types/machines-view';
 
 const router = Router();
 
@@ -149,6 +151,38 @@ router.get('/lines/:siteId/:lineId', requireRoleManager, (req, res) => {
     ...(surface.describeLine(siteId, lineId) ?? { siteId, lineId, leading: false }),
     summary: lineSummaryOf(surface, siteId, lineId, line),
   };
+  res.status(200).json(body);
+});
+
+/** The event as this viewer reads it: builders see the payload, everyone else the record without it. */
+function wireForViewer(event: WireEvent, builder: boolean): WireEvent {
+  if (builder) return event;
+  const { payload: _payload, ...rest } = event;
+  return rest;
+}
+
+router.get('/lines/:siteId/:lineId/wire', requireRoleManager, async (req, res) => {
+  const { surface, siteId, lineId, line } = lineOf(req);
+  if (!surface || !line) {
+    res.status(404).json({ error: surface ? `no line ${siteId}/${lineId}` : NO_LINES });
+    return;
+  }
+  const { direction, kind } = req.query;
+  if (direction !== undefined && !isWireDirection(direction)) {
+    res.status(400).json({ error: 'direction must be in or out' });
+    return;
+  }
+  if (kind !== undefined && !isWireKind(kind)) {
+    res.status(400).json({ error: 'kind is not a wire kind' });
+    return;
+  }
+  const query: WireWindowQuery = {
+    limit: queryInt(req.query.limit), machine: queryString(req.query.machine), since: queryString(req.query.since),
+    ...(direction !== undefined ? { direction } : {}), ...(kind !== undefined ? { kind } : {}),
+  };
+  const events = surface.wire(siteId, lineId, query);
+  const viewer = await viewerFor(req.auth?.userId);
+  const body: LineWireResponse = { siteId, lineId, leading: events !== null, events: (events ?? []).map((e) => wireForViewer(e, viewer.builder)) };
   res.status(200).json(body);
 });
 

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import jwt from 'jsonwebtoken';
@@ -155,7 +156,8 @@ export class LocalStorageBackend implements StorageBackend {
     };
   }
 
-  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string }> {
+  /** The digest is read from the file itself, so it is always the stored bytes' own. */
+  async getMetadata(key: string): Promise<{ size: number; modified_at: string; content_type: string; sha256: string }> {
     const resolved = resolveAndValidate(key);
     if (!fs.existsSync(resolved)) {
       throw new Error(`File not found: ${key}`);
@@ -165,6 +167,7 @@ export class LocalStorageBackend implements StorageBackend {
       size: stat.size,
       modified_at: stat.mtime.toISOString(),
       content_type: mimeFromPath(key),
+      sha256: createHash('sha256').update(fs.readFileSync(resolved)).digest('hex'),
     };
   }
 

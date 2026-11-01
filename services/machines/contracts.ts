@@ -5,7 +5,7 @@
  * protocol that resolves it differs.
  */
 
-import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE } from '../../lib/machines/line';
+import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE, DEFAULT_QUALITY_ROLE } from '../../lib/machines/line';
 import { REPLY_STATUS, TRANSFER_FAILURE } from '../../lib/machines/protocol';
 
 export const ROW_TYPE = {
@@ -20,6 +20,8 @@ export const ROW_TYPE = {
   CONTRACT_VIOLATION: 'contract-violation',
   /** An address claims a station the line already knows by another address, or the reverse: a person approves or rejects. */
   MACHINE_REGISTRATION: 'machine-registration',
+  /** Units a machine finished on hold wait for a quality decision: release, rework or scrap. */
+  QUALITY_HOLD: 'quality-hold',
 } as const;
 
 export const LINE_ROLE = {
@@ -27,6 +29,8 @@ export const LINE_ROLE = {
   OPERATOR: DEFAULT_OPERATOR_ROLE,
   /** People who take finished units off the line: the final handoff. */
   EXIT: DEFAULT_EXIT_ROLE,
+  /** People who decide units a machine finished on hold. */
+  QUALITY: DEFAULT_QUALITY_ROLE,
   /** The gateway's own identity. */
   CONTROLLER: 'line-controller',
 } as const;
@@ -136,6 +140,8 @@ export const HANDOFF_ERROR = {
   SOFTWARE_UNSUPPORTED: 'software-unsupported',
   WITHDRAWN: 'withdrawn',
   CANCELLED: 'cancelled',
+  /** An arrival no open handoff into the machine expects, shown to the operator role once per machine and carrier. */
+  UNMATCHED_ARRIVAL: 'unmatched-arrival',
   ...TRANSFER_FAILURE,
 } as const;
 export type HandoffErrorCode = typeof HANDOFF_ERROR[keyof typeof HANDOFF_ERROR];
@@ -194,6 +200,10 @@ export const DECISION = {
   RESTORED: 'restored',
   APPROVE: 'approve',
   REJECT: 'reject',
+  /** A quality decision on held units: they continue from where they are. */
+  RELEASE: 'release',
+  /** A quality decision on held units: they run again from a station on the route. */
+  REWORK: 'rework',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
@@ -215,12 +225,22 @@ export interface OperatorResolution {
   note?: string;
 }
 
+/** The decisions a quality role may take on units a machine finished on hold. */
+export const HOLD_DECISIONS: readonly Decision[] = [DECISION.RELEASE, DECISION.REWORK, DECISION.SCRAP];
+
+export interface QualityResolution extends OperatorResolution {
+  /** For `rework`: the station the units run again from; the holding station when absent. */
+  station?: string;
+}
+
 /** Signal keys for the unit workflow; every attempt mints a fresh key. */
 export const signalKeys = {
   handoff: (jobKey: string, step: number, attempt: number) => `handoff-${jobKey}-s${step}-a${attempt}`,
   handoffError: (jobKey: string, step: number, attempt: number, round = 1) =>
     `handoff-error-${jobKey}-s${step}-a${attempt}${round > 1 ? `-r${round}` : ''}`,
   jobStop: (jobKey: string, step: number, attempt: number) => `job-stop-${jobKey}-s${step}-a${attempt}`,
+  hold: (jobKey: string, step: number, attempt: number, round = 1) => `hold-${jobKey}-s${step}-a${attempt}${round > 1 ? `-r${round}` : ''}`,
+  disposition: (jobKey: string, step: number, attempt: number) => `disposition-${jobKey}-s${step}-a${attempt}`,
 };
 
 /** Metadata on a machine-command row. */

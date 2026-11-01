@@ -56,6 +56,9 @@ export class LtHttp {
   }
 }
 
+/** A row that was never given items (one parked by hand) answers 400; it holds none. */
+const NO_ITEMS_STATUS = 400;
+
 /** Escalation verbs over HTTP, each run with the bearer token of the actor it runs as. */
 export class HttpLineEscalations implements LineEscalations {
   constructor(
@@ -86,10 +89,15 @@ export class HttpLineEscalations implements LineEscalations {
   }
 
   async items(id: string): Promise<RowItem[]> {
-    const view = await this.http.request<{ items: { itemKey: string; payload?: Record<string, any> }[] }>(
-      'GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER),
-    );
-    return view.items.map((i) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
+    try {
+      const view = await this.http.request<{ items: { itemKey: string; payload?: Record<string, any> }[] }>(
+        'GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER),
+      );
+      return view.items.map((i) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
+    } catch (err) {
+      if (err instanceof LtHttpError && err.status === NO_ITEMS_STATUS) return [];
+      throw err;
+    }
   }
 
   async get(id: string): Promise<Record<string, any> | null> {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  LINE_STREAM, lineEventConsumerSpec, lineStreamSpecs, telemetrySubjects, filterToSubject,
+  LINE_STREAM, lineEventConsumerSpec, lineStreamSpecs, subjectCovers, telemetrySubjects, filterToSubject, uncoveredSubjects,
 } from '../../../lib/machines/transport';
 
 describe('site streams', () => {
@@ -51,5 +51,29 @@ describe('channels from a codec', () => {
     expect(telemetry.subjects).toEqual(['acme.v1.*.*.up.*.telemetry']);
     expect(lineEventConsumerSpec(codec, 's', 'l', 'gw').filterSubjects).toEqual(['acme.v1.s.l.up.*.events']);
     expect(telemetrySubjects(codec, 's', 'l')).toEqual(['acme.v1.s.l.up.*.telemetry']);
+  });
+});
+
+describe('one site, several codecs', () => {
+  const other = { root: 'acme/v2', channels: { events: ['events'], telemetry: ['telemetry'], commands: ['commands'] } };
+
+  it('keeps the subjects of every codec in the site streams, whichever is listed first', () => {
+    const [events, telemetry] = lineStreamSpecs(['line/v1', other]);
+    expect(events.subjects).toContain('line.v1.*.*.*.job');
+    expect(events.subjects).toContain('acme.v2.*.*.*.events');
+    expect(telemetry.subjects).toEqual(['line.v1.*.*.*.telemetry', 'acme.v2.*.*.*.telemetry']);
+    expect(lineStreamSpecs([other, 'line/v1'])[0].subjects).toEqual(expect.arrayContaining(events.subjects));
+    expect(lineStreamSpecs(['line/v1', 'line/v1'])[0].subjects).toEqual(lineStreamSpecs('line/v1')[0].subjects);
+  });
+
+  it('tells which consumer subjects a stream keeps nothing of', () => {
+    expect(subjectCovers('line.v1.*.*.*.job', 'line.v1.s.l.*.job')).toBe(true);
+    expect(subjectCovers('line.v1.>', 'line.v1.s.l.*.job')).toBe(true);
+    expect(subjectCovers('line.v1.*.*.*.job', 'acme.v2.s.l.*.events')).toBe(false);
+    expect(subjectCovers('line.v1.s.l.*.job', 'line.v1.*.*.*.job')).toBe(false);
+    expect(subjectCovers('line.v1.*.*.*.job', 'line.v1.s.l.>')).toBe(false);
+    const stream = lineStreamSpecs('line/v1')[0];
+    expect(uncoveredSubjects(stream, lineEventConsumerSpec('line/v1', 's', 'l', 'gw').filterSubjects)).toEqual([]);
+    expect(uncoveredSubjects(stream, lineEventConsumerSpec(other, 's', 'l', 'gw').filterSubjects)).toEqual(['acme.v2.s.l.*.events']);
   });
 });
