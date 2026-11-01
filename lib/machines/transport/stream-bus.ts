@@ -3,7 +3,9 @@
  * line's durable consumer on LINE_EVENTS (replayed after a restart); telemetry
  * is read live, since it only proves a machine is alive. Commands leave through
  * an MQTT session at QoS 1 on the site broker, which queues them for a machine
- * that is away; retained machine state is read there too.
+ * that is away; retained machine state is read there too. The streams are
+ * ensured with every codec on the site, so lines on different roots share
+ * them, and a consumer the stream would feed nothing refuses to start.
  */
 
 import type { LTPubSub, LTStreams, LTSubscription } from '../../../types/messaging';
@@ -11,7 +13,7 @@ import type { MqttEndpoint } from '../../../services/machines/config';
 import { toTopic } from '../protocol';
 import { MqttSession } from './mqtt-session';
 import { SerialQueue } from './serial';
-import { LINE_STREAM, lineEventConsumerSpec, lineStreamSpecs, telemetrySubjects, type StreamCodec } from './streams';
+import { LINE_STREAM, lineEventConsumerSpec, lineStreamSpecs, telemetrySubjects, uncoveredSubjects, type StreamCodec } from './streams';
 import type { Disposition, InboundMessage, MachineBus } from './delivery';
 
 export interface StreamBusOptions {
@@ -24,6 +26,8 @@ export interface StreamBusOptions {
   lineId: string;
   /** The codec's topics: which subjects are durable events and which are live telemetry. */
   codec: StreamCodec;
+  /** The codecs of every line on this site; the streams keep all their subjects, whichever line starts last. */
+  siteCodecs?: StreamCodec[];
   nakDelayMs?: number;
 }
 
@@ -40,9 +44,15 @@ export class StreamMachineBus implements MachineBus {
   }
 
   async connect(): Promise<void> {
-    const { streams, codec, siteId, lineId, controllerId } = this.opts;
-    for (const spec of lineStreamSpecs(codec)) await streams.ensureStream(spec);
-    await streams.ensureConsumer(LINE_STREAM.EVENTS, lineEventConsumerSpec(codec, siteId, lineId, this.durableName));
+    const { streams, codec, siteId, lineId, controllerId, siteCodecs = [] } = this.opts;
+    for (const spec of lineStreamSpecs([codec, ...siteCodecs])) await streams.ensureStream(spec);
+    const consumer = lineEventConsumerSpec(codec, siteId, lineId, this.durableName);
+    await streams.ensureConsumer(LINE_STREAM.EVENTS, consumer);
+    const events = await streams.describeStream(LINE_STREAM.EVENTS);
+    const missing = events ? uncoveredSubjects(events, consumer.filterSubjects) : consumer.filterSubjects;
+    if (missing.length) {
+      throw new Error(`${LINE_STREAM.EVENTS} keeps nothing of ${missing.join(', ')}; the stream holds ${events?.subjects.join(', ') ?? 'nothing'}`);
+    }
     this.session = await MqttSession.open(this.opts.mqtt, controllerId);
   }
 

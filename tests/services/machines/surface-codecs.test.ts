@@ -34,4 +34,13 @@ describe('the codec a line runs on', () => {
     expect(surface.commandOps('site-1', 'line-3')).not.toContain('probe');
     await surface.stop();
   });
+
+  it('knows every codec a site runs, so the site streams keep all their subjects', async () => {
+    const elsewhere = { ...DEFAULT_LINE, siteId: 'site-2', lineId: 'line-1' };
+    const surface = MachineSurface.start({ lines: [DEFAULT_LINE, second, elsewhere], env: ENV, codecs: { 'site-1/line-2': own, 'site-2/line-1': shared } });
+    expect(surface.codecsOnSite('site-1').map((c) => c.root)).toEqual(['line/v1', 'cell/v2']);
+    expect(surface.codecsOnSite('site-2').map((c) => c.root)).toEqual(['shared/v1']);
+    expect(surface.codecsOnSite('site-3')).toEqual([]);
+    await surface.stop();
+  });
 });

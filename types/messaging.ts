@@ -65,6 +65,8 @@ export interface LTStreams {
   ensureStream(spec: StreamSpec): Promise<void>;
   /** Create the consumer, or bring an existing one's filter up to the spec; its position is kept. */
   ensureConsumer(stream: string, spec: ConsumerSpec): Promise<void>;
+  /** The stream as it is now, or null when there is none. */
+  describeStream(name: string): Promise<StreamSpec | null>;
   /** Append a message; resolves once the stream holds it. */
   append(subject: Subject, payload: string): Promise<void>;
   /** Deliver the consumer's messages to `handler` one at a time; a thrown handler counts as a nak. */

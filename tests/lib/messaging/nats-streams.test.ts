@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consumerConfig, ensureConsumer, ensureStream, streamConfig } from '../../../lib/messaging/nats/streams';
+import { consumerConfig, describeStream, ensureConsumer, ensureStream, streamConfig } from '../../../lib/messaging/nats/streams';
 import { lineEventConsumerSpec, lineStreamSpecs, LINE_STREAM } from '../../../lib/machines/transport';
 
 function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: Error) {
@@ -8,7 +8,11 @@ function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: E
   return {
     calls,
     streams: {
-      info: async (name: string) => { if (failWith) throw failWith; if (!existing.includes(name)) throw notFound('stream'); return {}; },
+      info: async (name: string) => {
+        if (failWith) throw failWith;
+        if (!existing.includes(name)) throw notFound('stream');
+        return { config: { subjects: ['line.v1.>'], max_age: 60_000 * 1_000_000 } };
+      },
       add: async (c: any) => { calls.push(`add ${c.name}`); },
       update: async (name: string) => { calls.push(`update ${name}`); },
     },
@@ -39,6 +43,12 @@ describe('JetStream from messaging specs', () => {
     const jsm = fakeJsm([LINE_STREAM.EVENTS]);
     for (const spec of lineStreamSpecs('line/v1')) await ensureStream(jsm, spec);
     expect(jsm.calls).toEqual([`update ${LINE_STREAM.EVENTS}`, `add ${LINE_STREAM.TELEMETRY}`]);
+  });
+
+  it('describes a stream from its JetStream config, and a missing one as null', async () => {
+    expect(await describeStream(fakeJsm([LINE_STREAM.EVENTS]), LINE_STREAM.EVENTS)).toEqual({ name: LINE_STREAM.EVENTS, subjects: ['line.v1.>'], maxAgeMs: 60_000 });
+    expect(await describeStream(fakeJsm([]), LINE_STREAM.EVENTS)).toBeNull();
+    await expect(describeStream(fakeJsm([], [], new Error('authorization violation')), LINE_STREAM.EVENTS)).rejects.toThrow(/authorization/);
   });
 
   it('rethrows anything other than not found', async () => {

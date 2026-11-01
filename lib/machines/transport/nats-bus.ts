@@ -21,6 +21,8 @@ export interface NatsBusOptions {
   lineId: string;
   /** The codec's topics: which subjects are durable events and which are live telemetry. */
   codec: StreamCodec;
+  /** The codecs of every line on this site, so the streams keep all their subjects. */
+  siteCodecs?: StreamCodec[];
   nakDelayMs?: number;
 }
 

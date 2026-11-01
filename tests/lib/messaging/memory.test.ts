@@ -36,6 +36,14 @@ describe('memory messaging: pub/sub', () => {
 });
 
 describe('memory messaging: streams', () => {
+  it('describes a stream as ensured, and none as null', async () => {
+    const { streams } = await streamWith();
+    expect(await streams.describeStream('EVENTS')).toEqual(STREAM);
+    expect(await streams.describeStream('OTHER')).toBeNull();
+    await streams.ensureStream({ ...STREAM, subjects: ['line.>', 'acme.>'] });
+    expect((await streams.describeStream('EVENTS'))?.subjects).toEqual(['line.>', 'acme.>']);
+  });
+
   it('delivers in order, only the subjects the consumer reads, from where it started', async () => {
     const { streams } = await streamWith();
     await streams.append('line.a.m1.job', 'before');

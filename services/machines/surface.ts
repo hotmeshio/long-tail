@@ -106,7 +106,11 @@ class LineRun {
   private readonly leadership: LineLeadership;
   readonly codec: LineCodec;
 
-  constructor(readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog) {
+  constructor(
+    readonly line: LineDef, private readonly config: MachineLineConfig, private readonly opts: MachineSurfaceOptions, private readonly log: GatewayLog,
+    /** The codecs of every line on this line's site, read when the gateway starts. */
+    private readonly siteCodecs: () => LineCodec[] = () => [],
+  ) {
     this.leadership = new LineLeadership(`lt-machine-line:${line.siteId}/${line.lineId}`);
     this.codec = codecFor(opts, config, line);
   }
@@ -147,7 +151,7 @@ class LineRun {
     };
     const { config, line, codec } = this;
     this.gateway = new MachineGateway({
-      bus: createMachineBus(config, line, codec),
+      bus: createMachineBus(config, line, codec, undefined, this.siteCodecs()),
       codec,
       rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
@@ -228,8 +232,13 @@ export class MachineSurface implements LineSurface {
     return run ? commandOpsOf(run.codec) : [];
   }
 
+  /** The codecs every line on a site runs, so one site's streams keep all their subjects. */
+  codecsOnSite(siteId: string): LineCodec[] {
+    return [...new Set([...this.runs.values()].filter((run) => run.line.siteId === siteId).map((run) => run.codec))];
+  }
+
   private begin(line: LineDef): void {
-    const run = new LineRun(line, this.config, this.opts, composeLogs(this.log, eventsLog(line)));
+    const run = new LineRun(line, this.config, this.opts, composeLogs(this.log, eventsLog(line)), () => this.codecsOnSite(line.siteId));
     this.runs.set(keyOf(line.siteId, line.lineId), run);
     run.start();
   }
