@@ -66,7 +66,7 @@ const BODY: Record<MessageKind, Schema> = {
   }, ['needsPerson']),
   [MESSAGE_KIND.TELEMETRY]: shape({ readings: { type: 'object', additionalProperties: NUM } }),
   [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
-  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR }, ['code']),
+  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR, preparing: BOOL }, ['code', 'preparing']),
   [MESSAGE_KIND.REPORT]: { type: 'object' },
 };
 

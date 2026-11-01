@@ -134,7 +134,7 @@ export class Executor {
         this.watchOffline(a.machineId);
         return [plannedAction(a)];
       case 'settleReply':
-        if (replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason, ...(a.code ? { code: a.code } : {}) })) return [plannedAction(a)];
+        if (replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason, ...(a.code ? { code: a.code } : {}), ...(a.preparing ? { preparing: true } : {}) })) return [plannedAction(a)];
         return [{ verb: 'ack', detail: `late ${a.status} ${a.cmdId}` }, ...await this.lateReply(a)];
       case 'settleSnapshot':
         replies.settleSnapshot(a.machineId, new Set(a.jobIds));
@@ -164,7 +164,7 @@ export class Executor {
     const context = { row: into.id, machine: m, cmdId: a.cmdId, reason: a.reason };
     if (a.status === REPLY_STATUS.COMPLETED) {
       log.info(GATEWAY_LOG.DISPATCH_READY, context);
-      return [];
+      return this.readyForArrival(into, m, a.cmdId);
     }
     if (a.status !== REPLY_STATUS.FAILED) return [];
     const row = into.ended ? onwardRow(state, into, m) : into;
@@ -173,6 +173,18 @@ export class Executor {
     return this.apply(failHandoff(state, row, m, {
       received: false, errorCode: HANDOFF_ERROR.DISPATCH_FAILED, detail: `${m} could not prepare the job: ${a.reason}`, ...(a.code ? { code: a.code } : {}),
     }));
+  }
+
+  /** On arrival dispatch, a row that waited for the machine to prepare is received once every job it sent is ready. */
+  private async readyForArrival(into: HandoffRow, m: string, cmdId: string): Promise<WireAction[]> {
+    const { lt, state } = this.d;
+    if (into.ended || !into.awaitingReady?.has(cmdId)) return [];
+    into.awaitingReady.delete(cmdId);
+    if (into.awaitingReady.size) return [];
+    const units = into.units.map((u) => u.unitId);
+    const resolved = await lt.resolve(m, into.id, { received: true, receiver: m, units });
+    state.close(into.id);
+    return [outcomeOf('resolve', into.id, resolved)];
   }
 
   /** Add the item; when the row then holds every key the action waits for, resolve it. */

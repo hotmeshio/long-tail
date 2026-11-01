@@ -6,6 +6,7 @@ export const GATEWAY_LOG = {
   DISPATCHED: 'machine_gateway.dispatch.accepted',
   DISPATCH_REFUSED: 'machine_gateway.dispatch.refused',
   DISPATCH_READY: 'machine_gateway.dispatch.ready',
+  DISPATCH_PREPARING: 'machine_gateway.dispatch.preparing',
   DISPATCH_FAILED: 'machine_gateway.dispatch.failed',
   DISPATCH_RECONCILED: 'machine_gateway.dispatch.reconciled',
   VERB_INVALID: 'machine_gateway.verb.invalid',

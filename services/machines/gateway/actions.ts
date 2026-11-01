@@ -35,7 +35,7 @@ export type Action =
   /** A row for a person, raised by the controller. */
   | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
-  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string }
+  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string; preparing?: boolean }
   /** A machine reported the jobs it holds: answers a status query in flight. */
   | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] }
   /** Bind a station to the address that claims it, and keep the binding in the address book. `by`: who approved it, when someone did. */

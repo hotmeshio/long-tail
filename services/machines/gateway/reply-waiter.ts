@@ -11,6 +11,8 @@ export interface CommandReply {
   reason: string;
   /** The machine's structured code for the outcome, when its reply carried one. */
   code?: string;
+  /** An acceptance the machine will follow with `completed` or `failed` once the job is prepared. */
+  preparing?: boolean;
 }
 
 /** The jobs a machine reports holding, queued or in work. */

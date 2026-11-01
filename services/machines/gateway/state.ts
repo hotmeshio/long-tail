@@ -32,6 +32,8 @@ export interface HandoffRow extends HandoffFacets {
   trace?: TraceEntry[];
   /** Each unit's arrival event, as its receiver reported it (dispatch on arrival). */
   arrivals?: Record<string, Record<string, any>>;
+  /** Dispatch commands accepted as preparing; on arrival dispatch the row is received once each is ready. */
+  awaitingReady?: Set<string>;
   /** Lifecycle item keys already on the row (lifecycle.ts). */
   noted?: string[];
   /** Parked with a limit on its items, which lifecycle notes must never use up. */
@@ -135,7 +137,7 @@ export class GatewayState {
     this.openRows.set(row.id, existing
       ? {
         ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals,
-        dueAt: existing.dueAt, noted: existing.noted ?? row.noted,
+        dueAt: existing.dueAt, noted: existing.noted ?? row.noted, awaitingReady: existing.awaitingReady,
       }
       : row);
   }

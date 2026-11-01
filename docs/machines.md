@@ -90,7 +90,7 @@ When a handoff ends without every unit (a failure, a timeout, a cancel), the gat
 
 `Machines.handoffProgress(units, items)` reads where a handoff's units stand from its items (a row's items, or `$accumulated` on a finished wait): `{ released, arrived, missing }`. A workflow reads it to decide what a split means for its own process.
 
-On arrival dispatch, the units are already at the receiver, so its acceptance resolves the row the same way.
+On arrival dispatch, the units are already at the receiver, so the row resolves `received` once the machine has the job: at its acceptance, or, when the acceptance says `preparing: true`, at the `completed` reply that follows; a `failed` reply meanwhile ends the row `dispatch-failed`. A gateway taking the line over resolves such a row at once if the machine's snapshot holds the job, since the reply it waited for may have passed.
 
 When the handoff ends without a receipt, the row resolves `{ received: false, errorCode, unitId?, result?, reason?, detail, code? }`. `detail` is text for a person; `code` is the machine's structured code when its reply carried one, so a workflow can branch on it:
 
@@ -216,7 +216,7 @@ interface LineCodec {
 - With `unitsPerDispatch: 1` the gateway sends one job per unit, claims the row once every job is accepted, and cancels the accepted jobs if any is refused.
 - `topicFor` lays out the topics, for a protocol with its own levels (a direction before the machine, say). The layout begins with `{root}/{site}/{line}/`. The broker ACL and the stream subjects follow it. Without it the layout is `{root}/{site}/{line}/{address}/{channel}`.
 - `dispatchOn: 'arrival'` is for machines that take work only for units they have scanned in. The job goes out once every unit of the row has arrived, and each unit carries the arrival event its receiver reported (`units[].arrival`), so `encode` can echo the receiver's own visit id.
-- A reply is `accepted` (recorded), and a machine that prepares its jobs may later reply `completed` (ready) or `failed` under the same `cmdId`. A failure after acceptance ends the handoff as `dispatch-failed`. When no reply comes, the gateway asks the machine for its snapshot before deciding.
+- A reply is `accepted` (recorded), and a machine that prepares its jobs says so with `preparing: true` and later replies `completed` (ready) or `failed` under the same `cmdId`. A failure after acceptance ends the handoff as `dispatch-failed`. When no reply comes, the gateway asks the machine for its snapshot before deciding.
 - `receipt` confirms the messages the gateway is done with, for machines that resend an event until it is confirmed. `decode` marks each such message with a `receiptId`. The ids go out per machine in batches of up to 100 after `MACHINE_RECEIPT_DELAY_MS`, including messages already applied. A message still waiting for its row is confirmed once it lands.
 - `strict: true` holds a message with contract violations: it is confirmed, never acted on, and one `contract-violation` row shows it to the operator role. Without it, known fields are acted on and the violations are logged.
 - An alarm body may say `needsPerson: true`: the row is raised whatever the level, and the row's level stays the machine's. Stopping levels raise a row on their own.

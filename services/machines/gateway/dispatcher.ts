@@ -177,7 +177,14 @@ export class Dispatcher {
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
       this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
-      if (a.receivedOnAccept) await this.received(a);
+      if (!a.receivedOnAccept) return;
+      const preparing = jobs.filter((job, i) => replies[i]?.status === REPLY_STATUS.ACCEPTED && replies[i]?.preparing).map((job) => `${a.cmdId}${job.suffix}`);
+      if (!preparing.length) {
+        await this.received(a);
+        return;
+      }
+      if (row) row.awaitingReady = new Set(preparing);
+      log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: preparing });
       return;
     }
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
@@ -195,7 +202,7 @@ export class Dispatcher {
     await this.withdraw(a, jobs.filter((_, i) => !replies[i] || took(replies[i])));
   }
 
-  /** The units were already at the machine: its acceptance completes the handoff. */
+  /** The units were already at the machine: a job it has taken and is ready for completes the handoff. */
   private async received(a: DispatchAction): Promise<void> {
     this.live();
     const units = (a.args.units as { unitId: string }[]).map((u) => u.unitId);

@@ -37,7 +37,10 @@ export function planMachineMessage(state: GatewayState, parsed: ParsedTopic, env
 function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: Envelope | null, b: Record<string, any>, ttl: number): Plan {
   switch (parsed.kind) {
     case MESSAGE_KIND.REPLY:
-      return ack([{ kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason, ...(typeof b.code === 'string' ? { code: b.code } : {}) }]);
+      return ack([{
+        kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason,
+        ...(typeof b.code === 'string' ? { code: b.code } : {}), ...(b.preparing === true ? { preparing: true } : {}),
+      }]);
     case MESSAGE_KIND.JOB:
       return planJob(state, m, b, env?.at, ttl);
     case MESSAGE_KIND.ALARM:
