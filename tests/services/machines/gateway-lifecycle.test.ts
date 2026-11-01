@@ -1,9 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { ROW_TYPE } from '../../../services/machines/contracts';
-import { JOB_EVENT, OP } from '../../../lib/machines/protocol';
+import { CHANNEL, JOB_EVENT, OP, buildEnvelope, machineTopic } from '../../../lib/machines/protocol';
+import { identOf } from '../../../lib/machines/line';
+import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
+import { OFFLINE_REASON } from '../../../examples/workflows/machine-line/mock/machine';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
-import { sleep, until } from '../../helpers/machine-line-fixtures';
+import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 
 let rig: LineRig;
 afterEach(async () => rig?.stop());
@@ -37,6 +40,24 @@ describe('gateway: alarms and liveness are rows for people', () => {
     await rig.line.network('cut-01', { mode: 'restore' });
     expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ decision: 'restored' });
     await until(() => rig.recorder.commands('cut-01', OP.SNAPSHOT)[0]);
+  });
+
+  it('a new session while online is asked for a snapshot, with no offline row between', async () => {
+    rig = await startRig();
+    expect(rig.recorder.commands('cut-01', OP.SNAPSHOT)).toEqual([]);
+    const ident = identOf(DEFAULT_LINE, 'cut-01');
+    rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.PRESENCE), JSON.stringify(buildEnvelope(ident, { online: true, software: '1.0.0', sessionId: 'session-2' })), true);
+    await until(() => rig.recorder.commands('cut-01', OP.SNAPSHOT)[0]);
+    await sleep(30);
+    expect(rig.recorder.commands('cut-01', OP.SNAPSHOT)).toHaveLength(1);
+    expect(rig.lt.ofType(ROW_TYPE.MACHINE_OFFLINE)).toEqual([]);
+  });
+
+  it('a machine that says goodbye gets an offline row that says why', async () => {
+    rig = await startRig();
+    await rig.line.network('cut-01', { mode: 'graceful' });
+    const row = await until(() => rig.lt.ofType(ROW_TYPE.MACHINE_OFFLINE)[0]);
+    expect(row.metadata).toMatchObject({ machineId: 'cut-01', reason: OFFLINE_REASON.GRACEFUL });
   });
 
   it('a short blip under the debounce raises nothing', async () => {

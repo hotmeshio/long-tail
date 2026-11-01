@@ -36,6 +36,7 @@ import natsCredentialsRouter from './nats-credentials';
 import scanCodesRouter from './scan-codes';
 import domainRouter from './domain';
 import announcementsRouter from './announcements';
+import machinesRouter from './machines';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.use('/topics', topicsRouter);
 router.use('/scan-codes', scanCodesRouter);
 router.use('/domain', domainRouter);
 router.use('/announcements', announcementsRouter);
+router.use('/machines', machinesRouter);
 
 import overviewRouter from './overview';
 router.use('/overview', overviewRouter);

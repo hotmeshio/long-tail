@@ -27,7 +27,6 @@ export interface MachineLineConfig {
   mqtt?: MqttEndpoint;
   replyTimeoutMs: number;
   dispatchAttempts: number;
-  handoffTimeout: string;
   offlineDebounceMs: number;
   /** A connected machine silent this long gets a quiet row; 0 turns the check off. */
   quietMs: number;
@@ -39,6 +38,8 @@ export interface MachineLineConfig {
   lifecycle: boolean;
   /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
   progressStep: number;
+  /** Telemetry messages are published as wire events too; off by default, since they are read live and many. */
+  wireTelemetry: boolean;
   ltBaseUrl: string;
 }
 
@@ -106,13 +107,13 @@ export function loadMachineLineConfig(env: Env = process.env): MachineLineConfig
     lineConfigPath: env.MACHINE_LINE_CONFIG || undefined,
     replyTimeoutMs: int(env, 'MACHINE_REPLY_TIMEOUT_MS', REPLY_DEADLINE_MS),
     dispatchAttempts: Math.max(1, int(env, 'MACHINE_DISPATCH_ATTEMPTS', 3)),
-    handoffTimeout: env.MACHINE_HANDOFF_TIMEOUT ?? '10m',
     offlineDebounceMs: int(env, 'MACHINE_OFFLINE_DEBOUNCE_MS', 15_000),
     quietMs: int(env, 'MACHINE_QUIET_MS', 90_000),
     dispatchTtlMs: int(env, 'MACHINE_DISPATCH_TTL_MS', 600_000),
     receiptDelayMs: int(env, 'MACHINE_RECEIPT_DELAY_MS', 250),
     lifecycle: oneOf('MACHINE_LIFECYCLE', env.MACHINE_LIFECYCLE || SWITCH.OFF, Object.values(SWITCH)) === SWITCH.ON,
     progressStep: percentStep(env, 'MACHINE_PROGRESS_STEP', 25),
+    wireTelemetry: oneOf('MACHINE_WIRE_TELEMETRY', env.MACHINE_WIRE_TELEMETRY || SWITCH.OFF, Object.values(SWITCH)) === SWITCH.ON,
     ltBaseUrl: env.LT_BASE_URL ?? 'http://localhost:3000',
   };
   if (transport === MACHINE_TRANSPORT.NATS) {

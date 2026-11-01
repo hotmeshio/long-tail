@@ -1,5 +1,5 @@
 /**
- * The machine broker (Mosquitto), rendered from the line. Machines speak
+ * The machine broker (Mosquitto), rendered from its lines. Machines speak
  * MQTT 5 to it over TLS, each with its own client certificate (the CN is
  * its username). The ACL lets a machine publish only its own channels and
  * read only its own commands, and lets the line controller command every
@@ -10,7 +10,7 @@
 import { addressOf, clientIdOf } from '../protocol/envelope';
 import { topicOf, type LineCodec } from '../protocol/codec';
 import { controllerId, identOf, learnsAddress, type LineDef } from '../line';
-import { bridgeId } from './site-conf';
+import { bridgeId, linesOf, type Lines } from './site-conf';
 
 export interface MosquittoConfOptions {
   root: string;
@@ -22,7 +22,26 @@ export interface MosquittoConfOptions {
   maxPacketBytes?: number;
 }
 
-export function renderMosquittoConf(line: LineDef, opts: MosquittoConfOptions): string {
+/** One bridge connection per line, carrying the line's topics out to the site NATS. */
+function bridgeBlock(line: LineDef, opts: MosquittoConfOptions): string {
+  return `connection ${line.siteId}-${line.lineId}-site-nats
+address ${opts.siteNats}
+bridge_protocol_version mqttv311
+bridge_cafile ${opts.certDir}/ca.pem
+bridge_certfile ${opts.certDir}/${bridgeId(line)}.pem
+bridge_keyfile ${opts.certDir}/${bridgeId(line)}.key
+remote_clientid ${bridgeId(line)}
+cleansession false
+try_private false
+notifications false
+topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
+`;
+}
+
+/** The broker for one line or several: one listener, one bridge per line. */
+export function renderMosquittoConf(lines: Lines, opts: MosquittoConfOptions): string {
+  const list = linesOf(lines);
+  if (!list.length) throw new Error('renderMosquittoConf needs at least one line');
   return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.
 persistence true
 persistence_location /mosquitto/data/
@@ -40,18 +59,7 @@ use_identity_as_username true
 acl_file ${opts.aclFile}
 max_packet_size ${opts.maxPacketBytes ?? 262_144}
 
-connection ${line.siteId}-${line.lineId}-site-nats
-address ${opts.siteNats}
-bridge_protocol_version mqttv311
-bridge_cafile ${opts.certDir}/ca.pem
-bridge_certfile ${opts.certDir}/${bridgeId(line)}.pem
-bridge_keyfile ${opts.certDir}/${bridgeId(line)}.key
-remote_clientid ${bridgeId(line)}
-cleansession false
-try_private false
-notifications false
-topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
-`;
+${list.map((line) => bridgeBlock(line, opts)).join('\n')}`;
 }
 
 /**
@@ -60,7 +68,14 @@ topic ${opts.root}/${line.siteId}/${line.lineId}/# out 1
  * the channels under its own name (%u), so its certificate's common name must be its address. On a line
  * that also declares addresses, a certificate named for a declared address is denied that station's channels.
  */
-export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+export function renderMosquittoAcl(lines: Lines, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
+  const list = linesOf(lines);
+  if (!list.length) throw new Error('renderMosquittoAcl needs at least one line');
+  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${list.map((line) => aclRules(line, codec)).join('\n\n')}\n`;
+}
+
+/** One line's rules: its stations, its controller, and the shadows a learning line needs. */
+function aclRules(line: LineDef, codec: Pick<LineCodec, 'root' | 'channels' | 'topicFor'>): string {
   const { siteId, lineId } = line;
   const { events, telemetry, commands } = codec.channels;
   const own = (address: string, channels: string[]) => channels.map((c) => topicOf(codec, { siteId, lineId, address }, c));
@@ -79,7 +94,7 @@ export function renderMosquittoAcl(line: LineDef, codec: Pick<LineCodec, 'root' 
     ...commands.map((c) => `topic write ${topicOf(codec, { siteId, lineId }, c)}`),
     `topic read ${codec.root}/${siteId}/${lineId}/#`,
   ].join('\n');
-  return `# Rendered from the line definition by site/setup.ts. Do not edit by hand.\n\n${[...learned, ...shadows, ...machines, controller].join('\n\n')}\n`;
+  return [...learned, ...shadows, ...machines, controller].join('\n\n');
 }
 
 /** Deny a declared station's channels to a certificate named for its address, which the patterns would grant. */

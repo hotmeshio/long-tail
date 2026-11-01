@@ -10,6 +10,7 @@
 import { addressOf, type LineCodec, type MachineIdent } from '../../../lib/machines/protocol';
 import type { MachineBus } from '../../../lib/machines/transport';
 import { GATEWAY_LOG, type GatewayLog } from './log';
+import type { WireRecorder } from './wire';
 
 /** Most message ids one receipt carries. */
 export const MAX_RECEIPT_IDS = 100;
@@ -20,6 +21,8 @@ export interface ReceiptDeps {
   /** How long ids gather before a receipt goes out. */
   delayMs: number;
   log: GatewayLog;
+  /** Records each receipt the gateway sends, for the line's wire view. */
+  wire?: Pick<WireRecorder, 'receipt'>;
 }
 
 interface Batch {
@@ -71,6 +74,9 @@ export class ReceiptBatcher {
   }
 
   private async publish(ident: MachineIdent, ids: string[]): Promise<void> {
-    for (const wire of this.d.codec.receipt!(ident, ids)) await this.d.bus.publish(wire.topic, wire.payload);
+    for (const wire of this.d.codec.receipt!(ident, ids)) {
+      await this.d.bus.publish(wire.topic, wire.payload);
+      this.d.wire?.receipt(ident, ids, wire);
+    }
   }
 }

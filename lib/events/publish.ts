@@ -1,4 +1,5 @@
 import type { LTEvent, LTMilestone } from '../../types';
+import type { WireEvent } from '../../types/machines-view';
 import { eventRegistry } from './index';
 import { sanitizeSubjectToken } from './matching';
 import { loggerRegistry } from '../logger';
@@ -266,6 +267,73 @@ export function publishWorkflowEvent(params: {
     originId: params.originId,
     status: params.status,
     data: params.data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/** The subject family of every message a line's gateway reads or sends. */
+export const MACHINE_WIRE_TYPE = 'machine.wire';
+/** The subject family of the gateway log. */
+export const MACHINE_LOG_TYPE = 'machine.log';
+/** The machine token of a wire event from an address no station claims. */
+export const MACHINE_UNKNOWN_TOKEN = 'unknown';
+
+const MACHINE_SOURCE = 'machine-gateway';
+
+/**
+ * Publish one wire record from a line's gateway.
+ * Subject: machine.wire.{site}.{line}.{machineId|unknown}.{in|out}
+ */
+export function publishMachineWireEvent(event: WireEvent): Promise<void> {
+  const machine = event.machineId ? sanitizeSubjectToken(event.machineId) : MACHINE_UNKNOWN_TOKEN;
+  return fireAndForget({
+    type: `${MACHINE_WIRE_TYPE}.${sanitizeSubjectToken(event.siteId)}.${sanitizeSubjectToken(event.lineId)}.${machine}.${event.direction}`,
+    source: MACHINE_SOURCE,
+    data: event as unknown as Record<string, any>,
+    timestamp: event.at,
+  });
+}
+
+const GATEWAY_LOG_PREFIX = 'machine_gateway.';
+
+/** The log event as one subject token: `machine_gateway.dispatch.accepted` becomes `dispatch-accepted`. */
+export function machineLogToken(event: string): string {
+  return sanitizeSubjectToken(event.startsWith(GATEWAY_LOG_PREFIX) ? event.slice(GATEWAY_LOG_PREFIX.length) : event);
+}
+
+/**
+ * Publish one gateway log entry.
+ * Subject: machine.log.{site}.{line}.{event}
+ */
+export function publishMachineLogEvent(params: {
+  siteId: string;
+  lineId: string;
+  level: 'info' | 'warn' | 'error';
+  event: string;
+  context?: Record<string, unknown>;
+}): Promise<void> {
+  return fireAndForget({
+    type: `${MACHINE_LOG_TYPE}.${sanitizeSubjectToken(params.siteId)}.${sanitizeSubjectToken(params.lineId)}.${machineLogToken(params.event)}`,
+    source: MACHINE_SOURCE,
+    data: { level: params.level, event: params.event, siteId: params.siteId, lineId: params.lineId, ...(params.context ?? {}) },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+const MACHINE_LINE_TYPE = 'machine.line';
+
+/** A line declared or retired in the registry; every replica reads the row again and follows. */
+export function publishMachineLineEvent(params: {
+  siteId: string;
+  lineId: string;
+  source: 'code' | 'api';
+  version: number;
+  action: 'declared' | 'retired';
+}): Promise<void> {
+  return fireAndForget({
+    type: `${MACHINE_LINE_TYPE}.${sanitizeSubjectToken(params.siteId)}.${sanitizeSubjectToken(params.lineId)}.${params.action}`,
+    source: MACHINE_SOURCE,
+    data: { ...params },
     timestamp: new Date().toISOString(),
   });
 }

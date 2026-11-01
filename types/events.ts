@@ -13,6 +13,11 @@ import type { LTMilestone } from './task';
  * a verb across roles (`system.escalation.*.*.created`), or one item across
  * role hops (`system.escalation.*.{id}.>`).
  *
+ * The machine surface publishes `machine.wire.{site}.{line}.{machine}.{in|out}`,
+ * one per message a line's gateway reads or sends, and
+ * `machine.log.{site}.{line}.{event}`, one per gateway log entry, and
+ * `machine.line.{site}.{line}.{declared|retired}` when the line registry changes.
+ *
  * On the wire (NATS): `lt.events.system.workflow.abc123.completed`
  * Dashboard subscribes: `lt.events.system.>` for all system events,
  * or `lt.events.system.workflow.abc123.>` for a specific workflow.
@@ -49,7 +54,12 @@ export type LTSystemEventPattern =
   | `system.agent.${string}.status_changed`
   | `system.agent.${string}.triggers_changed`
   | `system.milestone.${string}`
-  | 'system.oauth.grant.revoked';
+  | 'system.oauth.grant.revoked'
+  | `machine.wire.${string}.${string}.${string}.in`
+  | `machine.wire.${string}.${string}.${string}.out`
+  | `machine.log.${string}.${string}.${string}`
+  | `machine.line.${string}.${string}.declared`
+  | `machine.line.${string}.${string}.retired`;
 
 /** @deprecated Use LTSystemEventPattern for system events. Kept for backward compat. */
 export type LTEventType = LTSystemEventPattern;

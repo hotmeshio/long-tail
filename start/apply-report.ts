@@ -1,4 +1,3 @@
-import { getPool } from '../lib/db';
 import { loggerRegistry } from '../lib/logger';
 
 /** Who owns declared configuration after first boot. */
@@ -35,29 +34,7 @@ export function recordOutcome(report: SurfaceReport, name: string, outcome: Appl
   else report.dbOwned.push(name);
 }
 
-/**
- * Serializes multi-statement config writes (role-list replaces, escalation
- * target replaces) across concurrently booting containers. Single-statement
- * upserts are individually race-safe; the lock exists for the replace
- * transactions and keeps boot reports coherent. Distinct from the migration
- * lock so a slow migration on one container never blocks another's config
- * pass behind two locks at once.
- */
-const CONFIG_APPLY_LOCK_ID = 8675310;
-
-export async function withConfigLock<T>(fn: () => Promise<T>): Promise<T> {
-  const pool = getPool();
-  const client = await pool.connect();
-  try {
-    await client.query(`SELECT pg_advisory_lock(${CONFIG_APPLY_LOCK_ID})`);
-    return await fn();
-  } finally {
-    await client
-      .query(`SELECT pg_advisory_unlock(${CONFIG_APPLY_LOCK_ID})`)
-      .catch(() => { /* connection lost — the lock died with the session */ });
-    client.release();
-  }
-}
+export { withConfigLock } from '../lib/db/config-lock';
 
 /**
  * One boot line per surface. Warn level when orphans exist so operators see

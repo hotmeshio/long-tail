@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 
 import { ROW_TYPE } from '../../../services/machines/contracts';
 import { JOB_EVENT, OP } from '../../../lib/machines/protocol';
+import { REFUSAL_CODE } from '../../../examples/workflows/machine-line/mock/cell';
 import { facetsFor, startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 import { until } from '../../helpers/machine-line-fixtures';
 
@@ -46,11 +47,12 @@ describe('gateway: the golden path', () => {
 });
 
 describe('gateway: error roads', () => {
-  it('a refused dispatch resolves dispatch-refused as the machine', async () => {
+  it('a refused dispatch resolves dispatch-refused as the machine, with its reason and code', async () => {
     rig = await startRig();
     const row = rig.lt.park('line-bond', { ...facetsFor('U1', null, 'press-01'), recipeVersion: '99' });
     const ended = await rig.lt.ended(row.id);
-    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'dispatch-refused' });
+    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'dispatch-refused', code: REFUSAL_CODE.RECIPE_NOT_HELD });
+    expect(ended.resolver_payload!.detail).toMatch(/not held/);
     expect(ended.resolved_by).toBe('press-01');
   });
 
@@ -79,7 +81,7 @@ describe('gateway: error roads', () => {
     rig.line.arm('press-01', { result: 'reject', reason: 'BOND-WEAK' });
     const ended = await rig.handoff('U1', 'press-01', 'cut-01');
     // The receiver holds the claim, so it resolves; the payload names the sender that reported it.
-    expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', reason: 'BOND-WEAK', reportedBy: 'press-01' });
+    expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', result: 'reject', reason: 'BOND-WEAK', reportedBy: 'press-01' });
     expect(ended.resolved_by).toBe('cut-01');
     await until(() => rig.recorder.commands('cut-01', OP.CANCEL)[0]);
   });

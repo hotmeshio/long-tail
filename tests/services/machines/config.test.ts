@@ -39,6 +39,23 @@ describe('machine line config', () => {
   });
 });
 
+describe('gateway timings', () => {
+  it('reads the receipt delay, and leaves handoff timeouts to the workflow input', () => {
+    expect(loadMachineLineConfig({})).toMatchObject({ receiptDelayMs: 250 });
+    expect(loadMachineLineConfig({ MACHINE_RECEIPT_DELAY_MS: '40' })).toMatchObject({ receiptDelayMs: 40 });
+    expect(loadMachineLineConfig({ MACHINE_HANDOFF_TIMEOUT: '10m' })).not.toHaveProperty('handoffTimeout');
+  });
+});
+
+describe('wire telemetry', () => {
+  it('is off unless MACHINE_WIRE_TELEMETRY is on', () => {
+    expect(loadMachineLineConfig({}).wireTelemetry).toBe(false);
+    expect(loadMachineLineConfig({ MACHINE_WIRE_TELEMETRY: 'on' }).wireTelemetry).toBe(true);
+    expect(loadMachineLineConfig({ MACHINE_WIRE_TELEMETRY: 'off' }).wireTelemetry).toBe(false);
+    expect(() => loadMachineLineConfig({ MACHINE_WIRE_TELEMETRY: 'yes' })).toThrow(/MACHINE_WIRE_TELEMETRY/);
+  });
+});
+
 describe('lifecycle notes', () => {
   it('are off unless MACHINE_LIFECYCLE is on, with progress noted every 25 percent', () => {
     expect(loadMachineLineConfig({})).toMatchObject({ lifecycle: false, progressStep: 25 });

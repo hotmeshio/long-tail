@@ -106,12 +106,15 @@ describe('mock floor: transfer faults', () => {
   it('a dropped link fires the will, queues reliable messages, and flushes them on restore', async () => {
     h = await startHarness();
     const presence = 'line/v1/site-1/line-1/press-01/presence';
+    const session = h.line.machine('press-01').sessionId;
     await h.line.network('press-01', { mode: 'drop' });
-    expect(JSON.parse(h.broker.retained(presence)[0].payload).body).toEqual({ online: false });
+    expect(JSON.parse(h.broker.retained(presence)[0].payload).body).toEqual({ online: false, sessionId: session });
     await h.line.alarm('press-01', { code: 'LOW-FILM', level: 'warning' });
     expect(h.line.machine('press-01').snapshot().link.outbox).toBeGreaterThan(0);
     await h.line.network('press-01', { mode: 'restore' });
     expect(h.line.machine('press-01').snapshot().link.outbox).toBe(0);
-    expect(JSON.parse(h.broker.retained(presence)[0].payload).body).toEqual({ online: true, software: '1.0.0' });
+    const back = JSON.parse(h.broker.retained(presence)[0].payload).body;
+    expect(back).toEqual({ online: true, software: '1.0.0', sessionId: h.line.machine('press-01').sessionId });
+    expect(back.sessionId).not.toBe(session);
   });
 });

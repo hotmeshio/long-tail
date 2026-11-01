@@ -5,9 +5,11 @@ import { commandRow, commandTarget } from '../../../services/machines/commands';
 import { CONTROLLER } from '../../../services/machines/gateway/actions';
 import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
 import { RecordingLog } from '../../../services/machines/testing/recording-log';
-import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
+import { MachineGateway } from '../../../services/machines/gateway/gateway';
+import { GATEWAY_SETTINGS, startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
+import { REFUSAL_CODE } from '../../../examples/workflows/machine-line/mock/cell';
 
 let rig: LineRig;
 afterEach(async () => rig?.stop());
@@ -39,11 +41,11 @@ describe('machine-command rows', () => {
     expect(press().mode).toBe(MODE.IDLE);
   });
 
-  it('a changeover to a version the machine does not hold is refused, as data on the row', async () => {
+  it('a changeover to a version the machine does not hold is refused, as data on the row, with the machine\'s code', async () => {
     rig = await startRig();
     const ended = await rig.lt.ended(ask(OP.CHANGEOVER, { recipe: { id: 'RCP-NONE', version: '9' } }).id);
     expect(ended.resolved_by).toBe('press-01');
-    expect(ended.resolver_payload).toMatchObject({ accepted: false, status: 'refused' });
+    expect(ended.resolver_payload).toMatchObject({ accepted: false, status: 'refused', code: REFUSAL_CODE.RECIPE_NOT_HELD });
     expect(ended.resolver_payload!.reason).toMatch(/not held/);
   });
 
@@ -89,6 +91,36 @@ function codecWithout(...missing: string[]): LineCodec {
   const generic = genericCodec({ root: ROOT });
   return { ...generic, encode: (ident, command) => (missing.includes(command.op) ? [] : generic.encode(ident, command)) };
 }
+
+describe('ops a row may ask for', () => {
+  it('a snapshot row resolves with the reply, and the machine reports its state', async () => {
+    rig = await startRig();
+    const before = rig.recorder.of('press-01', 'snapshot').length;
+    const ended = await rig.lt.ended(ask(OP.SNAPSHOT).id);
+    expect(ended.resolved_by).toBe('press-01');
+    expect(ended.resolver_payload).toMatchObject({ accepted: true, op: OP.SNAPSHOT, status: 'accepted' });
+    await until(() => rig.recorder.of('press-01', 'snapshot').length > before);
+  });
+
+  it('an op the codec declares is sent and resolved with the reply; one it does not declare is unsupported', async () => {
+    const codec = { ...genericCodec({ root: ROOT }), rowOps: ['purge'] };
+    rig = await startRig({}, {}, DEFAULT_LINE, { codec });
+    const purged = await rig.lt.ended(ask('purge').id);
+    expect(rig.recorder.commands('press-01', 'purge')).toHaveLength(1);
+    expect(purged.resolved_by).toBe('press-01');
+    expect(purged.resolver_payload).toMatchObject({ accepted: false, op: 'purge', status: 'refused', code: REFUSAL_CODE.UNKNOWN_OP });
+    const other = await rig.lt.ended(ask('rinse').id);
+    expect(other.resolved_by).toBe(CONTROLLER);
+    expect(other.resolver_payload).toMatchObject({ accepted: false, status: 'unsupported' });
+    expect(other.resolver_payload!.reason).toMatch(/one of .*purge/);
+    expect(rig.recorder.commands('press-01', 'rinse')).toEqual([]);
+  });
+
+  it('a codec whose row ops are not non-empty strings is refused before the line starts', () => {
+    const codec = { ...genericCodec({ root: ROOT }), rowOps: ['purge', ''] };
+    expect(() => new MachineGateway({ bus: {} as any, feed: {} as any, lt: {} as any, line: DEFAULT_LINE, settings: GATEWAY_SETTINGS, codec })).toThrow(/rowOps/);
+  });
+});
 
 describe('commands the codec has no message for', () => {
   it('a command row resolves unsupported at once, by the controller, and nothing is sent', async () => {

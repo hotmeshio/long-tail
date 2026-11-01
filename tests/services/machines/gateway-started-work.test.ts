@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { OP, genericCodec } from '../../../lib/machines/protocol';
+import { JOB_EVENT, OP, genericCodec } from '../../../lib/machines/protocol';
 import { commandRow, commandTarget } from '../../../services/machines/commands';
+import { REFUSAL_CODE, STOPPED_REASON } from '../../../examples/workflows/machine-line/mock/cell';
 import { stationRole } from '../../../lib/machines/line';
 import { facetsFor, startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
@@ -11,6 +12,7 @@ let rig: LineRig;
 afterEach(async () => rig?.stop());
 
 const perUnit = { codec: genericCodec({ root: ROOT, unitsPerDispatch: 1 }) };
+const press = () => rig.line.machine('press-01');
 const cancels = (machineId: string) => rig.recorder.commands(machineId, OP.CANCEL).map((c) => c.args.jobId);
 const arrivedOn = (rowId: string, unitId: string) => () => rig.lt.rows.get(rowId)!.items.some((i) => i.itemKey === `arrived:${unitId}`);
 
@@ -68,6 +70,24 @@ describe('started work is the workflow\'s to stop', () => {
     rig.lt.expire(row.id);
     await settled();
     expect(cancels('press-01')).toEqual([]);
+  });
+
+  it('a stop row with the job stops started work at a safe point; a job still queued is refused', async () => {
+    rig = await startRig({ autoArriveAtEntry: false });
+    rig.line.config('press-01', { cycleSec: 5_000 });
+    const running = await partlyArrived(['W1']);
+    await until(() => press().cell.jobs.get('W1-press-01')?.status === 'running');
+    const stopped = await rig.lt.ended(rig.lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.STOP, { jobId: 'W1-press-01' })).id);
+    expect(stopped.resolver_payload).toMatchObject({ accepted: true, op: OP.STOP, status: 'accepted' });
+    await until(() => press().cell.jobs.get('W1-press-01')?.status === 'done');
+    expect(rig.recorder.jobs('press-01', JOB_EVENT.FINISHED)[0]).toMatchObject({ jobId: 'W1-press-01', result: 'hold', reason: STOPPED_REASON });
+    expect(rig.lt.rows.get(running.id)!.status).toBe('resolved');
+
+    rig.park(['X1', 'X2'], null, 'press-01');
+    await until(() => press().cell.jobs.get('X1-press-01'));
+    const queued = await rig.lt.ended(rig.lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.STOP, { jobId: 'X1-press-01' })).id);
+    expect(queued.resolver_payload).toMatchObject({ accepted: false, status: 'refused', code: REFUSAL_CODE.JOB_STATE });
+    expect(press().cell.jobs.get('X1-press-01')?.status).toBe('queued');
   });
 
   it('a cancel row without the job to cancel is unsupported and never sent', async () => {

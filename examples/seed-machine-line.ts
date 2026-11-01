@@ -1,20 +1,29 @@
 /**
  * Machine line roles for the examples: the shipped role declarations
- * (services/machines/roles.ts) for the demo line or MACHINE_LINE_CONFIG, and
- * the roles people work in the route manifests, applied insert-if-absent so
- * an admin's tuning survives restarts.
+ * (services/machines/roles.ts) for the demo line or every line named by
+ * MACHINE_LINE_CONFIG, and the roles people work in the route manifests,
+ * applied insert-if-absent so an admin's tuning survives restarts.
  */
 
 import { createRole, listRolesWithDetails, updateRoleMetadata } from '../services/role';
 import { loggerRegistry } from '../lib/logger';
 import { machineRoleConfigs } from '../services/machines/roles';
 import type { LTRoleConfig } from '../types/startup';
-import { loadLine } from './workflows/machine-line/line';
+import { loadLines } from './workflows/machine-line/line';
 import { loadManifests, personRoleConfigs } from './workflows/machine-line/manifests';
 
-export function machineLineRoleData(lineConfigPath = process.env.MACHINE_LINE_CONFIG || undefined): LTRoleConfig[] {
-  const line = loadLine(lineConfigPath);
-  return [...machineRoleConfigs(line), ...personRoleConfigs(line, loadManifests())];
+export function machineLineRoleData(lineConfigPaths = process.env.MACHINE_LINE_CONFIG || undefined): LTRoleConfig[] {
+  const manifests = loadManifests();
+  const seen = new Set<string>();
+  const out: LTRoleConfig[] = [];
+  for (const line of loadLines(lineConfigPaths)) {
+    for (const role of [...machineRoleConfigs(line), ...personRoleConfigs(line, manifests)]) {
+      if (seen.has(role.role)) continue;
+      seen.add(role.role);
+      out.push(role);
+    }
+  }
+  return out;
 }
 
 export async function seedMachineLineRoles(): Promise<void> {

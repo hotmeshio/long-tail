@@ -53,9 +53,13 @@ export class CoreEscalationFeed implements EscalationFeed {
     });
   }
 
-  async close(): Promise<void> {
+  async unsubscribe(): Promise<void> {
     this.sub?.unsubscribe();
     await this.redelivery.stop();
+  }
+
+  async close(): Promise<void> {
+    await this.unsubscribe();
     await this.nc?.drain();
   }
 }

@@ -61,6 +61,10 @@ export class MemoryMachineBus implements MachineBus {
     return this.broker.retained(filter);
   }
 
+  async unsubscribe(): Promise<void> {
+    this.broker.detach(this.durableName);
+  }
+
   async close(): Promise<void> {
     this.broker.detach(this.durableName);
   }
@@ -83,6 +87,10 @@ export class MemoryEscalationFeed implements EscalationFeed {
       const event = toEscalationEvent(JSON.parse(msg.payload));
       return event ? handler(event) : DISPOSITION.TERM;
     });
+  }
+
+  async unsubscribe(): Promise<void> {
+    this.broker.detach(this.durableName);
   }
 
   async close(): Promise<void> {

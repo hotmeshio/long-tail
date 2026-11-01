@@ -6,7 +6,9 @@ import { eventRegistry } from '../lib/events';
 import { MESSAGING_LOG, messagingRegistry } from '../lib/messaging';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import { MachineSurface } from '../services/machines/surface';
+import { registerMachineSurface } from '../modules/machines';
 import { withMachineRoles } from '../services/machines/roles';
+import { syncDeclaredLines, watchLineRegistry } from '../services/machines/registry-sync';
 import { maintenanceRegistry } from '../services/maintenance';
 import { cronRegistry } from '../services/cron';
 import { mcpRegistry } from '../services/mcp';
@@ -86,10 +88,17 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   const { workers, builtinMcpServerFactories } = await collectWorkers(startConfig);
   const { adminUserId } = await startWorkers(startConfig, workers, builtinMcpServerFactories);
 
-  // 5b. Machines, after the workers exist so their rows publish lifecycle events
-  const machines = startConfig.machines
-    ? MachineSurface.start({ ...startConfig.machines, callbacks: eventRegistry.getAdapter(CallbackEventAdapter) })
-    : null;
+  // 5b. Machines, after the workers exist so their rows publish lifecycle events.
+  // Code lines land in the registry under the configSource rules; the surface runs every line the registry holds.
+  let machines: MachineSurface | null = null;
+  let unwatchLines: (() => void) | null = null;
+  if (startConfig.machines) {
+    const callbacks = eventRegistry.getAdapter(CallbackEventAdapter);
+    const { lines } = await syncDeclaredLines(startConfig.machines.lines, (startConfig.configSource ?? 'db') === 'code');
+    machines = MachineSurface.start({ ...startConfig.machines, lines, callbacks });
+    if (callbacks) unwatchLines = watchLineRegistry(machines, callbacks);
+  }
+  registerMachineSurface(machines);
 
   // 6. Start embedded server (if enabled)
   const serverEnabled = startConfig.server?.enabled !== false;
@@ -110,7 +119,9 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       await new Promise<void>((resolve) => httpServer!.close(() => resolve()));
     }
     if (machines) {
+      unwatchLines?.();
       await machines.stop();
+      registerMachineSurface(null);
     }
     if (mcpRegistry.hasAdapter) {
       await mcpRegistry.disconnect();

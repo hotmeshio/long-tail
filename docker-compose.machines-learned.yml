@@ -11,9 +11,14 @@ services:
     environment:
       MACHINE_LINE_CONFIG: /etc/site/line.json
 
+  # The learning line is the factory line alone; the south site stays out of this run.
   machine-site:
     environment:
+      MACHINE_LINE_CONFIG: /app/examples/workflows/machine-line/factory-line.json
       MACHINE_LINE_ADDRESSES: /app/examples/workflows/machine-line/factory-line-addresses.json
+
+  machine-mock-south:
+    profiles: ["south"]
 
   machine-mock:
     environment:

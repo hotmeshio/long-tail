@@ -3,6 +3,7 @@
  * reads escalation events (a new handoff row means "dispatch"), reads every
  * machine message on the line (a receipt means "resolve"), and performs the
  * verbs a person would, as the machine. Neither side knows about the other.
+ * Every message read or sent is recorded on the wire (wire.ts).
  */
 
 import { standardRows, type HandoffRowAdapter } from '../rows';
@@ -12,17 +13,22 @@ import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, 
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdViolation, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, OP, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
+import { publishMachineWireEvent } from '../../../lib/events/publish';
+import type { InspectResult } from '../../../types/machines-view';
 import { ReplyWaiter } from './reply-waiter';
 import type { LineEscalations } from './escalations';
 import { Executor } from './executor';
+import { GatewayStopped } from './dispatcher';
+import { dryRun } from './inspect';
 import { GATEWAY_LOG, consoleLog, type GatewayLog } from './log';
 import { concernsLine, planEscalationEvent, statusFits } from './plan-escalation';
 import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
+import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
 
 export interface GatewaySettings {
   topicRoot: string;
@@ -39,6 +45,8 @@ export interface GatewaySettings {
   lifecycle?: boolean;
   /** With lifecycle notes, progress is noted each time it crosses this many percent; 0 notes none. */
   progressStep?: number;
+  /** Record telemetry messages on the wire too; off unless set. */
+  wireTelemetry?: boolean;
 }
 
 export interface GatewayDeps {
@@ -54,6 +62,8 @@ export interface GatewayDeps {
   codec?: LineCodec;
   /** Where a line that learns addresses keeps them; in memory by default. */
   addresses?: AddressBook;
+  /** Where wire records go; Long Tail's events by default. */
+  wire?: WireSink;
 }
 
 export class MachineGateway {
@@ -65,6 +75,7 @@ export class MachineGateway {
   private readonly log: GatewayLog;
   private readonly addresses: AddressBook;
   private readonly admission: AdmissionContext;
+  private readonly wire: WireRecorder;
   private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
@@ -73,18 +84,20 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
+    this.state.rowOps = declaredRowOps(this.codec);
     this.state.lifecycle = deps.settings.lifecycle === true;
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
+    this.wire = new WireRecorder(deps.line, deps.wire ?? publishMachineWireEvent, { telemetry: deps.settings.wireTelemetry === true });
     this.executor = new Executor({
-      addresses: this.addresses,
+      addresses: this.addresses, wire: this.wire,
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
     });
     this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace() };
-    this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log });
+    this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log, wire: this.wire });
   }
 
   async start(): Promise<void> {
@@ -103,9 +116,16 @@ export class MachineGateway {
     this.log.info(GATEWAY_LOG.STARTED, { site: this.deps.line.siteId, line: this.deps.line.lineId });
   }
 
+  /**
+   * Hand the line over cleanly: nothing new is raised or sent, a message
+   * still being handled is nak'd for the next leader if it would make a row,
+   * receipts for what was applied go out, then the sessions close.
+   */
   async stop(): Promise<void> {
     if (this.quietTimer) clearInterval(this.quietTimer);
     this.executor.stop();
+    await this.deps.feed.unsubscribe();
+    await this.deps.bus.unsubscribe();
     await this.executor.idle();
     await this.receipts.flush();
     await this.deps.feed.close();
@@ -123,6 +143,11 @@ export class MachineGateway {
   /** Resolves when no dispatch is in flight (tests). */
   idle(): Promise<void> {
     return this.executor.idle();
+  }
+
+  /** A dry run of one message on a copy of the state: nothing is applied (inspect.ts). */
+  inspect(msg: Pick<InboundMessage, 'topic' | 'payload' | 'retained'>): InspectResult {
+    return dryRun({ state: this.state, line: this.deps.line, codec: this.codec, dispatchTtlMs: this.deps.settings.dispatchTtlMs }, { ...msg, deliveries: 1 });
   }
 
   /**
@@ -183,13 +208,19 @@ export class MachineGateway {
     const active = new Set<string>();
     this.state.readingRetained = true;
     try {
-      for (const msg of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
-        for (const raw of this.decode(msg.topic, msg.payload, true)) {
+      for (const read of await this.deps.bus.retained(lineFilter(this.codec.root, line.siteId, line.lineId))) {
+        const msg = { ...read, retained: true };
+        for (const raw of this.decode(msg)) {
           if (!raw.parsed) continue;
-          const seen = await admitSender(this.admission, msg.topic, raw);
-          if (!('parsed' in seen) || !seen.parsed) continue;
-          if (seen.parsed.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed.ident.machineId, seen.parsed.key!));
-          await this.applyMachine(msg.topic, seen.parsed, seen.body);
+          const admitted = await admitSender(this.admission, msg.topic, raw);
+          if (!('seen' in admitted)) {
+            this.wire.inbound(msg, raw, admitted, 1, admitted.sender);
+            continue;
+          }
+          const { seen } = admitted;
+          if (seen.parsed!.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed!.ident.machineId, seen.parsed!.key!));
+          const applied = await this.applyMachine(msg.topic, seen.parsed!, seen.body);
+          this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, 1);
         }
       }
     } finally {
@@ -209,7 +240,7 @@ export class MachineGateway {
       await this.pace();
       return DISPOSITION.ACK;
     } catch (err: any) {
-      this.log.error(GATEWAY_LOG.VERB_FAILED, { event: event.type, error: err.message });
+      if (!(err instanceof GatewayStopped)) this.log.error(GATEWAY_LOG.VERB_FAILED, { event: event.type, error: err.message });
       return DISPOSITION.NAK;
     }
   }
@@ -227,18 +258,20 @@ export class MachineGateway {
   }
 
   private async onMachine(msg: InboundMessage): Promise<Disposition> {
-    const decoded = this.decode(msg.topic, msg.payload, msg.retained);
+    const decoded = this.decode(msg);
     const acted: Inspection[] = [];
     let outcome: Disposition = DISPOSITION.TERM;
     let failed = false;
     for (const raw of decoded) {
       if (!raw.parsed) continue;
-      const seen = await admitSender(this.admission, msg.topic, raw);
-      if (!('parsed' in seen)) {
-        failed ||= seen.failed;
-        outcome = worse(outcome, seen.disposition);
+      const admitted = await admitSender(this.admission, msg.topic, raw);
+      if (!('seen' in admitted)) {
+        failed ||= admitted.failed;
+        outcome = worse(outcome, admitted.disposition);
+        this.wire.inbound(msg, raw, admitted, msg.deliveries, admitted.sender);
         continue;
       }
+      const { seen } = admitted;
       acted.push(seen);
       if (seen.violations.length && msg.deliveries === 1) {
         this.log.warn(GATEWAY_LOG.CONTRACT_VIOLATION, { topic: msg.topic, violations: seen.violations });
@@ -248,6 +281,7 @@ export class MachineGateway {
         : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
+      this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, msg.deliveries);
     }
     // No row has claimed it after this many tries, so it is not racing its row: stop. A failed verb always retries.
     if (outcome === DISPOSITION.NAK && !failed && msg.deliveries >= MAX_DELIVERIES) {
@@ -259,13 +293,17 @@ export class MachineGateway {
   }
 
   /** A message the codec cannot read is not retried: it is logged and has no effect. */
-  private decode(topic: string, payload: string, retained?: boolean): Inspection[] {
+  private decode(msg: InboundMessage): Inspection[] {
+    let decoded: Inspection[];
     try {
-      return this.codec.decode(topic, payload, retained);
+      decoded = this.codec.decode(msg.topic, msg.payload, msg.retained);
     } catch (err: any) {
-      this.log.warn(GATEWAY_LOG.UNREADABLE, { topic, error: err.message });
+      this.log.warn(GATEWAY_LOG.UNREADABLE, { topic: msg.topic, error: err.message });
+      this.wire.unreadable(msg, err.message);
       return [];
     }
+    if (!decoded.length) this.wire.unreadable(msg, 'not a machine message', 'none');
+    return decoded;
   }
 
   /** Done with the message: confirm each id its codec asked to confirm. */
@@ -284,20 +322,19 @@ export class MachineGateway {
       plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
     } catch (err: any) {
       this.log.warn(GATEWAY_LOG.UNREADABLE, { topic, error: err.message });
-      return { disposition: DISPOSITION.TERM, failed: false };
+      return { disposition: DISPOSITION.TERM, failed: false, actions: [{ verb: 'unreadable', detail: err.message }] };
     }
     try {
-      await this.executor.apply(plan.actions);
+      const actions = await this.executor.apply(plan.actions);
       await this.pace();
-      return { disposition: plan.disposition, failed: false };
+      return { disposition: plan.disposition, failed: false, actions };
     } catch (err: any) {
-      this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
-      return { disposition: DISPOSITION.NAK, failed: true };
+      if (!(err instanceof GatewayStopped)) this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
+      return { disposition: DISPOSITION.NAK, failed: true, actions: [] };
     }
   }
 }
 
-const MAX_DELIVERIES = 30;
 const DEFAULT_RECEIPT_DELAY_MS = 250;
 
 const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };

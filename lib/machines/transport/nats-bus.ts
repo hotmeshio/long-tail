@@ -57,6 +57,10 @@ export class NatsMachineBus implements MachineBus {
     return this.stream().retained(filter);
   }
 
+  async unsubscribe(): Promise<void> {
+    await this.bus?.unsubscribe();
+  }
+
   async close(): Promise<void> {
     await this.bus?.close();
     await this.provider.disconnect();

@@ -1,0 +1,22 @@
+{
+  "automated": {
+    "description": "Print cell, bonding press and optical inspection at the south site; a person at the inspector receives.",
+    "steps": [
+      "print-21",
+      "press-21",
+      "inspect-21"
+    ]
+  },
+  "manual": {
+    "description": "Print cell harvested by hand, then people at each station to the inspector.",
+    "steps": [
+      "print-21",
+      {
+        "role": "harvester"
+      },
+      {
+        "role": "finisher"
+      }
+    ]
+  }
+}

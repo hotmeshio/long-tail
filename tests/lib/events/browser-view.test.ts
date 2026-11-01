@@ -36,6 +36,28 @@ describe('eventForViewer', () => {
   });
 });
 
+describe('machine wire events', () => {
+  const wire: LTEvent = {
+    type: 'machine.wire.site-1.line-1.press-01.in', timestamp: 't', source: 'machine-gateway',
+    data: {
+      type: 'machine.wire', siteId: 'site-1', lineId: 'line-1', machineId: 'press-01', direction: 'in', kind: 'job', event: 'arrived',
+      summary: 'job arrived U1', violations: [], actions: [{ verb: 'accumulate', rowId: 'h1', itemKey: 'arrived:U1' }],
+      payload: { v: '1', body: { event: 'arrived', unitId: 'U1', measurements: [{ name: 'secret', value: 1 }] } },
+    },
+  };
+
+  it('a builder receives the raw payload', () => {
+    expect(eventForViewer(wire, { builder: true })).toBe(wire);
+  });
+
+  it('anyone else receives the record without the payload', () => {
+    const seen = eventForViewer(wire, { builder: false });
+    expect(seen.data).not.toHaveProperty('payload');
+    expect(seen.data).toMatchObject({ kind: 'job', event: 'arrived', summary: 'job arrived U1', actions: [{ verb: 'accumulate', rowId: 'h1', itemKey: 'arrived:U1' }] });
+    expect(seen.type).toBe(wire.type);
+  });
+});
+
 describe('payloadForViewer', () => {
   it('rewrites a serialized event, and withholds anything that is not one', () => {
     const out = payloadForViewer(Buffer.from(JSON.stringify(milestone)), { builder: false })!;

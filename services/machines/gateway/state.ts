@@ -6,6 +6,9 @@
  */
 
 import type { HandoffFacets, TraceEntry } from '../contracts';
+import type { LineDef } from '../../../lib/machines/line';
+import type { ContestedClaimView, LineView } from '../../../types/machines-view';
+import { projectLine } from './project';
 import { mergeTrace } from './trace';
 
 /**
@@ -44,6 +47,7 @@ export interface AlarmTrack {
   alarmId: string;
   /** When the machine raised it; a reused alarm id with a new time is a new alarm. */
   raisedAt?: string;
+  level?: string;
   rowId?: string;
   /** Created and not yet resolved by anyone. */
   open: boolean;
@@ -60,6 +64,22 @@ export interface LinkTrack {
   watching?: boolean;
   software?: string;
   bootId?: string;
+  /** The machine's connection, when its presence names one; a new one while online is a reconnect to resync. */
+  sessionId?: string;
+  /** Why the machine went offline, when its presence said. */
+  reason?: string;
+  /** The jobs its last snapshot listed, as the codec reported them. */
+  jobs?: unknown[];
+}
+
+/** One unit a machine holds: the job it arrived under. */
+export interface HeldUnit {
+  unitId: string;
+  jobId: string;
+}
+
+function copyInto<K, V>(from: Map<K, V>, into: Map<K, V>, clone: (v: V) => V = (v) => v): void {
+  for (const [k, v] of from) into.set(k, clone(v));
 }
 
 const CLOSED_LIMIT = 2_000;
@@ -69,6 +89,8 @@ export class GatewayState {
   unitsPerDispatch: number | null = null;
   /** Jobs go to a receiver once its units arrive there, from the codec. */
   dispatchOnArrival = false;
+  /** Commands of the machines' own that a machine-command row may ask for, from the codec. */
+  rowOps: readonly string[] = [];
   /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
   lifecycle = false;
   /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
@@ -88,7 +110,8 @@ export class GatewayState {
   readonly alarms = new Map<string, AlarmTrack>();
   /** Finished records that came before their row: machine/unit → job body. */
   private earlyFinishes = new Map<string, Record<string, any>>();
-  private openCommands = new Set<string>();
+  /** Open machine-command rows → the machine each commands. */
+  private openCommands = new Map<string, string>();
   /** Accepted dispatch command ids → their row, so a later failure finds the row. */
   private dispatches = new Map<string, string>();
   private endedCommands = new Set<string>();
@@ -98,8 +121,8 @@ export class GatewayState {
   /** Learned addresses, both ways: station → address and address → station. */
   private addressOfStation = new Map<string, string>();
   private stationOfAddress = new Map<string, string>();
-  /** Contested claims already raised as registration rows, `${address}>${station}`. */
-  private claims = new Set<string>();
+  /** Contested claims already raised as registration rows, `${address}>${station}` → the row. */
+  private claims = new Map<string, string | null>();
   /** Contested claims heard from the machines themselves, `${address}>${station}`. */
   private heard = new Set<string>();
   /** Addresses heard that claim no station, logged once each. */
@@ -169,6 +192,10 @@ export class GatewayState {
     return [...(this.held.get(machineId)?.values() ?? [])];
   }
 
+  heldUnitsAt(machineId: string): HeldUnit[] {
+    return [...(this.held.get(machineId)?.entries() ?? [])].map(([unitId, jobId]) => ({ unitId, jobId }));
+  }
+
   /** Keep only units whose job the machine still lists (its snapshot). */
   keepHeld(machineId: string, jobIds: Set<string>): void {
     const units = this.held.get(machineId);
@@ -207,10 +234,15 @@ export class GatewayState {
   }
 
   /** Track a machine-command row; false when it is already tracked or has ended. */
-  trackCommand(id: string): boolean {
+  trackCommand(id: string, machineId = ''): boolean {
     if (this.openCommands.has(id) || this.endedCommands.has(id)) return false;
-    this.openCommands.add(id);
+    this.openCommands.set(id, machineId);
     return true;
+  }
+
+  /** Open machine-command rows for one machine. */
+  openCommandsFor(machineId: string): number {
+    return [...this.openCommands.values()].filter((m) => m === machineId).length;
   }
 
   endCommand(id: string): void {
@@ -244,8 +276,16 @@ export class GatewayState {
     return this.claims.has(`${address}>${machineId}`);
   }
 
-  raiseClaim(address: string, machineId: string): void {
-    this.claims.add(`${address}>${machineId}`);
+  raiseClaim(address: string, machineId: string, rowId?: string): void {
+    this.claims.set(`${address}>${machineId}`, rowId ?? this.claims.get(`${address}>${machineId}`) ?? null);
+  }
+
+  /** The contested claims waiting for a person, with the rows that ask. */
+  contested(): ContestedClaimView[] {
+    return [...this.claims.entries()].map(([key, rowId]) => {
+      const [address, station] = key.split('>');
+      return { address, station, rowId: rowId ?? '' };
+    });
   }
 
   settleClaim(address: string, machineId: string): void {
@@ -292,6 +332,36 @@ export class GatewayState {
 
   alarmKey(machineId: string, alarmId: string): string {
     return `${machineId}/${alarmId}`;
+  }
+
+  /** The line as this gateway sees it (project.ts). */
+  project(line: LineDef): LineView {
+    return projectLine(this, line);
+  }
+
+  /** A copy a dry run may change without touching the line. */
+  clone(): GatewayState {
+    const copy = new GatewayState();
+    Object.assign(copy, {
+      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, lifecycle: this.lifecycle,
+      retainedAlarms: this.retainedAlarms, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
+    });
+    copyInto(this.held, copy.held, (units) => new Map(units));
+    copyInto(this.openRows, copy.openRows, (row) => ({ ...row, units: [...row.units], ...(row.noted ? { noted: [...row.noted] } : {}) }));
+    copyInto(this.closedRows, copy.closedRows, (row) => ({ ...row }));
+    copyInto(this.alarms, copy.alarms, (track) => ({ ...track, ...(track.noted ? { noted: [...track.noted] } : {}) }));
+    copyInto(this.earlyFinishes, copy.earlyFinishes);
+    copyInto(this.openCommands, copy.openCommands);
+    copyInto(this.dispatches, copy.dispatches);
+    copyInto(this.links, copy.links, (link) => ({ ...link }));
+    copyInto(this.addressOfStation, copy.addressOfStation);
+    copyInto(this.stationOfAddress, copy.stationOfAddress);
+    copyInto(this.claims, copy.claims);
+    for (const id of this.endedCommands) copy.endedCommands.add(id);
+    for (const key of this.violations) copy.violations.add(key);
+    for (const key of this.heard) copy.heard.add(key);
+    for (const key of this.strangers) copy.strangers.add(key);
+    return copy;
   }
 }
 

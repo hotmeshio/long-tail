@@ -98,6 +98,12 @@ describe('contract: alarms and replies', () => {
     expect(inspectMessage(ROOT, topic, msg({ cmdId: 'c1', status: 'maybe', reason: 'ok' })).violations.length).toBeGreaterThan(0);
     expect(inspectMessage(ROOT, topic, msg({ cmdId: 'c1', status: 'accepted', reason: 'ok' }), true).violations).toContain('reply must not be retained');
   });
+
+  it('lets a reply carry a structured code, as a string', () => {
+    const topic = machineTopic(ROOT, ident, CHANNEL.REPLY);
+    expect(inspectMessage(ROOT, topic, msg({ cmdId: 'c1', status: 'refused', reason: 'queue full', code: 'queue-full' }), false).violations).toEqual([]);
+    expect(inspectMessage(ROOT, topic, msg({ cmdId: 'c1', status: 'refused', reason: 'queue full', code: 7 }), false).violations.join()).toMatch(/code/);
+  });
 });
 
 describe('contract: who a job event is about', () => {

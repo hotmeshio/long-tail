@@ -29,8 +29,12 @@ export class CallbackEscalationFeed implements EscalationFeed {
     });
   }
 
-  async close(): Promise<void> {
+  async unsubscribe(): Promise<void> {
     this.off?.();
     await this.redelivery.stop();
+  }
+
+  async close(): Promise<void> {
+    await this.unsubscribe();
   }
 }

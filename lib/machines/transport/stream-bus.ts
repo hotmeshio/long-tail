@@ -64,9 +64,14 @@ export class StreamMachineBus implements MachineBus {
     return this.mqtt().retained(filter);
   }
 
-  async close(): Promise<void> {
+  /** Stops the consumer and the live subscriptions; the MQTT session stays open for commands and receipts. */
+  async unsubscribe(): Promise<void> {
     for (const sub of this.subs.splice(0)) await sub.close();
     await this.queue.drained();
+  }
+
+  async close(): Promise<void> {
+    await this.unsubscribe();
     await this.session?.close(true);
   }
 

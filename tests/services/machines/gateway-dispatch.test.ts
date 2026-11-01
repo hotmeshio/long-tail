@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { JOB_EVENT, OP, genericCodec } from '../../../lib/machines/protocol';
+import { CHANNEL, JOB_EVENT, OP, buildEnvelope, genericCodec, machineTopic } from '../../../lib/machines/protocol';
+import { identOf } from '../../../lib/machines/line';
 import { CONTROLLER } from '../../../services/machines/gateway/actions';
 import { GATEWAY_LOG } from '../../../services/machines/gateway/log';
 import { RecordingLog } from '../../../services/machines/testing/recording-log';
@@ -36,6 +37,23 @@ describe('dispatch: a machine that is away', () => {
     await sleep(50);
     expect(rig.recorder.replies('press-01').some((r) => /expired/.test(r.reason))).toBe(true);
     expect(rig.recorder.jobs('press-01', JOB_EVENT.STARTED)).toEqual([]);
+  });
+});
+
+describe('dispatch: a machine that answers nothing', () => {
+  it('two dispatches waiting on one machine both reconcile against its next snapshot', async () => {
+    rig = await startRig({ autoArriveAtEntry: false }, { replyTimeoutMs: 100, dispatchAttempts: 1 });
+    await rig.line.network('press-01', { mode: 'drop' });
+    const rows = [rig.park('U1', null, 'press-01'), rig.park('U2', null, 'press-01')];
+    await until(() => rig.recorder.commands('press-01', OP.SNAPSHOT).length === 2);
+    const ident = identOf(DEFAULT_LINE, 'press-01');
+    rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.SNAPSHOT), JSON.stringify(buildEnvelope(ident, {
+      bootId: press().bootId, software: press().software, mode: 'idle', enabled: true, recipe: null, alarms: [], cycles: 0,
+      jobs: rows.map((r) => ({ jobId: r.metadata.jobId, units: r.metadata.units.map((u: { unitId: string }) => u.unitId), status: 'queued' })),
+    })), true);
+    await until(() => rows.every((r) => rig.lt.rows.get(r.id)!.assigned_to === 'press-01'));
+    await rig.gateway.idle();
+    expect(rows.map((r) => rig.lt.rows.get(r.id)!.status)).toEqual(['pending', 'pending']);
   });
 });
 

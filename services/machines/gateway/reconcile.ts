@@ -29,8 +29,8 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
       .map(async (type) => (await lt.listOpen({ type, role })).filter(mine)),
   );
   for (const row of alarms) {
-    const { machineId, alarmId, raisedAt } = row.metadata;
-    state.alarms.set(state.alarmKey(machineId, alarmId), { machineId, alarmId, raisedAt, rowId: row.id, open: true });
+    const { machineId, alarmId, raisedAt, level } = row.metadata;
+    state.alarms.set(state.alarmKey(machineId, alarmId), { machineId, alarmId, raisedAt, level, rowId: row.id, open: true });
   }
   for (const row of offline) {
     const link = state.link(row.metadata.machineId);
@@ -38,7 +38,7 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
     link.rowId = row.id;
   }
   for (const row of quiet) state.link(row.metadata.machineId).quietRowId = row.id;
-  for (const row of registrations) state.raiseClaim(row.metadata.address, row.metadata.machineId);
+  for (const row of registrations) state.raiseClaim(row.metadata.address, row.metadata.machineId, row.id);
   return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length };
 }
 

@@ -41,6 +41,11 @@ export class MqttMachineBus implements MachineBus {
     return this.connected().retained(filter);
   }
 
+  /** Stops delivery in this process; the persistent session keeps its subscription, so messages queue for the next gateway. */
+  async unsubscribe(): Promise<void> {
+    await this.redelivery.stop();
+  }
+
   async close(): Promise<void> {
     await this.redelivery.stop();
     await this.session?.close(true);

@@ -14,13 +14,16 @@ import { randomUUID } from 'crypto';
 import { identOf, type LineDef, type MachineDef } from '../../../../lib/machines/line';
 import type { MachineLink } from '../../../../lib/machines/transport';
 import { Alarms, type AlarmRecord } from './alarms';
-import { Cell } from './cell';
+import { Cell, REFUSAL_CODE, type Refusal } from './cell';
 import { CommandHandler } from './commands';
 import type { Floor } from './floor';
 import type { PayloadStore } from './payloads';
 import { TimerBag, type MockSettings } from './settings';
 
 interface Outgoing { topic: string; payload: string; qos: 0 | 1; retain: boolean }
+
+/** Why a machine said it was going offline. */
+export const OFFLINE_REASON = { GRACEFUL: 'graceful' } as const;
 
 export class MockMachine {
   readonly ident: MachineIdent;
@@ -29,6 +32,8 @@ export class MockMachine {
   readonly cell = new Cell(this);
   commands = new CommandHandler(this);
   bootId = randomUUID();
+  /** One per connection; a new one tells the controller the link was remade. */
+  sessionId = randomUUID();
   readonly timers = new TimerBag();
   readonly recipes: Record<string, string[]>;
   mode: Mode = MODE.IDLE;
@@ -106,7 +111,7 @@ export class MockMachine {
   /** drop: the link is lost (the will fires); restore: reconnect; graceful: say offline first. */
   async network(mode: 'drop' | 'restore' | 'graceful'): Promise<void> {
     if (mode === 'restore') return this.connect();
-    if (mode === 'graceful') await this.publishPresence(false);
+    if (mode === 'graceful') await this.publishPresence(false, OFFLINE_REASON.GRACEFUL);
     await this.link.disconnect(mode === 'graceful');
   }
 
@@ -140,10 +145,10 @@ export class MockMachine {
     this.recipe = { ...recipe };
   }
 
-  /** Change over to a recipe version it holds: changeover mode until it is loaded, then idle. */
-  async changeover(recipe: { id: string; version: string }): Promise<string | null> {
-    if (!this.recipes[recipe?.id]?.includes(String(recipe?.version))) return `recipe ${recipe?.id} v${recipe?.version} is not held`;
-    if (!PRODUCTIVE_MODES.includes(this.mode)) return `cannot change over in ${this.mode}`;
+  /** Change over to a recipe version it holds: changeover mode until it is loaded, then idle. Returns why not, or null. */
+  async changeover(recipe: { id: string; version: string }): Promise<Refusal | null> {
+    if (!this.recipes[recipe?.id]?.includes(String(recipe?.version))) return { reason: `recipe ${recipe?.id} v${recipe?.version} is not held`, code: REFUSAL_CODE.RECIPE_NOT_HELD };
+    if (!PRODUCTIVE_MODES.includes(this.mode)) return { reason: `cannot change over in ${this.mode}`, code: REFUSAL_CODE.MODE };
     await this.setMode(MODE.CHANGEOVER);
     this.timers.after(this.ms(this.def.changeoverSec), () => void (async () => {
       if (this.mode !== MODE.CHANGEOVER) return;
@@ -200,7 +205,7 @@ export class MockMachine {
     return this.publish(CHANNEL.JOB, body);
   }
 
-  publishReply(body: { cmdId: string; status: string; reason: string }): Promise<void> {
+  publishReply(body: { cmdId: string; status: string; reason: string; code?: string }): Promise<void> {
     return this.publish(CHANNEL.REPLY, body);
   }
 
@@ -217,8 +222,9 @@ export class MockMachine {
     };
   }
 
-  private publishPresence(online: boolean): Promise<void> {
-    return this.publish(CHANNEL.PRESENCE, online ? { online, software: this.software } : { online }, { retain: true });
+  private publishPresence(online: boolean, reason?: string): Promise<void> {
+    const body = online ? { online, software: this.software, sessionId: this.sessionId } : { online, sessionId: this.sessionId, ...(reason ? { reason } : {}) };
+    return this.publish(CHANNEL.PRESENCE, body, { retain: true });
   }
 
   private publishTelemetry(): Promise<void> {
@@ -243,7 +249,8 @@ export class MockMachine {
   }
 
   private async connect(): Promise<void> {
-    const will = { topic: machineTopic(this.root, this.ident, CHANNEL.PRESENCE), payload: this.wrap({ online: false }), retain: true };
+    this.sessionId = randomUUID();
+    const will = { topic: machineTopic(this.root, this.ident, CHANNEL.PRESENCE), payload: this.wrap({ online: false, sessionId: this.sessionId }), retain: true };
     await this.link.connect({ clientId: this.clientId, will, onRestored: () => void this.announce() });
     await this.link.subscribe(machineTopic(this.root, this.ident, CHANNEL.CMD), (msg) => {
       void this.commands.handle(parsePayload(msg.payload));
