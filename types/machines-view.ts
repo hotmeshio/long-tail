@@ -125,6 +125,24 @@ export interface WireEvent {
 }
 
 /** A dry run of one message: what the codec read and what the gateway would do. */
+/** A read of the leader's wire window: newest first. */
+export interface WireWindowQuery {
+  limit?: number;
+  machine?: string;
+  direction?: WireDirection;
+  kind?: WireKind;
+  /** Only events after this time (ISO 8601). */
+  since?: string;
+}
+
+export interface LineWireResponse {
+  siteId: string;
+  lineId: string;
+  /** False from a replica that is not leading the line; its window is then empty. */
+  leading: boolean;
+  events: WireEvent[];
+}
+
 export interface InspectResult {
   kind: WireKind | null;
   event: string | null;

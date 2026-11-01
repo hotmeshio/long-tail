@@ -14,7 +14,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { learnsAddress, machineRole, type LineDef } from '../../lib/machines/line';
 import { CONTROL_OPS, OP, declaredRowOps, type LineCodec } from '../../lib/machines/protocol';
 import type { InboundMessage } from '../../lib/machines/transport';
-import type { InspectResult, LineSummary, LineView } from '../../types/machines-view';
+import type { InspectResult, LineSummary, LineView, WireEvent, WireWindowQuery } from '../../types/machines-view';
 import { ESCALATION_FEED, MACHINE_TRANSPORT, loadMachineLineConfig, type MachineLineConfig } from './config';
 import { ApiLineEscalations } from './gateway/api-escalations';
 import { MachineGateway } from './gateway/gateway';
@@ -54,6 +54,8 @@ export interface LineSurface {
   describeLine(siteId: string, lineId: string): LineView | null;
   /** A dry run of one message; null when this replica is not leading the line. */
   inspect(siteId: string, lineId: string, probe: WireProbe): InspectResult | null;
+  /** The leader's last wire events, newest first; null when this replica is not leading the line. */
+  wire(siteId: string, lineId: string, query?: WireWindowQuery): WireEvent[] | null;
   /** The declared line, or undefined. */
   findLine(siteId: string, lineId: string): LineDef | undefined;
   /** The ops a machine-command row on this line may ask for. */
@@ -157,6 +159,7 @@ class LineRun {
         topicRoot: config.topicRoot, replyTimeoutMs: config.replyTimeoutMs, dispatchAttempts: config.dispatchAttempts,
         offlineDebounceMs: config.offlineDebounceMs, dispatchTtlMs: config.dispatchTtlMs, quietMs: config.quietMs,
         receiptDelayMs: config.receiptDelayMs, lifecycle: config.lifecycle, progressStep: config.progressStep, wireTelemetry: config.wireTelemetry,
+        wireWindow: config.wireWindow,
       },
     });
     await this.gateway.start();
@@ -210,6 +213,10 @@ export class MachineSurface implements LineSurface {
 
   inspect(siteId: string, lineId: string, probe: WireProbe): InspectResult | null {
     return this.run(siteId, lineId)?.leader()?.inspect(probe) ?? null;
+  }
+
+  wire(siteId: string, lineId: string, query: WireWindowQuery = {}): WireEvent[] | null {
+    return this.run(siteId, lineId)?.leader()?.window.read(query) ?? null;
   }
 
   findLine(siteId: string, lineId: string): LineDef | undefined {

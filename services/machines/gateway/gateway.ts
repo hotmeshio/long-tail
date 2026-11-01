@@ -29,6 +29,7 @@ import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
 import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
+import { WireWindow } from './wire-window';
 
 export interface GatewaySettings {
   topicRoot: string;
@@ -47,6 +48,8 @@ export interface GatewaySettings {
   progressStep?: number;
   /** Record telemetry messages on the wire too; off unless set. */
   wireTelemetry?: boolean;
+  /** How many of the latest wire events the gateway keeps for reading over HTTP; 500 by default. */
+  wireWindow?: number;
 }
 
 export interface GatewayDeps {
@@ -76,6 +79,8 @@ export class MachineGateway {
   private readonly addresses: AddressBook;
   private readonly admission: AdmissionContext;
   private readonly wire: WireRecorder;
+  /** The line's last wire events, newest first on read. */
+  readonly window: WireWindow;
   private quietTimer?: NodeJS.Timeout;
 
   constructor(private readonly deps: GatewayDeps) {
@@ -89,7 +94,9 @@ export class MachineGateway {
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
-    this.wire = new WireRecorder(deps.line, deps.wire ?? publishMachineWireEvent, { telemetry: deps.settings.wireTelemetry === true });
+    this.window = new WireWindow(deps.settings.wireWindow);
+    const sink = deps.wire ?? publishMachineWireEvent;
+    this.wire = new WireRecorder(deps.line, (event) => { this.window.push(event); sink(event); }, { telemetry: deps.settings.wireTelemetry === true });
     this.executor = new Executor({
       addresses: this.addresses, wire: this.wire,
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
