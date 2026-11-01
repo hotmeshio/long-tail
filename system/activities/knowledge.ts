@@ -10,8 +10,7 @@ import {
   LIST_DOMAINS,
   SET_KNOWLEDGE_FIELD,
   REMOVE_KNOWLEDGE_FIELD,
-  APPEND_KNOWLEDGE,
-} from './sql';
+  APPEND_KNOWLEDGE, LABEL_KNOWLEDGE_VERSION } from './sql';
 
 async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   const { class: PgClient, options } = getConnection();
@@ -24,12 +23,24 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   }
 }
 
+/** Name the entry's current edition. A label already naming another edition of the entry is refused. */
+async function labelCurrentEdition(client: { query: (sql: string, params: unknown[]) => Promise<{ rows: any[] }> }, domain: string, key: string, version: number, label: string): Promise<void> {
+  try {
+    await client.query(LABEL_KNOWLEDGE_VERSION, [domain, key, label, version]);
+  } catch (err: any) {
+    if (err?.code === '23505') throw new Error(`label "${label}" already names another edition of ${domain}/${key}`);
+    throw err;
+  }
+}
+
 export async function storeKnowledge(args: {
   domain: string;
   key: string;
   data: Record<string, any>;
   tags?: string[];
   replace?: boolean;
+  /** A name for the edition this write leaves current, which lookup refs may pin. */
+  label?: string;
 }): Promise<{ id: string; domain: string; key: string; current_version: number; created: boolean; updated_at: string }> {
   return withClient(async (client) => {
     const sql = args.replace ? REPLACE_KNOWLEDGE : UPSERT_KNOWLEDGE;
@@ -37,6 +48,7 @@ export async function storeKnowledge(args: {
       sql,
       [args.domain, args.key, JSON.stringify(args.data), args.tags || []],
     );
+    if (args.label) await labelCurrentEdition(client, args.domain, args.key, rows[0].current_version, args.label);
     const result = { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
     publishKnowledgeEvent({ type: 'knowledge.stored', domain: args.domain, key: args.key });
     return result;
@@ -241,6 +253,8 @@ export async function appendKnowledge(args: {
   key: string;
   path: string;
   value: any;
+  /** A name for the edition this write leaves current, which lookup refs may pin. */
+  label?: string;
 }): Promise<{ id: string; domain: string; key: string; current_version: number; updated_at: string }> {
   return withClient(async (client) => {
     const pathParts = args.path.split('.');
@@ -257,6 +271,7 @@ export async function appendKnowledge(args: {
       APPEND_KNOWLEDGE,
       [args.domain, args.key, JSON.stringify(initData), pathArray, valueJson],
     );
+    if (args.label) await labelCurrentEdition(client, args.domain, args.key, rows[0].current_version, args.label);
     return { ...rows[0], updated_at: rows[0].updated_at.toISOString() };
   });
 }

@@ -46,8 +46,8 @@ router.get('/entries', async (req, res) => {
 /**
  * GET /api/knowledge/entry
  * Get a single knowledge entry — the live edition, or an immutable snapshot
- * when ?version=N is present.
- * Query: ?domain=...&key=...&version=N
+ * when ?version=N (or ?version=<label>) is present.
+ * Query: ?domain=...&key=...&version=N|label
  */
 router.get('/entry', async (req, res) => {
   const domain = req.query.domain as string;
@@ -57,9 +57,10 @@ router.get('/entry', async (req, res) => {
     return;
   }
   if (req.query.version !== undefined) {
-    const version = Number(req.query.version);
-    if (!Number.isInteger(version) || version < 1) {
-      res.status(400).json({ error: 'version must be a positive integer' });
+    const raw = String(req.query.version);
+    const version = /^[1-9][0-9]*$/.test(raw) ? Number(raw) : raw;
+    if (version === '' || version === 'current') {
+      res.status(400).json({ error: 'version must be a positive integer or an edition label' });
       return;
     }
     const result = await api.getEntryVersion({ domain, key, version });

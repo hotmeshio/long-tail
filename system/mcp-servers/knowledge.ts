@@ -11,12 +11,13 @@ const storeSchema = z.object({
   field: z.string().optional().describe('RECOMMENDED. Names a specific field to set within the entry (e.g. "2026-05-09", "url", "score"). Using field is additive — it merges into existing data without clobbering other fields. Without field, the entire data object is merged at the top level, which can overwrite existing fields with the same keys. Always use field when adding to an entry that may already have data.'),
   data: z.any().describe('The value to store. When field is provided, this can be any type (string, number, boolean, object, array) and is stored as { [field]: data }. When field is omitted, data must be a JSON object whose keys merge into existing data.'),
   tags: z.array(z.string()).optional().describe('Categorization tags (unioned on upsert)'),
+  label: z.string().min(1).optional().describe('A name for the edition this write leaves current; lookup refs may pin it as their version'),
 });
 
 const getSchema = z.object({
   domain: z.string().describe('Knowledge domain'),
   key: z.string().describe('Document key'),
-  version: z.number().int().min(1).optional().describe('Fetch this immutable edition instead of the live entry'),
+  version: z.union([z.number().int().min(1), z.string().min(1)]).optional().describe('Fetch this immutable edition, by number or by the label it carries, instead of the live entry'),
 });
 
 const listVersionsSchema = z.object({
@@ -64,6 +65,7 @@ const appendSchema = z.object({
   key: z.string().describe('Document key'),
   path: z.string().describe('JSONB path to array field (e.g. "screenshots" or "analysis.variations")'),
   value: z.any().refine((v) => v !== undefined, 'value is required').describe('Value to append to the array'),
+  label: z.string().min(1).optional().describe('A name for the edition this write leaves current; lookup refs may pin it as their version'),
 });
 
 function registerTools(server: McpServer) {
@@ -102,7 +104,7 @@ function registerTools(server: McpServer) {
         dataObj = args.data;
       }
       const result = await knowledge.storeKnowledge({
-        domain: args.domain, key: args.key, data: dataObj, tags: args.tags,
+        domain: args.domain, key: args.key, data: dataObj, tags: args.tags, label: args.label,
       });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
@@ -201,7 +203,7 @@ function registerTools(server: McpServer) {
       inputSchema: appendSchema,
     },
     async (args: z.infer<typeof appendSchema>) => {
-      const result = await knowledge.appendKnowledge(args as { domain: string; key: string; path: string; value: any });
+      const result = await knowledge.appendKnowledge(args as { domain: string; key: string; path: string; value: any; label?: string });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },
   );

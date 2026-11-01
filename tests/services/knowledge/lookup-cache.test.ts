@@ -9,6 +9,7 @@ vi.mock('../../../lib/db', () => ({
 }));
 
 import {
+  editionOfLabel,
   getKnowledgeSnapshot,
   resolveLookupContext,
   resolveLookupRefs,
@@ -57,7 +58,7 @@ describe('resolveLookupContext', () => {
     expect(await resolveLookupContext([])).toBeNull();
     expect(await resolveLookupContext('nope')).toBeNull();
     expect(await resolveLookupContext([{ domain: 'cat-d', key: 'k', version: 1.5 }])).toBeNull();
-    expect(await resolveLookupContext([{ domain: 'cat-d', key: 'k', version: 'newest' }])).toBeNull();
+    expect(await resolveLookupContext([{ domain: 'cat-d', key: 'k', version: '' }])).toBeNull();
     expect(mockQuery).not.toHaveBeenCalled();
   });
 });
@@ -108,3 +109,36 @@ describe('current refs', () => {
       .toEqual([{ domain: 'cur-d', key: 'ghost', version: null, current: true, data: null, missing: true }]);
   });
 });
+
+describe('refs that pin an edition by its label', () => {
+  it('resolve the label to its edition once, then serve the snapshot from cache', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ version: 3 }] })
+      .mockResolvedValueOnce(snapshotRow({ items: ['a'] }));
+    const [first] = await resolveLookupRefs([{ domain: 'cat-l', key: 'codes', version: 'rev-b' }]);
+    expect(first).toMatchObject({ version: 3, label: 'rev-b', data: { items: ['a'] } });
+    expect(first.missing).toBeUndefined();
+    const [again] = await resolveLookupRefs([{ domain: 'cat-l', key: 'codes', version: 'rev-b' }]);
+    expect(again.version).toBe(3);
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('read a whole-number label no edition carries as that edition number', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(snapshotRow({ items: ['n'] }));
+    expect(await editionOfLabel('cat-n', 'codes', '2')).toBe(2);
+    const ctx = await resolveLookupContext([{ domain: 'cat-n', key: 'codes', version: '2' }]);
+    expect(ctx).toEqual({ codes: { items: ['n'] } });
+  });
+
+  it('answer missing for a label nothing carries, without caching it', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+    const [one] = await resolveLookupRefs([{ domain: 'cat-m', key: 'codes', version: 'ghost' }]);
+    expect(one).toMatchObject({ version: null, label: 'ghost', data: null, missing: true });
+    await resolveLookupRefs([{ domain: 'cat-m', key: 'codes', version: 'ghost' }]);
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+});
+

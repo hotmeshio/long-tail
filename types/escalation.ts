@@ -168,22 +168,28 @@ export const ESCALATION_ENVELOPE_KEYS = {
 export const LOOKUP_VERSION_CURRENT = 'current' as const;
 
 /**
- * One knowledge lookup reference. `version` pins an immutable edition; absent
- * or `'current'`, the ref follows the entry's newest edition: a pending row
- * reads the edition in force when it renders, and a closed row reads the
- * edition that was current when it closed. `as` renames the ref's
- * form-context address when the key alone is ambiguous.
+ * One knowledge lookup reference. `version` pins an immutable edition by its
+ * number or by the label an edition carries; absent or `'current'`, the ref
+ * follows the entry's newest edition: a pending row reads the edition in
+ * force when it renders, and a closed row reads the edition that was current
+ * when it closed. `as` renames the ref's form-context address when the key
+ * alone is ambiguous.
  */
 export interface EscalationLookupRef {
   domain: string;
   key: string;
-  version?: number | typeof LOOKUP_VERSION_CURRENT;
+  version?: number | string;
   as?: string;
 }
 
 /** True when the ref follows the newest edition rather than pinning one. */
 export function isCurrentLookupRef(ref: Pick<EscalationLookupRef, 'version'>): boolean {
   return ref.version === undefined || ref.version === LOOKUP_VERSION_CURRENT;
+}
+
+/** True when the ref pins an edition by the label it carries. */
+export function isLabelLookupRef(ref: Pick<EscalationLookupRef, 'version'>): boolean {
+  return typeof ref.version === 'string' && ref.version.length > 0 && ref.version !== LOOKUP_VERSION_CURRENT;
 }
 
 /**
@@ -202,9 +208,10 @@ export function assertLookupRefs(refs: unknown): asserts refs is EscalationLooku
       throw new Error('Each lookup ref requires a non-empty domain and key');
     }
     const pinned = typeof r.version === 'number' && Number.isInteger(r.version) && r.version >= 1;
-    if (r.version !== undefined && r.version !== LOOKUP_VERSION_CURRENT && !pinned) {
+    const labelled = typeof r.version === 'string' && r.version.length > 0;
+    if (r.version !== undefined && !pinned && !labelled) {
       throw new Error(
-        `Lookup ref ${r.domain}/${r.key}: version must be a positive integer, 'current', or absent`,
+        `Lookup ref ${r.domain}/${r.key}: version must be a positive integer, an edition label, 'current', or absent`,
       );
     }
     if (r.as !== undefined && (typeof r.as !== 'string' || r.as.length === 0)) {

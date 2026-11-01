@@ -7,8 +7,8 @@
  * cached — a later seed or republish must become visible.
  */
 import { getPool } from '../../lib/db';
-import { isCurrentLookupRef, type EscalationLookupRef } from '../../types/escalation';
-import { GET_KNOWLEDGE_VERSION, GET_LATEST_KNOWLEDGE_VERSION } from './sql';
+import { isCurrentLookupRef, isLabelLookupRef, type EscalationLookupRef } from '../../types/escalation';
+import { GET_KNOWLEDGE_VERSION, GET_KNOWLEDGE_VERSION_BY_LABEL, GET_LATEST_KNOWLEDGE_VERSION } from './sql';
 
 const SNAPSHOT_CACHE_MAX_ENTRIES = 256;
 
@@ -24,6 +24,8 @@ export interface ResolvedLookup {
   version: number | null;
   /** The ref follows the newest edition rather than pinning one. */
   current?: true;
+  /** The ref pins an edition by this label. */
+  label?: string;
   as?: string;
   data: Record<string, unknown> | null;
   missing?: boolean;
@@ -31,6 +33,8 @@ export interface ResolvedLookup {
 
 // Map preserves insertion order — delete+set on read keeps it LRU.
 const snapshotCache = new Map<string, KnowledgeSnapshot>();
+// A label names one edition for good, so the number it resolves to is kept too.
+const labelCache = new Map<string, number>();
 
 function remember(cacheKey: string, snapshot: KnowledgeSnapshot): void {
   snapshotCache.set(cacheKey, snapshot);
@@ -74,7 +78,8 @@ export async function resolveRefEdition(
   asOf?: string | null,
 ): Promise<{ version: number; snapshot: KnowledgeSnapshot } | null> {
   if (!isCurrentLookupRef(ref)) {
-    const version = ref.version as number;
+    const version = isLabelLookupRef(ref) ? await editionOfLabel(ref.domain, ref.key, ref.version as string) : (ref.version as number);
+    if (version === null) return null;
     const snapshot = await getKnowledgeSnapshot(ref.domain, ref.key, version);
     return snapshot ? { version, snapshot } : null;
   }
@@ -92,13 +97,32 @@ export async function resolveRefEdition(
   return { version, snapshot };
 }
 
+/**
+ * The edition a label names, or, for a label that is a whole number no edition
+ * carries, that edition's number. Null when the label names nothing; that is
+ * never cached, so a label given later becomes visible.
+ */
+export async function editionOfLabel(domain: string, key: string, label: string): Promise<number | null> {
+  const cacheKey = `${domain} ${key} #${label}`;
+  const hit = labelCache.get(cacheKey);
+  if (hit !== undefined) return hit;
+  const { rows } = await getPool().query(GET_KNOWLEDGE_VERSION_BY_LABEL, [domain, key, label]);
+  if (rows[0]) {
+    const version = Number(rows[0].version);
+    labelCache.set(cacheKey, version);
+    while (labelCache.size > SNAPSHOT_CACHE_MAX_ENTRIES) labelCache.delete(labelCache.keys().next().value as string);
+    return version;
+  }
+  return /^[1-9][0-9]*$/.test(label) ? Number(label) : null;
+}
+
 /** Structural check for one ref — malformed entries in stored metadata are skipped, not fatal. */
 function isLookupRef(ref: unknown): ref is EscalationLookupRef {
   if (!ref || typeof ref !== 'object') return false;
   const r = ref as Record<string, unknown>;
   return typeof r.domain === 'string' && r.domain.length > 0
     && typeof r.key === 'string' && r.key.length > 0
-    && (isCurrentLookupRef(r) || (typeof r.version === 'number' && Number.isInteger(r.version) && r.version >= 1))
+    && (isCurrentLookupRef(r) || isLabelLookupRef(r) || (typeof r.version === 'number' && Number.isInteger(r.version) && r.version >= 1))
     && (r.as === undefined || (typeof r.as === 'string' && r.as.length > 0));
 }
 
@@ -136,12 +160,14 @@ export async function resolveLookupRefs(
   for (const ref of refs) {
     if (!isLookupRef(ref)) continue;
     const current = isCurrentLookupRef(ref);
+    const label = isLabelLookupRef(ref) ? (ref.version as string) : undefined;
     const edition = await resolveRefEdition(ref, asOf);
     resolved.push({
       domain: ref.domain,
       key: ref.key,
-      version: edition?.version ?? (current ? null : (ref.version as number)),
+      version: edition?.version ?? (current || label !== undefined ? null : (ref.version as number)),
       ...(current ? { current: true as const } : {}),
+      ...(label !== undefined ? { label } : {}),
       ...(ref.as ? { as: ref.as } : {}),
       data: edition ? edition.snapshot.data : null,
       ...(edition ? {} : { missing: true }),

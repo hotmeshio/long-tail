@@ -135,3 +135,10 @@ export const APPEND_KNOWLEDGE = `
     ON CONFLICT (domain, key, version) DO NOTHING
   )
   SELECT id, domain, key, current_version, updated_at FROM upserted`;
+
+/** Name an edition: the label a lookup ref may pin instead of the number. A label names one edition of an entry. */
+export const LABEL_KNOWLEDGE_VERSION = `
+  UPDATE lt_knowledge_versions SET label = $3
+  WHERE domain = $1 AND key = $2 AND version = $4
+  RETURNING version`;
+

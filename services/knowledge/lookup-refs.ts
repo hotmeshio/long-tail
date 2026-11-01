@@ -1,5 +1,5 @@
 import { getPool } from '../../lib/db';
-import { isCurrentLookupRef, type EscalationLookupRef } from '../../types/escalation';
+import { isCurrentLookupRef, isLabelLookupRef, type EscalationLookupRef } from '../../types/escalation';
 import { resolveRefEdition } from './lookup-cache';
 import { LIST_KNOWLEDGE_VERSIONS } from './sql';
 
@@ -18,7 +18,7 @@ export async function describeMissingLookupRefs(refs: EscalationLookupRef[]): Pr
     const where = versions.length
       ? `editions: ${versions.map((v: number) => `v${v}`).join(', ')}`
       : `no knowledge entry ${ref.domain}/${ref.key}`;
-    const named = isCurrentLookupRef(ref) ? 'current' : `v${ref.version}`;
+    const named = isCurrentLookupRef(ref) ? 'current' : isLabelLookupRef(ref) ? `label ${JSON.stringify(ref.version)}` : `v${ref.version}`;
     problems.push(`Lookup ref ${ref.domain}/${ref.key} ${named} names no edition (${where})`);
   }
   return problems;

@@ -163,7 +163,7 @@ describe('conditional', () => {
         role: 'catalog-picker',
         lookups: [{ domain: 'catalog', key: 'materials', version: 0 }],
       }),
-    ).rejects.toThrow(/positive integer, 'current', or absent/);
+    ).rejects.toThrow(/positive integer/);
     expect(mockCondition).not.toHaveBeenCalled();
   });
 

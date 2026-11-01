@@ -185,4 +185,22 @@ describe('knowledge store', () => {
     const result = await knowledge.deleteKnowledge({ domain: DOMAIN, key: 'nope' });
     expect(result.deleted).toBe(false);
   });
+
+  // ── edition labels ───────────────────────────────────────────────────────
+
+  it('names the edition a write leaves current, and reads it back by that label', async () => {
+    const { getKnowledgeVersion, listKnowledgeVersions } = await import('../../../services/knowledge');
+    await knowledge.storeKnowledge({ domain: DOMAIN, key: 'labelled', data: { codes: ['A'] }, label: 'rev-a' });
+    const second = await knowledge.storeKnowledge({ domain: DOMAIN, key: 'labelled', data: { codes: ['A', 'B'] }, label: 'rev-b' });
+    expect(second.current_version).toBe(2);
+    expect((await getKnowledgeVersion(DOMAIN, 'labelled', 'rev-a'))?.data).toEqual({ codes: ['A'] });
+    expect((await getKnowledgeVersion(DOMAIN, 'labelled', 'rev-b'))).toMatchObject({ version: 2, label: 'rev-b' });
+    expect(await getKnowledgeVersion(DOMAIN, 'labelled', 'rev-c')).toBeNull();
+    expect((await listKnowledgeVersions(DOMAIN, 'labelled')).map((v) => v.label)).toEqual(['rev-b', 'rev-a']);
+  });
+
+  it('refuses a label that already names another edition of the entry', async () => {
+    await knowledge.storeKnowledge({ domain: DOMAIN, key: 'twice', data: { n: 1 }, label: 'one' });
+    await expect(knowledge.storeKnowledge({ domain: DOMAIN, key: 'twice', data: { n: 2 }, label: 'one' })).rejects.toThrow(/already names another edition/);
+  });
 });
