@@ -255,27 +255,34 @@ function planPresence(state: GatewayState, m: string, b: Record<string, any>): P
   return ack(actions);
 }
 
-/** A new boot id means the machine restarted and lost its queue: send its open dispatches again. */
+/**
+ * A new boot id means the machine restarted and lost its queue: send its open
+ * dispatches again, and the jobs it had ready for units it still holds, from
+ * the rows that sent them. A lost job nothing is remembered for is logged.
+ */
 function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, ttl: number): Plan {
   const link = state.link(m);
   if (b.software) link.software = b.software;
   const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
+  // A snapshot without a boot id says nothing about restarts.
+  const rebooted = typeof b.bootId === 'string' && !!link.bootId && link.bootId !== b.bootId;
+  const held = new Set(jobIds);
+  const lost = rebooted ? state.lostAfterReboot(m, held) : { resend: [], unknown: [] };
   if (Array.isArray(b.jobs)) {
-    state.keepHeld(m, new Set(jobIds));
+    state.keepHeld(m, new Set([...jobIds, ...lost.resend.map((l) => l.jobId)]));
     link.jobs = b.jobs;
   }
+  if (typeof b.bootId === 'string') link.bootId = b.bootId;
   const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
   const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
-  // A snapshot without a boot id says nothing about restarts.
-  if (typeof b.bootId !== 'string') return ack([...cleared, answer]);
-  const previous = link.bootId;
-  link.bootId = b.bootId;
-  if (!previous || previous === b.bootId) return ack([...cleared, answer]);
-  const held = new Set(jobIds);
+  if (!rebooted) return ack([...cleared, answer]);
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
-  const lost = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
-  return ack([...cleared, answer, ...lost.map((r) => dispatchAction(r, m, ttl))]);
+  const open = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
+  const rows = new Map(lost.resend.map((l) => [l.row.id, l.row]));
+  const again = [...rows.values()].map((r): Action => ({ ...(dispatchAction(r, m, ttl) as Extract<Action, { kind: 'dispatch' }>), ended: true }));
+  const unknown: Action[] = lost.unknown.length ? [{ kind: 'unrecoverable', machineId: m, jobs: lost.unknown }] : [];
+  return ack([...cleared, answer, ...open.map((r) => dispatchAction(r, m, ttl)), ...again, ...unknown]);
 }
 
 /** Alarm rows for `m` whose alarm its snapshot no longer lists: they cleared at the machine. */

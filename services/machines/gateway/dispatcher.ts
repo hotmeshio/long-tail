@@ -177,9 +177,14 @@ export class Dispatcher {
     const held = !refused && silent.length ? await this.heldJobs(a.machineId, a.cmdId) : null;
     this.live();
     const reconciled = !!held && silent.every((j) => held.has(j.jobId));
+    if (a.ended) {
+      this.resent(a, jobs, refused ?? null, !refused && (!silent.length || reconciled));
+      return;
+    }
     const row = state.get(a.rowId);
     if (!refused && (!silent.length || reconciled)) {
       if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
+      for (const job of jobs) state.rememberSent(a.machineId, job.jobId, a.rowId);
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
       this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
@@ -206,6 +211,13 @@ export class Dispatcher {
     state.close(a.rowId);
     if (ended.outcome !== VERB_OUTCOME.DONE) return;
     await this.withdraw(a, jobs.filter((_, i) => !replies[i] || took(replies[i])));
+  }
+
+  /** A job sent again after the machine restarted, for a row that already ended: the reply is only logged. */
+  private resent(a: DispatchAction, jobs: DispatchJob[], refused: CommandReply | null, taken: boolean): void {
+    const context = { row: a.rowId, machine: a.machineId, jobs: jobs.map((j) => j.jobId), resent: true };
+    if (taken) this.d.log.info(GATEWAY_LOG.DISPATCHED, { ...context, reason: 'sent again after a restart' });
+    else this.d.log.warn(GATEWAY_LOG.DISPATCH_REFUSED, { ...context, reason: refused ? `${refused.status}: ${refused.reason}` : 'no reply' });
   }
 
   /** The units were already at the machine: a job it has taken and is ready for completes the handoff. */

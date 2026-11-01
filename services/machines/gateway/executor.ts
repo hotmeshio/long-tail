@@ -147,6 +147,9 @@ export class Executor {
       case 'refuseBinding':
         this.d.log.warn(GATEWAY_LOG.ADDRESS_REFUSED, { machine: a.machineId, address: a.address, reason: a.reason });
         return [plannedAction(a)];
+      case 'unrecoverable':
+        this.d.log.warn(GATEWAY_LOG.DISPATCH_UNRECOVERABLE, { machine: a.machineId, jobs: a.jobs });
+        return [plannedAction(a)];
     }
   }
 

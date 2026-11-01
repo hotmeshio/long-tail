@@ -8,6 +8,7 @@
 import type { HandoffFacets, TraceEntry } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
 import type { ContestedClaimView, LineView } from '../../../types/machines-view';
+import { dispatchJobs } from './jobs';
 import { projectLine } from './project';
 import { mergeTrace } from './trace';
 
@@ -107,6 +108,10 @@ export class GatewayState {
   holdDispatch = false;
   /** Units at each machine that arrived and have not left: machine → unit → job. */
   private held = new Map<string, Map<string, string>>();
+  /** Jobs sent and taken, by machine: job → the row that sent it, kept while the machine holds the job's units. */
+  private sentJobs = new Map<string, Map<string, string>>();
+  /** Jobs whose units left each machine since its last snapshot: they ended, a snapshot without them lost nothing. */
+  private endedJobs = new Map<string, Set<string>>();
   private openRows = new Map<string, HandoffRow>();
   private closedRows = new Map<string, HandoffRow>();
   readonly alarms = new Map<string, AlarmTrack>();
@@ -146,6 +151,11 @@ export class GatewayState {
     return this.openRows.get(id);
   }
 
+  /** A row that ended, while the gateway still remembers it. */
+  closedRow(id: string): HandoffRow | undefined {
+    return this.closedRows.get(id);
+  }
+
   close(id: string, ended: RowEnd = ROW_END.RESOLVED): HandoffRow | undefined {
     const row = this.openRows.get(id);
     if (!row) return undefined;
@@ -182,7 +192,45 @@ export class GatewayState {
   }
 
   letGo(machineId: string, unitId: string): void {
-    this.held.get(machineId)?.delete(unitId);
+    const units = this.held.get(machineId);
+    const jobId = units?.get(unitId);
+    units?.delete(unitId);
+    if (jobId === undefined || [...units!.values()].includes(jobId)) return;
+    this.sentJobs.get(machineId)?.delete(jobId);
+    if (!this.endedJobs.has(machineId)) this.endedJobs.set(machineId, new Set());
+    this.endedJobs.get(machineId)!.add(jobId);
+  }
+
+  /** A job the machine took, remembered by its row while the machine holds the job's units. */
+  rememberSent(machineId: string, jobId: string, rowId: string): void {
+    if (!this.sentJobs.has(machineId)) this.sentJobs.set(machineId, new Map());
+    this.sentJobs.get(machineId)!.set(jobId, rowId);
+  }
+
+  /**
+   * After a restart, the jobs the machine lost: those its units are held under
+   * or its last snapshot listed, that the new snapshot lacks and no open row
+   * will send again. `resend` names the rows remembered for them; `unknown`
+   * the jobs nothing is remembered for.
+   */
+  lostAfterReboot(machineId: string, listed: Set<string>): { resend: { jobId: string; row: HandoffRow }[]; unknown: string[] } {
+    const link = this.links.get(machineId);
+    const before = new Set<string>(this.heldAt(machineId));
+    for (const job of link?.jobs ?? []) if (typeof (job as any)?.jobId === 'string') before.add((job as any).jobId);
+    const ended = this.endedJobs.get(machineId) ?? new Set<string>();
+    const sendsAgain = new Set<string>();
+    for (const row of this.openRows.values()) {
+      if (row.toMachine === machineId) for (const job of dispatchJobs(row.jobId, row.units, this.unitsPerDispatch)) sendsAgain.add(job.jobId);
+    }
+    const resend: { jobId: string; row: HandoffRow }[] = [];
+    const unknown: string[] = [];
+    for (const jobId of before) {
+      if (listed.has(jobId) || ended.has(jobId) || sendsAgain.has(jobId)) continue;
+      const row = this.closedRows.get(this.sentJobs.get(machineId)?.get(jobId) ?? '');
+      if (row) resend.push({ jobId, row });
+      else unknown.push(jobId);
+    }
+    return { resend, unknown };
   }
 
   /** The job a unit arrived under at `machineId`, while it is still there. */
@@ -198,11 +246,16 @@ export class GatewayState {
     return [...(this.held.get(machineId)?.entries() ?? [])].map(([unitId, jobId]) => ({ unitId, jobId }));
   }
 
-  /** Keep only units whose job the machine still lists (its snapshot). */
+  /** Keep only units whose job the machine still lists (its snapshot); a job it no longer lists is over. */
   keepHeld(machineId: string, jobIds: Set<string>): void {
+    this.endedJobs.delete(machineId);
     const units = this.held.get(machineId);
     if (!units) return;
-    for (const [unitId, jobId] of units) if (!jobIds.has(jobId)) units.delete(unitId);
+    for (const [unitId, jobId] of units) {
+      if (jobIds.has(jobId)) continue;
+      units.delete(unitId);
+      this.sentJobs.get(machineId)?.delete(jobId);
+    }
   }
 
   /** Keep a sender's finished record until its row is known, so an arrival cannot close the row without it. */
@@ -349,6 +402,8 @@ export class GatewayState {
       retainedAlarms: this.retainedAlarms, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));
+    copyInto(this.sentJobs, copy.sentJobs, (jobs) => new Map(jobs));
+    copyInto(this.endedJobs, copy.endedJobs, (jobs) => new Set(jobs));
     copyInto(this.openRows, copy.openRows, (row) => ({ ...row, units: [...row.units], ...(row.noted ? { noted: [...row.noted] } : {}) }));
     copyInto(this.closedRows, copy.closedRows, (row) => ({ ...row }));
     copyInto(this.alarms, copy.alarms, (track) => ({ ...track, ...(track.noted ? { noted: [...track.noted] } : {}) }));

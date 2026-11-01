@@ -9,6 +9,7 @@ export const GATEWAY_LOG = {
   DISPATCH_PREPARING: 'machine_gateway.dispatch.preparing',
   DISPATCH_FAILED: 'machine_gateway.dispatch.failed',
   DISPATCH_RECONCILED: 'machine_gateway.dispatch.reconciled',
+  DISPATCH_UNRECOVERABLE: 'machine_gateway.dispatch.unrecoverable',
   VERB_INVALID: 'machine_gateway.verb.invalid',
   VERB_FAILED: 'machine_gateway.verb.failed',
   ROW_NOT_VISIBLE: 'machine_gateway.verb.row_not_visible',
