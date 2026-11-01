@@ -6,20 +6,31 @@ This page is the contract for a host. A runnable factory lives in [examples/work
 
 ## Declaration
 
+Lines are declared two ways, and both land in one registry (`lt_machine_lines`) that every replica reads: in code, through `start({ machines })`, and through the API, `PUT /api/machines/lines/:siteId/:lineId`.
+
 ```typescript
 import { start, Machines } from '@hotmeshio/long-tail';
 
 await start({
   // ...database, workers, roles
   machines: {
-    lines: [Machines.loadLine('/etc/line.json')],
+    lines: [Machines.loadLine('/etc/line.json')],   // code lines; [] when every line comes through the API
     codec: myCodec,     // optional: the machines' wire protocol (default: the generic line protocol)
     rows: myRows,       // optional: how your rows read as handoffs (default: the standard handoff facets)
   },
 });
 ```
 
-Transports come from the environment (see [Configuration](#configuration)). `mqtt` is an optional peer dependency; install it in the host when a line runs.
+Transports come from the environment (see [Configuration](#configuration)). `mqtt` is an optional peer dependency; install it in the host when a line runs. Declaring `machines` opens the dashboard's [Lines view](#lines-view), with or without code lines.
+
+The registry keeps each line's definition, who declared it (`source`: `code` or `api`), and a `version` that advances once per change. Ownership follows `configSource`, as roles do:
+
+- `db` (the default): a code line is inserted when absent and left as it is afterwards; a declaration that differs from the row is logged as drift and the row stands.
+- `code`: a code line is written whenever its declaration differs, advancing the version once; the row then matches the code again.
+
+Boot applies the code lines under these rules, logs one report (applied, unchanged, db-owned, and code lines the registry still holds that code no longer declares), then runs every enabled line the registry holds, code and API alike. Boot never deletes a line: a line leaves the registry only through `DELETE /api/machines/lines/:siteId/:lineId`. An API declaration applies the line's station, exit and operator roles where none exist (the host's own role declarations win), runs the line on the replica that took the request, and publishes `machine.line.<site>.<line>.declared`; every other replica reads the row back and runs it too. Retiring a line publishes `machine.line.<site>.<line>.retired` and each replica stops it; the line's roles and bot accounts stay.
+
+The registry is Long Tail's side of a line. The site's side, its broker's certificates and ACL and its NATS permissions, is rendered from the lines it serves (see [Topology and identity](#topology-and-identity)); a line declared through the API leads only once the site knows it too. Until then the replica stands by and logs `machine_gateway.line.leadership_lost` with the broker's refusal, and the registry row waits.
 
 For each line, one replica leads (a Postgres advisory lock held on its own connection), makes sure the line's bot accounts exist, and runs the gateway. Other replicas wait on the lock and take over when the leader's session ends. A replica whose connection drops or is refused, as while Postgres restarts, contends again every 5 seconds.
 
@@ -58,12 +69,13 @@ A machine handoff is a row on the receiving machine's role (a handoff to a perso
 | Facet | Meaning |
 |---|---|
 | `siteId`, `lineId` | The line; a gateway acts only on its own line's rows |
-| `units` | `[{ unitId, carrierId, artifact?, artifacts?, parameters? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` is its own file, such as a per-unit model, and `artifacts` its files when it has several; each is `{ url, sha256, id?, contentType?, sizeBytes? }`. Its `parameters` are its own settings |
+| `units` | `[{ unitId, carrierId, artifact?, artifacts?, parameters?, refs? }]`: the units that move together; any of a route's units, all or some. A unit's `artifact` is its own file, such as a per-unit model, and `artifacts` its files when it has several; each is `{ url, sha256, id?, contentType?, sizeBytes? }`. Its `parameters` are its own settings and its `refs` its own references |
 | `jobId`, `senderJobId` | The receiver's job and the sender's. Each open handoff into a machine names its own job; a second open row naming the same job there resolves `dispatch-refused`. A row for some of a sender job's units still receives their releases, however the codec split that job |
 | `fromMachine`, `toMachine` | Machine ids, or null for line entry and for a person |
 | `recipeId`, `recipeVersion`, `process` | What the receiver runs |
 | `artifactUrl`, `artifactSha256` | The job file, by reference |
 | `parameters` | Settings for the job, sent to the machine as given. Long Tail does not read them; what they mean is between the host and its codec |
+| `refs` | The host's references for the job by name, `{ orderId: 'ORD-9', batch: 'B-2' }`: string values only, others are dropped. Sent with the dispatch as `refs` (and each unit's as `units[].refs`) and containment-searchable on the row: `GET /escalations?facets={"refs":{"orderId":"ORD-9"}}` |
 | `attempt` | Retry number |
 
 The gateway dispatches to `toMachine` when the row is created, or, under a codec that dispatches on arrival, once every unit has arrived there. It claims the row as that machine once the machine accepts. It records each unit's release by the sender and each arrival at the receiver as items. It resolves the row as the receiver once every unit has arrived:
@@ -78,15 +90,15 @@ When a handoff ends without every unit (a failure, a timeout, a cancel), the gat
 
 On arrival dispatch, the units are already at the receiver, so its acceptance resolves the row the same way.
 
-When the handoff ends without a receipt, the row resolves `{ received: false, errorCode, unitId?, reason?, detail }`:
+When the handoff ends without a receipt, the row resolves `{ received: false, errorCode, unitId?, result?, reason?, detail, code? }`. `detail` is text for a person; `code` is the machine's structured code when its reply carried one, so a workflow can branch on it:
 
 | `errorCode` | Cause |
 |---|---|
-| `dispatch-refused` | The machine refused or failed the dispatch (mode, recipe, queue, artifact), or the machine requires an artifact and the row has none. The reason is in `detail` |
-| `dispatch-failed` | The machine accepted the job, then could not prepare it (artifact, recipe). The reason is in `detail` |
+| `dispatch-refused` | The machine refused or failed the dispatch (mode, recipe, queue, artifact), or the machine requires an artifact and the row has none. The reason is in `detail`, and `code` is the reply's code when it had one |
+| `dispatch-failed` | The machine accepted the job, then could not prepare it (artifact, recipe). The reason is in `detail`, and `code` is the reply's code when it had one |
 | `no-reply` | No reply after every attempt with the same command id, and the machine's snapshot does not list the job, or it sent none (`detail` then says the state is unknown). A job the snapshot lists counts as accepted. The dispatch is cancelled, so a copy still queued for an absent machine never runs |
 | `software-unsupported` | The machine runs a version the line does not allow |
-| `sender-rejected` | The sender finished a unit as reject, hold, scrap or rework. Its reason is in `reason` and `detail` |
+| `sender-rejected` | The sender finished a unit as reject, hold, scrap or rework; `result` says which. Its reason is in `reason` and `detail` |
 | `jam`, `incomplete-handshake`, `carrier-mismatch`, `unreadable-id` | The move between machines failed |
 | `withdrawn` | The receiver gave the job back |
 
@@ -147,7 +159,7 @@ A unit leaves when the machine releases it, when it arrives at the next machine,
 
 ## Commands
 
-A host asks a machine to start, stop, pause, resume, change over or cancel a job (`cancel` needs `args.jobId`) by parking a `machine-command` row on the machine's role, from a workflow step or through the API, the way it asks a person for anything:
+A host asks a machine to start, stop, pause, resume, change over, cancel a job (`cancel` needs `args.jobId`), report a `snapshot`, or do anything its codec declares (`rowOps`, see [The wire](#the-wire)) by parking a `machine-command` row on the machine's role, from a workflow step or through the API, the way it asks a person for anything. `stop` with `args.jobId` stops that job at a safe point and holds its units; without it, the machine finishes the current unit and takes no more:
 
 ```typescript
 const reply = await conditional<Machines.CommandResolution>(`changeover-${orderId}`, {
@@ -167,9 +179,11 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `status` | Meaning |
 |---|---|
 | `accepted` | The machine took the command |
-| `refused`, `failed` | The machine said no; its reason is in `reason` (a changeover to a version it does not hold is refused) |
+| `refused`, `failed` | The machine said no; its reason is in `reason` (a changeover to a version it does not hold is refused), and `code` is the reply's structured code when it carried one |
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
-| `unsupported` | Not a command a row may ask for, not a machine on this line, or a command the line's codec has no message for; nothing was sent |
+| `unsupported` | Not a command a row may ask for (a control op, `snapshot`, or one the codec declares), not a machine on this line, or a command the line's codec has no message for; nothing was sent |
+
+A `snapshot` row resolves with the reply like any command, and the machine's snapshot follows on its own channel; a dashboard or a workflow asks for a machine's state this way.
 
 A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation, and a round begins only once the one before it has expired; a command sent in a later round goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments. Dispatches work the same way with `MACHINE_DISPATCH_TTL_MS`, counted from the row's creation, or for `dispatchOn: 'arrival'` from the last unit's arrival, so a machine never holds two valid commands for one row.
 
@@ -189,6 +203,7 @@ interface LineCodec {
   strict?: boolean;                                       // broken messages go to a person, never acted on
   snapshotOnStart?: boolean;                              // ask every machine for a snapshot on taking the line
   retainedAlarms?: boolean;                               // active alarms stay retained on the broker until they clear
+  rowOps?: readonly string[];                             // the machines' own commands a machine-command row may ask for
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
@@ -209,30 +224,83 @@ interface LineCodec {
 - A receiver that reads only the carrier may report `arrived`, or `transfer-failed` with `unreadable-id`, with `carrierId` and no `unitId` or `jobId`. The gateway finds the unit an open handoff into that machine carries on that carrier.
 - Each command reaches `encode` with `attempt`, how many times this gateway has sent that `cmdId`, and `retry`, true when the machine may already have it: sent earlier, or its row existed before this gateway took the line. A protocol with a retransmission flag sets it from `retry`.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
+- `rowOps` names the machines' own commands, beyond the line protocol's control ops and `snapshot`, that a machine-command row may ask for. Each goes through `encode` with the row's `args` and the row resolves with the reply. Every entry is a non-empty string; the gateway refuses to start on a codec whose entries are not.
+- A reply may carry `code`, a string the machine chooses, beside its `reason` text. The gateway puts it on the row as `code`, on a command row's resolution and on a `dispatch-refused` or `dispatch-failed` handoff, so a workflow branches on the code and a person reads the reason.
+- Presence may carry `sessionId`, one per connection, and `reason` on a goodbye. A presence with a new `sessionId` while the machine is online is a reconnect whose offline presence was never heard: the gateway asks for a snapshot, as it does when a machine comes back. An offline row records the `reason` the machine gave.
 
 The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Every message is wrapped in `{ v, id, at, source, body }`.
 
 | Channel | Purpose |
 |---|---|
-| `presence` (retained) | Birth and will, with the software version |
+| `presence` (retained) | Birth and will, with the software version, a `sessionId` per connection, and on a goodbye the `reason` |
 | `snapshot` (retained) | Mode, recipe, jobs, alarms, counters, boot id |
 | `job` | Per unit: `queued`, `ready`, `arrived`, `bound`, `started`, `progress`, `finished`, `released`, `transfer-failed`, `withdrawn` |
 | `alarm/<id>` (retained while active) | Raise, acknowledgement, clear (with who cleared it) |
 | `telemetry` | Readings |
 | `report/<name>` | Production, availability, inventory and other reporting, kept in the stream |
-| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop`, `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `completed`, `refused`, `failed`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
+| `cmd` / `cmd/reply` | `dispatch`, `cancel`, `start`, `stop` (with `jobId`: that job, at a safe point), `pause`, `resume`, `changeover`, `ack-alarm`, `snapshot`; replies `accepted`, `completed`, `refused`, `failed`, with a `reason` and an optional `code`. Every command carries a `cmdId` (a repeat is answered, never run twice) and an expiry |
 
 ## Rows for people
 
 | Row | Raised when | Resolved when |
 |---|---|---|
 | `line-alarm` | A stopping alarm (critical or emergency) is raised | The machine clears it (with who cleared it). If a person resolves it first, the gateway sends `ack-alarm` |
-| `machine-offline` | Presence goes offline past a debounce | The machine is heard again |
+| `machine-offline` | Presence goes offline past a debounce; the row's `reason` is the machine's, when its goodbye gave one | The machine is heard again |
 | `machine-quiet` | A connected machine sends nothing for `MACHINE_QUIET_MS` | It is heard again |
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
 | `machine-registration` | On a line that learns addresses, an address claims a station bound to another address, or an address bound to one station claims another | A person resolves it with `{ decision: 'approve' }`, which binds the station to the claimant, or `reject` |
 
 A replica taking a line reads back its learned addresses, its open handoff, command, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids. An alarm id reused with a new raise time counts as a new alarm.
+
+## Lines view
+
+The dashboard shows the lines under Monitor. The index lists every line in the registry with how it is right now, searched and paged on the server: site and line, the machines with any offline or quiet, active alarms, rows waiting on a person, work in flight, who declared it, and whether this replica leads it; lines needing attention sort first, and the sites give the index its facet. A line opens to one tile per machine (presence, process, address, software, held units, open rows, alarms), a live tape of everything on the wire, a panel per machine with its snapshot and tools, and a timeline over a window. The view exists only when `start({ machines })` is declared: `GET /api/settings` then carries `machines: { lines: LineSummary[] }` (the lines this replica runs), and is without it otherwise. Reading the view takes the ops tier (superadmin, admin type, or engineer); declaring and retiring a line takes an administrator.
+
+### The wire record
+
+Every message a line's gateway reads, and every command, snapshot request and receipt it sends, is published as one event, `machine.wire.<site>.<line>.<machineId|unknown>.<in|out>` (on NATS `lt.events.machine.wire...`, tokens sanitized as escalation subjects are). The dashboard subscribes to `lt.events.machine.wire.<site>.<line>.>`. The event's `data` is the record:
+
+```typescript
+interface WireEvent {
+  type: 'machine.wire'; siteId: string; lineId: string; machineId: string | null; address: string | null;
+  direction: 'in' | 'out'; channel: string; topic: string; id: string | null; at: string; retained: boolean;
+  kind: 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'cmd' | 'reply' | 'receipt' | 'unknown';
+  event: string | null;    // job event, alarm raised/acked/cleared, command op, reply status, presence online/offline, snapshot mode
+  summary: string;         // one line from the kind, the event and the ids the body names
+  violations: string[];    // what the contract check found
+  actions: { verb: 'claim' | 'accumulate' | 'resolve' | 'create-row' | 'refuse' | 'hold' | 'unmatched' | 'unreadable' | 'ack' | 'none'; rowId?: string; itemKey?: string; detail?: string }[];
+  payload?: unknown;       // the raw wire payload; builders only, stripped before it reaches anyone else's browser
+}
+```
+
+`actions` is what the gateway did with the message: the verbs it performed on rows, with the row ids (`claim`, `accumulate` with its `itemKey`, `resolve`, `create-row`), a verb Long Tail refused (`refuse`), a message held for a person under a strict codec (`hold`), one no row claimed after every delivery (`unmatched`), one the codec or the planner could not read (`unreadable`), one admitted with nothing to do (`ack`), and `none` with a `detail` for everything else: a message waiting for its row, a dispatch or command that went out because of it (the send is its own `out` record), an address no station claims. A record of a message read back from the broker on taking the line says `retained: true`.
+
+Telemetry messages are read live and are many: they join the wire record only with `MACHINE_WIRE_TELEMETRY=on`.
+
+The gateway log is published the same way, `machine.log.<site>.<line>.<event>` with the entry's level and context, where `<event>` is the log event without its `machine_gateway.` prefix as one token (`dispatch-accepted`, `verb-row_not_visible`). The console log keeps every entry as before.
+
+### Routes
+
+| Route | Answer |
+|---|---|
+| `GET /api/machines/lines?q=&site=&attention=&sort=&limit=&offset=` | The index, `LineIndex`: one page of `LineIndexRow` (the `LineSummary` with its machines, process, role, address and the codec's `rowOps`; `source`, `version`, `enabled`, `updatedAt`; `leading` on this replica; and `health`: machines, and the pending rows counted as `offline`, `quiet`, `alarms`, `people` (handoff errors, contract violations, registrations), `handoff`, `command`, with `attention` when a machine is offline, an alarm is active or a person is needed), `total`, `sites` (every site with its lines and how many need attention), `limit`, `offset`. `q` searches site, line, machine ids, processes, roles and addresses; `attention=true` keeps only lines that need it; `sort` is `attention` (default), `site` or `updated`; `limit` is 50 by default and 200 at most. 404 when `machines` is not declared at all |
+| `PUT /api/machines/lines/:siteId/:lineId` `{ definition: LineDef, version? }` | Declares the line through the API (administrators): the definition is validated as `loadLine` validates a file, stored with `source: api`, its roles applied, and the line run on every replica. A `version` names the version the caller last read; a different one is 409. Answers `{ line: LineIndexRow }`; 400 names what the definition lacks |
+| `DELETE /api/machines/lines/:siteId/:lineId` | Retires the line (administrators): the registry row goes, every replica stops it, its roles and bot accounts stay. 204, or 404 when there is no such line |
+| `GET /api/machines/lines/:siteId/:lineId` | The `LineView` from the replica leading the line: `takenAt`, each machine's link (online, since, last seen, software, boot and session ids), held units with the rows they came in on, open row counts by kind with the offline and quiet row ids, alarms with their rows, the last snapshot's jobs; and the contested claims waiting for a person. A replica that is not leading answers `{ leading: false }` |
+| `POST /api/machines/lines/:siteId/:lineId/inspect` `{ topic, payload, retained? }` | A dry run on the leader: what the codec reads (`kind`, `event`, `summary`, `inspections`, `violations`) and the actions the gateway would take, planned on a copy of its state. Nothing is applied and no row is created; 409 on a replica that is not leading |
+| `POST /api/machines/lines/:siteId/:lineId/machines/:machineId/commands` `{ op, args }` | Parks a `machine-command` row on the machine's role as the caller, so that role's write access decides, and answers `{ rowId }`. `op` is a control op, `snapshot`, or one the codec declares (400 otherwise); an unknown machine is 404 |
+
+Declaring a line from a shell:
+
+```bash
+curl -X PUT http://localhost:3000/api/machines/lines/site-2/line-1 \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d "{\"definition\": $(cat line.json)}"
+curl "http://localhost:3000/api/machines/lines?q=press&attention=true" -H "authorization: Bearer $TOKEN"
+curl -X DELETE http://localhost:3000/api/machines/lines/site-2/line-1 -H "authorization: Bearer $TOKEN"
+```
+
+Each replica answers the index; only the leader of a line holds its state. A request-reply to the leader, so any replica can serve the line view and the dry run, and a per-line runtime switch for telemetry on the wire are the next steps.
 
 ## Topology and identity
 
@@ -251,7 +319,7 @@ A replica taking a line reads back its learned addresses, its open handoff, comm
 - **Bot accounts:** in Long Tail each machine is a bot account on its station and receiver roles, so `claimed_by` and `resolved_by` name the machine. The controller bot holds those roles and the operator role, and raises the operator rows. The bots are member accounts with no password, under names the line derives; the line will not start while a person's account holds one of those names.
 - **Rows are the authority:** an escalation event only tells the gateway which row to look at. It reads the row back as the controller and acts on the stored role, status and metadata. A row on a role the controller does not hold, or an event its stored row contradicts, does nothing.
 - **Roles carry the access:** dispatching to a machine or commanding one means parking a row on that machine's role, so Long Tail's role access decides who can. The gateway acts on a handoff into a machine only on that machine's role, and on a handoff to a person only on a receiver role. A row commands only the machine whose role it is on: cancelling a handoff withdraws the receiver's dispatch, and the sender's job is stopped only by a `cancel` command row on the sender's role.
-- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(line, codec)` render the configuration from the line; the ACL takes its topics from the codec's channels.
+- **Rendering:** `Machines.renderSiteConf`, `renderMosquittoConf` and `renderMosquittoAcl(lines, codec)` render the configuration from one line or several on the same broker and site NATS: one bridge identity per line, one gateway user allowed every line's streams, and each line's stations and controller in the ACL. The ACL takes its topics from the codec's channels.
 - **Machines that host their own broker:** the machine broker connects out to each machine's broker with a Mosquitto bridge, carrying the machine's messages in and its commands out under the machine's level of the line's topics, and its codec reads them there. The bridge's notification topic, kept on the machine broker, is the machine's presence. `examples/workflows/bambu-printer` does this for 3D printers.
 
 ### Learned addresses
@@ -272,7 +340,7 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 | `MACHINE_TRANSPORT` | | `nats` (durable streams) or `mqtt` (any MQTT broker, no replay beyond the session) |
 | `MACHINE_ESCALATION_FEED` | `in-process` inside Long Tail, `core` for a standalone gateway | Where escalation events come from; `core` subscribes over Long Tail's messaging, or to `NATS_URL` with `NATS_TOKEN` when the gateway has none |
 | `MACHINE_TOPIC_ROOT` | `line/v1` | The generic codec's root |
-| `MACHINE_LINE_CONFIG` | | Path of the line JSON |
+| `MACHINE_LINE_CONFIG` | | The line JSON files, one path or several separated by commas; each site and line once |
 | `MACHINE_SITE_NATS_URL`, `_USER`, `_PASSWORD` | | A site NATS of its own for the streams; unset, `nats` keeps them in Long Tail's messaging |
 | `MACHINE_MQTT_URL`, `_PROTOCOL` | `_PROTOCOL` 5 | Machine broker, for commands and retained reads; 4 for a broker that speaks only MQTT 3.1.1 |
 | `MACHINE_MQTT_CA`, `_CERT`, `_KEY` | | TLS files; `{clientId}` in a path picks each identity's certificate |
@@ -284,7 +352,8 @@ A line with `addressing: 'learned'` names its stations and lets each machine tel
 | `MACHINE_RECEIPT_DELAY_MS` | `250` | How long confirmed message ids gather before a receipt goes out |
 | `MACHINE_LIFECYCLE` | `off` | `on` notes each job's start, progress steps and pauses on the row that holds it |
 | `MACHINE_PROGRESS_STEP` | `25` | With lifecycle notes on, progress is noted each time it crosses this many percent; `0` notes none |
-| `MACHINE_CODEC_MODULE` | | Development server only: a module whose `createCodec(line)` speaks the machines' protocol |
+| `MACHINE_WIRE_TELEMETRY` | `off` | `on` publishes telemetry messages on the wire record too ([Lines view](#lines-view)) |
+| `MACHINE_CODEC_MODULE` | | Development server only: a module whose `createCodec(line)` speaks the machines' protocol, for a single line |
 
 ## Testing a codec or adapter
 
