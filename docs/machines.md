@@ -157,7 +157,7 @@ A machine's load is every job it has been sent or still holds:
 - rows whose units still wait on it to move on;
 - units that arrived and have not left.
 
-A unit leaves when the machine releases it, when it arrives at the next machine, or when the machine's snapshot no longer lists its job. A replica taking the line reads every open row back before it sends anything, so pacing survives a restart.
+A unit leaves when the machine releases it, when it arrives at the next machine, or when the machine's snapshot no longer lists its job. A replica taking the line reads every open row back before it sends anything, so pacing survives a restart; a handoff row that was never given items, one parked by hand on a machine's role, reads as holding none.
 
 ## Commands
 
