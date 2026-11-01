@@ -23,7 +23,7 @@ export interface CreateRowInput {
 
 export type Action =
   /** `receivedOnAccept`: the units are already at the machine, so its acceptance completes the handoff. */
-  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; receivedOnAccept?: boolean }
+  | { kind: 'dispatch'; rowId: string; machineId: string; cmdId: string; args: Record<string, any>; issuedAt?: number; receivedOnAccept?: boolean }
   | { kind: 'command'; machineId: string; op: string; cmdId: string; args: Record<string, any> }
   /** A host's machine-command row: send the command, resolve the row with the reply. */
   | { kind: 'control'; rowId: string; machineId: string; op: string; args: Record<string, any>; createdAt?: number }

@@ -25,6 +25,12 @@ export interface MachineCommand {
   attempt?: number;
   /** The command may have reached the machine before: sent earlier, or its row predates this gateway's takeover. */
   retry?: boolean;
+  /**
+   * When the command was issued, ISO 8601: the same on every send of this `cmdId`, by this gateway or the
+   * next, so a protocol that stamps a time repeats the first attempt. A dispatch or a command row takes the
+   * start of its validity round; any other command the time of its first send.
+   */
+  issuedAt?: string;
 }
 
 /** MQTT filters under each machine's topic, e.g. `job` or `alarm/+`. */
@@ -180,7 +186,7 @@ export function genericCodec(opts: GenericCodecOptions): LineCodec {
       return receiptFrom === RECEIPT_FROM.ARRIVED ? [seen] : inferReceipt(seen, receiptFrom);
     },
     encode(ident, command) {
-      return [{ topic: machineTopic(opts.root, ident, CHANNEL.CMD), payload: JSON.stringify(buildEnvelope(ident, command)) }];
+      return [{ topic: machineTopic(opts.root, ident, CHANNEL.CMD), payload: JSON.stringify(buildEnvelope(ident, command, { at: command.issuedAt })) }];
     },
   };
 }

@@ -56,7 +56,7 @@ export function dispatchAction(row: HandoffRow, machineId: string, dispatchTtlMs
   row.createdAt ??= now;
   const { round, expiresAt } = dispatchWindow(row.dueAt ?? row.createdAt, now, dispatchTtlMs);
   return {
-    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id, round), args: dispatchArgs(row, expiresAt),
+    kind: 'dispatch', rowId: row.id, machineId, cmdId: dispatchCommandId(row.id, round), args: dispatchArgs(row, expiresAt), issuedAt: expiresAt - dispatchTtlMs,
     ...(row.dispatch === DISPATCH_STATE.ARRIVING ? { receivedOnAccept: true } : {}),
   };
 }

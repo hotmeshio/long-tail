@@ -48,11 +48,11 @@ describe('a dispatch sent again', () => {
     const feed = new MemoryEscalationFeed(broker);
     const lt = new FakeLongTail(feed);
     const ident = identOf(DEFAULT_LINE, 'press-01');
-    const dispatches: { cmdId: string; args: Record<string, unknown> }[] = [];
+    const dispatches: { cmdId: string; args: Record<string, unknown>; issuedAt: string; at: string }[] = [];
     broker.connect('press-hand');
     broker.subscribe('press-hand', machineTopic(ROOT, ident, CHANNEL.CMD), (msg) => {
-      const cmd = JSON.parse(msg.payload.toString()).body;
-      if (cmd.op === OP.DISPATCH) dispatches.push({ cmdId: cmd.cmdId, args: cmd.args });
+      const { body: cmd, at } = JSON.parse(msg.payload.toString());
+      if (cmd.op === OP.DISPATCH) dispatches.push({ cmdId: cmd.cmdId, args: cmd.args, issuedAt: cmd.issuedAt, at });
       broker.publish(machineTopic(ROOT, ident, CHANNEL.REPLY), JSON.stringify(buildEnvelope(ident, { cmdId: cmd.cmdId, status: REPLY_STATUS.ACCEPTED, reason: '' })));
     });
     const snapshot = (bootId: string) => broker.publish(machineTopic(ROOT, ident, CHANNEL.SNAPSHOT), JSON.stringify(buildEnvelope(ident, {
@@ -72,6 +72,8 @@ describe('a dispatch sent again', () => {
 
     expect(dispatches[1].cmdId).toBe(`${row.id}:dispatch`);
     expect(dispatches[1]).toEqual(dispatches[0]);
+    expect(dispatches[0].at).toBe(dispatches[0].issuedAt);
+    expect(Date.parse(dispatches[0].issuedAt)).toBe(Date.parse(dispatches[0].args.expiresAt as string) - TTL);
   });
 });
 
@@ -84,11 +86,11 @@ describe('a command sent again', () => {
     const feed = new MemoryEscalationFeed(broker);
     const lt = new FakeLongTail(feed);
     const ident = identOf(DEFAULT_LINE, 'press-01');
-    const sent: { cmdId: string; args: Record<string, unknown> }[] = [];
+    const sent: { cmdId: string; args: Record<string, unknown>; issuedAt: string; at: string }[] = [];
     broker.connect('press-hand');
     broker.subscribe('press-hand', machineTopic(ROOT, ident, CHANNEL.CMD), (msg) => {
-      const cmd = JSON.parse(msg.payload.toString()).body;
-      if (cmd.op === OP.PAUSE) sent.push({ cmdId: cmd.cmdId, args: cmd.args });
+      const { body: cmd, at } = JSON.parse(msg.payload.toString());
+      if (cmd.op === OP.PAUSE) sent.push({ cmdId: cmd.cmdId, args: cmd.args, issuedAt: cmd.issuedAt, at });
     });
     const start = async () => {
       gateway = new MachineGateway({
@@ -106,6 +108,7 @@ describe('a command sent again', () => {
 
     expect(sent[1].cmdId).toBe(`${row.id}:command`);
     expect(sent[1]).toEqual(sent[0]);
+    expect(sent[0].at).toBe(sent[0].issuedAt);
   });
 
   it('tells the codec each send\'s attempt, and that a command whose row predates the takeover may have been sent', async () => {
@@ -126,6 +129,7 @@ describe('a command sent again', () => {
     const first = lt.parkRow(commandRow(commandTarget(DEFAULT_LINE, 'press-01'), OP.PAUSE));
     await until(() => sends.length === 2);
     expect(sends.map((c) => [c.attempt, c.retry])).toEqual([[1, false], [2, true]]);
+    expect(sends[1].issuedAt).toBe(sends[0].issuedAt);
     await lt.ended(first.id);
 
     await gateway!.stop();
