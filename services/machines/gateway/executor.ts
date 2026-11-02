@@ -178,12 +178,25 @@ export class Executor {
     }));
   }
 
-  /** On arrival dispatch, a row that waited for the machine to prepare is received once every job it sent is ready. */
+  /**
+   * On arrival dispatch, a row that waited for the machine to prepare is
+   * received once every job it sent is ready. A ready that comes before the
+   * dispatch has recorded what it waits for is kept for it; one that comes
+   * while the dispatch's claim is still out waits for that claim.
+   */
   private async readyForArrival(into: HandoffRow, m: string, cmdId: string): Promise<WireAction[]> {
     const { lt, state } = this.d;
-    if (into.ended || !into.awaitingReady?.has(cmdId)) return [];
+    if (into.ended) return [];
+    if (!into.awaitingReady) {
+      if (into.dispatch !== DISPATCH_STATE.ACCEPTED && into.dispatch !== DISPATCH_STATE.PENDING) return [];
+      (into.readyEarly ??= new Set()).add(cmdId);
+      return [{ verb: 'none', detail: `ready before its dispatch settled; kept` }];
+    }
+    if (!into.awaitingReady.has(cmdId)) return [];
     into.awaitingReady.delete(cmdId);
     if (into.awaitingReady.size) return [];
+    if (into.claiming) await into.claiming;
+    if (into.ended) return [];
     const units = into.units.map((u) => u.unitId);
     const resolved = await lt.resolve(m, into.id, { received: true, receiver: m, units });
     state.close(into.id);

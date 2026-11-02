@@ -35,6 +35,10 @@ export interface HandoffRow extends HandoffFacets {
   arrivals?: Record<string, Record<string, any>>;
   /** Dispatch commands accepted as preparing; on arrival dispatch the row is received once each is ready. */
   awaitingReady?: Set<string>;
+  /** Jobs the machine said were ready before the dispatch recorded what it waits for. */
+  readyEarly?: Set<string>;
+  /** The claim the dispatch has out; a ready that completes the row waits for it. */
+  claiming?: Promise<unknown>;
   /** Lifecycle item keys already on the row (lifecycle.ts). */
   noted?: string[];
   /** Parked with a limit on its items, which lifecycle notes must never use up. */
@@ -142,7 +146,7 @@ export class GatewayState {
     this.openRows.set(row.id, existing
       ? {
         ...row, dispatch: existing.dispatch, trace: mergeTrace(row.trace, existing.trace), arrivals: existing.arrivals,
-        dueAt: existing.dueAt, noted: existing.noted ?? row.noted, awaitingReady: existing.awaitingReady,
+        dueAt: existing.dueAt, noted: existing.noted ?? row.noted, awaitingReady: existing.awaitingReady, readyEarly: existing.readyEarly, claiming: existing.claiming,
       }
       : row);
   }
