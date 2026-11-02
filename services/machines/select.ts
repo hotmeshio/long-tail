@@ -41,11 +41,11 @@ export type LineMessaging = Pick<typeof messagingRegistry, 'streams' | 'pubsub'>
  */
 export function createMachineBus(
   config: MachineLineConfig, line: LineDef, codec: LineCodec = defaultCodec(config, line), messaging: LineMessaging = messagingRegistry,
-  siteCodecs: LineCodec[] = [],
+  siteCodecs: LineCodec[] = [], onLost?: (reason: string) => void,
 ): MachineBus {
   switch (config.transport) {
     case MACHINE_TRANSPORT.NATS: {
-      const where = { mqtt: mqttOf(config), controllerId: controllerId(line), siteId: line.siteId, lineId: line.lineId, codec, siteCodecs };
+      const where = { mqtt: mqttOf(config), controllerId: controllerId(line), siteId: line.siteId, lineId: line.lineId, codec, siteCodecs, onLost };
       if (config.siteNatsUrl) {
         return new NatsMachineBus({ natsUrl: config.siteNatsUrl, user: config.siteNatsUser, password: config.siteNatsPassword, ...where });
       }

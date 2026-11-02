@@ -5,11 +5,12 @@ import { sanitizeSubjectToken } from './matching';
 import { loggerRegistry } from '../logger';
 
 /**
- * Fire-and-forget publish helper. Swallows errors (best-effort).
+ * Fire-and-forget publish helper. Swallows errors (best-effort). The publish
+ * is noted at debug: a line's wire can carry many events a second.
  */
 function fireAndForget(event: LTEvent): Promise<void> {
   if (!eventRegistry.hasAdapters) return Promise.resolve();
-  loggerRegistry.info(`[lt-pub] ${event.type} ${event.workflowId || ''} ${event.escalationId || event.taskId || ''}`);
+  loggerRegistry.debug(`[lt-pub] ${event.type} ${event.workflowId || ''} ${event.escalationId || event.taskId || ''}`);
   return eventRegistry.publish(event).catch(() => {});
 }
 

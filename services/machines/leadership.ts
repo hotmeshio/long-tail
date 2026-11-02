@@ -24,7 +24,7 @@ export class LineLeadership {
   private client?: PoolClient;
   private stopped = false;
   private leading = false;
-  private endTurn?: () => void;
+  private endTurn?: (err?: Error) => void;
   private readonly connect: () => Promise<PoolClient>;
   private readonly retryMs: number;
 
@@ -74,7 +74,7 @@ export class LineLeadership {
   private async holdLock(client: PoolClient, lead: () => Promise<void>): Promise<Error> {
     const ended = new Promise<Error>((resolve) => {
       client.once('error', resolve);
-      this.endTurn = () => resolve(new Error('leadership stopped'));
+      this.endTurn = (err?: Error) => resolve(err ?? new Error('leadership stopped'));
     });
     try {
       await client.query(LOCK_SQL, [this.key]);
@@ -85,6 +85,12 @@ export class LineLeadership {
     } catch (err) {
       return err as Error;
     }
+  }
+
+  /** The leader gives its turn up without stopping: `lost` runs, the lock goes, and the line contends again after the pause. */
+  relinquish(reason: string): void {
+    if (!this.leading) return;
+    this.endTurn?.(new Error(reason));
   }
 
   /** A leader unlocks; a replica still waiting drops its connection, which ends the wait. */

@@ -33,11 +33,12 @@ function subjectsFor(codec: StreamCodec, channels: string[], siteId?: string, li
 /**
  * The site's streams: every line under each codec's root, since lines on
  * different protocols share one site NATS. A root alone means the generic
- * layout; several codecs give the union of their subjects, in order.
+ * layout; several codecs give the union of their subjects, sorted, so every
+ * line asks the site for the same stream whichever codec it lists first.
  */
 export function lineStreamSpecs(codecs: StreamCodec | string | (StreamCodec | string)[]): StreamSpec[] {
   const list = (Array.isArray(codecs) ? codecs : [codecs]).map(codecOf);
-  const union = (channel: 'events' | 'telemetry') => [...new Set(list.flatMap((c) => subjectsFor(c, c.channels[channel])))];
+  const union = (channel: 'events' | 'telemetry') => [...new Set(list.flatMap((c) => subjectsFor(c, c.channels[channel])))].sort();
   return [
     { name: LINE_STREAM.EVENTS, subjects: union('events'), maxAgeMs: 30 * DAY_MS },
     { name: LINE_STREAM.TELEMETRY, subjects: union('telemetry'), maxAgeMs: 3 * DAY_MS },

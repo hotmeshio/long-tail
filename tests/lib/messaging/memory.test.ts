@@ -105,6 +105,19 @@ describe('memory messaging: streams', () => {
     expect(second.seen[0].payload).toBe('two');
   });
 
+  it('starts a consumer again at the newest message when its subjects changed', async () => {
+    const { streams } = await streamWith();
+    await streams.append('line.a.m1.job', 'before');
+    await streams.ensureConsumer('EVENTS', { name: 'gw', filterSubjects: ['line.b.>'] });
+    expect(await streams.describeConsumer('EVENTS', 'gw')).toEqual({ name: 'gw', filterSubjects: ['line.b.>'] });
+    expect(await streams.describeConsumer('EVENTS', 'nobody')).toBeNull();
+    const { seen } = await record(streams, () => DELIVERY.ACK);
+    await streams.append('line.a.m1.job', 'other line now');
+    await streams.append('line.b.m1.job', 'this line');
+    await until(() => seen.length === 1);
+    expect(seen.map((m) => m.payload)).toEqual(['this line']);
+  });
+
   it('refuses a consumer that was never ensured', async () => {
     const { streams } = await streamWith();
     await expect(streams.consume('EVENTS', 'nobody', async () => DELIVERY.ACK)).rejects.toThrow(/no consumer nobody/);

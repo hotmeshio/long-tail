@@ -18,6 +18,7 @@ export function jsPermissions({ streams, durable }: JsScope): { publish: string[
     `$JS.API.CONSUMER.CREATE.${s}.${durable}`,
     `$JS.API.CONSUMER.CREATE.${s}.${durable}.>`,
     `$JS.API.CONSUMER.DURABLE.CREATE.${s}.${durable}`,
+    `$JS.API.CONSUMER.DELETE.${s}.${durable}`,
     `$JS.API.CONSUMER.MSG.NEXT.${s}.${durable}`,
     `$JS.ACK.${s}.${durable}.>`,
   ]);

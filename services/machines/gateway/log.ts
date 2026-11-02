@@ -33,6 +33,7 @@ export const GATEWAY_LOG = {
   LEADING: 'machine_gateway.line.leading',
   STANDBY: 'machine_gateway.line.standby',
   LEADERSHIP_LOST: 'machine_gateway.line.leadership_lost',
+  WIRE_LOST: 'machine_gateway.line.wire_lost',
   START_FAILED: 'machine_gateway.line.start_failed',
 } as const;
 export type GatewayLogEvent = typeof GATEWAY_LOG[keyof typeof GATEWAY_LOG];

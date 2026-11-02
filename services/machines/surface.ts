@@ -150,8 +150,14 @@ class LineRun {
       return id;
     };
     const { config, line, codec } = this;
+    const where = { site: line.siteId, line: line.lineId };
+    // A wire that stops delivering ends this turn: the gateway stops, the line contends again and ensures its streams anew.
+    const onLost = (reason: string) => {
+      this.log.warn(GATEWAY_LOG.WIRE_LOST, { ...where, reason });
+      this.leadership.relinquish(`wire lost: ${reason}`);
+    };
     this.gateway = new MachineGateway({
-      bus: createMachineBus(config, line, codec, undefined, this.siteCodecs()),
+      bus: createMachineBus(config, line, codec, undefined, this.siteCodecs(), onLost),
       codec,
       rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
@@ -168,7 +174,7 @@ class LineRun {
     });
     await this.gateway.start();
     this.ready = true;
-    this.log.info(GATEWAY_LOG.LEADING, { site: line.siteId, line: line.lineId });
+    this.log.info(GATEWAY_LOG.LEADING, where);
   }
 }
 
