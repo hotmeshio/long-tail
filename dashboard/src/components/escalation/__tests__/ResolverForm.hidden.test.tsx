@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 // x-lt-hidden: never rendered, and its value stays in the emitted payload.
 const schema = {

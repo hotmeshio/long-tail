@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 // Cascading selects — a field whose x-lt-options path embeds {{resolver.*}}
 // interpolation follows the live form: disabled until the parent answers,

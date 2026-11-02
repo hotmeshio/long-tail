@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 // x-lt-showIf as an array: the field renders only while every condition holds.
 const schema = {

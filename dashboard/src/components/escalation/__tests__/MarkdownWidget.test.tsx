@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MarkdownWidget } from '../widgets/MarkdownWidget';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 const SOURCE = '### Checklist\n\nConfirm the **legal name** matches.';
 

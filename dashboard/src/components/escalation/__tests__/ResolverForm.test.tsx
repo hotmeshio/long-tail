@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 function formJson(fields: Record<string, unknown>, schema?: Record<string, unknown>) {
   const data: Record<string, unknown> = { ...fields };
