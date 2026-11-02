@@ -1,4 +1,4 @@
-import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import { ResolverForm } from '../../../components/escalation/resolver-form/ResolverForm';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 
 export function ResolverSection({

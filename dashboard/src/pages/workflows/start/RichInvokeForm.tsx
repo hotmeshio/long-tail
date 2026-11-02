@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import { ResolverForm } from '../../../components/escalation/resolver-form/ResolverForm';
 import { ErrorsPanel } from '../../../components/escalation/ErrorsPanel';
 import { MarkdownRenderer } from '../../../components/common/display/MarkdownRenderer';
 import { buildResolverPayload } from '../../../lib/resolver-payload';

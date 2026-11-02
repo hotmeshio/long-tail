@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import { ResolverForm } from '../../../components/escalation/resolver-form/ResolverForm';
 import { seedFormJson } from '../../../lib/seed-form-json';
 import { buildInvokeFormContext } from '../../../lib/invoke-context';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';

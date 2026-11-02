@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 // x-lt-options — a select whose option list rides the escalation context.
 // Dispatch is by SCHEMA, not runtime value: a number-typed count seeded to 0

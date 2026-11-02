@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { KeyRound, MonitorPlay } from 'lucide-react';
 import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExhaustedContext';
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
-import { ResolverForm } from '../../../components/escalation/ResolverForm';
+import { ResolverForm } from '../../../components/escalation/resolver-form/ResolverForm';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import { ResolverSection } from './ResolverSection';

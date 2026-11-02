@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { ResolverForm } from '../ResolverForm';
+import { ResolverForm } from '../resolver-form/ResolverForm';
 
 // Display-mode rendering: dictionary lists, 2×2 column groups, labels, and the
 // help icon. Core input behavior lives in ResolverForm.test.tsx.
