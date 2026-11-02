@@ -127,3 +127,31 @@ describe('planner: attempts and restarts', () => {
     expect(state.get('e4')!.dispatch).toBe('accepted');
   });
 });
+
+describe('planner: a finish that is not ok', () => {
+  it('claims the row for its resolver before the record and the resolution', () => {
+    const state = new GatewayState();
+    created(state, 'e5', 'press-01', 'cut-01');
+    const held = planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'hold', reason: 'QA' }), 1).actions;
+    expect(held.slice(0, 3).map((a: any) => [a.kind, a.as])).toEqual([['claim', 'press-01'], ['accumulate', 'press-01'], ['resolve', 'press-01']]);
+    expect(held[3]).toMatchObject({ kind: 'command', machineId: 'cut-01' });
+    expect(held[1]).toMatchObject({ itemKey: 'released:U1', payload: { result: 'hold' } });
+    expect(held[2]).toMatchObject({ payload: { errorCode: 'sender-rejected', result: 'hold' } });
+  });
+
+  it('claims for the receiver when the receiver already holds the row', () => {
+    const state = new GatewayState();
+    created(state, 'e6', 'press-01', 'cut-01');
+    state.get('e6')!.dispatch = 'accepted';
+    const held = planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'reject' }), 1).actions;
+    expect(held.slice(0, 3).map((a: any) => [a.kind, a.as])).toEqual([['claim', 'cut-01'], ['accumulate', 'press-01'], ['resolve', 'cut-01']]);
+    expect(held[2]).toMatchObject({ payload: { reportedBy: 'press-01' } });
+  });
+
+  it('writes a finish that is ok without a claim', () => {
+    const state = new GatewayState();
+    created(state, 'e7', 'press-01', 'cut-01');
+    const ok = planMachineMessage(state, ...job('press-01', { event: 'finished', result: 'ok' }), 1).actions;
+    expect(ok.map((a: any) => a.kind)).toEqual(['accumulate']);
+  });
+});

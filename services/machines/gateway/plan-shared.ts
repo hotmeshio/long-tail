@@ -32,7 +32,21 @@ export function cancelDispatch(state: GatewayState, row: HandoffRow): Action[] {
  * claimant may resolve a claimed row); `reportedBy` names who saw the failure.
  */
 export function failHandoff(state: GatewayState, row: HandoffRow, reporter: Actor, resolution: HandoffResolution): Action[] {
-  const claimant = row.dispatch === DISPATCH_STATE.ACCEPTED && row.toMachine ? row.toMachine : reporter;
+  const claimant = resolverOf(row, reporter);
   const payload = claimant === reporter ? { ...resolution } : { ...resolution, reportedBy: reporter };
   return [{ kind: 'resolve', as: claimant, rowId: row.id, payload }, ...cancelDispatch(state, row)];
+}
+
+/** Who resolves a failed handoff: the receiver while it holds the claim, otherwise whoever reports. */
+export function resolverOf(row: HandoffRow, reporter: Actor): Actor {
+  return row.dispatch === DISPATCH_STATE.ACCEPTED && row.toMachine ? row.toMachine : reporter;
+}
+
+/**
+ * The row claimed for its resolver before anything else is written to it. A
+ * claimed row refuses every other resolver, so what the machine writes next
+ * and the resolution that follows land on a row nobody else can end meanwhile.
+ */
+export function holdForResolver(row: HandoffRow, reporter: Actor): Action {
+  return { kind: 'claim', as: resolverOf(row, reporter), rowId: row.id };
 }
