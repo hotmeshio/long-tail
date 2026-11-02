@@ -18,7 +18,7 @@ import { DISPOSITION } from '../../../lib/machines/transport';
 import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../types/escalation';
 import { CONTROLLER, type Action, type Plan } from './actions';
 import { dispatchAction, latestArrival } from './pacing';
-import { failHandoff } from './plan-shared';
+import { failHandoff, holdForResolver } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
 import { noteJobEvent, notePause, noteResume } from './lifecycle';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
@@ -139,7 +139,7 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     state.takeFinish(m, unitId);
     const released = releasedAction(row, m, b);
     if (b.result === JOB_RESULT.OK) return ack([released]);
-    return ack([released, ...failHandoff(state, row, m, {
+    return ack([holdForResolver(row, m), released, ...failHandoff(state, row, m, {
       received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, result: b.result, reason: b.reason ?? null,
       detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
     })]);

@@ -115,7 +115,7 @@ When a sender finishes a unit, the gateway records the release on the row and, i
 | `trace` | One entry per unit: `{ unitId, machineId, jobId, result, materials: [{ material, lot }] }` |
 | `lots` | Every lot those units consumed, once each |
 
-Both are containment-searchable, so the rows that used a lot, and with them the units, are one query: `GET /escalations?facets={"lots":["LOT-7"]}`. A unit's whole path is every handoff row whose `units` holds it. The sender's full finished record stays on the row as its `released:<unit>` item. A codec maps its own lot fields into `materials`.
+Both are containment-searchable, so the rows that used a lot, and with them the units, are one query: `GET /escalations?facets={"lots":["LOT-7"]}`. A unit's whole path is every handoff row whose `units` holds it. The sender's full finished record stays on the row as its `released:<unit>` item. When that record is not ok, the row is first claimed for the machine that resolves it, so the record and the `sender-rejected` resolution land on a row no receiver can end in between. A codec maps its own lot fields into `materials`.
 
 ### Job lifecycle on the row
 

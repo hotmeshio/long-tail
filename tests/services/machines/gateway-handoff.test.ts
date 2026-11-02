@@ -83,7 +83,23 @@ describe('gateway: error roads', () => {
     // The receiver holds the claim, so it resolves; the payload names the sender that reported it.
     expect(ended.resolver_payload).toMatchObject({ received: false, unitId: 'U1', errorCode: 'sender-rejected', result: 'reject', reason: 'BOND-WEAK', reportedBy: 'press-01' });
     expect(ended.resolved_by).toBe('cut-01');
+    // The row was claimed for its resolver just before the record went on it.
+    const onRow = rig.lt.calls.filter((c) => c.id === ended.id);
+    const record = onRow.findIndex((c) => c.verb === 'accumulate' && c.payload?.itemKey === 'released:U1');
+    expect(onRow[record - 1]).toMatchObject({ verb: 'claim', as: 'cut-01' });
     await until(() => rig.recorder.commands('cut-01', OP.CANCEL)[0]);
+  });
+
+  it('a unit finished on hold at the last machine ends the exit row as the sender, claimed first', async () => {
+    rig = await startRig();
+    await rig.handoff('U1', null, 'press-01');
+    rig.line.arm('press-01', { result: 'hold', reason: 'QA-HOLD' });
+    const ended = await rig.handoff('U1', 'press-01', null);
+    expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: 'sender-rejected', result: 'hold' });
+    expect(ended.assigned_to).toBe('press-01');
+    expect(ended.resolved_by).toBe('press-01');
+    const onRow = rig.lt.calls.filter((c) => c.id === ended.id).map((c) => c.verb);
+    expect(onRow).toEqual(['claim', 'accumulate', 'resolve']);
   });
 
   it('a jam resolves jam, raises an operator alarm row, and a retry after clearing completes', async () => {
