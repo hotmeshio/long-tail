@@ -16,7 +16,7 @@ import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
 import { cancelDispatch } from './plan-shared';
 import { jobOwns } from './jobs';
-import { admit, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './pacing';
+import { admit, dispatchAction, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './pacing';
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { standardRows, type HandoffRowAdapter } from '../rows';
@@ -128,6 +128,23 @@ function heldUnder(state: GatewayState, machineId: string, unitId: string, sende
   return !!held && (!senderJobId || jobOwns(senderJobId, held));
 }
 
+/**
+ * Units a new row sends to a machine that already holds them from an earlier
+ * attempt (a job that failed to prepare, then a retry) need no second scan:
+ * the row is dispatched now, with the arrivals the gateway kept for them.
+ */
+function arrivedAlready(state: GatewayState, row: HandoffRow, dispatchTtlMs: number): Action[] {
+  const m = row.toMachine;
+  if (!m || !row.units.length || !row.units.every((u) => state.heldJob(m, u.unitId))) return [];
+  const arrivals = row.units.map((u) => {
+    const before = state.closedFor(u.unitId, (r) => r.toMachine === m && !!r.arrivals?.[u.unitId]);
+    return [u.unitId, before?.arrivals?.[u.unitId] ?? { unitId: u.unitId, carrierId: u.carrierId ?? null }] as const;
+  });
+  row.arrivals = Object.fromEntries(arrivals);
+  row.dueAt = Date.now();
+  return [dispatchAction(row, m, dispatchTtlMs)];
+}
+
 function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent, facets: HandoffFacets | null, dispatchTtlMs: number): Action[] {
   const id = event.escalationId;
   if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
@@ -144,8 +161,9 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
     }
     if (state.dispatchOnArrival) {
       const refused = refuseUnfit(state, line, row);
-      if (!refused.length) row.dispatch = DISPATCH_STATE.ARRIVING;
-      return refused;
+      if (refused.length) return refused;
+      row.dispatch = DISPATCH_STATE.ARRIVING;
+      return arrivedAlready(state, row, dispatchTtlMs);
     }
     const refused = !!softwareRefusal(state, line, row.toMachine) || !!jobRefusal(state, row);
     if (state.holdDispatch || (!refused && (!hasRoom(state, line, row) || !reachable(state, line, row.toMachine)))) {
