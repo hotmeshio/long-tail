@@ -185,17 +185,27 @@ export class Dispatcher {
     if (!refused && (!silent.length || reconciled)) {
       if (row) row.dispatch = DISPATCH_STATE.ACCEPTED;
       for (const job of jobs) state.rememberSent(a.machineId, job.jobId, a.rowId);
+      // The machine may say a job is ready before the claim below returns: the set it is taken out of is there first, and a ready that came earlier still is already out of it.
+      const preparing = a.receivedOnAccept ? jobs.filter((job, i) => replies[i]?.status === REPLY_STATUS.ACCEPTED && replies[i]?.preparing).map((job) => `${a.cmdId}${job.suffix}`) : [];
+      if (row && preparing.length) {
+        row.awaitingReady = new Set(preparing.filter((cmdId) => !row.readyEarly?.has(cmdId)));
+        row.readyEarly = undefined;
+      }
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
-      this.check(a.rowId, 'claim', await lt.claim(a.machineId, a.rowId));
+      const claiming = lt.claim(a.machineId, a.rowId);
+      if (row) row.claiming = claiming;
+      this.check(a.rowId, 'claim', await claiming);
+      if (row) row.claiming = undefined;
       if (!a.receivedOnAccept) return;
-      const preparing = jobs.filter((job, i) => replies[i]?.status === REPLY_STATUS.ACCEPTED && replies[i]?.preparing).map((job) => `${a.cmdId}${job.suffix}`);
-      if (!preparing.length) {
+      // A ready that came while the claim was out has received the row already.
+      const live = state.get(a.rowId);
+      if (!live || live.ended) return;
+      if (!preparing.length || !live.awaitingReady?.size) {
         await this.received(a);
         return;
       }
-      if (row) row.awaitingReady = new Set(preparing);
-      log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: preparing });
+      log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: [...live.awaitingReady] });
       return;
     }
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.

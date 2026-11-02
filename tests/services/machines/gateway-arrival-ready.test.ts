@@ -50,6 +50,26 @@ describe('dispatch on arrival: a machine that prepares its jobs', () => {
     expect(ended.resolver_payload).toMatchObject({ received: true, receiver: 'press-01', units: ['U1'] });
   });
 
+  it('a ready that comes while the claim is still out completes the handoff once the claim is in', async () => {
+    const log = new RecordingLog();
+    await silentMock(log);
+    const claim = rig.lt.claim.bind(rig.lt);
+    rig.lt.claim = async (as, id) => {
+      await sleep(200);
+      return claim(as, id);
+    };
+    const row = rig.park('U1', null, 'press-01');
+    scanIn('U1');
+    await until(() => dispatches().length);
+    reply(dispatchCommandId(row.id), REPLY_STATUS.ACCEPTED, 'recorded', { preparing: true });
+    reply(dispatchCommandId(row.id), REPLY_STATUS.COMPLETED, 'ready at once');
+    const ended = await rig.lt.ended(row.id);
+    expect(ended).toMatchObject({ status: 'resolved', resolved_by: 'press-01', assigned_to: 'press-01' });
+    expect(ended.resolver_payload).toMatchObject({ received: true, units: ['U1'] });
+    expect(log.of(GATEWAY_LOG.VERB_INVALID)).toEqual([]);
+    expect(log.of(GATEWAY_LOG.DISPATCH_PREPARING)).toEqual([]);
+  });
+
   it('a failure to prepare after acceptance ends the handoff itself as dispatch-failed', async () => {
     await silentMock();
     const row = rig.park('U1', null, 'press-01');
@@ -62,6 +82,24 @@ describe('dispatch on arrival: a machine that prepares its jobs', () => {
     expect(ended).toMatchObject({ status: 'resolved', resolved_by: 'press-01' });
     expect(ended.resolver_payload).toMatchObject({ received: false, errorCode: HANDOFF_ERROR.DISPATCH_FAILED, code: 'artifact' });
     expect(ended.resolver_payload!.detail).toMatch(/checksum/);
+  });
+
+  it('a retry for a unit the machine still holds goes out with no second scan', async () => {
+    await silentMock();
+    const row = rig.park('U1', null, 'press-01');
+    scanIn('U1');
+    await until(() => dispatches().length === 1);
+    reply(dispatchCommandId(row.id), REPLY_STATUS.ACCEPTED, 'recorded', { preparing: true });
+    await until(() => rig.lt.rows.get(row.id)?.assigned_to);
+    reply(dispatchCommandId(row.id), REPLY_STATUS.FAILED, 'controller lost the recipe', { code: 'RECOVERY_REQUIRED' });
+    await rig.lt.ended(row.id);
+    const again = rig.park('U1', null, 'press-01', 2);
+    await until(() => dispatches().length === 2);
+    expect(dispatches()[1].cmdId).toBe(dispatchCommandId(again.id));
+    expect(dispatches()[1].args.units[0].arrival).toMatchObject({ unitId: 'U1', visitId: 'visit-U1' });
+    reply(dispatchCommandId(again.id), REPLY_STATUS.ACCEPTED, 'queued');
+    const ended = await rig.lt.ended(again.id);
+    expect(ended.resolver_payload).toMatchObject({ received: true, units: ['U1'] });
   });
 
   it('an acceptance that says nothing of preparing completes the handoff at once', async () => {
