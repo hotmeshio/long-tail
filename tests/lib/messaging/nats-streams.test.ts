@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { consumerConfig, describeStream, ensureConsumer, ensureStream, streamConfig } from '../../../lib/messaging/nats/streams';
+import { consumerConfig, describeConsumer, describeStream, ensureConsumer, ensureStream, streamConfig } from '../../../lib/messaging/nats/streams';
 import { lineEventConsumerSpec, lineStreamSpecs, LINE_STREAM } from '../../../lib/machines/transport';
 
-function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: Error) {
+function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: Error, opts: { raced?: boolean } = {}) {
   const calls: string[] = [];
   const notFound = (what: string) => Object.assign(new Error(`${what} not found`), { code: '404' });
   return {
@@ -13,7 +13,11 @@ function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: E
         if (!existing.includes(name)) throw notFound('stream');
         return { config: { subjects: ['line.v1.>'], max_age: 60_000 * 1_000_000 } };
       },
-      add: async (c: any) => { calls.push(`add ${c.name}`); },
+      add: async (c: any) => {
+        calls.push(`add ${c.name}`);
+        // Another line created the stream between this line's look and its create.
+        if (opts.raced) throw new Error('stream name already in use with a different configuration');
+      },
       update: async (name: string) => { calls.push(`update ${name}`); },
     },
     consumers: {
@@ -23,6 +27,7 @@ function fakeJsm(existing: string[] = [], consumers: string[] = [], failWith?: E
       },
       add: async (s: string, c: any) => { calls.push(`consumer ${s}/${c.durable_name}`); },
       update: async (s: string, name: string, c: any) => { calls.push(`update ${s}/${name} ${c.filter_subjects.length}`); },
+      delete: async (s: string, name: string) => { calls.push(`delete ${s}/${name}`); return true; },
     },
   } as any;
 }
@@ -51,15 +56,26 @@ describe('JetStream from messaging specs', () => {
     await expect(describeStream(fakeJsm([], [], new Error('authorization violation')), LINE_STREAM.EVENTS)).rejects.toThrow(/authorization/);
   });
 
+  it('updates a stream another line created between its look and its create', async () => {
+    const jsm = fakeJsm([], [], undefined, { raced: true });
+    await ensureStream(jsm, lineStreamSpecs('line/v1')[0]);
+    expect(jsm.calls).toEqual([`add ${LINE_STREAM.EVENTS}`, `update ${LINE_STREAM.EVENTS}`]);
+  });
+
   it('rethrows anything other than not found', async () => {
     await expect(ensureStream(fakeJsm([], [], new Error('authorization violation')), lineStreamSpecs('line/v1')[0])).rejects.toThrow(/authorization/);
   });
 
-  it('creates a missing consumer, and moves an existing one to new subjects without losing its place', async () => {
+  it('creates a missing consumer, and makes an existing one again when its subjects changed', async () => {
     const jsm = fakeJsm([], ['gw']);
     await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumerSpec('line/v1', 's', 'l', 'gw'));
     await ensureConsumer(jsm, LINE_STREAM.EVENTS, lineEventConsumerSpec('line/v1', 's', 'l', 'other'));
-    expect(jsm.calls).toEqual([`update ${LINE_STREAM.EVENTS}/gw 6`, `consumer ${LINE_STREAM.EVENTS}/other`]);
+    expect(jsm.calls).toEqual([`delete ${LINE_STREAM.EVENTS}/gw`, `consumer ${LINE_STREAM.EVENTS}/gw`, `consumer ${LINE_STREAM.EVENTS}/other`]);
+  });
+
+  it('describes a consumer by the subjects it reads, and a missing one as null', async () => {
+    expect(await describeConsumer(fakeJsm([], ['gw']), LINE_STREAM.EVENTS, 'gw')).toEqual({ name: 'gw', filterSubjects: ['line.v1.s.l.*.job'] });
+    expect(await describeConsumer(fakeJsm([], []), LINE_STREAM.EVENTS, 'gw')).toBeNull();
   });
 
   it('leaves a consumer alone when its subjects already match', async () => {

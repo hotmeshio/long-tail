@@ -57,16 +57,20 @@ export interface LTStreamMessage extends LTMessage {
 export interface LTConsumeOptions {
   /** Delay before a nak'd message is delivered again. */
   nakDelayMs?: number;
+  /** Told once when the consumer can deliver nothing more: its stream or itself is gone, or the server fell silent. */
+  onLost?: (reason: string) => void;
 }
 
 /** Durable streams: messages kept, delivered to named consumers in order, one at a time, until settled. */
 export interface LTStreams {
   /** Create the stream, or bring an existing one's subjects and age up to the spec. */
   ensureStream(spec: StreamSpec): Promise<void>;
-  /** Create the consumer, or bring an existing one's filter up to the spec; its position is kept. */
+  /** Create the consumer, or keep an existing one whose subjects match the spec; one whose subjects changed is made again. */
   ensureConsumer(stream: string, spec: ConsumerSpec): Promise<void>;
   /** The stream as it is now, or null when there is none. */
   describeStream(name: string): Promise<StreamSpec | null>;
+  /** The consumer as it is now, or null when there is none. */
+  describeConsumer(stream: string, name: string): Promise<ConsumerSpec | null>;
   /** Append a message; resolves once the stream holds it. */
   append(subject: Subject, payload: string): Promise<void>;
   /** Deliver the consumer's messages to `handler` one at a time; a thrown handler counts as a nak. */

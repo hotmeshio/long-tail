@@ -54,15 +54,19 @@ class MemoryStreams implements LTStreams {
     return this.streams.get(name)?.spec ?? null;
   }
 
+  /** An existing consumer keeps its place while its subjects match; one whose subjects changed starts again. */
   async ensureConsumer(stream: string, spec: ConsumerSpec): Promise<void> {
     const s = this.stream(stream);
     const existing = s.consumers.get(spec.name);
-    if (existing) {
-      existing.spec = { ...existing.spec, filterSubjects: spec.filterSubjects };
-      return;
-    }
+    const same = (a: string[], b: string[]) => [...a].sort().join('|') === [...b].sort().join('|');
+    if (existing && same(existing.spec.filterSubjects, spec.filterSubjects)) return;
     const floor = (spec.startAt ?? START_AT.NEW) === START_AT.ALL ? 0 : s.seq;
     s.consumers.set(spec.name, { spec, floor, settled: new Set(), deliveries: new Map(), retryAt: new Map() });
+  }
+
+  async describeConsumer(stream: string, name: string): Promise<ConsumerSpec | null> {
+    const spec = this.streams.get(stream)?.consumers.get(name)?.spec;
+    return spec ? { ...spec, filterSubjects: [...spec.filterSubjects] } : null;
   }
 
   async append(subject: Subject, payload: string): Promise<void> {

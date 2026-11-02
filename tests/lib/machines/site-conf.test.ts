@@ -21,8 +21,10 @@ describe('site NATS config', () => {
     expect(conf).toContain('"$JS.API.STREAM.UPDATE.LINE_EVENTS"');
     expect(conf).toContain('"$JS.API.CONSUMER.MSG.NEXT.LINE_EVENTS.line-controller-site-1-line-1-events"');
     expect(conf).toContain('"$JS.ACK.LINE_EVENTS.line-controller-site-1-line-1-events.>"');
+    expect(conf).toContain('"$JS.API.CONSUMER.DELETE.LINE_EVENTS.line-controller-site-1-line-1-events"');
     expect(conf).not.toContain('"$JS.API.>"');
     expect(conf).not.toContain('STREAM.DELETE');
+    expect(conf).not.toContain('STREAM.PURGE');
   });
 
   it('runs JetStream and MQTT over TLS with certificate login, as a server of its own', () => {

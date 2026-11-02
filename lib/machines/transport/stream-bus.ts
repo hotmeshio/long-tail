@@ -29,6 +29,8 @@ export interface StreamBusOptions {
   /** The codecs of every line on this site; the streams keep all their subjects, whichever line starts last. */
   siteCodecs?: StreamCodec[];
   nakDelayMs?: number;
+  /** Told once when the consumer can deliver nothing more, so the line can give its lead up and contend again. */
+  onLost?: (reason: string) => void;
 }
 
 export class StreamMachineBus implements MachineBus {
@@ -48,6 +50,12 @@ export class StreamMachineBus implements MachineBus {
     for (const spec of lineStreamSpecs([codec, ...siteCodecs])) await streams.ensureStream(spec);
     const consumer = lineEventConsumerSpec(codec, siteId, lineId, this.durableName);
     await streams.ensureConsumer(LINE_STREAM.EVENTS, consumer);
+    const held = await streams.describeConsumer(LINE_STREAM.EVENTS, consumer.name);
+    const reads = [...(held?.filterSubjects ?? [])].sort().join(', ');
+    const wants = [...consumer.filterSubjects].sort().join(', ');
+    if (reads !== wants) {
+      throw new Error(`${consumer.name} reads ${reads || 'nothing'} and not ${wants}; the consumer did not follow the line`);
+    }
     const events = await streams.describeStream(LINE_STREAM.EVENTS);
     const missing = events ? uncoveredSubjects(events, consumer.filterSubjects) : consumer.filterSubjects;
     if (missing.length) {
@@ -57,9 +65,9 @@ export class StreamMachineBus implements MachineBus {
   }
 
   async consume(handler: (msg: InboundMessage) => Promise<Disposition>): Promise<void> {
-    const { streams, pubsub, codec, siteId, lineId, nakDelayMs = 1_000 } = this.opts;
+    const { streams, pubsub, codec, siteId, lineId, nakDelayMs = 1_000, onLost } = this.opts;
     this.subs.push(await streams.consume(LINE_STREAM.EVENTS, this.durableName, (m) =>
-      this.queue.run(() => handler({ topic: toTopic(m.subject), payload: m.payload, deliveries: m.deliveries })), { nakDelayMs }));
+      this.queue.run(() => handler({ topic: toTopic(m.subject), payload: m.payload, deliveries: m.deliveries })), { nakDelayMs, onLost }));
     for (const subject of telemetrySubjects(codec, siteId, lineId)) {
       this.subs.push(pubsub.subscribe(subject, (m) =>
         void this.queue.run(() => handler({ topic: toTopic(m.subject), payload: m.payload, deliveries: 1 }))));

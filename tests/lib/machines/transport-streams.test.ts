@@ -11,7 +11,7 @@ describe('site streams', () => {
     const [events, telemetry] = streams;
     expect(events.name).toBe(LINE_STREAM.EVENTS);
     expect(events.subjects).toEqual([
-      'line.v1.*.*.*.presence', 'line.v1.*.*.*.snapshot', 'line.v1.*.*.*.job', 'line.v1.*.*.*.alarm.*', 'line.v1.*.*.*.cmd.reply', 'line.v1.*.*.*.report.>',
+      'line.v1.*.*.*.alarm.*', 'line.v1.*.*.*.cmd.reply', 'line.v1.*.*.*.job', 'line.v1.*.*.*.presence', 'line.v1.*.*.*.report.>', 'line.v1.*.*.*.snapshot',
     ]);
     expect(telemetry.subjects).toEqual(['line.v1.*.*.*.telemetry']);
     expect(events.subjects).not.toContain('line.v1.*.*.*.cmd');
@@ -34,7 +34,7 @@ describe('channels from a codec', () => {
   it('builds the streams and the consumer from the codec\'s own channels', () => {
     const channels = { events: ['state', 'work', 'events/alert/+'], telemetry: ['readings/raw'], commands: ['control'] };
     const [events, telemetry] = lineStreamSpecs({ root: 'acme/v1', channels });
-    expect(events.subjects).toEqual(['acme.v1.*.*.*.state', 'acme.v1.*.*.*.work', 'acme.v1.*.*.*.events.alert.*']);
+    expect(events.subjects).toEqual(['acme.v1.*.*.*.events.alert.*', 'acme.v1.*.*.*.state', 'acme.v1.*.*.*.work']);
     expect(telemetry.subjects).toEqual(['acme.v1.*.*.*.readings.raw']);
     expect(lineEventConsumerSpec({ root: 'acme/v1', channels }, 's', 'l', 'gw').filterSubjects).toContain('acme.v1.s.l.*.work');
   });
@@ -61,9 +61,17 @@ describe('one site, several codecs', () => {
     const [events, telemetry] = lineStreamSpecs(['line/v1', other]);
     expect(events.subjects).toContain('line.v1.*.*.*.job');
     expect(events.subjects).toContain('acme.v2.*.*.*.events');
-    expect(telemetry.subjects).toEqual(['line.v1.*.*.*.telemetry', 'acme.v2.*.*.*.telemetry']);
+    expect(telemetry.subjects).toEqual(['acme.v2.*.*.*.telemetry', 'line.v1.*.*.*.telemetry']);
     expect(lineStreamSpecs([other, 'line/v1'])[0].subjects).toEqual(expect.arrayContaining(events.subjects));
     expect(lineStreamSpecs(['line/v1', 'line/v1'])[0].subjects).toEqual(lineStreamSpecs('line/v1')[0].subjects);
+  });
+
+  it('asks for the same stream whichever codec a line lists first, so two lines never disagree on its configuration', () => {
+    const [eventsA, telemetryA] = lineStreamSpecs(['line/v1', other]);
+    const [eventsB, telemetryB] = lineStreamSpecs([other, 'line/v1']);
+    expect(eventsB.subjects).toEqual(eventsA.subjects);
+    expect(telemetryB.subjects).toEqual(telemetryA.subjects);
+    expect(eventsA.subjects).toEqual([...eventsA.subjects].sort());
   });
 
   it('tells which consumer subjects a stream keeps nothing of', () => {

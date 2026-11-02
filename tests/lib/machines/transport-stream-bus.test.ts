@@ -44,12 +44,31 @@ describe('two lines on one site, on different roots', () => {
     expect((await p.streams.describeStream('LINE_EVENTS'))?.subjects).toEqual(expect.arrayContaining(['line.v1.*.*.*.job', 'acme.v2.*.*.*.events']));
   });
 
+  it('refuses to start when its consumer did not follow the line', async () => {
+    const p = await provider();
+    const streams = { ...p.streams, ensureStream: p.streams.ensureStream.bind(p.streams), ensureConsumer: p.streams.ensureConsumer.bind(p.streams), describeStream: p.streams.describeStream.bind(p.streams), describeConsumer: async () => ({ name: 'gw-l1-events', filterSubjects: ['acme.v2.s.l1.*.events'] }) };
+    const b = new StreamMachineBus({ streams: streams as typeof p.streams, pubsub: p.pubsub, mqtt, controllerId: 'gw-l1', siteId: 's', lineId: 'l1', codec: line });
+    await expect(b.connect()).rejects.toThrow(/gw-l1-events reads acme\.v2\.s\.l1\.\*\.events and not .*line\.v1\.s\.l1\.\*\.job/);
+  });
+
+  it('tells the line when its consumer can deliver nothing more', async () => {
+    const p = await provider();
+    const lost: string[] = [];
+    const streams = { ...p.streams, ensureStream: p.streams.ensureStream.bind(p.streams), ensureConsumer: p.streams.ensureConsumer.bind(p.streams), describeStream: p.streams.describeStream.bind(p.streams), describeConsumer: p.streams.describeConsumer.bind(p.streams),
+      consume: async (_s: string, _c: string, _h: unknown, opts?: { onLost?: (r: string) => void }) => { opts?.onLost?.('stream_not_found'); return { close: async () => undefined }; } };
+    const b = new StreamMachineBus({ streams: streams as typeof p.streams, pubsub: p.pubsub, mqtt, controllerId: 'gw-l1', siteId: 's', lineId: 'l1', codec: line, onLost: (r) => { lost.push(r); } });
+    buses.push(b);
+    await b.connect();
+    await b.consume(async () => DISPOSITION.ACK);
+    expect(lost).toEqual(['stream_not_found']);
+  });
+
   it('refuses to start a consumer the stream would feed nothing', async () => {
     const p = await provider();
     const first = bus(p, 'l1', line, []);
     buses.push(first);
     await first.connect();
-    const streams = { ...p.streams, ensureStream: async () => undefined, describeStream: p.streams.describeStream.bind(p.streams), ensureConsumer: p.streams.ensureConsumer.bind(p.streams) };
+    const streams = { ...p.streams, ensureStream: async () => undefined, describeStream: p.streams.describeStream.bind(p.streams), ensureConsumer: p.streams.ensureConsumer.bind(p.streams), describeConsumer: p.streams.describeConsumer.bind(p.streams) };
     const second = new StreamMachineBus({ streams: streams as typeof p.streams, pubsub: p.pubsub, mqtt, controllerId: 'gw-l2', siteId: 's', lineId: 'l2', codec: other });
     await expect(second.connect()).rejects.toThrow(/LINE_EVENTS keeps nothing of acme\.v2\.s\.l2\.\*\.events/);
   });
