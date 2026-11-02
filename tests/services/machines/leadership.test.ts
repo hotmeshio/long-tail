@@ -68,6 +68,19 @@ describe('line leadership', () => {
     expect(lost).toEqual(['the database system is not yet accepting connections', 'the database system is not yet accepting connections']);
   });
 
+  it('gives its turn up when asked and contends again', async () => {
+    const lost: string[] = [];
+    const log: string[] = [];
+    const l = new LineLeadership(`test-line-relinquish-${Date.now()}`, { retryMs: 10 });
+    held.push(l);
+    void l.run(async () => { log.push('leading'); }, async (err) => { lost.push(err.message); });
+    await until(() => log.length === 1, 5_000);
+    l.relinquish('wire lost: stream_not_found');
+    await until(() => log.length === 2, 5_000);
+    expect(lost).toEqual(['wire lost: stream_not_found']);
+    expect(log).toEqual(['leading', 'leading']);
+  });
+
   it('never leads when stopped while its connection was still opening', async () => {
     const log: string[] = [];
     const l = new LineLeadership(`test-line-stop-early-${Date.now()}`, {

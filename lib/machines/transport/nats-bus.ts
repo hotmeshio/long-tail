@@ -24,6 +24,8 @@ export interface NatsBusOptions {
   /** The codecs of every line on this site, so the streams keep all their subjects. */
   siteCodecs?: StreamCodec[];
   nakDelayMs?: number;
+  /** Told once when the consumer can deliver nothing more, so the line can give its lead up and contend again. */
+  onLost?: (reason: string) => void;
 }
 
 export class NatsMachineBus implements MachineBus {
