@@ -30,6 +30,8 @@ export interface LTOAuthStartConfig {
   defaultRoleType?: 'admin' | 'member';
   /** Base URL for computing redirect URIs (default: derived from request) */
   baseUrl?: string;
+  /** Email domains a self-provisioned sign-in may come from. Empty: any. Invited accounts are not subject to it. */
+  allowedDomains?: string[];
 }
 
 /**

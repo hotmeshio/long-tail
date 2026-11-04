@@ -12,6 +12,7 @@ import {
   deleteOAuthConnection,
   listOAuthConnections,
 } from '../services/oauth';
+import { normalizeDomains, mayProvision } from '../services/oauth/provisioning';
 import { getUserByEmail, createUser } from '../services/user';
 
 const router = Router();
@@ -22,16 +23,19 @@ let _oauthConfig = {
   autoProvision: true,
   defaultRoleType: 'member' as 'admin' | 'member',
   baseUrl: '',
+  allowedDomains: [] as string[],
 };
 
 export function setOAuthConfig(cfg: {
   autoProvision?: boolean;
   defaultRoleType?: 'admin' | 'member';
   baseUrl?: string;
+  allowedDomains?: string[];
 }): void {
   if (cfg.autoProvision !== undefined) _oauthConfig.autoProvision = cfg.autoProvision;
   if (cfg.defaultRoleType) _oauthConfig.defaultRoleType = cfg.defaultRoleType;
   if (cfg.baseUrl) _oauthConfig.baseUrl = cfg.baseUrl;
+  if (cfg.allowedDomains) _oauthConfig.allowedDomains = normalizeDomains(cfg.allowedDomains);
 }
 
 /**
@@ -160,6 +164,13 @@ router.get('/:provider/callback', async (req, res) => {
     if (!user) {
       if (!_oauthConfig.autoProvision) {
         res.status(403).json({ error: 'No account found. Contact an administrator.' });
+        return;
+      }
+      if (!mayProvision(userInfo.email, _oauthConfig.allowedDomains)) {
+        loggerRegistry.warn(`[oauth] refused self-provisioning for ${provider} sign-in outside allowed domains`);
+        res.status(403).json({
+          error: `Sign-in is limited to ${_oauthConfig.allowedDomains.join(', ')}. Contact an administrator.`,
+        });
         return;
       }
       // Auto-provision new user

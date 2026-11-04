@@ -68,6 +68,7 @@ export async function applyServerAuthConfig(startConfig: LTStartConfig): Promise
       autoProvision: startConfig.auth.oauth.autoProvision,
       defaultRoleType: startConfig.auth.oauth.defaultRoleType,
       baseUrl: startConfig.auth.oauth.baseUrl,
+      allowedDomains: startConfig.auth.oauth.allowedDomains,
     });
   }
 
