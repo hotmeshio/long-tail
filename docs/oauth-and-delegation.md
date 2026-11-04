@@ -80,6 +80,7 @@ await start({
       encryptionKey: process.env.OAUTH_ENCRYPTION_KEY,
       autoProvision: true,      // create user on first OAuth login
       defaultRoleType: 'member', // role for auto-provisioned users
+      allowedDomains: ['example.com'], // email domains that may self-provision
       providers: [
         {
           provider: 'google',
@@ -100,7 +101,7 @@ await start({
 3. Backend generates CSRF state + PKCE code verifier, redirects to Google's consent screen.
 4. Google redirects back to `GET /api/auth/oauth/google/callback` with an authorization code.
 5. Backend exchanges the code for tokens, fetches user info (email, name).
-6. If the user exists (matched by email or OAuth provider ID), they're logged in. If not and `autoProvision` is true, a new user is created.
+6. If the user exists (matched by email or OAuth provider ID), they're logged in. If not and `autoProvision` is true and the email's domain is in `allowedDomains` (or no list is set), a new user is created. Accounts an administrator created by email sign in whatever their domain.
 7. OAuth tokens are encrypted (AES-256-GCM) and stored in `lt_oauth_tokens`.
 8. A JWT is issued and the browser redirects to `/?token=<jwt>`.
 9. The dashboard's `useOAuthCallback` hook picks up the token and completes login.

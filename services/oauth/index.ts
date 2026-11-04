@@ -6,6 +6,7 @@ import { loggerRegistry } from '../../lib/logger';
 export { encrypt, decrypt, getEncryptionKey, setEncryptionKey } from './crypto';
 export { createOAuthState, consumeOAuthState } from './state';
 export { registerProvider, getProvider, listProviders } from './providers';
+export { normalizeDomains, emailDomain, mayProvision } from './provisioning';
 export type { ProviderHandler, OAuthTokens } from './providers';
 export {
   upsertOAuthToken,
