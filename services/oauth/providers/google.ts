@@ -43,14 +43,14 @@ export function createGoogleHandler(cfg: LTOAuthProviderConfig): ProviderHandler
       };
     },
     async fetchUserInfo(accessToken) {
-      const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();
       return {
         provider: 'google',
-        providerUserId: data.id,
-        email: data.email || null,
+        providerUserId: data.sub || data.id,
+        email: data.email_verified === true && data.email ? data.email : null,
         displayName: data.name || null,
         raw: data,
       };

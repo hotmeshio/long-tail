@@ -236,6 +236,18 @@ export interface ScanStep {
    * refusal copy may read.
    */
   done?: { markdown: string };
+  /**
+   * After this write completes the held subject, the station follows the
+   * subject to its next pending row in these roles: it waits for the row,
+   * replays the held code, and holds the new row. The wait ends on the done
+   * copy when no row appears in `waitSeconds` (default 10).
+   */
+  follow?: ScanFollow;
+}
+
+export interface ScanFollow {
+  roles: string[];
+  waitSeconds?: number;
 }
 
 export interface ScanRuleFallback {

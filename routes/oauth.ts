@@ -17,6 +17,9 @@ import { getUserByEmail, createUser } from '../services/user';
 
 const router = Router();
 
+// What a refused person reads. The reason is logged, never shown.
+const SIGN_IN_REFUSED = 'This account is not allowed to sign in here. Contact an administrator.';
+
 // ── OAuth startup config (set by initializeOAuth) ────────────────────────────
 
 let _oauthConfig = {
@@ -157,20 +160,20 @@ router.get('/:provider/callback', async (req, res) => {
     let user = await getUserByOAuthProvider(provider, userInfo.providerUserId);
 
     if (!user && userInfo.email) {
-      // Try matching by email
+      // A provider id meets an invited account once, by its verified email
       user = await getUserByEmail(userInfo.email);
+      if (user) loggerRegistry.info(`[oauth] bound ${provider} id to existing account ${user.id} by verified email`);
     }
 
     if (!user) {
       if (!_oauthConfig.autoProvision) {
-        res.status(403).json({ error: 'No account found. Contact an administrator.' });
+        loggerRegistry.warn(`[oauth] refused ${provider} sign-in: no account and auto-provision is off`);
+        res.redirect(`/login?error=${encodeURIComponent(SIGN_IN_REFUSED)}`);
         return;
       }
       if (!mayProvision(userInfo.email, _oauthConfig.allowedDomains)) {
-        loggerRegistry.warn(`[oauth] refused self-provisioning for ${provider} sign-in outside allowed domains`);
-        res.status(403).json({
-          error: `Sign-in is limited to ${_oauthConfig.allowedDomains.join(', ')}. Contact an administrator.`,
-        });
+        loggerRegistry.warn(`[oauth] refused ${provider} sign-in: email domain not in allowedDomains`);
+        res.redirect(`/login?error=${encodeURIComponent(SIGN_IN_REFUSED)}`);
         return;
       }
       // Auto-provision new user

@@ -27,6 +27,12 @@ export interface ScanChoice {
   refuse?: string;
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
+  /** What the station says once the choice's write lands. Markdown template over the row (`{item.*}`). */
+  done?: { markdown: string };
+  /** The choice is left off the screen for a person without its roles, instead of shown withheld. */
+  hidden?: boolean;
+  /** The choice is offered only while the row carries these facet values. */
+  when?: Record<string, string | number | boolean>;
 }
 
 /**

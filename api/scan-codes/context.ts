@@ -1,6 +1,7 @@
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
 import {
+  SCAN_FOLLOW_WAIT_DEFAULT_SECONDS,
   SCAN_OUTCOMES,
   SCAN_PROVENANCE_KEYS,
   isEffectivelyClaimed,
@@ -188,11 +189,38 @@ export async function templated<T>(
  */
 export function withDone(
   result: LTApiResult<ScanExecuteResponse>,
-  step: ScanStep,
+  step: Pick<ScanStep, 'done'>,
   tpl: scanCodeService.ScanTemplateContext,
 ): LTApiResult<ScanExecuteResponse> {
   const data = result.data;
   if (!step.done || !data || data.outcome !== SCAN_OUTCOMES.EXECUTED || data.already || data.done) return result;
   return { ...result, data: { ...data, done: { markdown: scanCodeService.renderScanCopy(step.done.markdown, tpl) } } };
+}
+
+/**
+ * Attach the step's `follow` to a write that completed the held subject: the
+ * code the station replays and the target it waits for, so the subject's
+ * next row is held without scanning it again.
+ */
+export function withFollow(
+  result: LTApiResult<ScanExecuteResponse>,
+  step: Pick<ScanStep, 'follow'>,
+  ctx: StepContext,
+): LTApiResult<ScanExecuteResponse> {
+  const data = result.data;
+  const subject = ctx.subject;
+  if (!step.follow || !subject || !data || data.outcome !== SCAN_OUTCOMES.EXECUTED || !data.clearSubject) return result;
+  return {
+    ...result,
+    data: {
+      ...data,
+      follow: {
+        code: subject.code,
+        roles: step.follow.roles,
+        waitSeconds: step.follow.waitSeconds ?? SCAN_FOLLOW_WAIT_DEFAULT_SECONDS,
+        target: { facet: subject.scheme.target_facet, value: subject.parsed.target },
+      },
+    },
+  };
 }
 

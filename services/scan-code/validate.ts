@@ -1,5 +1,6 @@
 import {
   SCAN_ENCODINGS,
+  SCAN_FOLLOW_WAIT_MAX_SECONDS,
   SCAN_GRANT_SCOPES,
   SCAN_SCHEME_KINDS,
   SCAN_VERBS,
@@ -151,7 +152,50 @@ function assertValidChoices(choices: ScanChoice[] | undefined, at: string): void
       if (codes.has(choice.code)) throw new Error(`${cat}: duplicate code "${choice.code}"`);
       codes.add(choice.code);
     }
+    if (choice.done !== undefined) {
+      if (!choice.done || typeof choice.done !== 'object' || typeof choice.done.markdown !== 'string' || !choice.done.markdown) {
+        throw new Error(`${cat}: done.markdown is required`);
+      }
+      if (!SCAN_MUTATING_VERBS.includes(choice.verb)) {
+        throw new Error(`${cat}: done applies only to choices that write`);
+      }
+    }
+    if (choice.hidden !== undefined) {
+      if (typeof choice.hidden !== 'boolean') throw new Error(`${cat}: hidden must be a boolean`);
+      if (choice.hidden && !choice.roles?.length) throw new Error(`${cat}: hidden requires roles`);
+    }
+    if (choice.when !== undefined) assertValidWhen(choice.when, cat);
   });
+}
+
+/** A choice's `when`: facet keys to scalar values the row must carry. */
+function assertValidWhen(when: unknown, at: string): void {
+  if (!when || typeof when !== 'object' || Array.isArray(when) || Object.keys(when).length === 0) {
+    throw new Error(`${at}: when must be a non-empty object of facet values`);
+  }
+  for (const [key, value] of Object.entries(when as Record<string, unknown>)) {
+    if (!FACET_KEY.test(key)) throw new Error(`${at}: when key "${key}" is not a facet key`);
+    if (!['string', 'number', 'boolean'].includes(typeof value)) {
+      throw new Error(`${at}: when.${key} must be a string, number, or boolean`);
+    }
+  }
+}
+
+/** A step's `follow`: the roles the subject's next row may be in, and how long to wait for it. */
+function assertValidFollow(step: ScanStep, at: string): void {
+  const follow = step.follow;
+  if (follow === undefined) return;
+  if (!follow || typeof follow !== 'object' || Array.isArray(follow)) throw new Error(`${at}: follow must be an object`);
+  if (!Array.isArray(follow.roles) || follow.roles.length === 0
+    || follow.roles.some((r) => typeof r !== 'string' || !r)) {
+    throw new Error(`${at}: follow.roles must be a non-empty array of role names`);
+  }
+  if (follow.waitSeconds !== undefined
+    && (!Number.isInteger(follow.waitSeconds) || follow.waitSeconds < 1 || follow.waitSeconds > SCAN_FOLLOW_WAIT_MAX_SECONDS)) {
+    throw new Error(`${at}: follow.waitSeconds must be an integer from 1 to ${SCAN_FOLLOW_WAIT_MAX_SECONDS}`);
+  }
+  if (!SCAN_MUTATING_VERBS.includes(step.verb)) throw new Error(`${at}: follow applies only to steps that write`);
+  if (!step.subject) throw new Error(`${at}: follow applies only to steps that act on the held subject`);
 }
 
 /**
@@ -241,6 +285,7 @@ export function assertValidSteps(steps: ScanStep[]): void {
         throw new Error(`${at}: done applies only to steps that write`);
       }
     }
+    assertValidFollow(step, at);
     assertValidTemplateTokens(step, at);
     if (step.query && step.query.roles && !Array.isArray(step.query.roles)) {
       throw new Error(`${at}: query.roles must be an array`);

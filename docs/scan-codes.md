@@ -291,6 +291,26 @@ choice runs as the manager.
   "params": { "resolverPayload": { "outcome": "added-by-manager" } } }
 ```
 
+**One obvious act.** A choice with `hidden: true` beside its `roles` is left
+off the screen for a person without one of them, instead of shown withheld:
+the associate sees the one thing to do, and the manager's alternatives appear
+when the manager badges. A choice with `when: { <facet>: <value> }` is offered
+only while the presented row carries those facet values, and a tap on a
+choice the row no longer offers answers `conflict`.
+
+**Done copy for a choice.** A choice that writes may carry `done: { markdown }`,
+rendered over the row it acted on (`{item.<facet>}`) once the write lands. The
+station shows it as the done screen whether the badge came before or after
+the tap, then returns as the role says (see
+[After a scan completes](#after-a-scan-completes-the-return)). A choice
+without done copy ends on a short notice.
+
+```jsonc
+{ "label": "Arrived: move the orders", "verb": "resolve", "requireActingIdentity": true,
+  "params": { "resolverPayload": { "outcome": "arrived" } },
+  "done": { "markdown": "Moved **{item.memberCount}** orders to Matching." } }
+```
+
 ## Holding an item: the bench motion
 
 At a bench where items go into containers, every act is one item going into
@@ -347,6 +367,23 @@ answer is `subject_stale` with `clearSubject: true`.
 **Subject steps** run only while a subject from one of `subject.schemes` is
 held, and act on it. The `{subject.<facet>}` template bag reads the held
 row.
+
+**Following the subject.** A subject step may carry `follow: { roles,
+waitSeconds? }`. When its write completes the held row, the station keeps the
+done copy up and waits for the subject's next pending row in those roles: the
+row's `created` event replays the held code, the rule's hold step for that
+role answers, and the new row is held without scanning the item again. At
+Matching the last shoe box completes the matching row and the station flips
+to the order's binning hold a moment later. When no row appears within
+`waitSeconds` (default 10, at most 120), the done copy stands and the
+station returns as its role says.
+
+```jsonc
+{ "query": {}, "verb": "fill", "subject": { "schemes": [11] },
+  "params": { "fill": { "into": "subject" } },
+  "done": { "markdown": "All matched." },
+  "follow": { "roles": ["binning-associate"], "waitSeconds": 15 } }
+```
 
 | Step | What the container scan does |
 |---|---|
@@ -568,6 +605,25 @@ Pair kiosk with `x-lt-transition-done` on the role's form schema
 (`"/escalations/available?role={{escalation.role}}&status=available"`) so a
 resolve lands back on the list rather than walking browser history — see
 [x-lt-transition](./hitl/x-lt-transition.md).
+
+### After a scan completes: the return
+
+A station works in one rhythm: badge, item, destination, done, back to the
+list. A role names the last step in `properties.scan_done`:
+
+```jsonc
+"properties": { "kiosk": true, "scan_done": { "return": "home", "after_seconds": 2 } }
+```
+
+`return` is `home` (the role's kiosk home: its first portal, else its list) or
+a dashboard-relative route; `after_seconds` (0-60, default 2) is how long the
+done copy stays up first. The station returns once a scan act completes its
+row: the last fill of a batch, an executed choice with done copy, any write
+that clears the subject. A fill that leaves entries pending stays on the hold
+card, a refusal never returns, and a `follow` runs first. Without
+`scan_done` the done copy stays until the next scan. The value is validated
+where the role is written, like `badge_grant`, and set on the role page under
+Identity.
 
 ### The work surface — edit freely, badge at submit
 

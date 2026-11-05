@@ -1,6 +1,6 @@
 import * as scanCodeService from '../../services/scan-code';
 import { actingIdentitySatisfied, executeIdentityScan } from './identity';
-import { notPrimed, templateContext, withDone, type StepContext } from './context';
+import { notPrimed, templateContext, withDone, withFollow, type StepContext } from './context';
 import { peekGrant, settleGrant } from './grant';
 import { holdStep } from './hold';
 import { locateStep } from './locate';
@@ -97,7 +97,10 @@ export async function executeScanCode(
     let result: LTApiResult<ScanExecuteResponse> | null = null;
     for (let i = 0; i < rule.steps.length && !result; i++) {
       const stepResult = await executeStep(rule.steps[i], ctx);
-      if (stepResult) result = decorate(withDone(stepResult, rule.steps[i], templateContext(ctx)), ctx, i);
+      if (stepResult) {
+        const step = rule.steps[i];
+        result = decorate(withFollow(withDone(stepResult, step, templateContext(ctx)), step, ctx), ctx, i);
+      }
     }
 
     // 4. Nothing matched: a stale subject, or the fallback screen

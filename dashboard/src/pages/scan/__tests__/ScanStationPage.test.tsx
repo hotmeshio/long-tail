@@ -12,7 +12,12 @@ const mocks = vi.hoisted(() => ({
   lastResult: { current: null as unknown },
   subject: { current: null as unknown },
   pendingScan: { current: null as unknown },
+  followCode: vi.fn(async () => {}),
+  kiosk: { current: { role: null as string | null, homePath: null as string | null } },
+  roleDetails: { current: { roles: [] as unknown[] } },
 }));
+vi.mock('../../../hooks/useKioskMode', () => ({ useKioskMode: () => mocks.kiosk.current }));
+vi.mock('../../../api/roles', () => ({ useRoleDetails: () => ({ data: mocks.roleDetails.current }) }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
@@ -38,6 +43,7 @@ vi.mock('../../../hooks/useScanInput', () => ({
     subject: mocks.subject.current,
     dropSubject: vi.fn(),
     adoptResponse: vi.fn(),
+    followCode: mocks.followCode,
     pendingScan: mocks.pendingScan.current,
     dropPendingScan: vi.fn(),
   }),

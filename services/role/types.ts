@@ -21,6 +21,9 @@ export interface EscalationChain {
  *    A badge scanned on a device signed in as a member of this role mints
  *    its acting grant under this policy instead of the badge scheme's own
  *    (see api/scan-codes/badge-policy.ts).
+ *  - SCAN_DONE: RoleScanDone — where a station locked to this role goes once
+ *    a scan act completes its row: the kiosk home or a route, after a pause
+ *    on the done copy.
  *  - LINK_VARIABLES: RoleLinkVariable[] — metadata facet names members bind
  *    per device. Pins may reference `{lt:name}` as a whole facet value
  *    (e.g. `facets={"region":"{lt:region}"}`); the dashboard substitutes
@@ -34,7 +37,16 @@ export const ROLE_PROPERTY_KEYS = {
   KIOSK: 'kiosk',
   LINK_VARIABLES: 'link_variables',
   BADGE_GRANT: 'badge_grant',
+  SCAN_DONE: 'scan_done',
 } as const;
+
+/** Where a station returns after a scan act completes its row. */
+export interface RoleScanDone {
+  /** 'home' is the kiosk home (portal or list); otherwise a dashboard-relative route. */
+  return: 'home' | string;
+  /** Seconds the done copy stays up first (0-60, default 2). */
+  after_seconds?: number;
+}
 
 /** A station role's badge policy. Absent fields keep the badge scheme's value. */
 export interface RoleBadgeGrant {

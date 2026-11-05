@@ -178,6 +178,12 @@ export interface ScanChoice {
   refuse?: string;
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
+  /** What the station says once the choice's write lands. */
+  done?: { markdown: string };
+  /** Left off the screen for a person without its roles, instead of shown withheld. */
+  hidden?: boolean;
+  /** Offered only while the row carries these facet values. */
+  when?: Record<string, string | number | boolean>;
 }
 
 /** One presented choice as the client sees it (CHOICES outcome). */
@@ -192,6 +198,14 @@ export interface ScanPresentedChoice {
   code?: string;
   /** True = the identity requirement is unsatisfied; render the notPrimed affordance. */
   withheld: boolean;
+}
+
+/** The station replays `code` once a pending row for `target` appears in `roles`, within `waitSeconds`. */
+export interface ScanFollow {
+  code: string;
+  roles: string[];
+  waitSeconds: number;
+  target: { facet: string; value: string };
 }
 
 export interface ScanRuleFallback {
@@ -263,6 +277,8 @@ export interface ScanExecuteResponse {
   already?: boolean;
   /** EXECUTED: the step's done copy, rendered. */
   done?: { markdown: string };
+  /** EXECUTED, subject completed: follow the subject to its next row in these roles. */
+  follow?: ScanFollow;
   /** NOT_PRIMED that may be replayed once a badge primes. */
   replayable?: boolean;
   error?: string;
