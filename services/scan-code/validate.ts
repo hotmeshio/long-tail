@@ -15,6 +15,7 @@ import { FACET_KEY } from '../escalation/facet-sql';
 import { assertValidSubjectStep } from './validate-subject';
 import { assertValidQueryKinds } from './validate-query';
 import { assertValidFacts } from './validate-facts';
+import { assertGtinOrderDeclared, assertValidPatternFields } from './validate-scheme-pattern';
 
 const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
 /** Double-scan selection tokens — short, label-printable, never scheme-shaped. */
@@ -72,16 +73,20 @@ export function assertValidScheme(scheme: Partial<ScanScheme>): void {
     || (scheme.grant_scope ?? SCAN_GRANT_SCOPES.ACTION) !== SCAN_GRANT_SCOPES.ACTION) {
     throw new Error('grant policy applies only to identity schemes');
   }
+  assertValidPatternFields(scheme);
 }
 
 /**
  * A scheme must read codes no other scheme reads. Delimited and fixed
  * schemes are told apart by their version prefix; a gtin scheme has none,
  * so there is at most one, and no enabled fixed scheme may accept a GTIN
- * length while it is enabled. Throws naming both schemes.
+ * length while it is enabled. Pattern schemes read only codes no prefixed
+ * scheme reads, lowest version first, and beside an enabled gtin scheme
+ * they declare `precedes_gtin`. Throws naming both schemes.
  */
 export function assertSchemesCoexist(candidate: Partial<ScanScheme>, existing: ScanScheme[]): void {
   const others = existing.filter((s) => s.version !== candidate.version);
+  assertGtinOrderDeclared(candidate, others);
   const encoding = candidate.encoding ?? SCAN_ENCODINGS.FIXED;
   const enabled = candidate.enabled ?? true;
   if (encoding === SCAN_ENCODINGS.GTIN) {

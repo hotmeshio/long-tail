@@ -56,6 +56,12 @@ A scheme (`lt_config_scan_schemes`, indexed 10–99) declares:
 - **`target_facet`** — the escalation metadata key the target resolves
   against (`serialNumber`, `assetTag`, `batchId`…). The physical label and
   the digital twin share this value; the scan is the join.
+- **`target_match`** — `value` (default): the facet holds one value equal to
+  the target. `member`: the facet holds a list, such as every parcel still out
+  on an order (`trackingNumbers: ["1Z…B0", "1Z…B1"]`), and a row matches when
+  its list contains the target (`metadata @> { trackingNumbers: ["1Z…B1"] }`,
+  served by the GIN index). Every locate, claim, resolve, hold and add takes
+  the declared shape. Action schemes only.
 - **`encoding`** — how the code string parses:
   - `delimited` — text separated by a single character (default `:`), e.g.
     `10:1:SN-123`. Use with Code 128, QR, or DataMatrix labels; targets may
@@ -72,6 +78,17 @@ A scheme (`lt_config_scan_schemes`, indexed 10–99) declares:
     most one gtin scheme, and while it is enabled no enabled fixed scheme may
     accept an 8, 12, 13 or 14 digit code: the scheme write is refused, naming
     both schemes, so a digits-only code always has exactly one reading.
+  - `pattern` — codes another system prints with no version or category, such
+    as carrier tracking numbers. `patterns` lists 1 to 10 regular expressions,
+    each matched against the whole code (UPS `1Z[0-9A-Z]{16}`, FedEx
+    `[0-9]{12}`); the target is the code as scanned and the scheme's one rule
+    is category `0`. Patterns read codes of up to 64 characters, which bounds
+    the cost of any expression. A code a prefixed scheme reads parses there first, and
+    when two pattern schemes match, the lower version reads it. While a gtin
+    scheme is enabled, a pattern scheme declares `precedes_gtin`: `true` reads
+    a digits-only code with its patterns before the gtin scheme, `false`
+    leaves it to the gtin scheme. A write that leaves the order undeclared
+    while both are enabled is refused, naming both schemes.
 
 ## Rules and steps
 
@@ -390,7 +407,7 @@ done copy stands and the station returns as its role says.
 |---|---|
 | `accumulate` with `accumulate.from: "subject"` | The held item joins the accumulator the scan names (found by the scheme facet, narrowed by `accumulate.container`). The held row is written as the reciprocal in the same statement, so a held row parked as a one-slot accumulator completes and its workflow wakes. `params.itemKey` names the item, e.g. `{subject.itemId}`. |
 | `accumulate` with `accumulate.into: "subject"` | The held row collects the scanned code (`itemKey` defaults to `{scan.target}`). Use it when the container has no row yet: the first item for a container tells the workflow which container was scanned. With `accumulate.item`, the scanned code's own pending row is written as the reciprocal in the same statement (see below). On a bounded accumulator the answer carries `progress` and the subject stays held while slots remain. |
-| `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. On a `gtin` scheme a refusal's `expected` lists codes as the package prints them (EAN-13, or EAN-8), not the stored 14-digit form. `fill.into: "scanned"` fills the row the scan itself names. |
+| `fill` with `fill.into: "subject"` | One expected item is checked off: the held row is a batch whose keys are codes, and the scan fills the first open key for its code. A code expected twice is declared `<code>#1`, `<code>#2` and takes two scans; a third is refused. The answer carries `progress: { filled, total, remaining }`, the subject stays held while items remain, and the last fill completes the row. On a wait declared with `wakeOnFill`, a fill wakes the workflow while items remain and answers as an interim fill: the station stays on the hold card, and the next scan fills the workflow's next round, the pending row of the same workflow in the same role carrying the same target. On a `gtin` scheme a refusal's `expected` lists codes as the package prints them (EAN-13, or EAN-8), not the stored 14-digit form. `fill.into: "scanned"` fills the row the scan itself names. |
 
 **Naming what a fill still expects.** Codes alone do not tell a person which
 box to take. `fill.labels` names a per-key map on the batch row (the map a batch
@@ -749,13 +766,14 @@ with Enter; capture is **pattern-anchored**: a capture-phase window listener
 accumulates keystrokes freely, and when the terminator arrives it checks
 whether the recent keys end with a scan-code shape. The shapes come from the
 configured schemes: each delimited version's `VV:C:target`, each fixed
-scheme's exact digit lengths, and for a gtin scheme a whole 8, 12, 13 or 14
-digit run whose check digit holds (a leading zero is part of the code). A
-code never starts inside a longer run of digits.
+scheme's exact digit lengths, for a gtin scheme a whole 8, 12, 13 or 14
+digit run whose check digit holds (a leading zero is part of the code), and
+for a pattern scheme a run matching one of its expressions. A code never
+starts inside a longer run of digits.
 
-- **Digits-only codes fire only at scanner speed** (avg ≤ 50 ms/key). A
-  typed PO number or count followed by Enter stays in its field, even when
-  its digits happen to form a valid barcode.
+- **Digits-only and pattern codes fire only at scanner speed** (avg ≤ 50
+  ms/key). A typed PO number, count or tracking number followed by Enter
+  stays in its field, even when it happens to form a valid code.
 - **An open form can take the scan first.** A field with
   [`x-lt-scan`](hitl/x-lt-scan.md) that accepts the scan's scheme is filled
   instead; every other scan, and every badge, runs globally.
@@ -788,7 +806,8 @@ camera provider plugs into the same dispatch pipeline.
 The **header bar** runs rules without hardware: its type chip lists every
 enabled rule as a Run mode, the bar shows the rule's code head (`10:1:`) ahead
 of the input, and Enter composes and executes `10:1:<target>` through the same
-pipeline a scanner uses. See [Search and run](dashboard.md#search-and-run).
+pipeline a scanner uses. A gtin or pattern rule has no code head: the typed
+code runs as entered. See [Search and run](dashboard.md#search-and-run).
 
 The **scan panel** (the bar's menu footer, or the user menu) carries a manual
 entry field — type or paste a whole code to execute it — the last scan's

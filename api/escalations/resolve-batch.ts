@@ -1,7 +1,7 @@
 import * as escalationService from '../../services/escalation';
 import { checkResolverPayload } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
-import { ESCALATION_BATCH_KEYS } from '../../types/escalation';
+import { BATCH_ITEM_OUTCOMES, ESCALATION_BATCH_KEYS } from '../../types/escalation';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 
 import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
@@ -13,7 +13,9 @@ import { restrictScopeRoles } from './metadata';
  * with `batch: [...]`). Interim submissions are cheap atomic fills — the row
  * stays pending and `remaining` reports progress. The LAST item completes the
  * escalation: the row resolves and the waiting workflow wakes with the full
- * collection, in the same statement.
+ * collection, in the same statement. On a wait that declared `wakeOnFill` for
+ * this key, the fill resolves the row early and the workflow wakes with the
+ * items so far (`outcome: 'woke'`, `remaining` > 0).
  *
  * Each item validates against the SAME versioned form schema a single-item
  * resolver gets (metadata.form_schema → pinned lt_role_schemas → live role
@@ -254,6 +256,17 @@ function batchOutcomeResult(
           outcome: 'accepted',
           remaining: result.remaining,
           escalationId: result.escalation?.id,
+        },
+      };
+    case BATCH_ITEM_OUTCOMES.WOKE:
+      return {
+        status: 200,
+        data: {
+          outcome: BATCH_ITEM_OUTCOMES.WOKE,
+          remaining: result.remaining,
+          signaled: !!result.escalation?.signal_key,
+          escalationId: result.escalation?.id,
+          workflowId,
         },
       };
     case 'duplicate-item':

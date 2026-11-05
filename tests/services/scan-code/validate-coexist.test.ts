@@ -6,7 +6,7 @@ import type { ScanScheme } from '../../../types';
 const stored = (over: Partial<ScanScheme>): ScanScheme => ({
   version: 11, name: 'Bag', description: null, target_facet: 'orderSlug', encoding: 'delimited',
   delimiter: ':', target_length: null, kind: 'action', grant_ttl_seconds: null, grant_max_uses: 0,
-  grant_scope: 'action', enabled: true, ...over,
+  grant_scope: 'action', enabled: true, patterns: [], precedes_gtin: false, target_match: 'value', ...over,
 });
 
 const GTIN = { version: 16, name: 'Shoe', target_facet: 'upc', encoding: 'gtin' as const };

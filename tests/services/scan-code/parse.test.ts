@@ -14,7 +14,7 @@ const delimited: ScanScheme = {
   kind: 'action',
   grant_ttl_seconds: null,
   grant_max_uses: 0,
-  grant_scope: 'action',
+  grant_scope: 'action', patterns: [], precedes_gtin: false, target_match: 'value',
   enabled: true,
 };
 
@@ -29,7 +29,7 @@ const fixed: ScanScheme = {
   kind: 'action',
   grant_ttl_seconds: null,
   grant_max_uses: 0,
-  grant_scope: 'action',
+  grant_scope: 'action', patterns: [], precedes_gtin: false, target_match: 'value',
   enabled: true,
 };
 

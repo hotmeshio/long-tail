@@ -15,6 +15,8 @@ import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 import { assertReadAccess, assertWriteAccess, getEscalationWriteScope } from './helpers';
 import { validationFailure, redactPasswords, resolverIdentity } from './resolve';
 import { restrictScopeRoles } from './metadata';
+import { hasFacetValue } from '../../lib/facet-value';
+import type { FacetValue } from '../../types/facets';
 
 /** Names the second row of a reciprocal add or removal. Exactly one selector. */
 export interface ReciprocalInput {
@@ -78,7 +80,7 @@ function itemKeyError(itemKey: string | undefined): LTApiResult | null {
  */
 async function pickAccumulatorByFacet(
   key: string,
-  value: string,
+  value: FacetValue,
   roles: string[] | null,
   selector?: ContainerSelector,
   excludeId?: string,
@@ -317,7 +319,7 @@ export async function accumulateItemBySignalKey(
  */
 export async function accumulateItemByMetadata(
   input: {
-    key: string; value: string; restrictRoles?: string[];
+    key: string; value: FacetValue; restrictRoles?: string[];
     /** Narrows the container beyond the facet: type, subtype, extra facet guards. */
     container?: ContainerSelector;
   } & Omit<AccumulateItemInput, 'assertClaim'>,
@@ -325,7 +327,7 @@ export async function accumulateItemByMetadata(
 ): Promise<LTApiResult> {
   try {
     const { key, value, itemKey, metadata } = input;
-    if (!key || !value) return { status: 400, error: 'key and value are required' };
+    if (!key || !hasFacetValue(value)) return { status: 400, error: 'key and value are required' };
     const keyError = itemKeyError(itemKey);
     if (keyError) return keyError;
     const initiator = await resolveActor(input.initiatedBy, auth);

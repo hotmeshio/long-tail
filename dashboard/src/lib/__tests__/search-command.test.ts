@@ -15,9 +15,13 @@ import type { ScanRule, ScanScheme } from '../../api/scan-codes';
 
 const delimited: ScanCommand = {
   version: 10, category: '1', name: 'Collect Print', schemeName: 'Printer serial',
-  targetFacet: 'serialNumber', encoding: 'delimited', delimiter: ':', targetLength: null,
+  targetFacet: 'serialNumber', encoding: 'delimited', delimiter: ':', targetLength: null, patterns: [],
 };
 const fixed: ScanCommand = { ...delimited, version: 12, category: '0', name: 'Locate', encoding: 'fixed', targetLength: 8 };
+const gtin: ScanCommand = { ...delimited, version: 16, category: '0', name: 'Shoe', encoding: 'gtin' };
+const tracking: ScanCommand = {
+  ...delimited, version: 18, category: '0', name: 'Receive', encoding: 'pattern', patterns: ['1Z[0-9A-Z]{16}', '[0-9]{12}'],
+};
 
 beforeEach(() => localStorage.clear());
 
@@ -34,6 +38,15 @@ describe('commandPrefix / buildCommandCode', () => {
   it('fixed: digits concatenate with no delimiter', () => {
     expect(commandPrefix(fixed)).toBe('120');
     expect(buildCommandCode(fixed, '75949975')).toEqual({ code: '12075949975' });
+  });
+
+  it('gtin and pattern: the typed value is the code, with no prefix', () => {
+    expect(commandPrefix(gtin)).toBe('');
+    expect(buildCommandCode(gtin, '036000291452')).toEqual({ code: '036000291452' });
+    expect(buildCommandCode(gtin, 'ABC')).toEqual({ error: 'Shoe takes digits only' });
+    expect(commandPrefix(tracking)).toBe('');
+    expect(buildCommandCode(tracking, '1Z1380B21BB46041B0')).toEqual({ code: '1Z1380B21BB46041B0' });
+    expect(buildCommandCode(tracking, '1Z13')).toEqual({ error: 'Receive takes a code matching its patterns' });
   });
 
   it('fixed: accepts a trailing check digit', () => {

@@ -5,7 +5,7 @@ import type { ScanCommand, SearchMode } from '../../../lib/search-command';
 
 const collect: ScanCommand = {
   version: 10, category: '1', name: 'Collect Print', schemeName: 'Printer serial',
-  targetFacet: 'serialNumber', encoding: 'delimited', delimiter: ':', targetLength: null,
+  targetFacet: 'serialNumber', encoding: 'delimited', delimiter: ':', targetLength: null, patterns: [],
 };
 const locate: ScanCommand = { ...collect, version: 12, category: '0', name: 'Locate', schemeName: 'Asset tag', targetFacet: 'assetTag', encoding: 'fixed', targetLength: 8 };
 const facets = ['escalationId', 'workflowId', 'po'];

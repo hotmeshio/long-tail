@@ -15,13 +15,14 @@
  *   delimited: VV:C:target per scheme version, target of [a-zA-Z0-9._-]
  *   fixed:     VV + category + exactly the scheme's target digits
  *   gtin:      a whole 8/12/13/14-digit run whose check digit holds
+ *   pattern:   a run matching one of the scheme's declared expressions
  * Until the schemes load, generic shapes stand in. Typing a delimited code
  * and pressing Enter fires it too, anywhere: the scanner IS a keyboard. A
- * digits-only code fires only at scanner speed, so a typed PO number or
- * count followed by Enter stays in its field.
+ * digits-only or pattern code fires only at scanner speed, so a typed PO
+ * number, count or tracking number followed by Enter stays in its field.
  */
 
-import { isValidGtin } from '../../../../shared/scan-code';
+import { isValidGtin, PATTERN_CODE_MAX_LENGTH, unanchorPattern } from '../../../../shared/scan-code';
 
 export interface WedgeConfig {
   /** Max ms between keys before the accumulator restarts. Generous by design —
@@ -79,29 +80,42 @@ export function saveWedgeConfig(config: Partial<WedgeConfig>): WedgeConfig {
  */
 export interface TailShape {
   pattern: RegExp;
-  /** Digits only: fires only when the code arrived at scanner speed. */
-  digitsOnly: boolean;
+  /** Fires only when the code arrived at scanner speed (digits-only and pattern codes). */
+  scannerPaced: boolean;
   /** Extra acceptance test on the matched code (e.g. a GTIN check digit). */
   accept?: (code: string) => boolean;
+  /** Match only this many trailing characters of the buffer (bounds a declared expression's cost). */
+  maxTail?: number;
 }
 
 /** The scheme fields capture reads. */
 export interface CaptureScheme {
   version: number;
-  encoding: 'fixed' | 'delimited' | 'gtin';
+  encoding: 'fixed' | 'delimited' | 'gtin' | 'pattern';
   delimiter: string;
   target_length: number | null;
+  /** Pattern encoding: regular expressions over the whole code. */
+  patterns?: string[];
   enabled: boolean;
 }
 
 /** Generic shapes for before the schemes load. */
 export const DEFAULT_TAIL_SHAPES: TailShape[] = [
-  { pattern: /(?:^|[^0-9])([1-9][0-9]:[0-9]:[a-zA-Z0-9._-]+)$/, digitsOnly: false },
-  { pattern: /(?:^|[^0-9])([1-9][0-9]{7,})$/, digitsOnly: true },
+  { pattern: /(?:^|[^0-9])([1-9][0-9]:[0-9]:[a-zA-Z0-9._-]+)$/, scannerPaced: false },
+  { pattern: /(?:^|[^0-9])([1-9][0-9]{7,})$/, scannerPaced: true },
 ];
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** A declared whole-code expression anchored to the buffer's end, after a boundary; null when it does not compile. */
+function tailPattern(declared: string): RegExp | null {
+  try {
+    return new RegExp(`(?:^|[^A-Za-z0-9])((?:${unanchorPattern(declared)}))$`);
+  } catch {
+    return null;
+  }
 }
 
 /** The shapes the configured schemes read. Identity (badge) schemes included. */
@@ -112,20 +126,32 @@ export function buildTailShapes(schemes: CaptureScheme[]): TailShape[] {
       const d = escapeRegExp(scheme.delimiter);
       shapes.push({
         pattern: new RegExp(`(?:^|[^0-9])(${scheme.version}${d}[0-9]${d}[a-zA-Z0-9._-]+)$`),
-        digitsOnly: false,
+        scannerPaced: false,
       });
     } else if (scheme.encoding === 'fixed') {
       const digits = 1 + (scheme.target_length ?? 0);
       shapes.push({
         pattern: new RegExp(`(?:^|[^0-9])(${scheme.version}[0-9]{${digits},${digits + 1}})$`),
-        digitsOnly: true,
+        scannerPaced: true,
       });
     } else if (scheme.encoding === 'gtin') {
       shapes.push({
         pattern: /(?:^|[^0-9])([0-9]{8}|[0-9]{12,14})$/,
-        digitsOnly: true,
+        scannerPaced: true,
         accept: isValidGtin,
       });
+    } else if (scheme.encoding === 'pattern') {
+      for (const declared of scheme.patterns ?? []) {
+        const pattern = tailPattern(declared);
+        if (pattern) {
+          shapes.push({
+            pattern,
+            scannerPaced: true,
+            maxTail: PATTERN_CODE_MAX_LENGTH + 1,
+            accept: (code) => code.length <= PATTERN_CODE_MAX_LENGTH,
+          });
+        }
+      }
     }
   }
   return shapes.length ? shapes : DEFAULT_TAIL_SHAPES;
@@ -138,7 +164,8 @@ export function matchScanShape(
 ): { code: string; shape: TailShape } | null {
   let best: { code: string; shape: TailShape } | null = null;
   for (const shape of shapes) {
-    const code = buffer.match(shape.pattern)?.[1];
+    const tail = shape.maxTail ? buffer.slice(-shape.maxTail) : buffer;
+    const code = tail.match(shape.pattern)?.[1];
     if (!code || (shape.accept && !shape.accept(code))) continue;
     if (!best || code.length > best.code.length) best = { code, shape };
   }
@@ -209,7 +236,7 @@ export function createWedgeMachine(
   function capturable(): string | null {
     const match = matchScanShape(state.buffer, shapes);
     if (!match || match.code.length < config.minLength) return null;
-    if (match.shape.digitsOnly && !scannerPaced(match.code)) return null;
+    if (match.shape.scannerPaced && !scannerPaced(match.code)) return null;
     return match.code;
   }
 

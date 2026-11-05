@@ -22,6 +22,12 @@ export const SCAN_ENCODINGS = {
    * the 14-digit GTIN, and the scheme's single rule is category '0'.
    */
   GTIN: 'gtin',
+  /**
+   * Codes that carry no scheme or category, read by declared regular
+   * expressions over the whole code (a carrier tracking number, say). The
+   * target is the code as scanned and the scheme's single rule is category '0'.
+   */
+  PATTERN: 'pattern',
 } as const;
 export type ScanEncoding = (typeof SCAN_ENCODINGS)[keyof typeof SCAN_ENCODINGS];
 
@@ -30,6 +36,24 @@ export const GTIN_CATEGORY = '0';
 
 /** Code lengths a GTIN scheme reads: EAN-8, UPC-A, EAN-13, GTIN-14. */
 export const GTIN_LENGTHS: readonly number[] = [8, 12, 13, 14];
+
+/** The only rule category a pattern scheme has: the code itself carries none. */
+export const PATTERN_CATEGORY = '0';
+
+/** A pattern scheme declares 1 to this many regular expressions. */
+export const SCAN_PATTERNS_MAX = 10;
+
+/** The longest regular expression a pattern scheme accepts. */
+export const SCAN_PATTERN_MAX_LENGTH = 200;
+
+/** How the scanned target matches the scheme's target facet on a row. */
+export const SCAN_TARGET_MATCH = {
+  /** The facet holds one value equal to the target. */
+  VALUE: 'value',
+  /** The facet holds a list; the row matches when the list contains the target. */
+  MEMBER: 'member',
+} as const;
+export type ScanTargetMatch = (typeof SCAN_TARGET_MATCH)[keyof typeof SCAN_TARGET_MATCH];
 
 export const SCAN_SCHEME_KINDS = {
   /** The ECA model: the target resolves against escalations; the rule's steps run. */

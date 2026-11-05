@@ -144,6 +144,16 @@ describe('ScanStationPage — finishing', () => {
     expect(mocks.followCode).toHaveBeenCalledWith('11:0:K7Q2M9XA');
   });
 
+  it('a follow replays the held code when the next row lists the target among its values', async () => {
+    const follow = { code: '11:0:K7Q2M9XA', roles: ['binning-associate'], waitSeconds: 10, target: { facet: 'orderId', value: 'K7Q2M9XA' } };
+    mocks.lastResult.current = completingFill({ follow });
+    renderStation();
+    act(() => mocks.handlers[0]({ data: { metadata: { orderId: ['OTHER'] } } }));
+    expect(mocks.followCode).not.toHaveBeenCalled();
+    act(() => mocks.handlers[0]({ data: { metadata: { orderId: ['OTHER', 'K7Q2M9XA'] } } }));
+    expect(mocks.followCode).toHaveBeenCalledWith('11:0:K7Q2M9XA');
+  });
+
   it('a follow that finds nothing in time takes one last look, then returns', async () => {
     mocks.roleDetails.current = { roles: RETURNS };
     const follow = { code: '11:0:K7Q2M9XA', roles: ['binning-associate'], waitSeconds: 2, target: { facet: 'orderId', value: 'K7Q2M9XA' } };

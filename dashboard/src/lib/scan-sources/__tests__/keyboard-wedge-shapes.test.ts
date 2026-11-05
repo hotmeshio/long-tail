@@ -78,3 +78,32 @@ describe('digits-only codes fire only at scanner speed', () => {
     expect(machine.pendingAutoFire()?.code).toBe('036000291452');
   });
 });
+
+describe('pattern schemes', () => {
+  const UPS = '1Z1380B21BB46041B0';
+  const PATTERN = buildTailShapes([scheme({ version: 18, encoding: 'pattern', patterns: ['1Z[0-9A-Z]{16}'] })]);
+
+  it('reads a carrier label after other text, and nothing it does not match', () => {
+    expect(matchScanTail(`note ${UPS}`, PATTERN)).toBe(UPS);
+    expect(matchScanTail('1Z1380', PATTERN)).toBeNull();
+    expect(matchScanTail(`X${UPS}`, PATTERN)).toBeNull();
+  });
+
+  it('fires at scanner speed, and a typed tracking number stays in its field', () => {
+    expect(typeThenEnter(createWedgeMachine(WEDGE_DEFAULTS, PATTERN), UPS, 10)).toMatchObject({ emit: UPS, suppress: true });
+    expect(typeThenEnter(createWedgeMachine(WEDGE_DEFAULTS, PATTERN), UPS, 150)).toMatchObject({ emit: null, suppress: false });
+  });
+
+  it('skips an expression that does not compile', () => {
+    expect(buildTailShapes([scheme({ version: 18, encoding: 'pattern', patterns: ['['] })]).length).toBe(2);
+  });
+});
+
+
+describe('pattern shapes read only the buffer tail', () => {
+  it('still reads a label after long text, and skips a run longer than a code can be', () => {
+    const shapes = buildTailShapes([scheme({ version: 19, encoding: 'pattern', patterns: ['[A-Z0-9]+'] })]);
+    expect(matchScanTail(`${'x '.repeat(40)}1Z1380B21BB46041B0`, shapes)).toBe('1Z1380B21BB46041B0');
+    expect(matchScanTail('A'.repeat(100), shapes)).toBeNull();
+  });
+});

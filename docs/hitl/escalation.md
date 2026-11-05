@@ -115,6 +115,22 @@ const result = await conditional<Record<string, unknown>>(signalId, {
 if (result && result.$trigger === 'flag') return sendToManager(orderId, result.$flags);
 ```
 
+Add `wakeOnFill: true` (hotmesh 0.32.0+), or a list of keys, and a fill ends the wait so the workflow acts on each item as it lands: the fill resolves the row and the wait resumes with the items so far, `$filled: [itemKey]`, `$filledAt` and `$filledBy` (every filled key's time and actor) and `$trigger: 'fill'`. The workflow parks the next round with every fill carried forward through `filled`, built from `$filledAt` and `$filledBy`; the last key completes as on any batch. The fill answers `woke` with the remaining count.
+
+```typescript
+let filled: Record<string, BatchFilledEntry> | undefined;
+for (let round = 1; ; round++) {
+  const out = await conditional<Record<string, any>>(`receive-${orderId}-${round}`, {
+    role: 'receiving', metadata: { orderId, trackingNumbers }, batch: boxKeys, wakeOnFill: true,
+    ...(filled ? { filled } : {}),
+  });
+  if (!out || out.$trigger !== 'fill') return out;          // complete, expired, or cancelled
+  await recordReceipt(orderId, out.$filled[0]);             // a proxied activity
+  filled = Object.fromEntries(Object.keys(out.$filledAt).map((key) =>
+    [key, { payload: out[key], at: out.$filledAt[key], actor: out.$filledBy?.[key] }]));
+}
+```
+
 Entries already satisfied before the wait begins go in `filled` (hotmesh 0.31.0+), keyed by item key with their `payload`, the `at` they were satisfied (from the source of record, never a clock read in the workflow), and an optional `actor`. The row starts with that progress: those keys are left out of `batch_pending`, their payloads, times, and actors are written beside the rest, and the completing wake delivers them with the collection. Every key in `filled` must be declared in `batch`, and at least one must stay open; a `filled` that covers every key throws, so skip the wait instead.
 
 ```typescript

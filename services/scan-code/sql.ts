@@ -21,8 +21,9 @@ SELECT * FROM lt_config_scan_actions WHERE scheme_version = $1 AND category = $2
 export const UPSERT_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
-   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
+   patterns, precedes_gtin, target_match)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT (version) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
@@ -34,6 +35,9 @@ ON CONFLICT (version) DO UPDATE SET
   grant_ttl_seconds = EXCLUDED.grant_ttl_seconds,
   grant_max_uses = EXCLUDED.grant_max_uses,
   grant_scope = EXCLUDED.grant_scope,
+  patterns = EXCLUDED.patterns,
+  precedes_gtin = EXCLUDED.precedes_gtin,
+  target_match = EXCLUDED.target_match,
   enabled = EXCLUDED.enabled
 RETURNING *`;
 
@@ -62,8 +66,9 @@ DELETE FROM lt_config_scan_actions WHERE scheme_version = $1 AND category = $2`;
 export const SEED_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
-   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
+   patterns, precedes_gtin, target_match)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT (version) DO NOTHING`;
 
 export const SEED_ACTION = `\
@@ -84,8 +89,9 @@ ON CONFLICT (scheme_version, category) DO NOTHING`;
 export const APPLY_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
-   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+   kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
+   patterns, precedes_gtin, target_match)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT (version) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
@@ -97,6 +103,9 @@ ON CONFLICT (version) DO UPDATE SET
   grant_ttl_seconds = EXCLUDED.grant_ttl_seconds,
   grant_max_uses = EXCLUDED.grant_max_uses,
   grant_scope = EXCLUDED.grant_scope,
+  patterns = EXCLUDED.patterns,
+  precedes_gtin = EXCLUDED.precedes_gtin,
+  target_match = EXCLUDED.target_match,
   enabled = EXCLUDED.enabled,
   updated_at = NOW()
 WHERE (lt_config_scan_schemes.name, lt_config_scan_schemes.description,
@@ -104,12 +113,14 @@ WHERE (lt_config_scan_schemes.name, lt_config_scan_schemes.description,
        lt_config_scan_schemes.delimiter, lt_config_scan_schemes.target_length,
        lt_config_scan_schemes.kind, lt_config_scan_schemes.grant_ttl_seconds,
        lt_config_scan_schemes.grant_max_uses, lt_config_scan_schemes.enabled,
-       lt_config_scan_schemes.grant_scope)
+       lt_config_scan_schemes.grant_scope, lt_config_scan_schemes.patterns,
+       lt_config_scan_schemes.precedes_gtin, lt_config_scan_schemes.target_match)
   IS DISTINCT FROM
       (EXCLUDED.name, EXCLUDED.description, EXCLUDED.target_facet,
        EXCLUDED.encoding, EXCLUDED.delimiter, EXCLUDED.target_length,
        EXCLUDED.kind, EXCLUDED.grant_ttl_seconds, EXCLUDED.grant_max_uses,
-       EXCLUDED.enabled, EXCLUDED.grant_scope)
+       EXCLUDED.enabled, EXCLUDED.grant_scope, EXCLUDED.patterns,
+       EXCLUDED.precedes_gtin, EXCLUDED.target_match)
 RETURNING (xmax = 0) AS inserted`;
 
 export const APPLY_ACTION = `\

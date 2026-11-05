@@ -10,6 +10,7 @@ import { useRoleDetails } from '../../api/roles';
 import { escalationPatterns } from '../../lib/events/subjects';
 import { readScanDone, resolveScanDoneReturn } from '../../lib/scan-done';
 import { portalsOf } from '../../lib/portal-path';
+import { facetHolds } from '../../../../shared/scan-code';
 import {
   executeScanChoice,
   SCAN_OUTCOMES,
@@ -167,7 +168,7 @@ export function ScanStationPage() {
     if (!following) return;
     const { facet, value } = following.follow.target;
     const meta = event?.data?.metadata;
-    if (meta && typeof meta === 'object' && meta[facet] !== undefined && meta[facet] !== value) return;
+    if (meta && typeof meta === 'object' && meta[facet] !== undefined && !facetHolds(meta[facet], value)) return;
     void followCode(following.follow.code);
   });
 

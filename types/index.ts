@@ -54,6 +54,7 @@ export type {
   FacetOrder,
   FacetQuery,
   ContainerSelector,
+  FacetValue,
   ClaimedGroup,
   GroupSummary,
 } from './facets';
@@ -270,6 +271,7 @@ export type {
   ScanSubjectRef,
   ScanHeldSubject,
   ScanGrantScope,
+  ScanTargetMatch,
 } from './scan-code';
 
 export type {
@@ -299,6 +301,10 @@ export {
   SCAN_FACT_FORMATS,
   GTIN_CATEGORY,
   GTIN_LENGTHS,
+  PATTERN_CATEGORY,
+  SCAN_PATTERNS_MAX,
+  SCAN_PATTERN_MAX_LENGTH,
+  SCAN_TARGET_MATCH,
   ACTING_IDENTITY_LABEL,
 } from './scan-code';
 

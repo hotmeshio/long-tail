@@ -5,6 +5,7 @@ import { useScanSchemes, useUpsertScanScheme, SCAN_SCHEME_KINDS, type ScanScheme
 import { useRoleDetails } from '../../../api/roles';
 import { GrantScopeField } from './GrantScopeField';
 import { PageHeader } from '../../../components/common/layout/PageHeader';
+import { SchemeMatchFields, patternLines, patternsValid, type TargetMatch } from './SchemeMatchFields';
 
 /** The first free two-digit scheme index (10-99), or null when all are taken. */
 function nextSchemeVersion(used: Set<number>): number | null {
@@ -62,7 +63,10 @@ export function ScanCodesPage() {
                     ? `fixed, ${scheme.target_length} digit target`
                     : scheme.encoding === 'gtin'
                       ? 'manufacturer barcodes (UPC / EAN)'
-                      : `delimited by "${scheme.delimiter}"`}
+                      : scheme.encoding === 'pattern'
+                        ? `${scheme.patterns.length} ${scheme.patterns.length === 1 ? 'pattern' : 'patterns'}`
+                        : `delimited by "${scheme.delimiter}"`}
+                  {scheme.target_match === 'member' && ' · list target'}
                 </div>
               </div>
               <span className={`text-2xs uppercase tracking-widest ${scheme.enabled ? 'text-status-success' : 'text-text-quaternary'}`}>
@@ -112,7 +116,10 @@ function NewSchemeForm({
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ScanSchemeKind>(SCAN_SCHEME_KINDS.ACTION);
   const [targetFacet, setTargetFacet] = useState('');
-  const [encoding, setEncoding] = useState<'' | 'fixed' | 'delimited' | 'gtin'>('');
+  const [encoding, setEncoding] = useState<'' | 'fixed' | 'delimited' | 'gtin' | 'pattern'>('');
+  const [targetMatch, setTargetMatch] = useState<TargetMatch>('value');
+  const [patternsText, setPatternsText] = useState('');
+  const [precedesGtin, setPrecedesGtin] = useState<boolean | null>(null);
   const [targetLength, setTargetLength] = useState(8);
   const [grantTtlSeconds, setGrantTtlSeconds] = useState(3600);
   const [grantMaxUses, setGrantMaxUses] = useState(0);
@@ -124,10 +131,12 @@ function NewSchemeForm({
 
   const isIdentity = kind === SCAN_SCHEME_KINDS.IDENTITY;
   const ttlValid = grantTtlSeconds >= 1 && grantTtlSeconds <= 86_400;
+  const isPattern = encoding === 'pattern';
+  const fieldsValid = !isPattern || patternsValid(patternsText);
 
   const submit = async () => {
     if (!name || !targetFacet || !encoding) return;
-    if (isIdentity && !ttlValid) return;
+    if ((isIdentity && !ttlValid) || !fieldsValid) return;
     await upsert.mutateAsync({
       version,
       name,
@@ -135,6 +144,9 @@ function NewSchemeForm({
       target_facet: targetFacet,
       encoding,
       target_length: encoding === 'fixed' ? targetLength : null,
+      patterns: isPattern ? patternLines(patternsText) : [],
+      precedes_gtin: isPattern ? precedesGtin : null,
+      target_match: isIdentity ? 'value' : targetMatch,
       grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
       grant_max_uses: isIdentity ? grantMaxUses : 0,
       grant_scope: isIdentity ? grantScope : 'action',
@@ -215,12 +227,13 @@ function NewSchemeForm({
       <div className="flex flex-wrap gap-4">
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Code style <span className="text-status-error">*</span></span>
-          <span className="block text-2xs text-text-tertiary mb-1">Delimited for QR / Code 128, fixed digits for numeric labels, manufacturer barcodes for the codes printed on products.</span>
+          <span className="block text-2xs text-text-tertiary mb-1">Delimited for QR / Code 128, fixed digits for numeric labels, manufacturer barcodes for the codes printed on products, patterns for codes another system prints (carrier tracking numbers).</span>
           <select value={encoding} onChange={(e) => setEncoding(e.target.value as any)} className="select">
             <option value="" disabled>Choose…</option>
             <option value="delimited">Delimited text (QR / Code 128)</option>
             <option value="fixed">Fixed digits (UPC)</option>
             {!isIdentity && <option value="gtin">Manufacturer barcode (UPC / EAN)</option>}
+            <option value="pattern">Patterns (tracking numbers)</option>
           </select>
         </label>
         {encoding === 'fixed' && (
@@ -235,6 +248,16 @@ function NewSchemeForm({
             />
           </label>
         )}
+        <SchemeMatchFields
+          encoding={encoding}
+          isIdentity={isIdentity}
+          targetMatch={targetMatch}
+          onTargetMatch={setTargetMatch}
+          patternsText={patternsText}
+          onPatternsText={setPatternsText}
+          precedesGtin={precedesGtin}
+          onPrecedesGtin={setPrecedesGtin}
+        />
       </div>
       {upsert.error && <p className="text-xs text-status-error">{(upsert.error as Error).message}</p>}
       <div className="flex gap-3">
@@ -242,7 +265,7 @@ function NewSchemeForm({
         <button
           type="button"
           onClick={submit}
-          disabled={!name || !targetFacet || !encoding || (isIdentity && !ttlValid) || upsert.isPending}
+          disabled={!name || !targetFacet || !encoding || (isIdentity && !ttlValid) || !fieldsValid || upsert.isPending}
           className="btn-primary text-xs"
         >
           Create scheme

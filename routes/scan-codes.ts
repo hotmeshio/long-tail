@@ -79,6 +79,9 @@ router.put('/schemes/:version', requireRoleManager, async (req, res) => {
     grant_ttl_seconds: req.body.grant_ttl_seconds,
     grant_max_uses: req.body.grant_max_uses,
     grant_scope: req.body.grant_scope,
+    patterns: req.body.patterns,
+    precedes_gtin: req.body.precedes_gtin,
+    target_match: req.body.target_match,
     enabled: req.body.enabled,
   });
   res.status(result.status).json(result.data ?? { error: result.error });

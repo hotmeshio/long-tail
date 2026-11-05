@@ -11,6 +11,8 @@ import { validationFailure } from './resolve';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 import type { ScanAvailability } from '../../types';
 import { isUuid } from '../../lib/uuid';
+import { hasFacetValue } from '../../lib/facet-value';
+import type { FacetValue } from '../../types/facets';
 
 /**
  * Intersect the caller's scope roles with an optional caller-supplied
@@ -40,7 +42,7 @@ export async function findByMetadata(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    if (!input.key || !input.value) {
+    if (!input.key || !hasFacetValue(input.value)) {
       return { status: 400, error: 'key and value are required' };
     }
     // RBAC scoped IN SQL: the caller's read scope (read_all roles see every match;
@@ -72,7 +74,7 @@ export async function findByMetadata(
  */
 export async function claimByMetadata(
   input: {
-    key: string; value: string; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>;
+    key: string; value: FacetValue; durationMinutes?: number; assignee?: string; metadata?: Record<string, any>;
     provisionIfAbsent?: ProvisionIfAbsent; restrictRoles?: string[];
     /** Claims only this row, when it still matches every other condition. */
     assertId?: string;
@@ -80,7 +82,7 @@ export async function claimByMetadata(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    if (!input.key || !input.value) {
+    if (!input.key || !hasFacetValue(input.value)) {
       return { status: 400, error: 'key and value are required' };
     }
     if (input.assertId !== undefined && !isUuid(input.assertId)) {
@@ -144,7 +146,7 @@ export async function claimByMetadata(
  */
 export async function resolveByMetadata(
   input: {
-    key: string; value: string; resolverPayload: Record<string, any>; assignee?: string;
+    key: string; value: FacetValue; resolverPayload: Record<string, any>; assignee?: string;
     metadata?: Record<string, any>; restrictRoles?: string[]; extraFacets?: Record<string, any>;
     /** Narrows the pick to a claim state; 'mine' is the resolver's live claim. */
     availability?: ScanAvailability;
@@ -154,7 +156,7 @@ export async function resolveByMetadata(
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
   try {
-    if (!input.key || !input.value) {
+    if (!input.key || !hasFacetValue(input.value)) {
       return { status: 400, error: 'key and value are required' };
     }
     if (!input.resolverPayload) {

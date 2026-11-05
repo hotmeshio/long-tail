@@ -36,7 +36,7 @@ import {
   type StationSubject,
 } from '../lib/scan-subject';
 import { SCAN_SOURCE_IDS, type ScanSourceId } from '../lib/scan-sources/types';
-import { metadataFacetsUrl } from '../lib/facet-url';
+import { metadataFacetsUrl, metadataMembersUrl } from '../lib/facet-url';
 import { getScanOverride } from '../lib/view-as';
 import { useSettings } from '../api/settings';
 
@@ -188,10 +188,12 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     }
 
     if (outcome === SCAN_OUTCOMES.MATCHED_LIST && response.listQuery) {
-      const { targetFacet, target, roles } = response.listQuery as {
-        targetFacet: string; target: string; roles?: string[];
+      const { targetFacet, target, targetMatch, roles } = response.listQuery as {
+        targetFacet: string; target: string; targetMatch?: 'value' | 'member'; roles?: string[];
       };
-      navigate(metadataFacetsUrl({ [targetFacet]: target }, roles?.[0] ?? null));
+      navigate(targetMatch === 'member'
+        ? metadataMembersUrl(targetFacet, target, roles?.[0] ?? null)
+        : metadataFacetsUrl({ [targetFacet]: target }, roles?.[0] ?? null));
       return true;
     }
 

@@ -180,6 +180,11 @@ describe('claimByMetadata', () => {
     expect(result.status).toBe(400);
   });
 
+  it('returns 400 for an empty list value', async () => {
+    const result = await claimByMetadata({ key: 'trackingNumbers', value: [] }, SYSTEM_AUTH);
+    expect(result.status).toBe(400);
+  });
+
   it('passes scoped write_all roles for non-global user', async () => {
     mockHasGlobalAccess.mockResolvedValue(false);
     mockGetUserRoles.mockResolvedValue([

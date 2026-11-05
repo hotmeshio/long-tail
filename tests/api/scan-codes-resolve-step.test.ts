@@ -54,6 +54,12 @@ describe('resolveStep', () => {
     expect(result?.data?.outcome).toBe(SCAN_OUTCOMES.EXECUTED);
   });
 
+  it('a list-valued target facet resolves the row whose list holds the target', async () => {
+    const member = { ...ctx, scheme: { ...ctx.scheme, target_facet: 'trackingNumbers', target_match: 'member' } };
+    await resolveStep(step, member);
+    expect(mockResolveByMetadata.mock.calls[0][0]).toMatchObject({ key: 'trackingNumbers', value: ['SHELF-7'] });
+  });
+
   it('a step without a claim state leaves the pick unchanged', async () => {
     await resolveStep({ ...step, query: { roles: ['binning-associate'] } } as any, ctx);
     expect(mockResolveByMetadata.mock.calls[0][0].availability).toBeUndefined();

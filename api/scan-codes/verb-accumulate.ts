@@ -16,6 +16,7 @@ import {
   refused,
   templated,
   type StepContext,
+  targetValue,
 } from './context';
 import { spendGrant } from './grant';
 import { locateForStep } from './locate';
@@ -87,7 +88,7 @@ export async function accumulateStep(
   } else {
     request = {
       key: ctx.scheme.target_facet,
-      value: ctx.parsed.target,
+      value: targetValue(ctx),
       itemKey: rendered.itemKey,
       payload: rendered.payload,
       metadata: rendered.metadata,

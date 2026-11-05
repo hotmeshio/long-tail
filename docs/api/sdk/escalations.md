@@ -453,7 +453,7 @@ if (bin === null) return cancelled();
 ship(bin.$accumulated.map((item) => item.itemKey), bin.$trigger);
 ```
 
-Requires hotmesh 0.29.0+. `conditional` accepts the same `accumulate` field and returns `T | false | null`; `partialOnTimeout: true` on a `batch` wait likewise makes the timer deliver the filled items with `$trigger: 'timeout'`, and `wakeOnFlag: true` makes a flag on a pending key deliver them with `$flags` and `$trigger: 'flag'` (hotmesh 0.31.3+). See [Creating Escalations](../../hitl/escalation.md#open-accumulation--items-arrive-over-time).
+Requires hotmesh 0.29.0+. `conditional` accepts the same `accumulate` field and returns `T | false | null`; `partialOnTimeout: true` on a `batch` wait likewise makes the timer deliver the filled items with `$trigger: 'timeout'`, `wakeOnFlag: true` makes a flag on a pending key deliver them with `$flags` and `$trigger: 'flag'` (hotmesh 0.31.3+), and `wakeOnFill: true` (or a list of keys) makes a fill deliver them with `$filled`, `$filledAt`, `$filledBy` and `$trigger: 'fill'` (hotmesh 0.32.0+). See [Creating Escalations](../../hitl/escalation.md#open-accumulation--items-arrive-over-time).
 
 ### Two-step form
 

@@ -1,5 +1,6 @@
 import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { BatchItemOutcome, LTEscalationRecord } from '../../types';
+import { BATCH_ITEM_OUTCOMES } from '../../types/escalation';
 
 import { isUuid } from '../../lib/uuid';
 import { escalations } from './client';
@@ -10,7 +11,7 @@ export interface ResolveBatchItemOutcome {
   outcome: BatchItemOutcome;
   /** Items still awaiting submission after this call (0 exactly when completed). */
   remaining: number;
-  /** The post-fill row on `completed`/`accepted`; null on every failure outcome. */
+  /** The post-fill row on `completed`/`accepted`/`woke`; null on every failure outcome. */
   escalation: LTEscalationRecord | null;
 }
 
@@ -18,8 +19,9 @@ export interface ResolveBatchItemOutcome {
  * Fills one declared item of a batch escalation in a single atomic SDK
  * statement (guarded fill + facet recompute + resolve-and-wake on the last
  * item). `actor` is recorded under `envelope.batch_filled_by[itemKey]`. Interim fills publish `escalation.updated` with progress; the
- * completing fill publishes the standard `escalation.resolved`. Failure
- * outcomes publish nothing — the row was untouched.
+ * completing fill, and a fill that woke a `wakeOnFill` wait (`woke`), publish
+ * the standard `escalation.resolved`. Failure outcomes publish nothing — the
+ * row was untouched.
  */
 export async function resolveBatchItem(
   id: string,
@@ -101,7 +103,7 @@ export async function resolveBatchItemByMetadata(
 
 function settleBatchOutcome(
   result:
-    | { ok: true; outcome: 'completed' | 'accepted'; remaining: number; entry: Record<string, any> }
+    | { ok: true; outcome: 'completed' | 'accepted' | 'woke'; remaining: number; entry: Record<string, any> }
     | { ok: false; outcome: BatchItemOutcome },
   itemKey: string,
 ): ResolveBatchItemOutcome {
@@ -109,7 +111,7 @@ function settleBatchOutcome(
     return { outcome: result.outcome, remaining: -1, escalation: null };
   }
   const escalation = toEscalationRecord(result.entry as any);
-  const completed = result.outcome === 'completed';
+  const completed = result.outcome === BATCH_ITEM_OUTCOMES.COMPLETED || result.outcome === BATCH_ITEM_OUTCOMES.WOKE;
   publishEscalationChange({
     type: completed ? 'escalation.resolved' : 'escalation.updated',
     source: 'service',

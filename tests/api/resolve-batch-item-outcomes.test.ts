@@ -59,3 +59,16 @@ describe('resolveBatchItem (api) — failure bodies carry the outcome', () => {
     expect(await fill()).toMatchObject({ status: 409, data: { outcome: 'already-expired' } });
   });
 });
+
+describe('resolveBatchItem (api) — a fill that wakes the wait', () => {
+  it('answers 200 woke with the remaining count and the signaled row', async () => {
+    mockGet.mockResolvedValue(batch());
+    mockFill.mockResolvedValue({
+      outcome: 'woke', remaining: 1, escalation: { id: 'esc-batch', signal_key: 'sig-1' },
+    } as any);
+    expect(await fill()).toEqual({
+      status: 200,
+      data: { outcome: 'woke', remaining: 1, signaled: true, escalationId: 'esc-batch', workflowId: 'wf-1' },
+    });
+  });
+});

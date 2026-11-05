@@ -3,6 +3,7 @@ import {
   SCAN_ENCODINGS,
   SCAN_GRANT_SCOPES,
   SCAN_SCHEME_KINDS,
+  SCAN_TARGET_MATCH,
   type ScanScheme,
   type ScanRule,
   type ScanStep,
@@ -39,6 +40,9 @@ export interface ScanSchemeInput {
   grant_ttl_seconds?: number | null;
   grant_max_uses?: number;
   grant_scope?: ScanScheme['grant_scope'];
+  patterns?: string[];
+  precedes_gtin?: boolean | null;
+  target_match?: ScanScheme['target_match'];
   enabled?: boolean;
 }
 
@@ -66,6 +70,9 @@ function schemeParams(input: ScanSchemeInput): unknown[] {
     input.grant_max_uses ?? 0,
     input.enabled ?? true,
     input.grant_scope ?? SCAN_GRANT_SCOPES.ACTION,
+    JSON.stringify(input.patterns ?? []),
+    input.encoding === SCAN_ENCODINGS.PATTERN ? input.precedes_gtin ?? null : null,
+    input.target_match ?? SCAN_TARGET_MATCH.VALUE,
   ];
 }
 

@@ -117,3 +117,9 @@ export interface GroupSummary {
   minPriority: number;
   createdAt: Date;
 }
+
+/**
+ * A metadata facet value matched by containment: one value, or a list whose
+ * members the row's list-valued facet must contain.
+ */
+export type FacetValue = string | string[];

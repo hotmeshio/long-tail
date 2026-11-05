@@ -7,9 +7,13 @@ import { isValidGtin, normalizeGtin } from './gtin';
 export interface ParseableScheme {
   version: number;
   name: string;
-  encoding: 'fixed' | 'delimited' | 'gtin';
+  encoding: 'fixed' | 'delimited' | 'gtin' | 'pattern';
   delimiter: string;
   target_length: number | null;
+  /** Pattern encoding: regular expressions over the whole code. */
+  patterns?: string[];
+  /** Pattern encoding: true reads a digits-only code before the gtin scheme does. */
+  precedes_gtin?: boolean | null;
   enabled: boolean;
 }
 
@@ -32,6 +36,14 @@ export type ScanParseResult<S extends ParseableScheme = ParseableScheme> =
   | { ok: false; failure: ScanParseFailure };
 
 const GTIN_CATEGORY = '0';
+const PATTERN_CATEGORY = '0';
+
+/**
+ * The longest code a pattern scheme reads. Declared expressions run only on
+ * codes up to this length, which bounds their cost on any input; carrier
+ * tracking numbers run to 34 characters.
+ */
+export const PATTERN_CODE_MAX_LENGTH = 64;
 
 /**
  * Parse a raw scan string against the configured schemes.
@@ -46,17 +58,30 @@ const GTIN_CATEGORY = '0';
  * when a gtin scheme is configured and its check digit holds: the target is
  * the 14-digit GTIN and the category is '0'. Config validation keeps fixed
  * and gtin lengths apart, so the order here never decides a real code.
+ *
+ * A code no prefixed scheme reads is matched against the pattern schemes'
+ * declared expressions, lowest version first: the target is the code as
+ * scanned and the category is '0'. A pattern scheme with `precedes_gtin`
+ * reads a digits-only code before the gtin scheme does.
  */
 export function parseScanCode<S extends ParseableScheme>(raw: string, schemes: S[]): ScanParseResult<S> {
   const code = raw.trim();
   if (!code) {
     return { ok: false, failure: { reason: 'empty', detail: 'empty scan code' } };
   }
+  const prefixed = parsePrefixed(code, schemes);
+  if (prefixed.ok) return prefixed;
+  return parsePattern(code, schemes, false) ?? prefixed;
+}
 
+/** The fixed, gtin and delimited reading of a code, with the gtin-first pattern schemes. */
+function parsePrefixed<S extends ParseableScheme>(code: string, schemes: S[]): ScanParseResult<S> {
   if (/^[0-9]+$/.test(code)) {
     const fixed = schemes.find((s) => s.encoding === 'fixed' && s.version === Number(code.slice(0, 2)));
     const fixedFits = fixed?.enabled && fitsFixed(code, fixed);
     if (!fixedFits) {
+      const first = parsePattern(code, schemes, true);
+      if (first) return first;
       const gtin = parseGtin(code, schemes);
       if (gtin) return gtin;
     }
@@ -87,6 +112,9 @@ export function parseScanCode<S extends ParseableScheme>(raw: string, schemes: S
   if (scheme.encoding === 'gtin') {
     return malformed(scheme, 'reads manufacturer barcodes, which carry no scheme prefix');
   }
+  if (scheme.encoding === 'pattern') {
+    return malformed(scheme, 'reads codes by its declared patterns, which carry no scheme prefix');
+  }
   if (scheme.encoding === 'delimited') {
     return parseDelimited(code, version, scheme);
   }
@@ -115,6 +143,55 @@ function parseGtin<S extends ParseableScheme>(code: string, schemes: S[]): ScanP
     parsed: { version: gtin.version, category: GTIN_CATEGORY, target: normalizeGtin(code), raw: code },
     scheme: gtin,
   };
+}
+
+/**
+ * The pattern scheme whose expressions match the whole code, lowest version
+ * first, or null. `gtinFirst` limits the search to schemes that precede gtin.
+ * A match on a disabled scheme only answers when no enabled one matches.
+ */
+function parsePattern<S extends ParseableScheme>(code: string, schemes: S[], gtinFirst: boolean): ScanParseResult<S> | null {
+  const matching = schemes
+    .filter((s) => s.encoding === 'pattern' && (!gtinFirst || s.precedes_gtin))
+    .filter((s) => patternsMatch(s.patterns ?? [], code))
+    .sort((a, b) => a.version - b.version);
+  const scheme = matching.find((s) => s.enabled) ?? matching[0];
+  if (!scheme) return null;
+  if (!scheme.enabled) {
+    return {
+      ok: false,
+      failure: { reason: 'scheme_disabled', detail: `scan scheme ${scheme.version} ("${scheme.name}") is disabled` },
+    };
+  }
+  return { ok: true, parsed: { version: scheme.version, category: PATTERN_CATEGORY, target: code }, scheme };
+}
+
+/** True when the code is within the pattern length and one of the expressions matches all of it. */
+export function patternsMatch(patterns: string[], code: string): boolean {
+  if (code.length > PATTERN_CODE_MAX_LENGTH) return false;
+  return patterns.some((p) => compilePattern(p)?.test(code));
+}
+
+const compiled = new Map<string, RegExp | null>();
+
+/** A declared expression anchored to the whole code; null when it does not compile. */
+export function compilePattern(pattern: string): RegExp | null {
+  if (compiled.has(pattern)) return compiled.get(pattern)!;
+  let regex: RegExp | null;
+  try {
+    regex = new RegExp(`^(?:${unanchorPattern(pattern)})$`);
+  } catch {
+    regex = null;
+  }
+  compiled.set(pattern, regex);
+  return regex;
+}
+
+/** The expression without one leading `^` and one unescaped trailing `$`. */
+export function unanchorPattern(pattern: string): string {
+  let body = pattern.startsWith('^') ? pattern.slice(1) : pattern;
+  if (body.endsWith('$') && !body.endsWith('\\$')) body = body.slice(0, -1);
+  return body;
 }
 
 function parseDelimited<S extends ParseableScheme>(code: string, version: number, scheme: S): ScanParseResult<S> {

@@ -607,7 +607,9 @@ in the placeholder. Type the target and press Enter: the bar composes
 the outcome navigates, confirms, or answers exactly as a physical scan would.
 An outcome that answers in place (a fallback, a conflict, a closed row) is
 narrated right under the bar. A whole code pasted into a Run mode executes
-as-is; fixed-encoding rules accept digits only and say so inline. The menu
+as-is; fixed-encoding rules accept digits only and say so inline. A gtin or
+pattern rule runs the typed code itself, and a pattern rule names a code that
+matches none of its patterns inline. The menu
 footer opens the scan panel for scanner settings and the barcode preview.
 See [Scan codes](scan-codes.md).
 

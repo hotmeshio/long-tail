@@ -1,3 +1,4 @@
+import { patternsMatch } from '../../../shared/scan-code';
 import { metadataFacetUrl } from './facet-url';
 import type { ScanRule, ScanScheme } from '../api/scan-codes';
 
@@ -25,6 +26,8 @@ export interface ScanCommand {
   encoding: ScanScheme['encoding'];
   delimiter: string;
   targetLength: number | null;
+  /** Pattern encoding: the expressions a typed code must match. */
+  patterns: string[];
 }
 
 export type SearchMode =
@@ -46,11 +49,13 @@ export function toScanCommand(scheme: ScanScheme, rule: ScanRule): ScanCommand {
     encoding: scheme.encoding,
     delimiter: scheme.delimiter,
     targetLength: scheme.target_length,
+    patterns: scheme.patterns ?? [],
   };
 }
 
-/** The code head a command contributes ahead of the typed target. */
+/** The code head a command contributes ahead of the typed target; gtin and pattern codes carry none. */
 export function commandPrefix(cmd: ScanCommand): string {
+  if (cmd.encoding === 'gtin' || cmd.encoding === 'pattern') return '';
   return cmd.encoding === 'delimited'
     ? `${cmd.version}${cmd.delimiter}${cmd.category}${cmd.delimiter}`
     : `${cmd.version}${cmd.category}`;
@@ -62,7 +67,13 @@ export function buildCommandCode(cmd: ScanCommand, target: string): { code: stri
     if (isWholeDelimitedCode(cmd, target)) return { code: target };
     return { code: `${commandPrefix(cmd)}${target}` };
   }
+  if (cmd.encoding === 'pattern') {
+    return patternsMatch(cmd.patterns, target)
+      ? { code: target }
+      : { error: `${cmd.name} takes a code matching its patterns` };
+  }
   if (!/^[0-9]+$/.test(target)) return { error: `${cmd.name} takes digits only` };
+  if (cmd.encoding === 'gtin') return { code: target };
   const len = cmd.targetLength;
   if (len && target.length !== len && target.length !== len + 1) {
     return { error: `${cmd.name} takes ${len} digits` };
