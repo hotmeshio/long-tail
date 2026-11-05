@@ -112,6 +112,12 @@ export interface ScanExecuteResponse {
   already?: boolean;
   /** EXECUTED: the step's `done` copy, rendered. */
   done?: { markdown: string };
+  /**
+   * EXECUTED, subject completed: follow the subject to its next row. The
+   * station replays `code` once a pending row for `target` appears in
+   * `roles`, within `waitSeconds`.
+   */
+  follow?: { code: string; roles: string[]; waitSeconds: number; target: { facet: string; value: string } };
   /** NOT_PRIMED that the client may replay once a badge primes. */
   replayable?: boolean;
   error?: string;

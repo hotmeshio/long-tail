@@ -2,6 +2,7 @@ import * as scanCodeService from '../../services/scan-code';
 import {
   SCAN_OUTCOMES,
   type LTEscalationRecord,
+  type ScanChoice,
   type ScanExecuteResponse,
   type ScanPresentedChoice,
   type ScanStep,
@@ -11,7 +12,13 @@ import { actingIdentitySatisfied } from './identity';
 import { holdsChoiceRole } from './choice-roles';
 import { locateForStep } from './locate';
 import { dispatchChoiceVerb } from './verbs';
-import { templateContext, type StepContext } from './context';
+import { templateContext, withDone, type StepContext } from './context';
+
+/** True when the row carries every facet value the choice is offered under. */
+export function choiceOffered(choice: Pick<ScanChoice, 'when'>, row: LTEscalationRecord): boolean {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  return Object.entries(choice.when ?? {}).every(([key, value]) => meta[key] === value);
+}
 
 /** The step's facts rendered against the presented row; unreadable tokens render empty. */
 function renderFacts(step: ScanStep, ctx: StepContext, row: LTEscalationRecord): ScanExecuteResponse['facts'] {
@@ -61,24 +68,30 @@ export async function presentStep(
 
   const only = step.choices?.length === 1 ? step.choices[0] : undefined;
   const autoSelect = step.autoSelectSingle === true && only !== undefined && !only.confirm;
-  if (autoSelect && (!only.requireActingIdentity || satisfied) && roleHeld[0]) {
-    return dispatchChoiceVerb(
-      { query: step.query, verb: only.verb, params: only.params },
-      ctx,
-      escalation,
+  if (autoSelect && (!only.requireActingIdentity || satisfied) && roleHeld[0] && choiceOffered(only, escalation)) {
+    const tpl = { ...templateContext(ctx), item: escalation.metadata ?? {} };
+    return withDone(
+      await dispatchChoiceVerb({ query: step.query, verb: only.verb, params: only.params }, ctx, escalation),
+      only,
+      tpl,
     );
   }
 
-  const choices: ScanPresentedChoice[] = (step.choices ?? []).map((choice, index) => ({
-    index,
-    label: choice.label,
-    verb: choice.verb,
-    ...(choice.confirm ? { confirm: choice.confirm } : {}),
-    ...(choice.requireActingIdentity ? { requireActingIdentity: true } : {}),
-    ...(choice.roles?.length ? { roles: choice.roles } : {}),
-    ...(choice.code ? { code: choice.code } : {}),
-    withheld: (!!choice.requireActingIdentity && !satisfied) || !roleHeld[index],
-  }));
+  // A choice the row's state does not offer, or one hidden from a person
+  // without its roles, is left off the screen; the index stays the config's.
+  const choices: ScanPresentedChoice[] = (step.choices ?? []).flatMap((choice, index) => {
+    if (!choiceOffered(choice, escalation) || (choice.hidden && !roleHeld[index])) return [];
+    return [{
+      index,
+      label: choice.label,
+      verb: choice.verb,
+      ...(choice.confirm ? { confirm: choice.confirm } : {}),
+      ...(choice.requireActingIdentity ? { requireActingIdentity: true } : {}),
+      ...(choice.roles?.length ? { roles: choice.roles } : {}),
+      ...(choice.code ? { code: choice.code } : {}),
+      withheld: (!!choice.requireActingIdentity && !satisfied) || !roleHeld[index],
+    }];
+  });
 
   return {
     status: 200,

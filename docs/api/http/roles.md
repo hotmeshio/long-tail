@@ -271,7 +271,7 @@ Returns all roles with metadata and usage counts.
 | `description` | `string \| null` | Human-readable summary |
 | `form_schema` | `object \| null` | JSON Schema for the escalation resolve form (the JIT UI). Versioned per role; fields may carry `x-lt-bind` to map values into the payload. Takes precedence over the deprecated workflow-level `resolver_schema` |
 | `metadata_schema` | `object \| null` | JSON Schema declaring the expected shape of `lt_escalations.metadata` for this role. Drives faceted-query key autocomplete and creation-time validation |
-| `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. No reserved keys |
+| `properties` | `object` | Free user-owned bag — icons, colors, tags, etc. Reserved keys: `kiosk`, `badge_grant`, `scan_done`, `link_variables`, `on_cancel`, `on_timeout`, `worked_by` (see [Scan codes — station deployments](../../scan-codes.md#station-deployments)); `badge_grant` and `scan_done` are validated on write |
 | `ops_visible` | `boolean` | When `true`, the role appears as a station on the `/operations` view |
 | `enforce_schema` | `boolean` | When `true`, every resolve surface validates submitted payloads against this role's form schema and rejects violations with `422` (`code: schema_validation`) — see [Schema Enforcement](../../schema-enforcement.md) |
 | `parent_role` | `string \| null` | Parent role in the process dependency graph; `null` for root stations |

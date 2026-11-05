@@ -200,6 +200,10 @@ export type ScanTemplateBag = (typeof SCAN_TEMPLATE_BAGS)[keyof typeof SCAN_TEMP
 
 /** Default seconds a held subject lives on the station. */
 export const SCAN_HOLD_TTL_DEFAULT_SECONDS = 45;
+
+/** How long a station follows a completed subject to its next row before ending on the done copy. */
+export const SCAN_FOLLOW_WAIT_DEFAULT_SECONDS = 10;
+export const SCAN_FOLLOW_WAIT_MAX_SECONDS = 120;
 export const SCAN_HOLD_TTL_MIN_SECONDS = 5;
 export const SCAN_HOLD_TTL_MAX_SECONDS = 600;
 

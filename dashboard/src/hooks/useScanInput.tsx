@@ -81,6 +81,8 @@ interface ScanInputContextValue {
   dropSubject(): void;
   /** Fold a response from outside the pipeline (an executed choice) into the held subject. */
   adoptResponse(response: ScanExecuteResponse): void;
+  /** Replay a held code to follow its subject: the answer lands on the station, never navigates. */
+  followCode(code: string): Promise<void>;
   /** A scan waiting on a badge; it replays once the badge primes. */
   pendingScan: PendingScan | null;
   /** Let go of the waiting scan. */
@@ -237,8 +239,8 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [subject]);
 
-  /** POST one code and fold the answer into station state. */
-  const execute = useCallback(async (code: string, source: string, token: string | null) => {
+  /** POST one code and fold the answer into station state. `quiet` answers on the station only. */
+  const execute = useCallback(async (code: string, source: string, token: string | null, quiet = false) => {
     setBusy(true);
     const at = Date.now();
     try {
@@ -275,7 +277,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
       if (response.outcome === SCAN_OUTCOMES.NOT_PRIMED && token) {
         clear();
       }
-      const navigated = navigateForResponse(response);
+      const navigated = quiet || navigateForResponse(response);
       setLastResult({ code, source, at, response, error: null, navigated });
     } catch (err: any) {
       setLastResult({ code, source, at, response: null, error: err.message, navigated: false });
@@ -290,6 +292,10 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
       if (intercept(code)) return;
     }
     await execute(code, source, actingTokenRef.current);
+  }, [execute]);
+
+  const followCode = useCallback(async (code: string) => {
+    await execute(code, SCAN_SOURCE_IDS.FOLLOW, actingTokenRef.current, true);
   }, [execute]);
 
   const dropSubject = useCallback(() => setSubject(null), []);
@@ -319,10 +325,10 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      submitCode, pushCodeInterceptor, lastResult, subject, dropSubject, adoptResponse, pendingScan, dropPendingScan,
+      submitCode, pushCodeInterceptor, lastResult, subject, dropSubject, adoptResponse, followCode, pendingScan, dropPendingScan,
       busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn, setDiagnosticsOn,
     }),
-    [submitCode, pushCodeInterceptor, lastResult, subject, dropSubject, adoptResponse, pendingScan, dropPendingScan,
+    [submitCode, pushCodeInterceptor, lastResult, subject, dropSubject, adoptResponse, followCode, pendingScan, dropPendingScan,
       busy, wedgeConfig, updateWedgeConfig, diagnostics, diagnosticsOn],
   );
 

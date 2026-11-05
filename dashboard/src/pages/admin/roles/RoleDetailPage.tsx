@@ -24,6 +24,7 @@ import { SchemasSection } from './sections/SchemasSection';
 import { PinsSection } from './sections/PinsSection';
 import { PortalSection } from './sections/PortalSection';
 import { BadgeGrantSection } from './sections/BadgeGrantSection';
+import { ScanDoneSection } from './sections/ScanDoneSection';
 
 // ── Sub-nav sections — the role's configuration, organized by concern ─────────
 
@@ -293,6 +294,7 @@ export function RoleDetailPage() {
               </SectionGroup>
 
               <BadgeGrantSection draft={draft} update={update} />
+              <ScanDoneSection draft={draft} update={update} />
             </div>
           )}
           {section === 'pins' && <PinsSection role={role} />}

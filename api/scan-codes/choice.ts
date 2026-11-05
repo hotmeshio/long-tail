@@ -12,7 +12,8 @@ import type { LTApiAuth, LTApiResult } from '../../types/sdk';
 import { actingIdentitySatisfied } from './identity';
 import { peekGrant, settleGrant } from './grant';
 import { assertReadAccess } from '../escalations/helpers';
-import { conflict, notPrimed, refused, type StepContext } from './context';
+import { conflict, notPrimed, refused, templateContext, withDone, type StepContext } from './context';
+import { choiceOffered } from './present';
 import { holdsChoiceRole } from './choice-roles';
 import { actionRefusal } from '../../shared/form-validation/x-lt-actions';
 import { locateForStep } from './locate';
@@ -122,13 +123,15 @@ export async function executeScanChoice(
     // same double-actor race a second scan loses.
     const located = await locateForStep(step, ctx, 2);
     const presented = located?.escalations.find((e) => e.id === input.escalationId);
-    if (!presented) {
+    if (!presented || !choiceOffered(choice, presented)) {
       return decorate(conflict('the item is no longer in the presented state'), ctx, input);
     }
 
-    // 7. Dispatch through the same atomic executors a direct scan uses.
+    // 7. Dispatch through the same atomic executors a direct scan uses; the
+    // choice's done copy reads the row it acted on.
     const synthesized: ScanStep = { query: step.query, verb: choice.verb, params: choice.params };
-    const result = decorate(await dispatchChoiceVerb(synthesized, ctx, presented), ctx, input);
+    const tpl = { ...templateContext(ctx), item: presented.metadata ?? {} };
+    const result = decorate(withDone(await dispatchChoiceVerb(synthesized, ctx, presented), choice, tpl), ctx, input);
 
     // 8. Settle the badge: refund a spend whose act did not land
     const acting = await settleGrant(ctx, result);

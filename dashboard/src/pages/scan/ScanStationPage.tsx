@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useActingIdentity } from '../../hooks/useActingIdentity';
 import { useViewerIdentity } from '../../hooks/useViewerIdentity';
+import { useKioskMode } from '../../hooks/useKioskMode';
+import { useEventSubscriptions } from '../../hooks/useEventContext';
 import { SCAN_CHOICES_STATE, useScanInput } from '../../hooks/useScanInput';
+import { useRoleDetails } from '../../api/roles';
+import { escalationPatterns } from '../../lib/events/subjects';
+import { readScanDone, scanDonePath, SCAN_DONE_AFTER_SECONDS_DEFAULT } from '../../lib/scan-done';
 import {
   executeScanChoice,
   SCAN_OUTCOMES,
   SCAN_VERBS,
   type ScanExecuteResponse,
+  type ScanFollow,
   type ScanPresentedChoice,
   type ScanVerb,
 } from '../../api/scan-codes';
@@ -43,10 +49,23 @@ function isBenchResponse(response: ScanExecuteResponse): boolean {
     case SCAN_OUTCOMES.NOT_PRIMED:
       return !!response.replayable;
     case SCAN_OUTCOMES.EXECUTED:
-      return !!(response.clearSubject || response.progress);
+      return !!(response.clearSubject || response.progress || response.done);
     default:
       return false;
   }
+}
+
+/** A completed act's copy, shown large until the station moves on. */
+interface DoneScreen {
+  at: number;
+  markdown: string;
+}
+
+/** The station waiting for the completed subject's next row. */
+interface Following {
+  at: number;
+  follow: ScanFollow;
+  markdown: string;
 }
 
 interface StationNotice {
@@ -77,11 +96,21 @@ export function ScanStationPage() {
   const { user } = useAuth();
   const { identity, clear, settle } = useActingIdentity();
   const { viewerId } = useViewerIdentity();
-  const { lastResult, subject, dropSubject, adoptResponse, pendingScan, dropPendingScan } = useScanInput();
+  const { lastResult, subject, dropSubject, adoptResponse, followCode, pendingScan, dropPendingScan } = useScanInput();
+  const kiosk = useKioskMode();
+  const { data: roleDetails } = useRoleDetails();
   const [screen, setScreen] = useState<ScanExecuteResponse | null>(null);
   const [pendingBadge, setPendingBadge] = useState<PendingBadge | null>(null);
   const [notice, setNotice] = useState<StationNotice | null>(null);
+  const [actDone, setActDone] = useState<DoneScreen | null>(null);
+  const [following, setFollowing] = useState<Following | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Where this station returns once an act completes its row, per its role.
+  const scanDone = useMemo(() => {
+    const role = kiosk.role ? roleDetails?.roles?.find((r) => r.role === kiosk.role) : undefined;
+    return readScanDone(role?.properties);
+  }, [kiosk.role, roleDetails]);
 
   // Adopt a CHOICES response arriving in route state, then drop it from
   // history so refresh/back land on the idle station, never a stale reality.
@@ -94,6 +123,7 @@ export function ScanStationPage() {
     if (!incoming) return;
     setScreen(incoming);
     setNotice(null);
+    setActDone(null);
     const single = incoming.choices?.length === 1 ? incoming.choices[0] : undefined;
     setPendingBadge(incoming.autoSelect && single ? { choice: single, returnTo: 'idle' } : null);
     navigate(location.pathname, { replace: true, state: null });
@@ -107,10 +137,55 @@ export function ScanStationPage() {
     setScreen(null);
     setPendingBadge(null);
     setNotice(null);
+    setActDone(null);
     if (bench.outcome === SCAN_OUTCOMES.SUBJECT_STALE) {
       setNotice({ at: Date.now(), tone: 'text-status-warning', text: bench.error || 'Scan it again.' });
     }
+    // A completing act that names the subject's next step: wait for that row.
+    if (bench.outcome === SCAN_OUTCOMES.EXECUTED && bench.follow) {
+      setFollowing({ at: benchAt, follow: bench.follow, markdown: bench.done?.markdown ?? 'Done.' });
+    }
   }, [bench, benchAt]);
+
+  // Following ends the moment a hold lands (the next row is held) or a new scan arrives.
+  useEffect(() => {
+    if (!following) return;
+    if (subject || (bench && benchAt > following.at && bench.outcome !== SCAN_OUTCOMES.NO_MATCH_FALLBACK)) {
+      setFollowing(null);
+    }
+  }, [following, subject, bench, benchAt]);
+
+  // A hold that lands while an act's copy is up replaces it.
+  useEffect(() => {
+    if (subject) setActDone(null);
+  }, [subject]);
+
+  // The next row announces itself: a created event in one of the follow roles
+  // for the same target replays the held code, and the hold lands.
+  const followPatterns = useMemo(
+    () => (following ? following.follow.roles.flatMap((role) => escalationPatterns({ role, verbs: ['created'] })) : []),
+    [following],
+  );
+  useEventSubscriptions(followPatterns, (event: any) => {
+    if (!following) return;
+    const { facet, value } = following.follow.target;
+    const meta = event?.data?.metadata;
+    if (meta && typeof meta === 'object' && meta[facet] !== undefined && meta[facet] !== value) return;
+    void followCode(following.follow.code);
+  });
+
+  // Nothing arrived in time: one last look, then the done copy stands.
+  useEffect(() => {
+    if (!following) return;
+    const remaining = following.at + following.follow.waitSeconds * 1000 - Date.now();
+    const timer = setTimeout(async () => {
+      await followCode(following.follow.code);
+      // The replay's answer took the bench; the completed act's copy stands on its own.
+      setActDone({ at: Date.now(), markdown: following.markdown });
+      setFollowing((current) => (current?.at === following.at ? null : current));
+    }, Math.max(0, remaining));
+    return () => clearTimeout(timer);
+  }, [following, followCode]);
 
   // Notices self-dismiss — one timeout keyed to the notice.
   useEffect(() => {
@@ -145,6 +220,11 @@ export function ScanStationPage() {
           if (DETAIL_VERBS.includes(choice.verb) && result.escalation) {
             // The claim (or show) landed — go work the item where it lives.
             navigate(`/escalations/detail/${result.escalation.id}`);
+            break;
+          }
+          if (result.done) {
+            // The choice's own done copy takes the screen, badge first or second.
+            setActDone({ at: Date.now(), markdown: result.done.markdown });
             break;
           }
           // Done — back to idle, ready for the next item.
@@ -218,9 +298,20 @@ export function ScanStationPage() {
   const refusal = bench?.outcome === SCAN_OUTCOMES.REFUSED ? bench : null;
   const executedBench = bench?.outcome === SCAN_OUTCOMES.EXECUTED && isBenchResponse(bench) ? bench : null;
   const progress = subject && executedBench ? executedBench.progress : null;
-  const doneMarkdown = executedBench && !subject
-    ? executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.')
+  const benchDone: DoneScreen | null = executedBench && !subject
+    ? { at: benchAt, markdown: executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.') }
     : null;
+  const done = actDone && (!benchDone || actDone.at > benchDone.at) ? actDone : benchDone;
+
+  // The row is complete and the station is not following it: return per the role.
+  useEffect(() => {
+    if (!done || following || !scanDone) return;
+    const path = scanDonePath(scanDone, kiosk.homePath);
+    if (!path) return;
+    const after = (scanDone.after_seconds ?? SCAN_DONE_AFTER_SECONDS_DEFAULT) * 1000;
+    const timer = setTimeout(() => navigate(path), after);
+    return () => clearTimeout(timer);
+  }, [done, following, scanDone, kiosk.homePath, navigate]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -257,8 +348,10 @@ export function ScanStationPage() {
           refreshKey={benchAt}
           onRelease={dropSubject}
         />
-      ) : doneMarkdown ? (
-        <DonePanel key={benchAt} markdown={doneMarkdown} nextPrompt="Scan the next item" />
+      ) : following ? (
+        <DonePanel key={following.at} markdown={following.markdown} nextPrompt="Finding its next step" />
+      ) : done ? (
+        <DonePanel key={done.at} markdown={done.markdown} nextPrompt="Scan the next item" />
       ) : showChoices ? (
         <InfoChoiceScreen
           key={String(screen!.escalation!.id)}

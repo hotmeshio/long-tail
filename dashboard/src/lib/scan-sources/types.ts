@@ -27,6 +27,8 @@ export const SCAN_SOURCE_IDS = {
   MANUAL: 'manual',
   /** The header bar: a chosen command plus a typed target. */
   TOOLBAR: 'toolbar',
+  /** The station replaying a held code to follow its subject. */
+  FOLLOW: 'follow',
 } as const;
 export type ScanSourceId = (typeof SCAN_SOURCE_IDS)[keyof typeof SCAN_SOURCE_IDS];
 
