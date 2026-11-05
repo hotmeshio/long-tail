@@ -66,7 +66,7 @@ describe('accumulateIntoSubject without item', () => {
   };
   const bag = (target: string) => ({
     ...ctx(target), scheme: { version: 14, target_facet: 'binCode' },
-    subject: { row: { id: 'bag-row', metadata: { binCode: 'SF-A-2' } }, code: '11:0:K7', parsed: {}, scheme: { version: 11 } },
+    subject: { row: { id: 'bag-row', role: 'binning', metadata: { binCode: 'SF-A-2' } }, code: '11:0:K7', parsed: {}, scheme: { version: 11 } },
   });
 
   it('the subject row collects the code with no reciprocal and no locate', async () => {
@@ -75,6 +75,11 @@ describe('accumulateIntoSubject without item', () => {
     expect(add).toHaveBeenCalledWith({ id: 'bag-row', itemKey: 'SF-A-2', payload: { binCode: 'SF-A-2' }, metadata: expect.any(Object) }, { userId: 'maria' });
     expect(search).not.toHaveBeenCalled();
     expect(result?.data).toMatchObject({ outcome: SCAN_OUTCOMES.EXECUTED, clearSubject: true, progress: { filled: 1, total: 1, remaining: 0 } });
+  });
+
+  it('the executed response names the role of the row it completed', async () => {
+    add.mockResolvedValue({ status: 200, data: { outcome: 'completed', count: 1, remaining: 0, escalationId: 'bag-row' } });
+    expect((await accumulateIntoSubject(into, bag('SF-A-2')))?.data?.escalation).toMatchObject({ id: 'bag-row', role: 'binning' });
   });
 
   it('a code that is not the offered one is refused', async () => {

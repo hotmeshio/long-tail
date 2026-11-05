@@ -220,7 +220,7 @@ export async function accumulateFromSubject(step: ScanStep, ctx: StepContext): P
     data: {
       outcome: SCAN_OUTCOMES.EXECUTED,
       verb: step.verb,
-      escalation: { id: container.id, ...result.data },
+      escalation: { id: container.id, role: container.role, ...result.data },
       clearSubject: true,
     },
   }, step, bags(ctx, container));
@@ -233,7 +233,7 @@ export function already(step: ScanStep, row: LTEscalationRecord, keepSubject = f
     data: {
       outcome: SCAN_OUTCOMES.EXECUTED,
       verb: step.verb,
-      escalation: { id: row.id },
+      escalation: { id: row.id, role: row.role },
       already: true,
       clearSubject: !keepSubject,
     },

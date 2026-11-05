@@ -141,7 +141,7 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
         data: {
           outcome: SCAN_OUTCOMES.EXECUTED,
           verb: step.verb,
-          escalation: { id: row.id, ...data },
+          escalation: { id: row.id, role: row.role, ...data },
           progress: filled,
           ...(done ? { clearSubject: true } : {}),
         },

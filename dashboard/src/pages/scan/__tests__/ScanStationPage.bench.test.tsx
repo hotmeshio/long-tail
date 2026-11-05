@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   kiosk: { current: { role: null as string | null, homePath: null as string | null } },
   roleDetails: { current: { roles: [] as unknown[] } },
 }));
-vi.mock('../../../hooks/useKioskMode', () => ({ useKioskMode: () => mocks.kiosk.current }));
+vi.mock('../../../hooks/useKioskMode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../hooks/useKioskMode')>()),
+  useKioskMode: () => mocks.kiosk.current,
+}));
 vi.mock('../../../api/roles', () => ({ useRoleDetails: () => ({ data: mocks.roleDetails.current }) }));
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { userId: 'station-1', displayName: 'Binning' } }) }));

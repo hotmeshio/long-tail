@@ -597,10 +597,15 @@ portals, and the scan screens (choice, badge). The list with neither a
 `role` nor a `facets` filter is every queue at once, so it redirects home
 too, including right after sign-in; a scan's `show-list` (narrowed by
 facets) stays. A role that declares
-[portals](./hitl/portal.md) lands on its first one as home instead of the list. The header toolbar and event feed remain. A user
-holding more than one role, or an admin-type grant, always gets full chrome —
-kiosk is for the single-role floor login, never a way to hide the product from
-a real operator.
+[portals](./hitl/portal.md) lands on its first one as home instead of the list. The header toolbar and event feed remain.
+
+A read-only station login (every grant a plain member with `write_scope:
+'none'`) may hold several roles. With one kiosk role among them it locks to
+that one. With several it keeps full chrome and offers a **Station queue**
+picker in the user menu; choosing one locks the device to it, and the choice
+persists per device. Any other login holding more than one role, or an
+admin-type grant, always gets full chrome. Kiosk is for the floor station,
+never a way to hide the product from a real operator.
 
 Pair kiosk with `x-lt-transition-done` on the role's form schema
 (`"/escalations/available?role={{escalation.role}}&status=available"`) so a
@@ -624,7 +629,14 @@ that clears the subject. A fill that leaves entries pending stays on the hold
 card, a refusal never returns, and a `follow` runs first. A station holding
 a row never returns: the hold a follow lands, by event or by its last look,
 keeps the station on it until the next scan. Without `scan_done` the done
-copy stays until the next scan. The value is validated
+copy stays until the next scan.
+
+The policy comes from the station's chosen queue when that queue declares
+`scan_done`; otherwise from the role of the row the act completed, which an
+executed bench or choice response names on `escalation.role`. A read-only station over several
+benches with no queue chosen returns by each row's own role, and `home` then
+resolves to that role's kiosk home. A station whose chosen queue declares a
+return lands there, whichever bench's row it completed. The value is validated
 where the role is written, like `badge_grant`, and set on the role page under
 Identity.
 
