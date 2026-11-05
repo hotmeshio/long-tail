@@ -68,7 +68,7 @@ export function createMockHandler(cfg: LTOAuthProviderConfig): ProviderHandler {
       return {
         provider: 'mock',
         providerUserId: data.sub || data.id || 'mock-user',
-        email: data.email || null,
+        email: data.email_verified === true && data.email ? data.email : null,
         displayName: data.name || null,
         raw: data,
       };

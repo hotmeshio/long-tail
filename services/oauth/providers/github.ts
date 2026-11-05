@@ -42,7 +42,8 @@ export function createGitHubHandler(cfg: LTOAuthProviderConfig): ProviderHandler
       ]);
       const user = await userRes.json();
       const emails: any[] = await emailRes.json().catch(() => []);
-      const primary = emails.find((e: any) => e.primary)?.email || emails[0]?.email || null;
+      const verified = emails.filter((e: any) => e.verified === true);
+      const primary = verified.find((e: any) => e.primary)?.email || verified[0]?.email || null;
       return {
         provider: 'github',
         providerUserId: String(user.id),

@@ -101,10 +101,14 @@ await start({
 3. Backend generates CSRF state + PKCE code verifier, redirects to Google's consent screen.
 4. Google redirects back to `GET /api/auth/oauth/google/callback` with an authorization code.
 5. Backend exchanges the code for tokens, fetches user info (email, name).
-6. If the user exists (matched by email or OAuth provider ID), they're logged in. If not and `autoProvision` is true and the email's domain is in `allowedDomains` (or no list is set), a new user is created. Accounts an administrator created by email sign in whatever their domain.
+6. If the user exists (matched by OAuth provider ID, or by verified email the first time), they're logged in. If not and `autoProvision` is true and the email's domain is in `allowedDomains` (or no list is set), a new user is created. Accounts an administrator created by email sign in whatever their domain. Otherwise the browser is sent back to the login page with a generic refusal; the reason (no account, or a domain outside `allowedDomains`) is logged, never shown.
 7. OAuth tokens are encrypted (AES-256-GCM) and stored in `lt_oauth_tokens`.
 8. A JWT is issued and the browser redirects to `/?token=<jwt>`.
 9. The dashboard's `useOAuthCallback` hook picks up the token and completes login.
+
+### What the Email Claim Means
+
+A provider's email reaches Long Tail only when the provider verified it. Google supplies `email_verified`, GitHub marks each address `verified`, and Microsoft vouches for an account only under a single-tenant authority (`OAUTH_MICROSOFT_TENANT_ID` set to the tenant id rather than `common`). Without a verified email a sign-in can neither self-provision nor match an invited account; it signs in only if its provider ID is already bound. The same rule sets the email shown on a credential connection.
 
 ### Token Storage
 

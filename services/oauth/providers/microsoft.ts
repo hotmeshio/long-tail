@@ -2,9 +2,13 @@ import type { LTOAuthProviderConfig } from '../../../types/oauth';
 
 import type { ProviderHandler } from './types';
 
+const MULTI_TENANT_AUTHORITIES = new Set(['common', 'organizations', 'consumers']);
+
 export function createMicrosoftHandler(cfg: LTOAuthProviderConfig): ProviderHandler {
   const redirectUri = cfg.redirectUri || '';
   const tenantId = process.env.OAUTH_MICROSOFT_TENANT_ID || 'common';
+  // Graph does not verify mail or the UPN. Only a single-tenant authority vouches for the account.
+  const singleTenant = !MULTI_TENANT_AUTHORITIES.has(tenantId);
   let _ms: any;
   async function getClient() {
     if (!_ms) {
@@ -47,7 +51,7 @@ export function createMicrosoftHandler(cfg: LTOAuthProviderConfig): ProviderHand
       return {
         provider: 'microsoft',
         providerUserId: data.id,
-        email: data.mail || data.userPrincipalName || null,
+        email: singleTenant ? data.mail || data.userPrincipalName || null : null,
         displayName: data.displayName || null,
         raw: data,
       };

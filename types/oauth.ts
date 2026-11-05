@@ -40,6 +40,7 @@ export interface LTOAuthStartConfig {
 export interface LTOAuthUserInfo {
   provider: string;
   providerUserId: string;
+  /** Present only when the provider verified the address. */
   email: string | null;
   displayName: string | null;
   raw: Record<string, any>;
