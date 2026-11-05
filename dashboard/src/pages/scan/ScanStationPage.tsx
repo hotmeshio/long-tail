@@ -174,14 +174,14 @@ export function ScanStationPage() {
     void followCode(following.follow.code);
   });
 
-  // Nothing arrived in time: one last look, then the done copy stands.
+  // Nothing arrived in time: one last look. A row found then is held; otherwise
+  // the completed act's copy stands on its own, since the replay's answer took the bench.
   useEffect(() => {
     if (!following) return;
     const remaining = following.at + following.follow.waitSeconds * 1000 - Date.now();
     const timer = setTimeout(async () => {
-      await followCode(following.follow.code);
-      // The replay's answer took the bench; the completed act's copy stands on its own.
-      setActDone({ at: Date.now(), markdown: following.markdown });
+      const held = await followCode(following.follow.code);
+      if (!held) setActDone({ at: Date.now(), markdown: following.markdown });
       setFollowing((current) => (current?.at === following.at ? null : current));
     }, Math.max(0, remaining));
     return () => clearTimeout(timer);
@@ -303,15 +303,15 @@ export function ScanStationPage() {
     : null;
   const done = actDone && (!benchDone || actDone.at > benchDone.at) ? actDone : benchDone;
 
-  // The row is complete and the station is not following it: return per the role.
+  // The row is complete, nothing is held and the station is not following: return per the role.
   useEffect(() => {
-    if (!done || following || !scanDone) return;
+    if (!done || following || subject || !scanDone) return;
     const path = scanDonePath(scanDone, kiosk.homePath);
     if (!path) return;
     const after = (scanDone.after_seconds ?? SCAN_DONE_AFTER_SECONDS_DEFAULT) * 1000;
     const timer = setTimeout(() => navigate(path), after);
     return () => clearTimeout(timer);
-  }, [done, following, scanDone, kiosk.homePath, navigate]);
+  }, [done, following, subject, scanDone, kiosk.homePath, navigate]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">

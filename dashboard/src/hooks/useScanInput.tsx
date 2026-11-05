@@ -82,7 +82,8 @@ interface ScanInputContextValue {
   /** Fold a response from outside the pipeline (an executed choice) into the held subject. */
   adoptResponse(response: ScanExecuteResponse): void;
   /** Replay a held code to follow its subject: the answer lands on the station, never navigates. */
-  followCode(code: string): Promise<void>;
+  /** Replay the held code quietly; true when the replay held a row. */
+  followCode(code: string): Promise<boolean>;
   /** A scan waiting on a badge; it replays once the badge primes. */
   pendingScan: PendingScan | null;
   /** Let go of the waiting scan. */
@@ -240,7 +241,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
   }, [subject]);
 
   /** POST one code and fold the answer into station state. `quiet` answers on the station only. */
-  const execute = useCallback(async (code: string, source: string, token: string | null, quiet = false) => {
+  const execute = useCallback(async (code: string, source: string, token: string | null, quiet = false): Promise<ScanExecuteResponse | null> => {
     setBusy(true);
     const at = Date.now();
     try {
@@ -261,8 +262,7 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
         setPendingScan(null);
         if (waiting && response.actingToken) {
           setLastResult({ code, source, at, response, error: null, navigated: false });
-          await execute(waiting.code, source, response.actingToken);
-          return;
+          return execute(waiting.code, source, response.actingToken);
         }
       } else if (isReplayable(response)) {
         // The act needs a badge: hold the scan and replay it once one primes.
@@ -279,8 +279,10 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
       }
       const navigated = quiet || navigateForResponse(response);
       setLastResult({ code, source, at, response, error: null, navigated });
+      return response;
     } catch (err: any) {
       setLastResult({ code, source, at, response: null, error: err.message, navigated: false });
+      return null;
     } finally {
       setBusy(false);
     }
@@ -295,7 +297,8 @@ export function ScanInputProvider({ children }: { children: ReactNode }) {
   }, [execute]);
 
   const followCode = useCallback(async (code: string) => {
-    await execute(code, SCAN_SOURCE_IDS.FOLLOW, actingTokenRef.current, true);
+    const response = await execute(code, SCAN_SOURCE_IDS.FOLLOW, actingTokenRef.current, true);
+    return response?.outcome === SCAN_OUTCOMES.HELD;
   }, [execute]);
 
   const dropSubject = useCallback(() => setSubject(null), []);

@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   subject: { current: null as unknown },
   pendingScan: { current: null as unknown },
   identity: { current: null as unknown },
-  followCode: vi.fn(async () => {}),
+  followCode: vi.fn(async () => false),
   kiosk: { current: { role: null as string | null, homePath: null as string | null } },
   roleDetails: { current: { roles: [] as unknown[] } },
 }));

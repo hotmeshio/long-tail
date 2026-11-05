@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   lastResult: { current: null as unknown },
   subject: { current: null as unknown },
-  followCode: vi.fn(async () => {}),
+  followCode: vi.fn(async () => false),
   kiosk: { current: { role: 'matching', homePath: '/escalations/available?role=matching&status=available' } },
   roleDetails: { current: { roles: [] as unknown[] } },
   handlers: [] as Array<(event: unknown) => void>,
@@ -148,6 +148,7 @@ describe('ScanStationPage — finishing', () => {
     const view = renderStation();
     mocks.followCode.mockImplementationOnce(async () => {
       mocks.lastResult.current = { code: '11:0:K7Q2M9XA', source: 'follow', at: Date.now(), error: null, navigated: true, response: { outcome: 'no_match_fallback', fallback: {} } };
+      return false;
     });
     await act(async () => { await vi.advanceTimersByTimeAsync(2_100); });
     expect(mocks.followCode).toHaveBeenCalledWith('11:0:K7Q2M9XA');
@@ -156,5 +157,26 @@ describe('ScanStationPage — finishing', () => {
     expect(screen.getByTestId('done-panel')).toHaveTextContent('Scan the next item');
     await act(async () => { await vi.advanceTimersByTimeAsync(1_100); });
     expect(mocks.navigate).toHaveBeenCalledWith('/escalations/available?role=matching&status=available');
+  });
+
+  it('a follow whose last look finds the next row holds it and never returns', async () => {
+    mocks.roleDetails.current = { roles: RETURNS };
+    const follow = { code: '11:0:K7Q2M9XA', roles: ['binning-associate'], waitSeconds: 2, target: { facet: 'orderId', value: 'K7Q2M9XA' } };
+    mocks.lastResult.current = completingFill({ follow });
+    const view = renderStation();
+    const held = { code: '11:0:K7Q2M9XA', escalationId: 'bin-row', label: 'K7Q2M9XA', headline: 'Bin the order: SF-A-3', expiresAt: new Date(Date.now() + 45_000).toISOString(), ttlMs: 45_000 };
+    // The hook holds the row before the replay resolves, so the hold is on screen first.
+    let resolveReplay: (held: boolean) => void = () => {};
+    mocks.followCode.mockImplementationOnce(() => new Promise<boolean>((resolve) => { resolveReplay = resolve; }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_100); });
+    expect(mocks.followCode).toHaveBeenCalledWith('11:0:K7Q2M9XA');
+    mocks.subject.current = held;
+    mocks.lastResult.current = { code: '11:0:K7Q2M9XA', source: 'follow', at: Date.now(), error: null, navigated: true, response: { outcome: 'held', subject: held } };
+    view.rerender(<MemoryRouter initialEntries={[{ pathname: '/scan/station' }]}><ScanStationPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText(/Bin the order: SF-A-3/)).toBeInTheDocument());
+    await act(async () => { resolveReplay(true); });
+    expect(screen.queryByTestId('done-panel')).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(mocks.navigate).not.toHaveBeenCalled();
   });
 });
