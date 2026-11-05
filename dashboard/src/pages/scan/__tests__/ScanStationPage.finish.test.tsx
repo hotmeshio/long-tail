@@ -24,7 +24,10 @@ vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { userId: 'st
 vi.mock('../../../hooks/useActingIdentity', () => ({
   useActingIdentity: () => ({ identity: null, clear: vi.fn(), settle: vi.fn(), remainingSeconds: () => 0 }),
 }));
-vi.mock('../../../hooks/useKioskMode', () => ({ useKioskMode: () => mocks.kiosk.current }));
+vi.mock('../../../hooks/useKioskMode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../hooks/useKioskMode')>()),
+  useKioskMode: () => mocks.kiosk.current,
+}));
 vi.mock('../../../api/roles', () => ({ useRoleDetails: () => ({ data: mocks.roleDetails.current }) }));
 vi.mock('../../../hooks/useEventContext', () => ({
   useEventSubscriptions: (patterns: string[], handler: (event: unknown) => void) => {

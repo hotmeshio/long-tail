@@ -3,12 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useActingIdentity } from '../../hooks/useActingIdentity';
 import { useViewerIdentity } from '../../hooks/useViewerIdentity';
-import { useKioskMode } from '../../hooks/useKioskMode';
+import { kioskHomePath, useKioskMode } from '../../hooks/useKioskMode';
 import { useEventSubscriptions } from '../../hooks/useEventContext';
 import { SCAN_CHOICES_STATE, useScanInput } from '../../hooks/useScanInput';
 import { useRoleDetails } from '../../api/roles';
 import { escalationPatterns } from '../../lib/events/subjects';
-import { readScanDone, scanDonePath, SCAN_DONE_AFTER_SECONDS_DEFAULT } from '../../lib/scan-done';
+import { readScanDone, resolveScanDoneReturn } from '../../lib/scan-done';
+import { portalsOf } from '../../lib/portal-path';
 import {
   executeScanChoice,
   SCAN_OUTCOMES,
@@ -55,10 +56,11 @@ function isBenchResponse(response: ScanExecuteResponse): boolean {
   }
 }
 
-/** A completed act's copy, shown large until the station moves on. */
+/** A completed act's copy, shown large until the station moves on, and the role of the row it completed. */
 interface DoneScreen {
   at: number;
   markdown: string;
+  role?: string;
 }
 
 /** The station waiting for the completed subject's next row. */
@@ -66,6 +68,7 @@ interface Following {
   at: number;
   follow: ScanFollow;
   markdown: string;
+  role?: string;
 }
 
 interface StationNotice {
@@ -106,12 +109,6 @@ export function ScanStationPage() {
   const [following, setFollowing] = useState<Following | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Where this station returns once an act completes its row, per its role.
-  const scanDone = useMemo(() => {
-    const role = kiosk.role ? roleDetails?.roles?.find((r) => r.role === kiosk.role) : undefined;
-    return readScanDone(role?.properties);
-  }, [kiosk.role, roleDetails]);
-
   // Adopt a CHOICES response arriving in route state, then drop it from
   // history so refresh/back land on the idle station, never a stale reality.
   // An autoSelect response skips the choice screen: the server would have
@@ -143,7 +140,7 @@ export function ScanStationPage() {
     }
     // A completing act that names the subject's next step: wait for that row.
     if (bench.outcome === SCAN_OUTCOMES.EXECUTED && bench.follow) {
-      setFollowing({ at: benchAt, follow: bench.follow, markdown: bench.done?.markdown ?? 'Done.' });
+      setFollowing({ at: benchAt, follow: bench.follow, markdown: bench.done?.markdown ?? 'Done.', role: bench.escalation?.role });
     }
   }, [bench, benchAt]);
 
@@ -181,7 +178,7 @@ export function ScanStationPage() {
     const remaining = following.at + following.follow.waitSeconds * 1000 - Date.now();
     const timer = setTimeout(async () => {
       const held = await followCode(following.follow.code);
-      if (!held) setActDone({ at: Date.now(), markdown: following.markdown });
+      if (!held) setActDone({ at: Date.now(), markdown: following.markdown, role: following.role });
       setFollowing((current) => (current?.at === following.at ? null : current));
     }, Math.max(0, remaining));
     return () => clearTimeout(timer);
@@ -224,7 +221,7 @@ export function ScanStationPage() {
           }
           if (result.done) {
             // The choice's own done copy takes the screen, badge first or second.
-            setActDone({ at: Date.now(), markdown: result.done.markdown });
+            setActDone({ at: Date.now(), markdown: result.done.markdown, role: result.escalation?.role });
             break;
           }
           // Done — back to idle, ready for the next item.
@@ -299,19 +296,31 @@ export function ScanStationPage() {
   const executedBench = bench?.outcome === SCAN_OUTCOMES.EXECUTED && isBenchResponse(bench) ? bench : null;
   const progress = subject && executedBench ? executedBench.progress : null;
   const benchDone: DoneScreen | null = executedBench && !subject
-    ? { at: benchAt, markdown: executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.') }
+    ? {
+        at: benchAt,
+        markdown: executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.'),
+        role: executedBench.escalation?.role,
+      }
     : null;
   const done = actDone && (!benchDone || actDone.at > benchDone.at) ? actDone : benchDone;
 
-  // The row is complete, nothing is held and the station is not following: return per the role.
+  // Where the station returns: the chosen queue's policy, else the completed row's role.
+  const completedRole = done?.role;
+  const scanDone = useMemo(() => {
+    const detailOf = (role: string | null | undefined) => (role ? roleDetails?.roles?.find((r) => r.role === role) : undefined);
+    const completed = detailOf(completedRole);
+    return resolveScanDoneReturn(
+      { policy: readScanDone(detailOf(kiosk.role)?.properties), homePath: kiosk.homePath },
+      completed ? { policy: readScanDone(completed.properties), homePath: kioskHomePath(completed.role, portalsOf(completed)) } : null,
+    );
+  }, [kiosk.role, kiosk.homePath, completedRole, roleDetails]);
+
+  // The row is complete, nothing is held and the station is not following: return per the policy.
   useEffect(() => {
     if (!done || following || subject || !scanDone) return;
-    const path = scanDonePath(scanDone, kiosk.homePath);
-    if (!path) return;
-    const after = (scanDone.after_seconds ?? SCAN_DONE_AFTER_SECONDS_DEFAULT) * 1000;
-    const timer = setTimeout(() => navigate(path), after);
+    const timer = setTimeout(() => navigate(scanDone.path), scanDone.afterMs);
     return () => clearTimeout(timer);
-  }, [done, following, subject, scanDone, kiosk.homePath, navigate]);
+  }, [done, following, subject, scanDone, navigate]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">

@@ -117,7 +117,7 @@ export async function accumulateIntoSubject(step: ScanStep, ctx: StepContext): P
     data: {
       outcome: SCAN_OUTCOMES.EXECUTED,
       verb: step.verb,
-      escalation: { id: subject.row.id, ...result.data },
+      escalation: { id: subject.row.id, role: subject.row.role, ...result.data },
       clearSubject: data.outcome === 'completed',
       ...(progress ? { progress } : {}),
     },

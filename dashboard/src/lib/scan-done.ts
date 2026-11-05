@@ -27,3 +27,24 @@ export function readScanDone(properties: Record<string, unknown> | null | undefi
 export function scanDonePath(policy: ScanDonePolicy, homePath: string | null): string | null {
   return policy.return === 'home' ? homePath : policy.return;
 }
+
+/** A role's return policy beside the home path its `'home'` resolves to. */
+export interface ScanDoneSource {
+  policy: ScanDonePolicy | null;
+  homePath: string | null;
+}
+
+/**
+ * Where the station goes, and when, once an act completes a row. A chosen
+ * station queue with its own policy wins; otherwise the completed row's role decides.
+ */
+export function resolveScanDoneReturn(
+  chosen: ScanDoneSource,
+  completed: ScanDoneSource | null,
+): { path: string; afterMs: number } | null {
+  const source = chosen.policy ? chosen : completed;
+  if (!source?.policy) return null;
+  const path = scanDonePath(source.policy, source.homePath);
+  if (!path) return null;
+  return { path, afterMs: (source.policy.after_seconds ?? SCAN_DONE_AFTER_SECONDS_DEFAULT) * 1000 };
+}

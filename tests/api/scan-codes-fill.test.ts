@@ -18,7 +18,7 @@ const SHOE = '00012345678905';
 const OTHER = '00036000291452';
 
 const orderRow = (pending: string[], keys = [`${SHOE}#1`, `${SHOE}#2`, OTHER]) =>
-  ({ id: 'order-row', metadata: { batch_pending: pending, batch_keys: keys } }) as any;
+  ({ id: 'order-row', role: 'matching', metadata: { batch_pending: pending, batch_keys: keys } }) as any;
 
 const ctx = (row: any, target = SHOE) => ({
   scheme: { version: 16, target_facet: 'upc' },
@@ -55,7 +55,7 @@ describe('fillStep', () => {
     fill.mockResolvedValue({ status: 200, data: { outcome: 'completed', remaining: 0, escalationId: 'order-row' } });
     const result = await fillStep(step, ctx(orderRow([`${SHOE}#2`])));
     expect(fill.mock.calls[0][0].itemKey).toBe(`${SHOE}#2`);
-    expect(result?.data).toMatchObject({ progress: { filled: 3, total: 3, remaining: 0 }, clearSubject: true });
+    expect(result?.data).toMatchObject({ progress: { filled: 3, total: 3, remaining: 0 }, clearSubject: true, escalation: { id: 'order-row', role: 'matching' } });
   });
 
   it('the done copy can say how far the order has come', async () => {
