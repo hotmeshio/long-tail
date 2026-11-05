@@ -1,5 +1,5 @@
 import type { ScanPresentedChoice } from '../scan-choice';
-import type { ScanFactFormat, ScanOutcome, ScanVerb } from './constants';
+import type { ScanFactFormat, ScanOutcome, ScanTargetMatch, ScanVerb } from './constants';
 import type { ScanRuleFallback, ScanStepParams, ScanStepQuery } from './rule';
 
 export interface ParsedScanCode {
@@ -75,7 +75,7 @@ export interface ScanExecuteResponse {
   escalations?: Record<string, any>[];
   total?: number;
   /** Query the client uses to build the list-page URL (show-list). */
-  listQuery?: ScanStepQuery & { targetFacet: string; target: string };
+  listQuery?: ScanStepQuery & { targetFacet: string; target: string; targetMatch: ScanTargetMatch };
   pendingAction?: ScanPendingAction;
   fallback?: ScanRuleFallback;
   /** The "scan your badge" screen (NOT_PRIMED, or beside withheld choices). */

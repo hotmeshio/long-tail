@@ -5,6 +5,7 @@ import { ensureEscalationCompatView } from './client';
 import { publishEscalationChange } from './crud';
 import { toEscalationRecord } from './map';
 import type { ClaimResult } from './types';
+import type { FacetValue } from '../../types/facets';
 
 /**
  * Claims one named row, the same claim `claimByMetadata` makes on the row it
@@ -39,7 +40,7 @@ RETURNING e.*, target.prior_assigned_to
 export async function claimAssertedByMetadata(
   id: string,
   key: string,
-  value: string,
+  value: FacetValue,
   userId: string,
   durationMinutes = 30,
   metadata?: Record<string, any>,

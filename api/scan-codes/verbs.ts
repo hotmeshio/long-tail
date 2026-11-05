@@ -22,6 +22,7 @@ import {
   targetFilter,
   templated,
   type StepContext,
+  targetValue,
 } from './context';
 import { spendGrant } from './grant';
 import { holdStep } from './hold';
@@ -43,7 +44,7 @@ export async function claimStep(
   if (notPrimed) return notPrimed;
   const result = await claimByMetadata({
     key: ctx.scheme.target_facet,
-    value: ctx.parsed.target,
+    value: targetValue(ctx),
     durationMinutes: step.params?.durationMinutes,
     metadata: { ...metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
@@ -74,7 +75,7 @@ export async function resolveStep(
   if (notPrimed) return notPrimed;
   const result = await resolveByMetadata({
     key: ctx.scheme.target_facet,
-    value: ctx.parsed.target,
+    value: targetValue(ctx),
     resolverPayload: rendered.resolverPayload,
     metadata: { ...rendered.metadata, ...provenance(ctx) },
     restrictRoles: step.query?.roles,
@@ -117,7 +118,7 @@ export async function escalateStep(
     role: step.params!.targetRole!,
     description: step.params?.description ?? ctx.rule.name,
     metadata: {
-      [ctx.scheme.target_facet]: ctx.parsed.target,
+      [ctx.scheme.target_facet]: targetValue(ctx),
       ...interpolatedMetadata(step, ctx),
       ...provenance(ctx),
     },
@@ -223,7 +224,7 @@ export async function cancelStep(
   if (notPrimed) return notPrimed;
   const claimed = await claimByMetadata({
     key: ctx.scheme.target_facet,
-    value: ctx.parsed.target,
+    value: targetValue(ctx),
     metadata: provenance(ctx),
     restrictRoles: step.query?.roles,
     assertId: presentedId,

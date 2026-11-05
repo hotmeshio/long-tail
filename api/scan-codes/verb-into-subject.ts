@@ -11,7 +11,7 @@ import {
   type ScanStep,
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
-import { conflict, refused, withDone, type StepContext } from './context';
+import { conflict, refused, targetValue, withDone, type StepContext } from './context';
 import { identityGate, spendGrant } from './grant';
 import { claimedByOther } from './subject';
 import { already, bags, claimGuard, failedAdd, matchGuard, rendered } from './verbs-subject';
@@ -37,7 +37,7 @@ async function locateItem(step: ScanStep, ctx: StepContext): Promise<ItemLocate>
     roles: roles ?? undefined,
     types: selector.types,
     subtypes: selector.subtypes,
-    facets: { ...selector.facets, [ctx.scheme.target_facet]: ctx.parsed.target },
+    facets: { ...selector.facets, [ctx.scheme.target_facet]: targetValue(ctx) },
     status: 'pending',
     exists: [ESCALATION_ACCUMULATE_KEYS.COUNT],
     limit: 3,

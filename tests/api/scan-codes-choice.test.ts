@@ -78,6 +78,16 @@ describe('executeScanChoice — the pointer is never authority', () => {
     expect(row2.id).toBe('esc-1');
   });
 
+  it('a row whose facet holds a list dispatches on its first member, pinned to the presented row', async () => {
+    const listed = { id: 'esc-1', metadata: { serialNumber: ['SER-9', 'SER-10'] } } as any;
+    esc.getEscalation.mockResolvedValue(listed);
+    locate.mockResolvedValue({ escalations: [listed], total: 1 });
+    await executeScanChoice(pointer, auth);
+    const [, ctx, row2] = claim.mock.calls[0];
+    expect(ctx.parsed.target).toBe('SER-9');
+    expect(row2.id).toBe('esc-1');
+  });
+
   it('a stale pointer (config edited away) is UNCONFIGURED', async () => {
     svc.getScanRule.mockResolvedValue({ ...rule, steps: [] });
     const result = await executeScanChoice(pointer, auth);

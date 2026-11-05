@@ -22,6 +22,7 @@ import {
   withDone,
   type HeldSubject,
   type StepContext,
+  targetValue,
 } from './context';
 import { identityGate, spendGrant } from './grant';
 import { claimedByOther } from './subject';
@@ -71,7 +72,7 @@ async function locateContainer(step: ScanStep, ctx: StepContext): Promise<LTEsca
     roles: roles ?? undefined,
     types: selector?.types,
     subtypes: selector?.subtypes,
-    facets: { ...selector?.facets, [ctx.scheme.target_facet]: ctx.parsed.target },
+    facets: { ...selector?.facets, [ctx.scheme.target_facet]: targetValue(ctx) },
     status: 'pending',
     exists: [ESCALATION_ACCUMULATE_KEYS.COUNT],
     limit: 2,

@@ -13,7 +13,7 @@ const roles = vi.mocked(roleService);
 
 const BADGE: ScanScheme = {
   version: 12, name: 'Badge', description: null, target_facet: 'badge_id', encoding: 'delimited', delimiter: ':',
-  target_length: null, kind: 'identity', grant_ttl_seconds: 60, grant_max_uses: 1, grant_scope: 'action', enabled: true,
+  target_length: null, kind: 'identity', grant_ttl_seconds: 60, grant_max_uses: 1, grant_scope: 'action', enabled: true, patterns: [], precedes_gtin: false, target_match: 'value',
 };
 const station = (...memberOf: string[]) => ({ id: 'station-1', roles: memberOf.map((role) => ({ role })) }) as any;
 const props: Record<string, Record<string, unknown>> = {

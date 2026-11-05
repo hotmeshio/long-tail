@@ -52,9 +52,15 @@ export interface ScanScheme {
   name: string;
   description: string | null;
   target_facet: string;
-  encoding: 'fixed' | 'delimited' | 'gtin';
+  encoding: 'fixed' | 'delimited' | 'gtin' | 'pattern';
   delimiter: string;
   target_length: number | null;
+  /** Pattern encoding: regular expressions over the whole code. */
+  patterns: string[];
+  /** Pattern encoding: which reads a digits-only code first beside a gtin scheme; null until declared. */
+  precedes_gtin: boolean | null;
+  /** How the target matches the target facet: one value, or a member of a list. */
+  target_match: 'value' | 'member';
   kind: ScanSchemeKind;
   /** Identity kind only: how long a minted acting grant lives (1–86400 s). */
   grant_ttl_seconds: number | null;
@@ -240,7 +246,7 @@ export interface ScanExecuteResponse {
   escalation?: { id: string; role: string; status: string } & Record<string, unknown>;
   escalations?: Record<string, unknown>[];
   total?: number;
-  listQuery?: Record<string, unknown> & { targetFacet: string; target: string };
+  listQuery?: Record<string, unknown> & { targetFacet: string; target: string; targetMatch?: 'value' | 'member' };
   pendingAction?: ScanPendingAction;
   fallback?: ScanRuleFallback;
   /** The "scan your badge" screen (NOT_PRIMED, or beside withheld choices). */

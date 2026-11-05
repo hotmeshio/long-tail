@@ -13,6 +13,7 @@ import { actingIdentitySatisfied } from './identity';
 import { peekGrant, settleGrant } from './grant';
 import { assertReadAccess } from '../escalations/helpers';
 import { conflict, notPrimed, refused, templateContext, withDone, type StepContext } from './context';
+import { facetTarget } from '../../shared/scan-code';
 import { choiceOffered } from './present';
 import { holdsChoiceRole } from './choice-roles';
 import { actionRefusal } from '../../shared/form-validation/x-lt-actions';
@@ -94,8 +95,8 @@ export async function executeScanChoice(
       return stampPointer(conflict('the item is no longer in the presented state'), rule, input);
     }
     const row = loaded;
-    const target = row?.metadata?.[scheme.target_facet];
-    if (!row || typeof target !== 'string' || !target) {
+    const target = facetTarget(row?.metadata?.[scheme.target_facet]);
+    if (!row || !target) {
       return {
         status: 200,
         data: { outcome: SCAN_OUTCOMES.UNCONFIGURED, error: `escalation does not carry the scheme facet "${scheme.target_facet}"` },

@@ -16,6 +16,7 @@ import {
 } from './map';
 import type { CreateEscalationInput, ClaimResult } from './types';
 import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
+import type { FacetValue } from '../../types/facets';
 
 /**
  * Every escalation write publishes an event AND drops this container's cached
@@ -637,7 +638,7 @@ export async function findByMetadata(
  */
 export async function claimByMetadata(
   key: string,
-  value: string,
+  value: FacetValue,
   userId: string,
   durationMinutes = 30,
   metadata?: Record<string, any>,
@@ -718,7 +719,7 @@ export interface ResolveByMetadataResult {
  */
 export async function resolveByMetadataAtomic(
   key: string,
-  value: string,
+  value: FacetValue,
   userId: string,
   resolverPayload: Record<string, any>,
   metadata?: Record<string, any>,

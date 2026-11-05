@@ -1000,13 +1000,16 @@ export const upsertScanSchemeSchema = z.object({
   name: z.string().describe('Scheme display name'),
   description: z.string().optional(),
   target_facet: z.string().describe("The metadata key the target resolves against: an escalation metadata key for action schemes, an lt_users.metadata key (e.g. badge_id) for identity schemes"),
-  encoding: z.enum(['fixed', 'delimited', 'gtin']).optional().describe('fixed = digits only with a scheme prefix, delimited = text with separators, gtin = manufacturer barcodes (UPC-A/EAN-13/EAN-8/GTIN-14) with no prefix; one rule, category 0'),
+  encoding: z.enum(['fixed', 'delimited', 'gtin', 'pattern']).optional().describe('fixed = digits only with a scheme prefix, delimited = text with separators, gtin = manufacturer barcodes (UPC-A/EAN-13/EAN-8/GTIN-14) with no prefix; one rule, category 0; pattern = codes matched by declared regular expressions with no prefix, the code is the target; one rule, category 0'),
   delimiter: z.string().optional().describe('Separator character for delimited encoding (default ":")'),
   target_length: z.number().int().min(1).optional().describe('Target digit count for fixed encoding'),
   kind: z.enum(['action', 'identity']).optional().describe("action = ECA steps over escalations (default); identity = a badge that mints a short-lived acting-identity grant"),
   grant_ttl_seconds: z.number().int().min(1).max(86400).optional().describe('Identity kind: how long a minted acting grant lives'),
   grant_max_uses: z.number().int().min(0).optional().describe('Identity kind: 0 = TTL-bound; n = the grant covers n acts'),
   grant_scope: z.enum(['action', 'subject']).optional().describe("Identity kind: 'action' spends a use per act (default); 'subject' binds to the first held subject it acts on and acts on it freely"),
+  patterns: z.array(z.string()).max(10).optional().describe('Pattern encoding: 1-10 regular expressions over the whole code, e.g. "1Z[0-9A-Z]{16}"'),
+  precedes_gtin: z.boolean().nullable().optional().describe('Pattern encoding: which reads a digits-only code first beside an enabled gtin scheme; true = these patterns, false = the gtin scheme. Required while an enabled gtin scheme exists'),
+  target_match: z.enum(['value', 'member']).optional().describe("'value' = the target facet holds one value (default); 'member' = the facet holds a list and a row matches when the list contains the target (action schemes)"),
   enabled: z.boolean().optional(),
 });
 

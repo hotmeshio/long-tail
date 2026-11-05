@@ -5,7 +5,7 @@ vi.mock('../../services/escalation', () => ({ searchByFacets: vi.fn(), listEscal
 
 import { getEscalationReadScope } from '../../api/escalations/helpers';
 import * as escalationService from '../../services/escalation';
-import { locateForStep } from '../../api/scan-codes/locate';
+import { locateForStep, locateStep } from '../../api/scan-codes/locate';
 import type { ScanStep } from '../../types';
 
 const search = vi.mocked(escalationService.searchByFacets);
@@ -48,5 +48,18 @@ describe('locateForStep', () => {
   it('a scope with no matching roles locates nothing', async () => {
     expect(await locateForStep({ query: { roles: ['ship'] }, verb: 'show-detail' }, ctx, 1)).toBeNull();
     expect(search).not.toHaveBeenCalled();
+  });
+
+  it('a list-valued target facet searches by membership', async () => {
+    const member = { ...ctx, scheme: { ...ctx.scheme, target_facet: 'trackingNumbers', target_match: 'member' } };
+    await locateForStep({ query: { roles: ['bin'] }, verb: 'hold' }, member, 1);
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({ facets: { trackingNumbers: ['SF-A-2'] } }));
+  });
+
+  it('a show-list names how its target matches, for the list link', async () => {
+    search.mockResolvedValue({ escalations: [{ id: 'e1' }, { id: 'e2' }] as any, total: 2 });
+    const member = { ...ctx, scheme: { ...ctx.scheme, target_facet: 'trackingNumbers', target_match: 'member' } };
+    const result = await locateStep({ query: { roles: ['bin'] }, verb: 'show-list' }, member);
+    expect(result?.data?.listQuery).toMatchObject({ targetFacet: 'trackingNumbers', target: 'SF-A-2', targetMatch: 'member' });
   });
 });

@@ -1131,7 +1131,7 @@ POST /api/escalations/resolve-batch-item-by-signal-key
 POST /api/escalations/resolve-batch-item-by-metadata
 ```
 
-Submit ONE declared item of a batch escalation (a `conditional` wait created with `batch: [...]`). Interim items answer `{ outcome: 'accepted', remaining }`; the LAST item answers `{ outcome: 'completed', remaining: 0, signaled, escalationId, workflowId }` and the waiting workflow resumes with the full collection, in the same statement. Each item validates against the row's versioned role form (canonical 422). Duplicates answer 409 (`Batch item already submitted`), undeclared keys 400, a non-batch row 400.
+Submit ONE declared item of a batch escalation (a `conditional` wait created with `batch: [...]`). Interim items answer `{ outcome: 'accepted', remaining }`; the LAST item answers `{ outcome: 'completed', remaining: 0, signaled, escalationId, workflowId }` and the waiting workflow resumes with the full collection, in the same statement. On a wait declared with `wakeOnFill` for the key, a fill with items remaining answers `{ outcome: 'woke', remaining, signaled, escalationId, workflowId }`: the row resolves and the workflow resumes with the items so far and `$trigger: 'fill'`. Each item validates against the row's versioned role form (canonical 422). Duplicates answer 409 (`Batch item already submitted`), undeclared keys 400, a non-batch row 400.
 
 **Body (by id):** `{ itemKey, resolverPayload, metadata?, assertClaim? }`. **By signal key:** `{ signalKey, itemKey, resolverPayload, metadata? }`. **By metadata:** `{ key, value, itemKey, resolverPayload, metadata?, restrictRoles? }`.
 

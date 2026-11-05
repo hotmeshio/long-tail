@@ -85,6 +85,12 @@ describe('accumulateFromSubject', () => {
     expect(add).not.toHaveBeenCalled();
   });
 
+  it('a list-valued target facet locates the container by membership', async () => {
+    const member = { ...ctx(), scheme: { version: 14, target_facet: 'binCodes', target_match: 'member' } };
+    await accumulateFromSubject(fromSubject({ match: undefined }), member);
+    expect(search.mock.calls[0][0]).toMatchObject({ facets: { binCodes: ['SF-A-2'] } });
+  });
+
   it('match.facets compares the container with the subject', async () => {
     const step = fromSubject({ match: { facets: ['boxKey'] }, refuse: { markdown: 'Wrong box.' } });
     search.mockResolvedValue({ escalations: [{ ...TUB, metadata: { boxKey: 'SF:NY' } }], total: 1 } as any);

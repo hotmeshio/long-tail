@@ -1,7 +1,7 @@
 import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
 import { resolveBatchItem } from '../escalations/resolve-batch';
-import { ESCALATION_BATCH_KEYS } from '../../types/escalation';
+import { BATCH_ITEM_OUTCOMES, ESCALATION_BATCH_KEYS } from '../../types/escalation';
 import {
   SCAN_FILL_SEPARATOR_DEFAULT,
   SCAN_OUTCOMES,
@@ -133,7 +133,8 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
     }, ctx.auth);
     if (result.status === 200) {
       const data = result.data as { outcome: string; remaining?: number };
-      const done = data.outcome === 'completed';
+      // A fill that woke the wait (`woke`) is interim here: the next round carries the rest.
+      const done = data.outcome === BATCH_ITEM_OUTCOMES.COMPLETED;
       const filled = progress(batch, batch.pending.length - (done ? 0 : (data.remaining ?? 0)));
       const next = pendingCopy(batch.pending.filter((k) => k !== itemKey), separator, labeler).next;
       return withDone({

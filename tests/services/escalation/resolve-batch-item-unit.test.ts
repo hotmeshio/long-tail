@@ -86,6 +86,18 @@ describe('resolveBatchItem (service)', () => {
     expect((event.data as any).remaining).toBe(1);
   });
 
+  it('publishes escalation.resolved when a fill wakes the wait, with the remaining count', async () => {
+    mockClient.resolveBatchItem.mockResolvedValue({
+      ok: true, outcome: 'woke', remaining: 1, entry: makeEntry({ status: 'resolved' }),
+    });
+    const result = await resolveBatchItem(ESC_ID, 'cut', { ok: true });
+    expect(result).toMatchObject({ outcome: 'woke', remaining: 1 });
+    const event = mockPublish.mock.calls[0][0];
+    expect(event.type).toBe('escalation.resolved');
+    expect(event.status).toBe('resolved');
+    expect((event.data as any).remaining).toBe(1);
+  });
+
   it('publishes escalation.resolved on the completing fill', async () => {
     mockClient.resolveBatchItem.mockResolvedValue({
       ok: true, outcome: 'completed', remaining: 0, entry: makeEntry({ status: 'resolved' }),

@@ -75,6 +75,13 @@ export function metadataFacetsUrl(pairs: Record<string, unknown>, role?: string 
   return `/escalations/available?facets=${facets}${FACET_SEARCH_TAIL}`;
 }
 
+/** A deep link to rows whose list-valued facet holds `member` (containment on a one-item list). */
+export function metadataMembersUrl(key: string, member: string, role?: string | null): string {
+  const facets = encodeURIComponent(JSON.stringify({ [key]: [member] }));
+  const roleParam = role ? `role=${encodeURIComponent(role)}&` : '';
+  return `/escalations/available?${roleParam}facets=${facets}${FACET_SEARCH_TAIL}`;
+}
+
 /** Single-pair convenience over metadataFacetsUrl. */
 export function metadataFacetUrl(key: string, value: unknown, role?: string | null): string {
   return metadataFacetsUrl({ [key]: value }, role);

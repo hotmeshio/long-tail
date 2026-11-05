@@ -7,6 +7,7 @@ import type {
   ScanFactFormat,
   ScanGrantScope,
   ScanSchemeKind,
+  ScanTargetMatch,
   ScanVerb,
 } from './constants';
 
@@ -23,6 +24,16 @@ export interface ScanScheme {
   encoding: ScanEncoding;
   delimiter: string;
   target_length: number | null;
+  /** Pattern encoding only: regular expressions over the whole code. */
+  patterns: string[];
+  /**
+   * Pattern encoding only: which reads a digits-only code first beside an
+   * enabled gtin scheme (true, these patterns; false, the gtin scheme).
+   * Null until declared; required while an enabled gtin scheme exists.
+   */
+  precedes_gtin: boolean | null;
+  /** How the target matches the target facet: one value, or a member of a list. */
+  target_match: ScanTargetMatch;
   kind: ScanSchemeKind;
   /** Identity kind only: how long a minted acting grant lives (1–86400 s). */
   grant_ttl_seconds: number | null;

@@ -58,6 +58,18 @@ describe('fillStep', () => {
     expect(result?.data).toMatchObject({ progress: { filled: 3, total: 3, remaining: 0 }, clearSubject: true, escalation: { id: 'order-row', role: 'matching' } });
   });
 
+  it('a fill that wakes the wait is interim at the station: the subject stays held with its progress', async () => {
+    fill.mockResolvedValue({ status: 200, data: { outcome: 'woke', remaining: 2, escalationId: 'order-row' } });
+    const result = await fillStep(step, ctx(orderRow([`${SHOE}#1`, `${SHOE}#2`, OTHER])));
+    expect(result?.data).toMatchObject({
+      outcome: SCAN_OUTCOMES.EXECUTED,
+      progress: { filled: 1, total: 3, remaining: 2 },
+      escalation: { id: 'order-row', role: 'matching', outcome: 'woke' },
+    });
+    expect(result?.data?.clearSubject).toBeUndefined();
+    expect(result?.data?.follow).toBeUndefined();
+  });
+
   it('the done copy can say how far the order has come', async () => {
     fill.mockResolvedValue({ status: 200, data: { outcome: 'accepted', remaining: 2 } });
     const result = await fillStep({ ...step, done: { markdown: '{fill.filled} of {fill.total} checked off.' } }, ctx(orderRow([`${SHOE}#1`, `${SHOE}#2`, OTHER])));

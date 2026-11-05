@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFacetParams, writeFacetParams, facetCount, metadataFacetsUrl, metadataFacetUrl } from '../facet-url';
+import { parseFacetParams, writeFacetParams, facetCount, metadataFacetsUrl, metadataFacetUrl, metadataMembersUrl } from '../facet-url';
 
 describe('facet-url — deep-link round-trip', () => {
   it('round-trips a full faceted query through URL params', () => {
@@ -88,5 +88,20 @@ describe('metadataFacetsUrl — a facet search lands in the dense table, newest-
     expect(params.get('facets')).toBe(JSON.stringify({ orderId: 'ORD-001' }));
     expect(params.get('view')).toBe('table');
     expect(params.get('orderBy')).toBe(JSON.stringify([{ field: 'created_at', direction: 'desc' }]));
+  });
+});
+
+describe('metadataMembersUrl — rows whose list facet holds a member', () => {
+  it('filters on a one-item list with the role and the table defaults', () => {
+    const url = metadataMembersUrl('trackingNumbers', '1Z1380B21BB46041B0', 'receiving');
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('facets')).toBe(JSON.stringify({ trackingNumbers: ['1Z1380B21BB46041B0'] }));
+    expect(params.get('role')).toBe('receiving');
+    expect(params.get('view')).toBe('table');
+    expect(parseFacetParams(params).facets).toEqual({ trackingNumbers: ['1Z1380B21BB46041B0'] });
+  });
+
+  it('leaves the role out when none is given', () => {
+    expect(new URLSearchParams(metadataMembersUrl('trackingNumbers', 'X').split('?')[1]).get('role')).toBeNull();
   });
 });

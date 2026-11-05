@@ -4,6 +4,7 @@ import {
   SCAN_FOLLOW_WAIT_DEFAULT_SECONDS,
   SCAN_OUTCOMES,
   SCAN_PROVENANCE_KEYS,
+  SCAN_TARGET_MATCH,
   isEffectivelyClaimed,
   type LTEscalationRecord,
   type ParsedScanCode,
@@ -54,7 +55,16 @@ export interface StepContext {
 }
 
 export function targetFilter(step: ScanStep, ctx: StepContext): Record<string, any> {
-  return { [ctx.scheme.target_facet]: ctx.parsed.target, ...(step.query?.facets ?? {}) };
+  return { [ctx.scheme.target_facet]: targetValue(ctx), ...(step.query?.facets ?? {}) };
+}
+
+/**
+ * The value the target facet contains on a matching row: the target, or a
+ * one-item list when the scheme's facet holds a list (`metadata @>` then
+ * matches membership).
+ */
+export function targetValue(ctx: Pick<StepContext, 'scheme' | 'parsed'>): string | string[] {
+  return ctx.scheme.target_match === SCAN_TARGET_MATCH.MEMBER ? [ctx.parsed.target] : ctx.parsed.target;
 }
 
 export function templateContext(ctx: StepContext): scanCodeService.ScanTemplateContext {

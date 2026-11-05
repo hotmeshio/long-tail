@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../services/escalation', () => ({ getEscalation: vi.fn() }));
+vi.mock('../../services/escalation', () => ({ getEscalation: vi.fn(), searchByFacets: vi.fn() }));
 vi.mock('../../services/user', () => ({ getUser: vi.fn() }));
 vi.mock('../../api/escalations/helpers', () => ({ assertReadAccess: vi.fn() }));
 
@@ -17,7 +17,7 @@ const readAccess = vi.mocked(assertReadAccess);
 const ROW_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const BAG: ScanScheme = {
   version: 11, name: 'Bag', description: null, target_facet: 'orderSlug', encoding: 'delimited', delimiter: ':',
-  target_length: null, kind: 'action', grant_ttl_seconds: null, grant_max_uses: 0, grant_scope: 'action', enabled: true,
+  target_length: null, kind: 'action', grant_ttl_seconds: null, grant_max_uses: 0, grant_scope: 'action', enabled: true, patterns: [], precedes_gtin: false, target_match: 'value',
 };
 const BADGE: ScanScheme = { ...BAG, version: 12, kind: 'identity', target_facet: 'badge_id' };
 const station = { userId: 'station-1' };
@@ -56,6 +56,38 @@ describe('resolveSubject — the pointer is never authority', () => {
     esc.getEscalation.mockResolvedValue(bagRow());
     readAccess.mockResolvedValue({ status: 403, error: 'no' });
     expect(await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station)).toEqual({ ok: false });
+  });
+
+  it('a row whose facet lists the code holds as the subject, and a list without it is stale', async () => {
+    esc.getEscalation.mockResolvedValue(bagRow({ metadata: { orderSlug: ['P3R8T1ZB', 'K7Q2M9XA'] } }));
+    expect(await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station))
+      .toMatchObject({ ok: true, subject: { parsed: { target: 'K7Q2M9XA' } } });
+    esc.getEscalation.mockResolvedValue(bagRow({ metadata: { orderSlug: ['P3R8T1ZB'] } }));
+    expect(await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station)).toEqual({ ok: false });
+  });
+
+  it('a row a fill resolved to wake its wait continues as the workflow\'s next round', async () => {
+    const NEXT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    esc.getEscalation.mockResolvedValue(bagRow({ status: 'resolved', workflow_id: 'wf-1', resolver_payload: JSON.stringify({ a: {}, $trigger: 'fill' }) }));
+    esc.searchByFacets.mockResolvedValue({ escalations: [
+      bagRow({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', workflow_id: 'wf-other' }),
+      bagRow({ id: NEXT_ID, workflow_id: 'wf-1' }),
+    ], total: 2 } as any);
+    const result = await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station);
+    expect(result).toMatchObject({ ok: true, subject: { row: { id: NEXT_ID }, code: '11:0:K7Q2M9XA' } });
+    expect(esc.searchByFacets).toHaveBeenCalledWith(expect.objectContaining({
+      roles: ['binning-associate'], facets: { orderSlug: 'K7Q2M9XA' }, status: 'pending',
+    }));
+  });
+
+  it('the next round is stale until it is parked, and a row resolved any other way never moves', async () => {
+    esc.getEscalation.mockResolvedValue(bagRow({ status: 'resolved', workflow_id: 'wf-1', resolver_payload: JSON.stringify({ $trigger: 'fill' }) }));
+    esc.searchByFacets.mockResolvedValue({ escalations: [], total: 0 } as any);
+    expect(await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station)).toEqual({ ok: false });
+    esc.searchByFacets.mockClear();
+    esc.getEscalation.mockResolvedValue(bagRow({ status: 'resolved', workflow_id: 'wf-1', resolver_payload: JSON.stringify({ a: {} }) }));
+    expect(await resolveSubject({ code: '11:0:K7Q2M9XA', escalationId: ROW_ID }, [BAG], station)).toEqual({ ok: false });
+    expect(esc.searchByFacets).not.toHaveBeenCalled();
   });
 
   it('a badge is never a subject', async () => {

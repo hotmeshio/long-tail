@@ -105,6 +105,7 @@ export async function locateStep(
           ...step.query,
           targetFacet: ctx.scheme.target_facet,
           target: ctx.parsed.target,
+          targetMatch: ctx.scheme.target_match,
         },
       },
     };

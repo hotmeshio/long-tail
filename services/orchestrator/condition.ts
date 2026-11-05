@@ -167,6 +167,12 @@ function toEngineConfig(
  * already satisfied go in `filled` (hotmesh 0.31.0+), keyed by item key
  * with `payload`, `at` from the source of record, and an optional `actor`;
  * the row starts with that progress and delivers them with the collection.
+ * Add `wakeOnFill: true` (or a list of keys, hotmesh 0.32.0+) and a fill
+ * resumes the wait with the items so far, `$filled: [itemKey]`, `$filledAt`,
+ * `$filledBy` and `$trigger: 'fill'`, so the workflow acts on each item as it
+ * lands; park the next round with every fill carried forward in `filled`,
+ * built from `$filledAt` and `$filledBy`. The last key completes as on any
+ * batch.
  *
  * **Open accumulation — items arrive over time (hotmesh 0.29.0+).** Declare
  * `accumulate` and the escalation holds items added via `accumulateItem`

@@ -101,6 +101,24 @@ export const ESCALATION_BATCH_KEYS = {
   FLAGS: 'batch_flags',
   /** Envelope: set by `wakeOnFlag`; a flag ends the wait. */
   WAKE_ON_FLAG: 'batch_wake_on_flag',
+  /** Envelope: set by `wakeOnFill` (`true` or its keys); a fill ends the wait. */
+  WAKE_ON_FILL: 'batch_wake_on_fill',
+} as const;
+
+/** Reserved resolver-payload key: what ended a batch or accumulator wait. */
+export const ESCALATION_TRIGGER_KEY = '$trigger';
+
+/** The trigger a fill records when it wakes a `wakeOnFill` wait. */
+export const ESCALATION_TRIGGER_FILL = 'fill';
+
+/** The successful outcomes of a batch-item fill. */
+export const BATCH_ITEM_OUTCOMES = {
+  /** The last item: the row resolved and the wait resumed with every item. */
+  COMPLETED: 'completed',
+  /** An interim fill: the row stays pending. */
+  ACCEPTED: 'accepted',
+  /** The wait declared `wakeOnFill` for this key: the row resolved early with the items so far. */
+  WOKE: 'woke',
 } as const;
 
 /**
