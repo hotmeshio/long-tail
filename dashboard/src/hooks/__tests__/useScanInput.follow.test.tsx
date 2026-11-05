@@ -44,7 +44,9 @@ describe('useScanInput — following a subject', () => {
   it('a replay that finds nothing yet stays on the station, whatever the fallback route', async () => {
     const { result } = renderHook(() => useScanInput(), { wrapper });
     execute.mockResolvedValueOnce({ outcome: 'no_match_fallback', fallback: { markdown: 'Nothing yet.', route: '/somewhere' } });
-    await act(() => result.current.followCode('11:0:K7Q2M9XA'));
+    let held: boolean | undefined;
+    await act(async () => { held = await result.current.followCode('11:0:K7Q2M9XA'); });
+    expect(held).toBe(false);
     expect(execute).toHaveBeenLastCalledWith('11:0:K7Q2M9XA', expect.objectContaining({ stationRole: 'matching' }));
     expect(navigate).not.toHaveBeenCalled();
     expect(result.current.lastResult?.navigated).toBe(true);
@@ -57,7 +59,9 @@ describe('useScanInput — following a subject', () => {
       outcome: 'held',
       subject: { code: '11:0:K7Q2M9XA', escalationId: 'bin-row', label: 'K7Q2M9XA', headline: 'SF-A-3', expiresAt: new Date(Date.now() + 45_000).toISOString() },
     });
-    await act(() => result.current.followCode('11:0:K7Q2M9XA'));
+    let held: boolean | undefined;
+    await act(async () => { held = await result.current.followCode('11:0:K7Q2M9XA'); });
+    expect(held).toBe(true);
     expect(result.current.subject?.headline).toBe('SF-A-3');
     expect(navigate).not.toHaveBeenCalled();
   });

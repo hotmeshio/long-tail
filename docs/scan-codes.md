@@ -374,9 +374,10 @@ done copy up and waits for the subject's next pending row in those roles: the
 row's `created` event replays the held code, the rule's hold step for that
 role answers, and the new row is held without scanning the item again. At
 Matching the last shoe box completes the matching row and the station flips
-to the order's binning hold a moment later. When no row appears within
-`waitSeconds` (default 10, at most 120), the done copy stands and the
-station returns as its role says.
+to the order's binning hold a moment later. When no event arrives within
+`waitSeconds` (default 10, at most 120), the station takes one last look: a
+row found then is held, exactly as if its event had arrived. Otherwise the
+done copy stands and the station returns as its role says.
 
 ```jsonc
 { "query": {}, "verb": "fill", "subject": { "schemes": [11] },
@@ -620,8 +621,10 @@ a dashboard-relative route; `after_seconds` (0-60, default 2) is how long the
 done copy stays up first. The station returns once a scan act completes its
 row: the last fill of a batch, an executed choice with done copy, any write
 that clears the subject. A fill that leaves entries pending stays on the hold
-card, a refusal never returns, and a `follow` runs first. Without
-`scan_done` the done copy stays until the next scan. The value is validated
+card, a refusal never returns, and a `follow` runs first. A station holding
+a row never returns: the hold a follow lands, by event or by its last look,
+keeps the station on it until the next scan. Without `scan_done` the done
+copy stays until the next scan. The value is validated
 where the role is written, like `badge_grant`, and set on the role page under
 Identity.
 
