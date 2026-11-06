@@ -36,8 +36,8 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
   },
   {
     name: 'get_escalation_lookups',
-    gate: 'superadmin',
-    description: 'Resolve the versioned knowledge lookups pinned on an escalation (envelope.lookups). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with missing: true.',
+    gate: 'caller',
+    description: 'Resolve the versioned knowledge lookups pinned on an escalation (envelope.lookups), for a caller who may read the escalation. Each ref answers with its edition; a ref whose snapshot does not exist answers with missing: true.',
     read_safe: true,
     inputSchema: {
       type: 'object',

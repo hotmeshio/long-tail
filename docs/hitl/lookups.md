@@ -88,6 +88,8 @@ GET /api/escalations/:id/lookups
 
 `version` is the edition served; `current: true` marks a ref that follows the newest edition.
 
+An agent reads the same answer with the `get_escalation_lookups` MCP tool, as the account it signed in with and under the same read check.
+
 The general knowledge API (`/api/knowledge/*`) is a builder surface — superadmin or engineer. A member never queries the knowledge store directly; the escalation-scoped endpoint serves them precisely the editions their work item carries, and nothing else. A ref whose snapshot does not exist answers with `missing: true` for that ref — the batch never fails.
 
 ## Form Addressing

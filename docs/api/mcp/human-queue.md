@@ -13,6 +13,8 @@ Built-in escalation and human queue management. Exposes the escalation API as MC
 
 These tools act with full authority. At `/mcp` they are listed for superadmin accounts only. Other accounts work the queue through the role-checked escalation tools on [long-tail-admin](admin.md).
 
+`get_escalation_lookups` is listed for every account. It runs as the caller, with the read check `GET /api/escalations/:id/lookups` runs.
+
 ## Compile Hints
 
 escalate_and_wait creates a durable pause point. The step AFTER escalate_and_wait is always a signal step (kind: "signal") that receives the human response. Fields from the signal step output (e.g., password) must be wired via data_flow edges to ALL downstream steps that need them.
@@ -55,7 +57,9 @@ Check the status of an escalation. Returns status and resolver payload if resolv
 
 ### get_escalation_lookups
 
-Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Each ref answers with its immutable edition; a ref whose snapshot does not exist answers with `missing: true`. Like the other tools on this server, the call carries no per-user identity — the MCP surface reads at service scope.
+Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Each ref answers with its edition; a ref whose snapshot does not exist answers with `missing: true`. A closed row answers with the editions current when it closed.
+
+Any caller who may read the escalation may call it: a superadmin, a member of the row's role with read scope `all`, or a read scope `self` member while the row is assigned to them. Others get `Not authorized to view this escalation` and no edition content. The refs on the row are the grant, so a member reads the editions their row names without a knowledge grant. An internal call reads as lt-system.
 
 | | |
 |---|---|
