@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { loggerRegistry } from '../../lib/logger';
 import { callerAuth, type ToolCallExtra } from './caller-auth';
 import { registeredToolCount } from '../../services/mcp/registered-tools';
+import { registerEscalationLookupsTool } from './human-queue-lookups';
 import * as escalationService from '../../services/escalation';
 import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
@@ -55,6 +56,7 @@ async function checkResolveToolPayload(
  * Registers the tools that expose the escalation API:
  * - escalate_to_human — create a new escalation (fire-and-forget)
  * - check_resolution — check escalation status
+ * - get_escalation_lookups — read the knowledge editions pinned on an escalation the caller may read
  * - get_available_work — list available escalations by role
  * - claim_and_resolve — claim + resolve in one step
  * - resolve_escalation — resolve an already-claimed escalation
@@ -159,6 +161,8 @@ export async function createHumanQueueServer(options?: {
       };
     },
   );
+
+  registerEscalationLookupsTool(server);
 
   // ── get_available_work ──────────────────────────────────────────────
   (server as any).registerTool(

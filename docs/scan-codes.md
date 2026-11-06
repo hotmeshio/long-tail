@@ -427,8 +427,12 @@ its code; without `fill.labels`, both tokens read codes.
 
 **`match` and `refuse`** check the pairing before anything is written.
 `match.target` lists templates the scanned target must equal (e.g.
-`["{subject.containerCode}"]`); `match.facets` lists facets the located container
-must share with the held row (e.g. `["containerKey"]`). A miss answers `refused`
+`["{subject.containerCode}"]`); `match.facets` lists facets the located row must
+share with the held row (e.g. `["containerKey"]`). The located row is the
+container the scan named, or on an add into the held subject with
+`accumulate.item`, the item's own row: a held container refuses an item whose
+own row names another `route`. Each facet must be present on both rows, compared
+as strings. A miss answers `refused`
 with `refuse.markdown` rendered, and nothing is written. The copy may read
 `{container.<facet>}` (the container the scan named), `{fill.pending}`
 (what a fill still expects) and `{fill.next}` (the next open entry), so the
