@@ -181,7 +181,7 @@ export interface ScanSubjectGate {
 export interface ScanMatch {
   /** The scanned target must equal one of these (templates). */
   target?: string[];
-  /** The located container must share each of these facets with the subject. */
+  /** The located row (the item's own row on an into-subject add, else the container) must share each of these facets with the subject. */
   facets?: string[];
 }
 

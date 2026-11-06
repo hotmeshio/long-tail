@@ -103,7 +103,9 @@ function expandTarget(template: string, tpl: scanCodeService.ScanTemplateContext
 
 /**
  * The pre-write guard. Returns the refusal when the pairing is wrong, null
- * when it holds (or the step declares no match).
+ * when it holds (or the step declares no match). `match.facets` compares the
+ * held subject with the row the scan located: the item's own row when there
+ * is one, else the container.
  */
 export function matchGuard(
   step: ScanStep,
@@ -117,10 +119,11 @@ export function matchGuard(
   const expected = (match.target ?? []).flatMap((t) => expandTarget(t, tpl));
   const targetOk = match.target === undefined || expected.includes(ctx.parsed.target);
   const subjectMeta = (ctx.subject?.row.metadata ?? {}) as Record<string, unknown>;
-  const containerMeta = (container?.metadata ?? {}) as Record<string, unknown>;
-  // With no container located there is nothing to compare; the step falls through.
-  const facetsOk = match.facets === undefined || !container || (match.facets.every((f) =>
-    subjectMeta[f] !== undefined && subjectMeta[f] !== null && String(subjectMeta[f]) === String(containerMeta[f])));
+  const paired = item ?? container;
+  const pairedMeta = (paired?.metadata ?? {}) as Record<string, unknown>;
+  // With no row located there is nothing to compare; the step falls through.
+  const facetsOk = match.facets === undefined || !paired || (match.facets.every((f) =>
+    subjectMeta[f] !== undefined && subjectMeta[f] !== null && String(subjectMeta[f]) === String(pairedMeta[f])));
   if (targetOk && facetsOk) return null;
   const markdown = scanCodeService.renderScanCopy(step.refuse?.markdown ?? STOCK_REFUSAL, tpl);
   return refused(markdown, { refusal: { markdown, ...(expected.length ? { expected } : {}) } });
