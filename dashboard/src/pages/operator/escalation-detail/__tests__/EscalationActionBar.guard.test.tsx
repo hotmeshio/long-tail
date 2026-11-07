@@ -67,3 +67,15 @@ describe('EscalationActionBar — submit guard reflection', () => {
     expect(onResolve).toHaveBeenCalledWith({ _lt: { needsTriage: true }, notes: 'machine jammed' });
   });
 });
+
+describe('EscalationActionBar: a refused claim', () => {
+  it('says why on the claim bar', () => {
+    renderBar({ mode: 'available', claimError: new Error('Not authorized to claim this escalation') });
+    expect(screen.getByTestId('claim-error')).toHaveTextContent('Not authorized to claim this escalation');
+  });
+
+  it('says nothing while a claim is in flight', () => {
+    renderBar({ mode: 'available', claimPending: true, claimError: new Error('old') });
+    expect(screen.queryByTestId('claim-error')).not.toBeInTheDocument();
+  });
+});

@@ -2,8 +2,12 @@ import { useEffect, useState } from 'react';
 import { CircleX, Package, ScanBarcode } from 'lucide-react';
 import { SimpleMarkdown } from '../../common/display/SimpleMarkdown';
 import { HeldRoster } from './HeldRoster';
+import { OpenButton } from './OpenButton';
 import { expectedLine } from './RefusalPanel';
 import type { StationSubject } from '../../../lib/scan-subject';
+import type { ScanOpenLink } from '../../../api/scan-codes';
+
+const RELEASE_LABEL_DEFAULT = 'Put it down';
 
 function secondsLeft(expiresAt: string): number {
   return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));
@@ -17,7 +21,8 @@ function secondsLeft(expiresAt: string): number {
  * at expiry); the per-second tick is a visible clock, not polling.
  *
  * With `show`, the held row's roster stays under the card for the whole
- * motion, and a refused scan reads on the card above it.
+ * motion, and a refused scan reads on the card above it. The release button
+ * reads as the rule names it; Open leads into the held row.
  */
 export function HoldScreen({
   subject,
@@ -28,6 +33,8 @@ export function HoldScreen({
   refusal,
   refreshKey = 0,
   onRelease,
+  onOpen,
+  onAllIn,
 }: {
   subject: StationSubject;
   primedName: string | null;
@@ -37,10 +44,14 @@ export function HoldScreen({
   /** The last act's done copy while the item is still held (a fill in progress). */
   note?: string | null;
   /** A refused scan while the list stays on screen. */
-  refusal?: { markdown: string; expected?: string[] } | null;
+  refusal?: { markdown: string; expected?: string[]; open?: ScanOpenLink } | null;
   /** Changes on every bench response, so the shown roster refetches. */
   refreshKey?: number;
   onRelease: () => void;
+  /** The station leaves for an Open target. */
+  onOpen?: () => void;
+  /** Every entry on the shown roster is in. */
+  onAllIn?: () => void;
 }) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -98,6 +109,7 @@ export function HoldScreen({
                 Expected <span className="text-text-primary">{expectedLine(refusal.expected)}</span>
               </p>
             )}
+            {refusal.open && <OpenButton open={refusal.open} onLeave={onOpen} />}
           </div>
         </div>
       )}
@@ -119,15 +131,26 @@ export function HoldScreen({
         <span className="mx-2">·</span>
         <span className="font-mono tabular-nums">{secondsLeft(subject.expiresAt)}s</span>
       </p>
-      <button
-        type="button"
-        onClick={onRelease}
-        className="mt-6 text-sm text-text-tertiary hover:text-text-secondary hover:underline"
-      >
-        Put it down
-      </button>
+      <div className="flex items-center gap-4">
+        {subject.open && <OpenButton open={subject.open} onLeave={onOpen} />}
+        <button
+          type="button"
+          onClick={onRelease}
+          className={subject.release?.tone === 'accent'
+            ? 'btn-primary mt-6'
+            : 'mt-6 text-sm text-text-tertiary hover:text-text-secondary hover:underline'}
+          data-testid="hold-release"
+        >
+          {subject.release?.label ?? RELEASE_LABEL_DEFAULT}
+        </button>
+      </div>
       {subject.show && (
-        <HeldRoster escalationId={subject.escalationId} field={subject.show} refreshKey={refreshKey} />
+        <HeldRoster
+          escalationId={subject.escalationId}
+          field={subject.show}
+          refreshKey={refreshKey}
+          onAllIn={subject.whenAllIn ? onAllIn : undefined}
+        />
       )}
     </div>
   );

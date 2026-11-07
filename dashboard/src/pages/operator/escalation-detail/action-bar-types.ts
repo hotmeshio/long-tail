@@ -22,6 +22,8 @@ export interface EscalationActionBarProps {
   // Claim
   onClaim: (minutes: number) => void;
   claimPending: boolean;
+  /** The last claim the server refused. */
+  claimError?: Error | null;
   /** Bumped when the user clicks the locked form — each bump replays the
    *  claim button's wiggle to point at the gesture that unlocks it. */
   claimNudge?: number;

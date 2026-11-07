@@ -11,6 +11,7 @@ import {
   useEscalation,
   useEscalationLookups,
   useClaimEscalation,
+  useRosterScan,
   useResolveEscalation,
   useEscalateToRole,
   useCancelEscalation,
@@ -145,6 +146,7 @@ function EscalationDetailView({ id }: { id: string }) {
     );
   }, [lookupData]);
   const claim = useClaimEscalation();
+  const rosterScan = useRosterScan();
   const resolve = useResolveEscalation();
   const escalate = useEscalateToRole();
   const cancel = useCancelEscalation();
@@ -201,7 +203,7 @@ function EscalationDetailView({ id }: { id: string }) {
 
   const [pendingWrite, setPendingWrite] = useState<{ verb: string; run: () => void | Promise<void> } | null>(null);
   // An embedded row action (roster, list) waiting on a badge at a shared station.
-  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void>; message?: string } | null>(null);
+  const [pendingEmbedWrite, setPendingEmbedWrite] = useState<{ verb: string; run: () => Promise<void>; message?: string; keepBadge?: boolean } | null>(null);
 
   // Claim clock: re-renders at the warning threshold (extend prompt) and at
   // expiry (isEffectivelyClaimed flips false on that render — the form locks
@@ -389,12 +391,13 @@ function EscalationDetailView({ id }: { id: string }) {
   }, [acting, pendingWrite, esc?.assigned_to, clearActing]);
 
   // An embedded action resolves another row, so it runs for whoever badges
-  // in and that row's RBAC judges them; then the badge retires as above.
+  // in and that row's RBAC judges them; then the badge retires as above,
+  // unless the write keeps it for the writes that follow.
   useEffect(() => {
     if (!pendingEmbedWrite || !acting) return;
-    const { run } = pendingEmbedWrite;
+    const { run, keepBadge } = pendingEmbedWrite;
     setPendingEmbedWrite(null);
-    void run().finally(() => clearActing());
+    void run().finally(() => { if (!keepBadge) clearActing(); });
   }, [acting, pendingEmbedWrite, clearActing]);
 
   const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
@@ -409,6 +412,16 @@ function EscalationDetailView({ id }: { id: string }) {
     onJsonChange: setJson,
     context: esc ? buildShowIfContext(esc, lookupCtx, rosterCtx) : undefined,
     onScanSubmit: (next) => scanSubmitRef.current(next),
+    onRosterScan: (field, code) => new Promise((settle) => {
+      guardEmbedWrite('check this off', async () => {
+        try {
+          await rosterScan.mutateAsync({ id, field, code });
+          settle(null);
+        } catch (err) {
+          settle((err as Error).message);
+        }
+      }, { keepBadge: true });
+    }),
   });
   // A scan's message renders at the field that took or refused it, and the
   // field scrolls into view; a field the form does not render keeps the line
@@ -493,8 +506,12 @@ function EscalationDetailView({ id }: { id: string }) {
   // The two are equal for the life of this keyed view, but binding to the
   // prop makes it impossible for an in-flight render against refreshed
   // query data to redirect an action at a different escalation.
+  // A read-only station login claims only through a badge: the claim runs as
+  // whoever badges in, and the badge stays primed for the work on the row.
   const handleClaim = (durationMinutes: number) => {
-    claim.mutate({ id, durationMinutes });
+    guardEmbedWrite('claim', async () => {
+      await claim.mutateAsync({ id, durationMinutes }).catch(() => {});
+    }, { keepBadge: true });
   };
 
   const goBack = () => {
@@ -584,7 +601,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const guardEmbedWrite: EmbedWriteGuard = (verb, run, options) => {
     if (options?.badge) {
       clearActing();
-      if (scanEnabled) setPendingEmbedWrite({ verb, run, message: options.badge });
+      if (scanEnabled) setPendingEmbedWrite({ verb, run, message: options.badge, keepBadge: options.keepBadge });
       return;
     }
     if (embedWriteRunsNow(myRoles, scanEnabled, acting)) {
@@ -592,7 +609,7 @@ function EscalationDetailView({ id }: { id: string }) {
       return;
     }
     clearActing();
-    setPendingEmbedWrite({ verb, run });
+    setPendingEmbedWrite({ verb, run, keepBadge: options?.keepBadge });
   };
 
   const handleResolve = async (payload: Record<string, unknown>) => {
@@ -860,7 +877,10 @@ function EscalationDetailView({ id }: { id: string }) {
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}
-          onClaim={submitOnClaim ? handleClaimAndSubmit : handleClaim}
+          onClaim={submitOnClaim
+            ? (minutes) => guardEmbedWrite('claim', () => handleClaimAndSubmit(minutes), { keepBadge: true })
+            : handleClaim}
+          claimError={claim.error as Error | null}
           claimPending={claim.isPending || (submitOnClaim && resolve.isPending)}
           claimNudge={claimNudge}
           workflowType={esc.workflow_type}

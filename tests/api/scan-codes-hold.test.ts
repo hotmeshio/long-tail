@@ -88,4 +88,16 @@ describe('holdStep', () => {
     expect(result?.data?.subject?.label).toBe('K7Q2M9XA');
     expect(result?.data?.subject?.expect).toBeUndefined();
   });
+
+  it('carries the release button and renders the all-in copy against the row', async () => {
+    const result = await holdStep({
+      ...step,
+      params: { hold: { show: 'roster', release: { label: "I'm done", tone: 'accent', return: 'home' }, whenAllIn: { markdown: 'All in for **{item.binCode}**.', afterSeconds: 5 } } },
+    }, ctx());
+    expect(result?.data?.subject).toMatchObject({
+      show: 'roster',
+      release: { label: "I'm done", tone: 'accent', return: 'home' },
+      whenAllIn: { markdown: 'All in for **SF-A-2**.', afterSeconds: 5 },
+    });
+  });
 });

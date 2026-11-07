@@ -99,7 +99,39 @@ export interface ScanStep {
   /** What the station says on a failed match, or a lost race. */
   refuse?: { markdown: string; conflict?: string; missing?: string };
   /** What the station says once the write lands. Markdown template. */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
+  /** An Open button on the hold, done or refusal screen this step answers with. */
+  open?: {
+    label?: string;
+    target: 'row' | 'subject' | 'located';
+    list?: { facets: string[]; role?: string };
+    claim?: boolean;
+  };
+  /** PRESENT only: a roster field of the row's form, shown above the choices. */
+  show?: string;
+}
+
+/** What the station says once a write lands, how long it stays, and the line under it. */
+export interface ScanDoneCopy {
+  markdown: string;
+  afterSeconds?: number;
+  nextPrompt?: string;
+}
+
+/** The button that ends a hold. */
+export interface ScanHoldRelease {
+  label?: string;
+  tone?: 'neutral' | 'accent';
+  return?: 'home' | string;
+}
+
+/** An Open button, resolved: a row to open (and maybe claim), or a faceted list. */
+export interface ScanOpenLink {
+  label: string;
+  escalationId?: string;
+  claim?: boolean;
+  facets?: Record<string, string | number | boolean>;
+  role?: string;
 }
 
 export interface ScanStepParams {
@@ -140,6 +172,10 @@ export interface ScanStepParams {
     expect?: { schemes: number[]; prompt?: string };
     /** A roster field of the held row's form, shown under the hold card while it is held. */
     show?: string;
+    /** The button that ends the hold. */
+    release?: ScanHoldRelease;
+    /** With `show`: once every roster entry is in, the hold ends with this done copy. */
+    whenAllIn?: ScanDoneCopy;
   };
   /** Fill verb options. */
   fill?: {
@@ -150,6 +186,8 @@ export interface ScanStepParams {
     labels?: string;
     /** How one entry reads: `{label.<path>}` and `{code}`. */
     label?: string;
+    /** Into-subject: a per-key map naming the value each key belongs to; the held target's keys fill first. */
+    prefer?: string;
   };
 }
 
@@ -169,6 +207,12 @@ export interface ScanHeldSubject extends ScanSubjectRef {
   claimedBy?: { id: string; displayName: string };
   /** A roster field of the held row's form to show under the hold card. */
   show?: string;
+  /** The button that ends the hold. */
+  release?: ScanHoldRelease;
+  /** With `show`: the done copy once every roster entry is in, rendered. */
+  whenAllIn?: ScanDoneCopy;
+  /** The Open button the hold screen offers. */
+  open?: ScanOpenLink;
 }
 
 /** One labeled choice on a PRESENT step. */
@@ -185,7 +229,7 @@ export interface ScanChoice {
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
   /** What the station says once the choice's write lands. */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
   /** Left off the screen for a person without its roles, instead of shown withheld. */
   hidden?: boolean;
   /** Offered only while the row carries these facet values. */
@@ -282,7 +326,11 @@ export interface ScanExecuteResponse {
   /** An executed add that found the item already in place. */
   already?: boolean;
   /** EXECUTED: the step's done copy, rendered. */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
+  /** The Open button the done or refusal screen offers. */
+  open?: ScanOpenLink;
+  /** CHOICES: a roster field of the row's form to show above the choices. */
+  show?: string;
   /** EXECUTED, subject completed: follow the subject to its next row in these roles. */
   follow?: ScanFollow;
   /** NOT_PRIMED that may be replayed once a badge primes. */

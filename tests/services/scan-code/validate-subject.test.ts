@@ -46,9 +46,13 @@ describe('subject steps', () => {
     expect(check(binIt({ params: { itemKey: 'x', accumulate: { from: 'subject', containerFacet: 'binKey' } } }))).toThrow(/item mode/);
   });
 
-  it('match.facets compares a located container, so it needs from-subject', () => {
+  it('match.facets compares a located row: a from-subject container, or an into-subject item', () => {
     expect(check(binIt({ match: { facets: ['boxKey'] }, refuse: undefined, params: { accumulate: { into: 'subject' } } })))
-      .toThrow(/from-subject accumulate/);
+      .toThrow(/from-subject accumulate, or the item's own row of an into-subject accumulate with item/);
+    expect(check(binIt({
+      match: { facets: ['route'] }, refuse: undefined,
+      params: { accumulate: { into: 'subject', item: { roles: ['transfer'] } } },
+    }))).not.toThrow();
   });
 
   it('refuse.missing is markdown, and only for a from-subject accumulate', () => {

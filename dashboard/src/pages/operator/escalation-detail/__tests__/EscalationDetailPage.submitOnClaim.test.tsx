@@ -185,7 +185,7 @@ describe('EscalationDetailPage — x-lt-submit-on-claim', () => {
 
     fireEvent.click(await screen.findByTestId('claim-button'));
 
-    await waitFor(() => expect(state.claim.mutate).toHaveBeenCalledWith({ id: ESC_ID, durationMinutes: 30 }));
+    await waitFor(() => expect(state.claim.mutateAsync).toHaveBeenCalledWith({ id: ESC_ID, durationMinutes: 30 }));
     expect(state.resolve.mutateAsync).not.toHaveBeenCalled();
   });
 });

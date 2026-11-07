@@ -30,6 +30,32 @@ export function printedCode(code: string, scheme: ScanScheme): string {
   return scheme.encoding === SCAN_ENCODINGS.GTIN ? scanCodeService.displayGtin(code) : code;
 }
 
+/** A per-key map the batch row carries (`envelope.<map>` or `metadata.<map>`); empty when absent. */
+export function rowMap(path: string, row: LTEscalationRecord): Record<string, unknown> {
+  const map = resolveCtxPath(path, { envelope: asObject(row.envelope), metadata: asObject(row.metadata) });
+  return isRecord(map) ? map : {};
+}
+
+/**
+ * The open keys in the order a fill tries them. With `prefer`, the keys whose
+ * mapped value equals (or, for a list, contains) the held subject's target
+ * come first; the rest keep the row's order.
+ */
+export function preferredKeys(
+  keys: string[],
+  fill: ScanFillParams,
+  row: LTEscalationRecord,
+  heldTarget: string | undefined,
+): string[] {
+  if (!fill.prefer || heldTarget === undefined) return keys;
+  const owners = rowMap(fill.prefer, row);
+  const owns = (key: string) => {
+    const value = owners[key];
+    return (Array.isArray(value) ? value : [value]).some((v) => v !== null && v !== undefined && String(v) === heldTarget);
+  };
+  return [...keys.filter(owns), ...keys.filter((key) => !owns(key))];
+}
+
 /**
  * The labeler a fill step declares, or null without `labels`. The map is
  * read from the batch row (`envelope.<map>` or `metadata.<map>`) and keyed by
@@ -39,8 +65,7 @@ export function printedCode(code: string, scheme: ScanScheme): string {
  */
 export function entryLabeler(fill: ScanFillParams, row: LTEscalationRecord, scheme: ScanScheme): EntryLabeler | null {
   if (!fill.labels) return null;
-  const map = resolveCtxPath(fill.labels, { envelope: asObject(row.envelope), metadata: asObject(row.metadata) });
-  const labels = isRecord(map) ? map : {};
+  const labels = rowMap(fill.labels, row);
   return (key, code) => {
     const printed = printedCode(code, scheme);
     const value = labels[key];

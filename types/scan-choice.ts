@@ -6,7 +6,7 @@
  * the disambiguator.
  */
 
-import type { ScanStepParams, ScanVerb } from './scan-code';
+import type { ScanDoneCopy, ScanStepParams, ScanVerb } from './scan-code';
 
 /** One labeled choice on a PRESENT step. */
 export interface ScanChoice {
@@ -28,7 +28,7 @@ export interface ScanChoice {
   /** Short token enabling double-scan selection (scan object, then an action card). */
   code?: string;
   /** What the station says once the choice's write lands. Markdown template over the row (`{item.*}`). */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
   /** The choice is left off the screen for a person without its roles, instead of shown withheld. */
   hidden?: boolean;
   /** The choice is offered only while the row carries these facet values. */

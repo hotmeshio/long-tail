@@ -140,6 +140,22 @@ export interface ScanHoldParams {
    * the row is held: each fill ticks its entry in without leaving the motion.
    */
   show?: string;
+  /** The button that ends the hold. Absent, it reads "Put it down" and the station stays. */
+  release?: ScanHoldRelease;
+  /**
+   * With `show`: once every entry on the roster is in, the hold ends on its
+   * own with this done copy, then the station returns as after a completed act.
+   */
+  whenAllIn?: ScanDoneCopy;
+}
+
+export interface ScanHoldRelease {
+  /** Default "Put it down". */
+  label?: string;
+  /** 'accent' draws the button as the screen's primary act. Default 'neutral'. */
+  tone?: 'neutral' | 'accent';
+  /** Where the station goes once released: the kiosk home or a dashboard route. Absent, it stays. */
+  return?: 'home' | string;
 }
 
 export interface ScanFillParams {
@@ -161,6 +177,13 @@ export interface ScanFillParams {
    * entry the map does not name reads as its code.
    */
   label?: string;
+  /**
+   * Into-subject only: a per-key map on the batch row (`envelope.<map>`)
+   * naming the value each key belongs to. Open keys whose value equals (or,
+   * for a list, contains) the held subject's target fill first; the rest
+   * follow in the row's order.
+   */
+  prefer?: string;
 }
 
 /** A step that acts on the held subject runs only while one is held. */
@@ -197,6 +220,37 @@ export interface ScanRefusal {
    * into-subject with `item`). Without it the step falls through.
    */
   missing?: string;
+}
+
+/** What the station says once a write lands, and how long it stays. */
+export interface ScanDoneCopy {
+  /** Markdown template. */
+  markdown: string;
+  /** Seconds before the station returns; overrides the role's `scan_done.after_seconds` for this act. */
+  afterSeconds?: number;
+  /** The line under the copy, in place of "Scan the next item". Markdown template. */
+  nextPrompt?: string;
+}
+
+/** The row an Open button leads to. */
+export type ScanOpenTarget = 'row' | 'subject' | 'located';
+
+/**
+ * An Open button on the station's answer (hold, done, refusal): the row's
+ * detail page, or the list of rows sharing facets with it.
+ */
+export interface ScanOpen {
+  /** Default "Open". */
+  label?: string;
+  /**
+   * `row`: the row the step acted on or located. `subject`: the held row.
+   * `located`: the scanned code's own pending row.
+   */
+  target: ScanOpenTarget;
+  /** Open the list of rows sharing these facets with the target, in place of the row. */
+  list?: { facets: string[]; role?: string };
+  /** Claim the row for the person acting when their scope covers it; otherwise it opens read-only. */
+  claim?: boolean;
 }
 
 /** One labeled fact on the info-choice screen. */
@@ -246,7 +300,14 @@ export interface ScanStep {
    * **{container.containerCode}**." Markdown template; it may read the bags its
    * refusal copy may read.
    */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
+  /** An Open button on the hold, done or refusal screen this step answers with. */
+  open?: ScanOpen;
+  /**
+   * PRESENT only: a roster field of the row's form, shown above the choices
+   * as a hold shows it.
+   */
+  show?: string;
   /**
    * After this write completes the held subject, the station follows the
    * subject to its next pending row in these roles: it waits for the row,

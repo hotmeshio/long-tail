@@ -9,7 +9,7 @@ export function scanDoneError(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) return 'properties.scan_done must be an object';
   const done = value as Record<string, unknown>;
-  const known = new Set(['return', 'after_seconds']);
+  const known = new Set(['return', 'after_seconds', 'button']);
   const extra = Object.keys(done).filter((k) => !known.has(k));
   if (extra.length) return `properties.scan_done has unknown key(s): ${extra.join(', ')}`;
   if (typeof done.return !== 'string' || !(done.return === SCAN_DONE_RETURN_HOME || done.return.startsWith('/'))) {
@@ -18,6 +18,9 @@ export function scanDoneError(value: unknown): string | null {
   if (done.after_seconds !== undefined
     && (!Number.isInteger(done.after_seconds) || (done.after_seconds as number) < 0 || (done.after_seconds as number) > AFTER_SECONDS_MAX)) {
     return `properties.scan_done.after_seconds must be an integer from 0 to ${AFTER_SECONDS_MAX}`;
+  }
+  if (done.button !== undefined && (typeof done.button !== 'string' || !done.button.trim())) {
+    return 'properties.scan_done.button must be non-empty text';
   }
   return null;
 }

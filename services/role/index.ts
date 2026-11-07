@@ -17,6 +17,7 @@ import {
   GET_ROLE_FORM_SCHEMA,
   GET_ROLE_METADATA_SCHEMA,
   GET_ROLE_PROPERTIES,
+  GET_ROLE_TITLE,
   GET_ROLE_UPSTREAMS,
   LIST_ROLE_SCHEMA_VERSIONS,
   GET_ROLE_SCHEMA_VERSION,
@@ -301,6 +302,13 @@ export async function getRoleProperties(role: string): Promise<Record<string, an
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLE_PROPERTIES, [role]);
   return rows[0]?.properties ?? null;
+}
+
+/** The role's display title, or null when it declares none. One PK read. */
+export async function getRoleTitle(role: string): Promise<string | null> {
+  const pool = getPool();
+  const { rows } = await pool.query(GET_ROLE_TITLE, [role]);
+  return rows[0]?.title ?? null;
 }
 
 /**

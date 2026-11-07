@@ -34,6 +34,14 @@ describe('resolveScanDoneReturn', () => {
     expect(resolveScanDoneReturn({ policy: null, homePath: null }, completed)).toEqual({ path: '/portal/done-role/main', afterMs: 2000 });
   });
 
+  it('an act\'s own pause wins over the policy\'s, and the policy\'s button rides along', () => {
+    const withButton = { policy: { return: 'home' as const, after_seconds: 1, button: 'Done' }, homePath: '/home' };
+    expect(resolveScanDoneReturn(withButton, null, 5)).toEqual({ path: '/home', afterMs: 5000, button: 'Done' });
+    expect(resolveScanDoneReturn(withButton, null, 0)).toEqual({ path: '/home', afterMs: 0, button: 'Done' });
+    expect(readScanDone({ scan_done: { return: 'home', button: 'Done' } })).toEqual({ return: 'home', button: 'Done' });
+    expect(readScanDone({ scan_done: { return: 'home', button: ' ' } })).toEqual({ return: 'home' });
+  });
+
   it('no policy anywhere is no return', () => {
     expect(resolveScanDoneReturn({ policy: null, homePath: null }, null)).toBeNull();
     expect(resolveScanDoneReturn({ policy: null, homePath: null }, { policy: null, homePath: '/x' })).toBeNull();

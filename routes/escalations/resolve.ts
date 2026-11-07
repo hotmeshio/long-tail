@@ -165,6 +165,28 @@ export function registerResolveRoutes(router: Router): void {
   });
 
   /**
+   * POST /api/escalations/:id/roster-scan
+   * A scan into a batch roster on this row's form. The field must declare
+   * x-lt-scan accepting the code's scheme; the scan fills the first open entry
+   * whose key is the code, as the person acting (the badged person when
+   * X-LT-Acting-Token rides the request).
+   * Body: { field: string, code: string }
+   */
+  router.post('/:id/roster-scan', async (req, res) => {
+    const token = req.headers[ACTING_TOKEN_HEADER];
+    const result = await api.runRosterScan(
+      {
+        id: req.params.id,
+        field: req.body?.field,
+        code: req.body?.code,
+        actingToken: typeof token === 'string' && token ? token : undefined,
+      },
+      req.auth!,
+    );
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * POST /api/escalations/:id/resolve
    * Resolve a pending escalation with a human-provided payload. Routes by
    * escalation shape: efficient (signal_key) resumes the job in place; legacy

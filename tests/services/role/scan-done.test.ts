@@ -10,6 +10,12 @@ describe('properties.scan_done', () => {
     expect(scanDoneError(undefined)).toBeNull();
   });
 
+  it('accepts a button that returns at once', () => {
+    expect(scanDoneError({ return: 'home', after_seconds: 5, button: 'Done' })).toBeNull();
+    expect(scanDoneError({ return: 'home', button: ' ' })).toMatch(/button must be non-empty text/);
+    expect(scanDoneError({ return: 'home', button: 3 })).toMatch(/button/);
+  });
+
   it('names the problem', () => {
     expect(scanDoneError('home')).toMatch(/must be an object/);
     expect(scanDoneError({})).toMatch(/return must be/);

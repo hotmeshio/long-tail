@@ -213,6 +213,9 @@ export const GET_ROLE_METADATA_SCHEMA = `
 export const GET_ROLE_PROPERTIES = `
   SELECT properties FROM lt_roles WHERE role = $1`;
 
+export const GET_ROLE_TITLE = `
+  SELECT title FROM lt_roles WHERE role = $1`;
+
 export const GET_ROLE_UPSTREAMS = `
   SELECT upstream_role FROM lt_role_upstreams WHERE role = $1 ORDER BY upstream_role`;
 

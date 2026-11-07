@@ -7,6 +7,7 @@ import {
   type ScanStepParams,
 } from '../../types';
 import { FACET_KEY } from '../escalation/facet-sql';
+import { ROSTER_FIELD, assertValidDoneCopy } from './validate-station';
 
 function isSchemeList(value: unknown): value is number[] {
   return Array.isArray(value) && value.length > 0
@@ -17,10 +18,7 @@ function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === 'string' && v);
 }
 
-/** A form field name, as `hold.show` names one. */
-const HOLD_SHOW_FIELD = /^[A-Za-z_][A-Za-z0-9_-]*$/;
-
-/** A fill's label map lives on the batch row: `envelope.<path>` or `metadata.<path>`. */
+/** A fill's per-key maps live on the batch row: `envelope.<path>` or `metadata.<path>`. */
 const FILL_LABELS_PATH = /^(envelope|metadata)\.[A-Za-z0-9_.-]+$/;
 
 function isPlainObject(value: unknown): boolean {
@@ -98,8 +96,8 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
       if (!isStringList(step.match.facets) || !step.match.facets.every((f) => FACET_KEY.test(f))) {
         throw new Error(`${at}: match.facets must be a non-empty array of facet keys`);
       }
-      if (accumulate?.from !== 'subject') {
-        throw new Error(`${at}: match.facets compares the located container, which only a from-subject accumulate has`);
+      if (accumulate?.from !== 'subject' && !(accumulate?.into === 'subject' && accumulate.item)) {
+        throw new Error(`${at}: match.facets compares the subject with a located row: the container of a from-subject accumulate, or the item's own row of an into-subject accumulate with item`);
       }
     }
   }
@@ -171,8 +169,27 @@ function assertValidHold(step: ScanStep, at: string): void {
       throw new Error(`${at}: params.hold.expect.prompt must be markdown`);
     }
   }
-  if (hold.show !== undefined && (typeof hold.show !== 'string' || !HOLD_SHOW_FIELD.test(hold.show))) {
+  if (hold.show !== undefined && (typeof hold.show !== 'string' || !ROSTER_FIELD.test(hold.show))) {
     throw new Error(`${at}: params.hold.show must name a roster field of the held row's form`);
+  }
+  if (hold.release !== undefined) assertValidRelease(hold.release, at);
+  if (hold.whenAllIn !== undefined) {
+    if (hold.show === undefined) throw new Error(`${at}: params.hold.whenAllIn requires params.hold.show`);
+    assertValidDoneCopy(hold.whenAllIn, at, 'params.hold.whenAllIn');
+  }
+}
+
+function assertValidRelease(release: NonNullable<NonNullable<ScanStepParams['hold']>['release']>, at: string): void {
+  if (!isPlainObject(release)) throw new Error(`${at}: params.hold.release must be an object`);
+  if (release.label !== undefined && (typeof release.label !== 'string' || !release.label.trim())) {
+    throw new Error(`${at}: params.hold.release.label must be non-empty text`);
+  }
+  if (release.tone !== undefined && release.tone !== 'neutral' && release.tone !== 'accent') {
+    throw new Error(`${at}: params.hold.release.tone must be 'neutral' or 'accent'`);
+  }
+  if (release.return !== undefined
+    && (typeof release.return !== 'string' || !(release.return === 'home' || release.return.startsWith('/')))) {
+    throw new Error(`${at}: params.hold.release.return must be 'home' or a dashboard-relative route`);
   }
 }
 
@@ -197,6 +214,12 @@ function assertValidFill(step: ScanStep, at: string): void {
   }
   if (fill.label !== undefined && fill.labels === undefined) {
     throw new Error(`${at}: params.fill.label requires params.fill.labels`);
+  }
+  if (fill.prefer !== undefined) {
+    if (typeof fill.prefer !== 'string' || !FILL_LABELS_PATH.test(fill.prefer)) {
+      throw new Error(`${at}: params.fill.prefer must name a map on the row, e.g. "envelope.key_owners"`);
+    }
+    if (fill.into !== 'subject') throw new Error(`${at}: params.fill.prefer compares with the held subject, so it needs into: 'subject'`);
   }
   if (step.confirm) throw new Error(`${at}: fill cannot carry confirm`);
 }

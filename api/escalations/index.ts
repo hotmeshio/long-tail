@@ -8,6 +8,7 @@ export { resolveEscalation, resolveBySignalKey, resolveByIds, resolveAllOrNone }
 export { resolveBatchItem, resolveBatchItemBySignalKey, resolveBatchItemByMetadata } from './resolve-batch';
 export { flagBatchItem, unflagBatchItem } from './batch-flag';
 export { runRosterAction, ROSTER_ACTION_OUTCOMES } from './roster-action';
+export { runRosterScan, ROSTER_SCAN_OUTCOMES } from './roster-scan';
 export {
   accumulateItem, accumulateItemBySignalKey, accumulateItemByMetadata,
   removeItem, removeItemBySignalKey, removeItemByMetadata,

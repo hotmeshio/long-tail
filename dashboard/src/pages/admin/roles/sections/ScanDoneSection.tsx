@@ -4,6 +4,7 @@ import { SectionGroup, safeParseJson, type Draft } from '../role-detail-shared';
 interface ScanDone {
   return?: string;
   after_seconds?: number;
+  button?: string;
 }
 
 /** The role's `scan_done` from the draft's properties JSON, or null when it declares none. */
@@ -84,6 +85,19 @@ export function ScanDoneSection({ draft, update }: { draft: Draft; update: (patc
               onChange={(e) => set({ after_seconds: e.target.value === '' ? undefined : Number(e.target.value) })}
               className="input w-[12rem]"
               aria-label="Return after (seconds)"
+            />
+          </label>
+        )}
+        {mode !== 'stay' && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Button</span>
+            <span className="block text-2xs text-text-tertiary mb-1">Returns at once, e.g. Done. Empty shows none.</span>
+            <input
+              type="text"
+              value={done.button ?? ''}
+              onChange={(e) => set({ button: e.target.value })}
+              className="input w-[12rem]"
+              aria-label="Return button"
             />
           </label>
         )}

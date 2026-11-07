@@ -1,6 +1,6 @@
 import type { ScanPresentedChoice } from '../scan-choice';
 import type { ScanFactFormat, ScanOutcome, ScanTargetMatch, ScanVerb } from './constants';
-import type { ScanRuleFallback, ScanStepParams, ScanStepQuery } from './rule';
+import type { ScanDoneCopy, ScanHoldRelease, ScanRuleFallback, ScanStepParams, ScanStepQuery } from './rule';
 
 export interface ParsedScanCode {
   version: number;
@@ -38,6 +38,23 @@ export interface ScanHeldSubject extends ScanSubjectRef {
   claimedBy?: { id: string; displayName: string };
   /** A roster field of the held row's form to show under the hold card. */
   show?: string;
+  /** The button that ends the hold. */
+  release?: ScanHoldRelease;
+  /** With `show`: the done copy once every roster entry is in, rendered. */
+  whenAllIn?: ScanDoneCopy;
+  /** The Open button the hold screen offers. */
+  open?: ScanOpenLink;
+}
+
+/** An Open button, resolved: a row to open (and maybe claim), or a faceted list. */
+export interface ScanOpenLink {
+  label: string;
+  escalationId?: string;
+  /** Claim the row as the person acting before it opens. */
+  claim?: boolean;
+  /** The list's facet values, read from the target row. */
+  facets?: Record<string, string | number | boolean>;
+  role?: string;
 }
 
 export interface ScanExecuteRequest {
@@ -111,7 +128,11 @@ export interface ScanExecuteResponse {
   /** An executed add that found the item already in place. */
   already?: boolean;
   /** EXECUTED: the step's `done` copy, rendered. */
-  done?: { markdown: string };
+  done?: ScanDoneCopy;
+  /** The Open button the done or refusal screen offers. */
+  open?: ScanOpenLink;
+  /** CHOICES: a roster field of the row's form to show above the choices. */
+  show?: string;
   /**
    * EXECUTED, subject completed: follow the subject to its next row. The
    * station replays `code` once a pending row for `target` appears in

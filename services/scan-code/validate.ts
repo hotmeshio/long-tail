@@ -15,6 +15,7 @@ import { FACET_KEY } from '../escalation/facet-sql';
 import { assertValidSubjectStep } from './validate-subject';
 import { assertValidQueryKinds } from './validate-query';
 import { assertValidFacts } from './validate-facts';
+import { assertValidDone, assertValidOpen, assertValidPresentShow } from './validate-station';
 import { assertGtinOrderDeclared, assertValidPatternFields } from './validate-scheme-pattern';
 
 const VALID_VERBS = new Set<string>(Object.values(SCAN_VERBS));
@@ -157,14 +158,7 @@ function assertValidChoices(choices: ScanChoice[] | undefined, at: string): void
       if (codes.has(choice.code)) throw new Error(`${cat}: duplicate code "${choice.code}"`);
       codes.add(choice.code);
     }
-    if (choice.done !== undefined) {
-      if (!choice.done || typeof choice.done !== 'object' || typeof choice.done.markdown !== 'string' || !choice.done.markdown) {
-        throw new Error(`${cat}: done.markdown is required`);
-      }
-      if (!SCAN_MUTATING_VERBS.includes(choice.verb)) {
-        throw new Error(`${cat}: done applies only to choices that write`);
-      }
-    }
+    assertValidDone(choice.done, choice.verb, cat, 'choices');
     if (choice.hidden !== undefined) {
       if (typeof choice.hidden !== 'boolean') throw new Error(`${cat}: hidden must be a boolean`);
       if (choice.hidden && !choice.roles?.length) throw new Error(`${cat}: hidden requires roles`);
@@ -282,14 +276,9 @@ export function assertValidSteps(steps: ScanStep[]): void {
       }
     }
     assertValidSubjectStep(step, at);
-    if (step.done !== undefined) {
-      if (!step.done || typeof step.done !== 'object' || typeof step.done.markdown !== 'string' || !step.done.markdown) {
-        throw new Error(`${at}: done.markdown is required`);
-      }
-      if (!SCAN_MUTATING_VERBS.includes(step.verb)) {
-        throw new Error(`${at}: done applies only to steps that write`);
-      }
-    }
+    assertValidDone(step.done, step.verb, at);
+    assertValidOpen(step, at);
+    assertValidPresentShow(step, at);
     assertValidFollow(step, at);
     assertValidTemplateTokens(step, at);
     if (step.query && step.query.roles && !Array.isArray(step.query.roles)) {
@@ -312,7 +301,7 @@ export function assertValidSteps(steps: ScanStep[]): void {
   });
 }
 
-const BAG_TOKEN = /\{(claim|item|subject|container|fill)\.([^}]*)\}/g;
+const BAG_TOKEN = /\{(claim|item|subject|container|fill|located)\.([^}]*)\}/g;
 
 /**
  * Bag tokens name facet keys and may only read what the step has:
@@ -321,7 +310,9 @@ const BAG_TOKEN = /\{(claim|item|subject|container|fill)\.([^}]*)\}/g;
  * presents),
  * `{subject.…}` the held subject (steps with a subject gate), and
  * `{container.…}` / `{fill.…}` only inside refusal and done copy, where a
- * subject accumulate or a fill has read them (into-subject: the held row).
+ * subject accumulate or a fill has read them (into-subject: the held row),
+ * and `{located.…}` (the scanned code's own pending row) only inside refusal
+ * and done copy.
  */
 function assertValidTemplateTokens(step: ScanStep, at: string): void {
   const accumulate = step.verb === SCAN_VERBS.ACCUMULATE ? step.params?.accumulate : undefined;
@@ -345,6 +336,9 @@ function assertValidTemplateTokens(step: ScanStep, at: string): void {
       }
       if (bag === 'fill' && !(inRefusal && step.verb === SCAN_VERBS.FILL)) {
         throw new Error(`${at}: ${token} is readable only in the refusal or done copy of a fill step`);
+      }
+      if (bag === 'located' && !inRefusal) {
+        throw new Error(`${at}: ${token} is readable only in refusal or done copy`);
       }
     }
   };
