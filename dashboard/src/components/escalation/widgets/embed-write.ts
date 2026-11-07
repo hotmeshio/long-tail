@@ -6,6 +6,11 @@ export interface EmbedWriteOptions {
    * the next badge, saying this. A page that takes no badges drops it.
    */
   badge?: string;
+  /**
+   * The badge stays primed after the write, for the writes that follow; its
+   * grant's own uses and lifetime still bound it.
+   */
+  keepBadge?: boolean;
 }
 
 /** Runs an embedded row action, or holds it until the page can run it (a badge at a shared station). */

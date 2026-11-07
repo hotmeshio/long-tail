@@ -219,6 +219,7 @@ export const SCAN_TEMPLATE_BAGS = {
   SUBJECT: 'subject',
   CONTAINER: 'container',
   FILL: 'fill',
+  LOCATED: 'located',
 } as const;
 export type ScanTemplateBag = (typeof SCAN_TEMPLATE_BAGS)[keyof typeof SCAN_TEMPLATE_BAGS];
 

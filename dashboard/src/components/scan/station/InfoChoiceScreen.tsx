@@ -5,6 +5,7 @@ import { formatTimeAgo } from '../../../lib/format';
 import { stationFactEntries } from '../../../lib/metadata-display';
 import { FormattedValue } from '../../common/display/FormattedValue';
 import { isChoiceEnabled, matchChoiceByCode } from './choice-code';
+import { HeldRoster } from './HeldRoster';
 import type { ScanExecuteResponse, ScanPresentedChoice } from '../../../api/scan-codes';
 
 /** Format a metadata leaf for display: booleans read as Yes/No, objects compact
@@ -40,7 +41,8 @@ function Dot() {
  * takes first look at raw scans: a code matching an enabled choice selects it
  * (confirm still applies); everything else falls through to normal execution.
  * Tapping a withheld choice hands it to the caller as a pending action — the
- * badge stop-over collects the identity and executes it.
+ * badge stop-over collects the identity and executes it. With `show`, the
+ * row's roster sits above the choices.
  */
 export function InfoChoiceScreen({
   response,
@@ -121,6 +123,10 @@ export function InfoChoiceScreen({
           </div>
         )}
       </div>
+
+      {response.show && (
+        <HeldRoster escalationId={String(escalation.id)} field={response.show} refreshKey={0} />
+      )}
 
       {/* Choices — the human's tap (or a second scan) disambiguates */}
       <div className="mt-8 space-y-3">

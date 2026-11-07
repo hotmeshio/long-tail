@@ -16,7 +16,7 @@ export type { ActionBarMode, ActiveView, EscalationActionBarProps } from './acti
 export function EscalationActionBar(props: EscalationActionBarProps) {
   const {
     mode, activeView, onActiveViewChange,
-    onClaim, claimPending, claimNudge,
+    onClaim, claimPending, claimNudge, claimError,
     workflowType, json, onResolve, resolvePending, resolveError,
     requestTriage, triageNotes,
     onRelease, releasePending,
@@ -134,6 +134,9 @@ export function EscalationActionBar(props: EscalationActionBarProps) {
                 </button>
               )}
               <div className="flex-1" />
+              {claimError && !claimPending && (
+                <p className="text-xs text-status-error" role="alert" data-testid="claim-error">{claimError.message}</p>
+              )}
               {isCustom && (
                 <CustomDurationPicker onChange={onCustomChange} compact autoFocus />
               )}

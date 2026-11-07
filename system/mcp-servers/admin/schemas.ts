@@ -941,6 +941,12 @@ export const executeScanChoiceSchema = z.object({
 
 export const listScanSchemesSchema = z.object({});
 
+const scanDoneSchema = z.object({
+  markdown: z.string().describe("What the station says once the write lands, e.g. 'Place it in **{container.containerCode}**.' (template)"),
+  afterSeconds: z.number().int().min(0).max(60).optional().describe("Seconds before the station returns, over the role's scan_done.after_seconds"),
+  nextPrompt: z.string().optional().describe("The line under the copy, in place of 'Scan the next item' (template)"),
+});
+
 const scanStepParamsSchema = z.object({
   resolverPayload: z.record(z.any()).optional(),
   metadata: z.record(z.any()).optional(),
@@ -978,11 +984,21 @@ const scanStepParamsSchema = z.object({
       schemes: z.array(z.number().int().min(10).max(99)),
       prompt: z.string().optional().describe('Markdown asking for the next scan (template)'),
     }).optional(),
+    show: z.string().optional().describe("A roster field of the held row's form, shown under the hold card"),
+    release: z.object({
+      label: z.string().optional().describe("Default 'Put it down'"),
+      tone: z.enum(['neutral', 'accent']).optional(),
+      return: z.string().optional().describe("'home' or a dashboard route; absent, the station stays"),
+    }).optional().describe('The button that ends the hold'),
+    whenAllIn: scanDoneSchema.optional().describe('With show: the hold ends with this done copy once every roster entry is in'),
   }).optional().describe('hold verb options'),
   fill: z.object({
     into: z.enum(['subject', 'scanned']),
     separator: z.string().length(1).optional().describe("Between a code and its ordinal in batch keys (default '#')"),
     payload: z.record(z.any()).optional(),
+    labels: z.string().optional().describe("A per-key map on the batch row naming each entry, e.g. 'envelope.item_labels'"),
+    label: z.string().optional().describe("How one entry reads: '{label.<path>}' and '{code}'"),
+    prefer: z.string().optional().describe("Into-subject: a per-key map on the batch row naming the value each key belongs to; keys the held subject's target names fill first"),
   }).optional().describe('fill verb options'),
 });
 
@@ -993,6 +1009,7 @@ const scanChoiceSchema = z.object({
   confirm: z.object({ prompt: z.string() }).optional(),
   requireActingIdentity: z.boolean().optional().describe('The choice executes only under a real acting identity (badge or a write-capable login)'),
   code: z.string().optional().describe('Short token enabling double-scan selection (scan object, then an action card)'),
+  done: scanDoneSchema.optional(),
 });
 
 export const upsertScanSchemeSchema = z.object({
@@ -1045,16 +1062,28 @@ export const upsertScanRuleSchema = z.object({
     }).optional().describe('The step acts on the held subject and runs only while one from these schemes is held'),
     match: z.object({
       target: z.array(z.string()).optional().describe("The scanned target must equal one of these, e.g. ['{subject.containerCode}']; a lone token naming a list facet ('{subject.offeredContainers}') allows every entry"),
-      facets: z.array(z.string()).optional().describe('The located container must share these facets with the subject'),
+      facets: z.array(z.string()).optional().describe("The located row (the container, or on an into-subject add with item, the item's own row) must share these facets with the subject"),
     }).optional().describe('Checked before the write; a miss refuses with nothing written'),
     refuse: z.object({
       markdown: z.string().describe('What the station says on a failed match (template; may read {container.*})'),
       conflict: z.string().optional().describe('What the station says when the write loses a race'),
       missing: z.string().optional().describe("Subject accumulate: what the station says when the pairing holds but the row the scan names is not found (from-subject: no open container; into-subject with item: no waiting item row). Else the next step runs"),
     }).optional(),
-    done: z.object({
-      markdown: z.string().describe("What the station says once the write lands, e.g. 'Place it in **{container.containerCode}**.' (template)"),
-    }).optional(),
+    done: scanDoneSchema.optional(),
+    open: z.object({
+      label: z.string().optional().describe("Default 'Open'"),
+      target: z.enum(['row', 'subject', 'located']).describe('The row the step acted on, the held row, or the scanned code\'s own pending row'),
+      list: z.object({
+        facets: z.array(z.string()),
+        role: z.string().optional(),
+      }).optional().describe('Open the list of rows sharing these facets with the target instead of the row'),
+      claim: z.boolean().optional().describe('Claim the row as the person acting first; a refused claim opens it read-only'),
+    }).optional().describe('An Open button on the hold, done or refusal screen'),
+    show: z.string().optional().describe("present verb only: a roster field of the row's form, shown above the choices"),
+    follow: z.object({
+      roles: z.array(z.string()),
+      waitSeconds: z.number().int().optional(),
+    }).optional().describe("After this write completes the held subject, hold its next pending row in these roles"),
   })).describe('Ordered condition/action steps — first match wins'),
   fallback: z.object({
     markdown: z.string().optional(),

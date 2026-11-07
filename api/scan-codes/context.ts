@@ -8,6 +8,7 @@ import {
   isEffectivelyClaimed,
   type LTEscalationRecord,
   type ParsedScanCode,
+  type ScanDoneCopy,
   type ScanExecuteResponse,
   type ScanRule,
   type ScanScheme,
@@ -52,6 +53,10 @@ export interface StepContext {
   subject?: HeldSubject;
   /** The station sent a subject pointer that no longer checks out. */
   subjectStale?: boolean;
+  /** The scanned code's own pending row, read once a step's copy or Open asks for it; null when none. */
+  located?: LTEscalationRecord | null;
+  /** The located row's role title. */
+  locatedTitle?: string | null;
 }
 
 export function targetFilter(step: ScanStep, ctx: StepContext): Record<string, any> {
@@ -74,7 +79,13 @@ export function templateContext(ctx: StepContext): scanCodeService.ScanTemplateC
     scannedAt: ctx.scannedAt,
     code: ctx.parsed.raw ?? ctx.parsed.target,
     ...(ctx.subject ? { subject: subjectBag(ctx.subject.row) } : {}),
+    ...(ctx.located ? { located: locatedBag(ctx.located, ctx.locatedTitle) } : {}),
   };
+}
+
+/** The `{located.x}` bag: the row's metadata plus its id, role and role title. */
+export function locatedBag(row: LTEscalationRecord, title?: string | null): Record<string, unknown> {
+  return { ...(row.metadata ?? {}), id: row.id, role: row.role, roleTitle: title || row.role };
 }
 
 /** The `{subject.x}` bag: the held row's metadata plus its id. */
@@ -204,7 +215,16 @@ export function withDone(
 ): LTApiResult<ScanExecuteResponse> {
   const data = result.data;
   if (!step.done || !data || data.outcome !== SCAN_OUTCOMES.EXECUTED || data.already || data.done) return result;
-  return { ...result, data: { ...data, done: { markdown: scanCodeService.renderScanCopy(step.done.markdown, tpl) } } };
+  return { ...result, data: { ...data, done: renderDone(step.done, tpl) } };
+}
+
+/** A done copy rendered for the station: the markdown, its pause, and the line under it. */
+export function renderDone(done: ScanDoneCopy, tpl: scanCodeService.ScanTemplateContext): ScanDoneCopy {
+  return {
+    markdown: scanCodeService.renderScanCopy(done.markdown, tpl),
+    ...(done.afterSeconds !== undefined ? { afterSeconds: done.afterSeconds } : {}),
+    ...(done.nextPrompt ? { nextPrompt: scanCodeService.renderScanCopy(done.nextPrompt, tpl) } : {}),
+  };
 }
 
 /**

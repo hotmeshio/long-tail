@@ -273,6 +273,10 @@ receives the raw value and renders it with the list's formatter, so an ISO
 instant in metadata reads the same on the station as in a list column (and
 in the deployment's display time zone, when one is set).
 
+`show` names a [roster](hitl/x-lt-roster.md) field of the row's form, rendered
+above the choices as a hold renders it: an arrival screen lists what came in
+the container before the person taps Arrive.
+
 Without `facts`, the station lists the row's metadata, leaving out the
 bookkeeping a bench never acts on: scan provenance (`scannedAt`,
 `scanScheme`, `scanCategory`, `scanStation`, `scanActionName`),
@@ -358,7 +362,10 @@ set one ("Take the new label from the printer and stick it on C-12").
 Any step that writes may carry `done: { markdown }`: the copy the station shows,
 large, once the write lands and until the next scan ("Place it in
 **{container.containerCode}**. All good."). It reads the same bags its refusal copy
-reads. A fill or an into-subject add that leaves slots open shows its done
+reads. `done.afterSeconds` (0-60) sets how long this act's copy stays up before
+the station returns, over the role's `scan_done.after_seconds`, and
+`done.nextPrompt` replaces the "Scan the next item" line under it when the next
+act is not a scan ("Set the bag in tub **{container.tubCode}**"). A fill or an into-subject add that leaves slots open shows its done
 copy under the hold; without done copy the station shows the count ("2 of 5
 checked off" for a fill, "2 of 5 added" for an add).
 
@@ -373,6 +380,22 @@ unchanged.
 "params": { "hold": { "ttlSeconds": 300, "label": "{item.orderId}",
   "expect": { "schemes": [16], "prompt": "Scan each shoe box." },
   "show": "shoes" } }
+```
+
+**Ending the hold.** The hold card's button lets go of the item. By default it
+reads "Put it down" and the station stays where it is. `hold.release` names it
+for the bench: `label`, `tone: "accent"` to draw it as the screen's primary act,
+and `return` (`home` or a dashboard route) for where the station goes once
+released. Releasing writes nothing: items not yet scanned simply wait for the
+next trip. With `hold.show`, `hold.whenAllIn` ends the hold on its own once
+every entry on the roster is in. The station shows its done copy
+(`markdown`, `afterSeconds`, `nextPrompt`, rendered against the held row), then
+returns as after a completed act.
+
+```jsonc
+"params": { "hold": { "label": "{item.tubCode}", "show": "bags",
+  "release": { "label": "I'm done", "tone": "accent", "return": "home" },
+  "whenAllIn": { "markdown": "Every bag is in **{item.tubCode}**.", "afterSeconds": 5 } } }
 ```
 
 The server trusts nothing about the subject. Each request re-parses its
@@ -418,6 +441,19 @@ printed code. With them, `{fill.pending}` lists the open entries by label,
 refusal's `expected` reads the labels. An entry the map does not name reads as
 its code; without `fill.labels`, both tokens read codes.
 
+**Which key a fill takes.** A scan fills the first open key for its code, in
+the row's order. When the same code is expected under several keys that each
+belong to something the station can hold (two boxes of one item arriving in
+two parcels), `fill.prefer` names a per-key map on the batch row naming the
+value each key belongs to. Open keys whose value equals the held subject's
+target (or, for a list value, contains it) fill first; the rest follow as
+before. Held by parcel `P2`, scanning the item fills the key mapped to `P2`.
+
+```jsonc
+"params": { "fill": { "into": "subject", "prefer": "envelope.key_parcels" } }
+// the row's envelope: { "key_parcels": { "<code>#1": "P1", "<code>#2": "P2" } }
+```
+
 ```jsonc
 "refuse": { "markdown": "Not one of this order's shoes. Still to match: {fill.pending}." },
 "done": { "markdown": "Matched. Next: {fill.next}" },
@@ -442,6 +478,14 @@ container), the answer is `refused` with `refuse.conflict`, and a step that
 declares `refuse.conflict` also clears the subject so the next item scan
 reads fresh state. Exactly one of two racing acts wins whenever both name
 the same row: the reciprocal statement writes both rows or neither.
+
+**Where the scanned item is now.** Refusal and done copy may read
+`{located.<facet>}`: the scanned code's own pending row, the newest one in any
+role the reader may read (the held row excepted). Besides the row's facets it
+carries `id`, `role` and `roleTitle` (the role's title, else its name), so a
+refusal can say where the item belongs: "This bag is at
+**{located.roleTitle}**." The row is read only for a step whose copy or Open
+names it; with no such row the token renders empty.
 
 **The item's own row on an into-subject add.** A held container that collects
 item codes (a box being packed from a bin) often has items that each wait on
@@ -633,6 +677,30 @@ Pair kiosk with `x-lt-transition-done` on the role's form schema
 resolve lands back on the list rather than walking browser history — see
 [x-lt-transition](./hitl/x-lt-transition.md).
 
+### Open: from a scan result into its row
+
+The station's answer stays light (right container or wrong one), but the moment
+something is off the person needs the full form. A step's `open` puts an
+**Open** button on the hold card, the done screen or the refusal it answers with:
+
+```jsonc
+"open": { "target": "subject", "claim": true }
+"open": { "target": "row", "label": "Open the bin", "list": { "facets": ["binCode"], "role": "binning" } }
+"open": { "target": "located", "label": "Where it is" }
+```
+
+`target` is the row the step acted on or located (`row`), the held row
+(`subject`, on a hold the row just held), or the scanned code's own pending row
+(`located`). Open lands on that row's detail page, in the app. With `list`, it
+lands on the faceted list of rows sharing those facets with the target, the
+values read from the target row on the server. With `claim`, the row is claimed
+first as the person acting (the badge rides the claim) and opens claimed in
+their name; a claim the server refuses (no badge, a scope that does not cover
+it, someone else's claim) still opens the row, read-only, where the detail page
+offers its own Claim. Opening from a hold lets go of the item. A target with no
+row, or a list facet the row does not carry, offers no button. Every decision
+(reject, missing, done) stays on the detail form.
+
 ### After a scan completes: the return
 
 A station works in one rhythm: badge, item, destination, done, back to the
@@ -644,7 +712,9 @@ list. A role names the last step in `properties.scan_done`:
 
 `return` is `home` (the role's kiosk home: its first portal, else its list) or
 a dashboard-relative route; `after_seconds` (0-60, default 2) is how long the
-done copy stays up first. The station returns once a scan act completes its
+done copy stays up first, and a step's `done.afterSeconds` sets it for one act.
+The done screen counts the seconds down. `button` (e.g. `"Done"`) adds a button
+that returns at once. The station returns once a scan act completes its
 row: the last fill of a batch, an executed choice with done copy, any write
 that clears the subject. A fill that leaves entries pending stays on the hold
 card, a refusal never returns, and a `follow` runs first. A station holding
@@ -687,6 +757,11 @@ submit for ten minutes. A grant bound to a scanned subject (`grant_scope:
 locally, so the identity gate sits at the one place a record actually
 changes, once per change.
 
+Claiming at a station works the same way. On a read-only station login, the
+detail page's Claim asks for a badge and claims as whoever badges in; the badge
+then stays primed for the work on the row, bounded by its grant's own uses and
+lifetime. A claim the server refuses says why on the claim bar.
+
 Mutations attribute to the badged person (`assigned_to`, `resolved_by`)
 with the device recorded beside them (`scanStation` in the scan
 provenance) — every action individually owned and geographically placed.
@@ -708,7 +783,10 @@ A field can take a scan while the form is open: with
 [`x-lt-scan`](hitl/x-lt-scan.md), scanning a container into a claimed form
 fills its container field (checked against what the record expects), and
 `x-lt-scan-submit` submits once the scan fields are filled, which raises the
-badge prompt. A scan no field accepts runs globally as usual.
+badge prompt. A batch [roster](hitl/x-lt-roster.md) that declares `x-lt-scan`
+checks its entries off the same way: a scan of an accepted scheme, with nothing
+focused, fills the row's first open entry for that code on the server, as the
+person acting. A scan no field accepts runs globally as usual.
 
 Badge tokens are printed credentials: seed them as long random strings,
 bind them server-side (`lt_users.metadata`), and treat badge possession

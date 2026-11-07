@@ -34,6 +34,8 @@ export interface ScanTemplateContext {
   container?: Record<string, unknown>;
   /** The batch a fill step read: `pending`, `total`, `filled`. */
   fill?: Record<string, unknown>;
+  /** The scanned code's own pending row: its metadata plus `id`, `role` and `roleTitle`. */
+  located?: Record<string, unknown>;
 }
 
 /** A bag token the context cannot resolve. */
@@ -44,7 +46,7 @@ export class ScanTemplateError extends Error {
   }
 }
 
-const BAG_TOKEN = /\{(claim|item|subject|container|fill)\.([a-zA-Z0-9_]+)\}/g;
+const BAG_TOKEN = /\{(claim|item|subject|container|fill|located)\.([a-zA-Z0-9_]+)\}/g;
 
 const MISSING_BAG: Record<ScanTemplateBag, string> = {
   claim: 'the actor holds no single live claim',
@@ -52,11 +54,17 @@ const MISSING_BAG: Record<ScanTemplateBag, string> = {
   subject: 'no subject is held',
   container: 'no container was located',
   fill: 'no batch was read',
+  located: 'the scanned code has no pending row the reader can read',
 };
 
 /** True when any string in the params mentions a `{claim.…}` token. */
 export function mentionsClaimToken(value: unknown): boolean {
   return JSON.stringify(value ?? null).includes(`{${SCAN_TEMPLATE_BAGS.CLAIM}.`);
+}
+
+/** True when any string in the value mentions a `{located.…}` token. */
+export function mentionsLocatedToken(value: unknown): boolean {
+  return JSON.stringify(value ?? null).includes(`{${SCAN_TEMPLATE_BAGS.LOCATED}.`);
 }
 
 function resolveBagToken(ctx: ScanTemplateContext, bag: ScanTemplateBag, facet: string, token: string): string {
@@ -74,7 +82,7 @@ function resolveBagToken(ctx: ScanTemplateContext, bag: ScanTemplateBag, facet: 
  * Replace the template tokens inside string values of a params object.
  * Deep, pure, non-mutating. The scan tokens are plain text replacement; the
  * bag tokens (`{claim.x}`, `{item.x}`, `{subject.x}`, `{container.x}`,
- * `{fill.x}`) read the context's facet bags and throw
+ * `{fill.x}`, `{located.x}`) read the context's facet bags and throw
  * {@link ScanTemplateError} when they cannot resolve, so a literal token
  * never reaches a row. No expression language.
  */

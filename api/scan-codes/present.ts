@@ -101,6 +101,7 @@ export async function presentStep(
       escalation,
       choices,
       ...(step.facts ? { facts: renderFacts(step, ctx, escalation) } : {}),
+      ...(step.show ? { show: step.show } : {}),
       notPrimed: ctx.rule.notPrimed,
       ...(autoSelect ? { autoSelect: true } : {}),
     },

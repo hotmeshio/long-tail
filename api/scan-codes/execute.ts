@@ -3,7 +3,9 @@ import { actingIdentitySatisfied, executeIdentityScan } from './identity';
 import { notPrimed, templateContext, withDone, withFollow, type StepContext } from './context';
 import { peekGrant, settleGrant } from './grant';
 import { holdStep } from './hold';
+import { loadLocated, readsLocated } from './located';
 import { locateStep } from './locate';
+import { withOpen } from './open';
 import { presentStep } from './present';
 import { resolveSubject } from './subject';
 import { fillStep } from './verb-fill';
@@ -99,7 +101,8 @@ export async function executeScanCode(
       const stepResult = await executeStep(rule.steps[i], ctx);
       if (stepResult) {
         const step = rule.steps[i];
-        result = decorate(withFollow(withDone(stepResult, step, templateContext(ctx)), step, ctx), ctx, i);
+        const answered = withFollow(withDone(stepResult, step, templateContext(ctx)), step, ctx);
+        result = decorate(await withOpen(answered, step, ctx), ctx, i);
       }
     }
 
@@ -169,6 +172,7 @@ async function executeStep(
   ctx: StepContext,
 ): Promise<LTApiResult<ScanExecuteResponse> | null> {
   if (!subjectGateOpen(step, ctx)) return null;
+  if (readsLocated(step)) await loadLocated(ctx);
   // The identity pre-condition: the effective actor must be a real acting
   // identity — a badge grant, or an authenticated user whose own write scope
   // covers the step. A write-incapable shared account can never self-satisfy,

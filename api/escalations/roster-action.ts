@@ -19,6 +19,7 @@ import {
   type ShowIfContext,
 } from '../../shared/form-validation';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
+import type { LTEscalationRecord } from '../../types';
 
 import { flagBatchItem, unflagBatchItem } from './batch-flag';
 import { assertReadAccess } from './helpers';
@@ -76,14 +77,9 @@ export async function runRosterAction(input: RosterActionInput, auth: LTApiAuth)
     }
 
     // 1. The host row and its form, as the page that offered the action read them
-    const detail = await escalationService.getEscalationWithFormSchema(input.id);
-    if (!detail || (await assertReadAccess(auth.userId, detail.escalation))) {
-      return { status: 404, error: 'Escalation not found' };
-    }
-    const host = detail.escalation;
-    const embedded = (host.metadata as Record<string, any> | null)?.form_schema;
-    const schema = (embedded && typeof embedded === 'object' ? embedded : detail.form_schema) as Record<string, any> | null;
-    const fieldSchema = schema?.properties?.[input.field] as Record<string, unknown> | undefined;
+    const loaded = await loadHostField(input.id, input.field, auth);
+    if (!loaded) return { status: 404, error: 'Escalation not found' };
+    const { host, fieldSchema } = loaded;
     const def = readRosterDef(fieldSchema);
     const action = readRosterActions(fieldSchema)[input.action];
     if (!def || !action) return { status: 409, error: 'This action is no longer offered' };
@@ -104,12 +100,8 @@ export async function runRosterAction(input: RosterActionInput, auth: LTApiAuth)
     }
 
     // 3. The person acting: the badge's person when one rides the request, read without spending it
-    let actor = auth;
-    if (input.actingToken) {
-      const peeked = await peekActingAuth(input.actingToken);
-      if (!peeked.ok) return refusal(401, ROSTER_ACTION_OUTCOMES.NOT_PRIMED, peeked.error);
-      actor = peeked.auth;
-    }
+    const actor = await actorFor(input.actingToken, auth);
+    if ('status' in actor) return actor;
     if (!(await holdsRole(action, actor.userId))) {
       return input.actingToken
         ? refusal(403, ROSTER_ACTION_OUTCOMES.ROLE_REFUSED, actionRefusal(action))
@@ -117,24 +109,50 @@ export async function runRosterAction(input: RosterActionInput, auth: LTApiAuth)
     }
 
     // 4. Spend the badge, run the act, and return the use when it does not land
-    let remaining: number | null | undefined;
-    if (input.actingToken) {
-      const spent = await consumeActingGrant(input.actingToken);
-      if (!spent.ok) return refusal(401, ROSTER_ACTION_OUTCOMES.NOT_PRIMED, spent.error);
-      remaining = spent.grant.remaining;
-    }
-    const result = await runAct(kind, action, entry, host.id, ctx, input.code, actor);
-    if (input.actingToken && result.status >= 300) {
-      await refundActingGrant(input.actingToken, false);
-      return result;
-    }
-    if (input.actingToken && result.data && typeof result.data === 'object') {
-      result.data = { ...result.data, acting: { remaining } };
-    }
-    return result;
+    return spendAndRun(input.actingToken, () => runAct(kind, action, entry, host.id, ctx, input.code, actor));
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+/** The host row and one field of its pinned form, or null when the row is gone or unreadable. */
+export async function loadHostField(
+  id: string,
+  field: string,
+  auth: LTApiAuth,
+): Promise<{ host: LTEscalationRecord; fieldSchema: Record<string, unknown> | undefined } | null> {
+  const detail = await escalationService.getEscalationWithFormSchema(id);
+  if (!detail || (await assertReadAccess(auth.userId, detail.escalation))) return null;
+  const host = detail.escalation;
+  const embedded = (host.metadata as Record<string, any> | null)?.form_schema;
+  const schema = (embedded && typeof embedded === 'object' ? embedded : detail.form_schema) as Record<string, any> | null;
+  return { host, fieldSchema: schema?.properties?.[field] as Record<string, unknown> | undefined };
+}
+
+/** Spend the badge, run the act, and return the use when the act does not land. */
+export async function spendAndRun(actingToken: string | undefined, run: () => Promise<LTApiResult>): Promise<LTApiResult> {
+  let remaining: number | null | undefined;
+  if (actingToken) {
+    const spent = await consumeActingGrant(actingToken);
+    if (!spent.ok) return refusal(401, ROSTER_ACTION_OUTCOMES.NOT_PRIMED, spent.error);
+    remaining = spent.grant.remaining;
+  }
+  const result = await run();
+  if (actingToken && result.status >= 300) {
+    await refundActingGrant(actingToken, false);
+    return result;
+  }
+  if (actingToken && result.data && typeof result.data === 'object') {
+    result.data = { ...result.data, acting: { remaining } };
+  }
+  return result;
+}
+
+/** The person acting: the badge's person when one rides the request, read without spending it. */
+export async function actorFor(actingToken: string | undefined, auth: LTApiAuth): Promise<LTApiAuth | LTApiResult> {
+  if (!actingToken) return auth;
+  const peeked = await peekActingAuth(actingToken);
+  return peeked.ok ? peeked.auth : refusal(401, ROSTER_ACTION_OUTCOMES.NOT_PRIMED, peeked.error);
 }
 
 async function holdsRole(action: RosterActionDef, userId: string): Promise<boolean> {
@@ -182,6 +200,6 @@ function runAct(
   }
 }
 
-function refusal(status: number, outcome: string, error: string): LTApiResult {
+export function refusal(status: number, outcome: string, error: string): LTApiResult {
   return { status, error, data: { error, outcome } };
 }

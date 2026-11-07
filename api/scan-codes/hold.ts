@@ -9,7 +9,7 @@ import {
   type ScanStep,
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
-import { templateContext, type StepContext } from './context';
+import { renderDone, templateContext, type StepContext } from './context';
 import { locateForStep } from './locate';
 import { claimedByOther } from './subject';
 
@@ -57,6 +57,8 @@ async function heldSubject(step: ScanStep, ctx: StepContext, row: LTEscalationRe
     } : {}),
     ...(claimant ? { claimedBy: claimant } : {}),
     ...(hold.show ? { show: hold.show } : {}),
+    ...(hold.release ? { release: hold.release } : {}),
+    ...(hold.whenAllIn ? { whenAllIn: renderDone(hold.whenAllIn, tpl) } : {}),
   };
 }
 

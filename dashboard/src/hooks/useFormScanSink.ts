@@ -8,6 +8,7 @@ import {
   scanFieldsFilled,
   wantsScanSubmit,
 } from '../lib/x-lt-scan';
+import { readRosterDef } from '../lib/x-lt-roster';
 
 /** What the last scan into the form did, for the field to show. */
 export interface FormScanNotice {
@@ -29,7 +30,8 @@ function focusedFieldKey(): string | null {
  * instead of running globally; a scan no field accepts, and every badge,
  * passes on to the scan pipeline unchanged. With x-lt-scan-submit, filling
  * the last required scan field submits the form (a station's submit still
- * asks for the badge).
+ * asks for the badge). A batch roster that declares x-lt-scan checks its
+ * entry off on the server instead (`onRosterScan`).
  */
 export function useFormScanSink({
   enabled,
@@ -37,6 +39,7 @@ export function useFormScanSink({
   onJsonChange,
   context,
   onScanSubmit,
+  onRosterScan,
 }: {
   enabled: boolean;
   /** The form's JSON (values plus `_form_schema`). */
@@ -46,14 +49,16 @@ export function useFormScanSink({
   context: Record<string, unknown> | undefined;
   /** Submit with the filled form. */
   onScanSubmit: (json: string) => void;
+  /** Check off a batch roster's entry for the scan; resolves with the refusal, or null. */
+  onRosterScan?: (field: string, code: string) => Promise<string | null>;
 }): FormScanNotice | null {
   const pushCodeInterceptor = useOptionalScanInput()?.pushCodeInterceptor;
   const { data } = useScanSchemes({ enabled, staleTime: 60_000 });
   const [notice, setNotice] = useState<FormScanNotice | null>(null);
 
   // Live refs: the interceptor installs once and reads the current form.
-  const live = useRef({ json, onJsonChange, context, onScanSubmit, schemes: data?.schemes ?? [] });
-  live.current = { json, onJsonChange, context, onScanSubmit, schemes: data?.schemes ?? [] };
+  const live = useRef({ json, onJsonChange, context, onScanSubmit, onRosterScan, schemes: data?.schemes ?? [] });
+  live.current = { json, onJsonChange, context, onScanSubmit, onRosterScan, schemes: data?.schemes ?? [] };
 
   useEffect(() => {
     if (!enabled || !pushCodeInterceptor) return;
@@ -73,6 +78,13 @@ export function useFormScanSink({
       if (!schema || !field) return false;
 
       const fieldSchema = (schema.properties as Record<string, Record<string, unknown>>)[field];
+      const roster = readRosterDef(fieldSchema);
+      if (roster && 'batch' in roster.expected) {
+        const scanRoster = live.current.onRosterScan;
+        if (!scanRoster) return false;
+        void scanRoster(field, raw.trim()).then((error) => setNotice({ field, error, at: Date.now() }));
+        return true;
+      }
       const scan = { version: parsed.parsed.version, target: parsed.parsed.target, code: parsed.parsed.raw ?? raw.trim() };
       const applied = applyScanToField(form[field], scan, fieldSchema, live.current.context);
       if (!applied.ok) {

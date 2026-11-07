@@ -11,7 +11,7 @@ import {
 } from '../../types';
 import type { LTApiResult } from '../../types/sdk';
 import { conflict, forbidden, provenance, refused, templateContext, withDone, type StepContext } from './context';
-import { entryLabeler, pendingLabels, printedCode, type EntryLabeler } from './fill-labels';
+import { entryLabeler, pendingLabels, preferredKeys, printedCode, type EntryLabeler } from './fill-labels';
 import { identityGate, spendGrant } from './grant';
 import { locateForStep } from './locate';
 import { claimedByOther } from './subject';
@@ -101,7 +101,7 @@ export async function fillStep(step: ScanStep, ctx: StepContext): Promise<ScanRe
       filled: batch.keys.length - batch.pending.length,
     },
   };
-  const candidates = keysFor(batch.pending, ctx.parsed.target, separator);
+  const candidates = preferredKeys(keysFor(batch.pending, ctx.parsed.target, separator), options, row, ctx.subject?.parsed.target);
   if (candidates.length === 0) {
     const declared = keysFor(batch.keys, ctx.parsed.target, separator);
     const markdown = declared.length

@@ -1,5 +1,7 @@
 import { CircleX } from 'lucide-react';
 import { SimpleMarkdown } from '../../common/display/SimpleMarkdown';
+import { OpenButton } from './OpenButton';
+import type { ScanOpenLink } from '../../../api/scan-codes';
 
 /** The expected entries as one line: codes comma-joined, labels (which carry commas) semicolon-joined. */
 export function expectedLine(expected: string[]): string {
@@ -14,9 +16,12 @@ export function expectedLine(expected: string[]): string {
 export function RefusalPanel({
   markdown,
   expected,
+  open,
 }: {
   markdown: string;
   expected?: string[];
+  /** The way into the row the refusal names. */
+  open?: ScanOpenLink;
 }) {
   return (
     <div
@@ -33,6 +38,7 @@ export function RefusalPanel({
           Expected <span className="font-mono text-text-primary">{expectedLine(expected)}</span>
         </p>
       )}
+      {open && <OpenButton open={open} />}
       <div className="w-16 border-t border-surface-border my-8" />
       <p className="text-sm text-text-tertiary">Scan the right one to place it.</p>
     </div>

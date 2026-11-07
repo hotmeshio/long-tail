@@ -17,6 +17,7 @@ import {
   SCAN_VERBS,
   type ScanExecuteResponse,
   type ScanFollow,
+  type ScanOpenLink,
   type ScanPresentedChoice,
   type ScanVerb,
 } from '../../api/scan-codes';
@@ -62,7 +63,14 @@ interface DoneScreen {
   at: number;
   markdown: string;
   role?: string;
+  /** The act's own pause before the station returns. */
+  afterSeconds?: number;
+  /** The line under the copy. */
+  nextPrompt?: string;
+  open?: ScanOpenLink;
 }
+
+const NEXT_PROMPT_DEFAULT = 'Scan the next item';
 
 /** The station waiting for the completed subject's next row. */
 interface Following {
@@ -222,7 +230,7 @@ export function ScanStationPage() {
           }
           if (result.done) {
             // The choice's own done copy takes the screen, badge first or second.
-            setActDone({ at: Date.now(), markdown: result.done.markdown, role: result.escalation?.role });
+            setActDone({ at: Date.now(), ...result.done, role: result.escalation?.role, open: result.open });
             break;
           }
           // Done — back to idle, ready for the next item.
@@ -299,29 +307,54 @@ export function ScanStationPage() {
   const benchDone: DoneScreen | null = executedBench && !subject
     ? {
         at: benchAt,
+        ...executedBench.done,
         markdown: executedBench.done?.markdown ?? (executedBench.already ? 'Already there.' : 'Done.'),
         role: executedBench.escalation?.role,
+        open: executedBench.open,
       }
     : null;
   const done = actDone && (!benchDone || actDone.at > benchDone.at) ? actDone : benchDone;
 
   // Where the station returns: the chosen queue's policy, else the completed row's role.
   const completedRole = done?.role;
+  const doneAfterSeconds = done?.afterSeconds;
   const scanDone = useMemo(() => {
     const detailOf = (role: string | null | undefined) => (role ? roleDetails?.roles?.find((r) => r.role === role) : undefined);
     const completed = detailOf(completedRole);
     return resolveScanDoneReturn(
       { policy: readScanDone(detailOf(kiosk.role)?.properties), homePath: kiosk.homePath },
       completed ? { policy: readScanDone(completed.properties), homePath: kioskHomePath(completed.role, portalsOf(completed)) } : null,
+      doneAfterSeconds,
     );
-  }, [kiosk.role, kiosk.homePath, completedRole, roleDetails]);
+  }, [kiosk.role, kiosk.homePath, completedRole, doneAfterSeconds, roleDetails]);
 
   // The row is complete, nothing is held and the station is not following: return per the policy.
+  const [returnAt, setReturnAt] = useState<number | null>(null);
   useEffect(() => {
-    if (!done || following || subject || !scanDone) return;
+    if (!done || following || subject || !scanDone) {
+      setReturnAt(null);
+      return;
+    }
+    setReturnAt(Date.now() + scanDone.afterMs);
     const timer = setTimeout(() => navigate(scanDone.path), scanDone.afterMs);
     return () => clearTimeout(timer);
   }, [done, following, subject, scanDone, navigate]);
+
+  // The hold's own release: let go, then go where the rule says.
+  const releaseSubject = useCallback(() => {
+    const target = subject?.release?.return;
+    dropSubject();
+    const path = target === 'home' ? kiosk.homePath : target;
+    if (path) navigate(path);
+  }, [subject, dropSubject, kiosk.homePath, navigate]);
+
+  // Every entry on the held roster is in: the hold ends on its done copy.
+  const completeHold = useCallback(() => {
+    const copy = subject?.whenAllIn;
+    if (!copy) return;
+    dropSubject();
+    setActDone({ at: Date.now(), ...copy });
+  }, [subject, dropSubject]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -346,6 +379,7 @@ export function ScanStationPage() {
         <RefusalPanel
           markdown={refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.'}
           expected={refusal.refusal?.expected}
+          open={refusal.open}
         />
       ) : subject ? (
         <HoldScreen
@@ -354,14 +388,28 @@ export function ScanStationPage() {
           progress={progress}
           progressLabel={executedBench?.verb === SCAN_VERBS.ACCUMULATE ? 'added' : 'checked off'}
           note={subject && executedBench ? executedBench.done?.markdown ?? null : null}
-          refusal={refusal ? { markdown: refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.', expected: refusal.refusal?.expected } : null}
+          refusal={refusal ? {
+            markdown: refusal.refusal?.markdown ?? refusal.error ?? 'Not placed.',
+            expected: refusal.refusal?.expected,
+            open: refusal.open,
+          } : null}
           refreshKey={benchAt}
-          onRelease={dropSubject}
+          onRelease={releaseSubject}
+          onOpen={dropSubject}
+          onAllIn={completeHold}
         />
       ) : following ? (
         <DonePanel key={following.at} markdown={following.markdown} nextPrompt="Finding its next step" />
       ) : done ? (
-        <DonePanel key={done.at} markdown={done.markdown} nextPrompt="Scan the next item" />
+        <DonePanel
+          key={done.at}
+          markdown={done.markdown}
+          nextPrompt={done.nextPrompt ?? NEXT_PROMPT_DEFAULT}
+          open={done.open}
+          returning={returnAt && scanDone
+            ? { at: returnAt, button: scanDone.button, onReturn: () => navigate(scanDone.path) }
+            : null}
+        />
       ) : showChoices ? (
         <InfoChoiceScreen
           key={String(screen!.escalation!.id)}

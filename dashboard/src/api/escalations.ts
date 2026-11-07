@@ -343,6 +343,22 @@ export function useRosterAction() {
   });
 }
 
+/** A scan into a batch roster on an open form: the server fills the first open entry for the code. */
+export function useRosterScan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, field, code }: { id: string; field: string; code: string }) =>
+      apiFetch<{ outcome: string }>(`/escalations/${id}/roster-scan`, {
+        method: 'POST',
+        body: JSON.stringify({ field, code }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      queryClient.invalidateQueries({ queryKey: ['escalationStats'] });
+    },
+  });
+}
+
 export interface AccumulateItemResponse {
   outcome: 'accepted' | 'completed';
   count: number;

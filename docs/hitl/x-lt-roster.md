@@ -104,6 +104,8 @@ Each `x-lt-actions` entry is one act on the entry:
 
 **Roles and badges.** An action with `roles` shows to everyone. A person without one of the roles is asked for a badge, and the action runs as whoever badges in; a badge without the roles is refused with `refuse`, and the badge is not spent. On a read-only station login every action runs through a badge, as before. A role limit is an act control layered on RBAC: the person must also be allowed to write the row.
 
+**Scans.** A batch roster that declares [`x-lt-scan`](x-lt-scan.md#a-batch-roster-takes-scans) checks its entries off from scans on the open form, as a station fill would, without a button.
+
 On a wait declared with `wakeOnFlag`, a flag ends the wait: the workflow wakes with the items filled so far, `$flags`, and `$trigger: "flag"`, and can route the order (for example, to a manager). Without it, the flag is recorded and the wait continues.
 
 Moving work to another person is a resolve with an outcome. "Send to a manager" above resolves the member row with `outcome: "needs-manager"`; the member's workflow opens a row in the manager's role, where only a manager can resolve it, and the manager's confirm adds the bag to the box.

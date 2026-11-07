@@ -46,6 +46,8 @@ export interface RoleScanDone {
   return: 'home' | string;
   /** Seconds the done copy stays up first (0-60, default 2). */
   after_seconds?: number;
+  /** A button on the done screen that returns at once, e.g. "Done". */
+  button?: string;
 }
 
 /** A station role's badge policy. Absent fields keep the badge scheme's value. */

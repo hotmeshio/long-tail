@@ -1168,6 +1168,21 @@ The request is a pointer. The server re-reads the action from the row's pinned f
 | 422 | `code_mismatch` | The entered code does not name the entry's code |
 | 409 | | The action or the entry is no longer offered |
 
+```
+POST /api/escalations/:id/roster-scan
+```
+
+A scan into a batch [roster](../../hitl/x-lt-scan.md#a-batch-roster-takes-scans) on this row's form. **Body:** `{ field, code }`: the roster field and the code as scanned.
+
+The field must be a batch roster that declares `x-lt-scan` accepting the code's scheme. The server re-reads the roster, fills the first open entry whose key is the code (a filled entry moves on to the next) with `{ scannedCode }` as its payload, as the person acting, under their RBAC. With `X-LT-Acting-Token`, the person acting is the badged person; one use is spent when the fill runs and returned when it does not land.
+
+| Status | `outcome` | Meaning |
+|--------|-----------|---------|
+| 409 | `not_accepted` | The field takes no scans |
+| 422 | `not_accepted` | The field does not take this code's scheme |
+| 422 | `unexpected` | No open entry is this code (the error says when every one is already checked off) |
+| 401 | `not_primed` | The badge expired or was spent |
+
 Otherwise the answer is the act's own.
 
 ## Accumulate items

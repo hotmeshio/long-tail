@@ -45,6 +45,18 @@ An array scan field reads as a checklist: its prompt while empty, `n of N` besid
 
 The focused field, when it accepts the scan's scheme. Otherwise the first field in `x-lt-order` that accepts it and still has room. Otherwise the first field that accepts it.
 
+## A batch roster takes scans
+
+A [roster](x-lt-roster.md) whose expected set is the row's batch (`expected: { batch: true }`) may declare `x-lt-scan` with its `schemes`. On the open, claimed form, a scan of one of those schemes checks the entry off on the server, with nothing focused: the row's first open entry whose key is the scanned code is filled as the person acting, with `{ scannedCode }` as the entry's payload (`POST /api/escalations/:id/roster-scan`). An entry the list does not expect, or one already checked off, is refused under the roster and nothing is written. On a read-only station login the first scan asks for a badge, and the badge stays primed for the scans that follow, within its grant's uses and lifetime.
+
+```json
+"items": {
+  "type": "string", "readOnly": true, "x-lt-widget": "roster",
+  "x-lt-roster": { "expected": { "batch": true, "labels": "envelope.item_labels" } },
+  "x-lt-scan": { "schemes": [16] }
+}
+```
+
 ## Expected values are checked on both sides
 
 A scan outside `expect` shows as an error directly under the field that refused it, and leaves the field as it was; an accepted scan shows a confirmation in the same place. Either way the field scrolls into view. The same check runs in the shared validator at submit, so a typed value outside `expect` is a field error in the form and a 422 from the API.
