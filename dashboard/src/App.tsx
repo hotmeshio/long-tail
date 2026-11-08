@@ -140,6 +140,9 @@ const EscalationListSchemaPage = lazy(() =>
 const ScanCodesPage = lazy(() =>
   import('./pages/admin/scan-codes/ScanCodesPage').then((m) => ({ default: m.ScanCodesPage })),
 );
+const LabelJobsPage = lazy(() =>
+  import('./pages/admin/labels/LabelJobsPage').then((m) => ({ default: m.LabelJobsPage })),
+);
 const ScanSchemeDetailPage = lazy(() =>
   import('./pages/admin/scan-codes/ScanSchemeDetailPage').then((m) => ({ default: m.ScanSchemeDetailPage })),
 );
@@ -417,6 +420,7 @@ const router = createBrowserRouter([
           { path: 'admin/roles/:role/list-schema', element: <Lazy><EscalationListSchemaPage /></Lazy> },
           { path: 'admin/scan-codes', element: <Lazy><ScanCodesPage /></Lazy> },
           { path: 'admin/scan-codes/:version', element: <Lazy><ScanSchemeDetailPage /></Lazy> },
+          { path: 'admin/labels/history', element: <Lazy><LabelJobsPage /></Lazy> },
           { path: 'admin/personas', element: <Lazy><PersonasPage /></Lazy> },
           { path: 'admin/personas/:key', element: <Lazy><PersonaDetailPage /></Lazy> },
         ],

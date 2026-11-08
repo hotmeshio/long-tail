@@ -15,6 +15,7 @@
   "dependencies": {
     "@hotmeshio/hotmesh": "^0.26.2",
     "@tanstack/react-query": "^5.62.0",
+    "bwip-js": "^4.11.4",
     "date-fns": "^4.1.0",
     "js-yaml": "^4.1.1",
     "jsbarcode": "^3.12.3",

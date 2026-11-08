@@ -18,6 +18,8 @@ import type { HandoffRowAdapter } from '../services/machines/rows';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
+import type { LabelTemplateInput, LTLabelTransport } from './labels';
+import type { LabelMedia } from '../shared/labels/types';
 
 /**
  * Inline workflow profile declared alongside a worker registration.
@@ -296,6 +298,31 @@ export interface LTScanRuleConfig {
 }
 
 /**
+ * A label template declared with its scan scheme: what one printed label
+ * shows. `codes` name the scheme's rules by category, each with a caption
+ * (default: the rule's name) and a band tone for black-only stock.
+ */
+export type LTLabelTemplateConfig = Omit<LabelTemplateInput, 'scheme_version'>;
+
+/** Label sheet settings: printer transports, extra media presets, the default media. */
+export interface LTLabelsConfig {
+  /** Named routes from issued labels to printers; a job sends with output `transport:<name>`. */
+  transports?: Record<string, LTLabelTransport>;
+  /** Extra media presets (label stock the shipped presets do not cover). */
+  media?: LabelMedia[];
+  /** The media id a job prints on when neither the job nor the template names one. */
+  defaultMedia?: string;
+  /**
+   * Identity keys (badge tokens) leave user reads, are refused in wholesale
+   * metadata writes, and are set only with credentialIssuer. Default true;
+   * false keeps the earlier user API behavior.
+   */
+  protectIdentityKeys?: boolean;
+  /** TrueType/OpenType bytes for PDF label text beyond Latin-1; Helvetica otherwise. */
+  font?: { regular: Uint8Array; bold?: Uint8Array };
+}
+
+/**
  * Declarative scan scheme registration — the scheme and its rules are one
  * ownership unit, owned per `configSource` (overridable per entry with
  * `reset`). Code-owned schemes are compared and applied on every boot;
@@ -310,6 +337,11 @@ export interface LTScanSchemeConfig {
   target_facet: string;
   encoding?: ScanEncoding;
   delimiter?: string;
+  /**
+   * Fixed encoding: the target's digit count. Delimited identity schemes:
+   * the length of a generated badge (8 to 64, default 10); scans of any
+   * length still resolve.
+   */
   target_length?: number | null;
   /** 'action' (default) or 'identity' (badge grants). */
   kind?: ScanSchemeKind;
@@ -320,6 +352,8 @@ export interface LTScanSchemeConfig {
   enabled?: boolean;
   /** The scheme's rules, one per category. */
   rules?: LTScanRuleConfig[];
+  /** Label templates that print this scheme's codes, owned with the scheme. */
+  labels?: LTLabelTemplateConfig[];
   /**
    * Per-entry ownership override for the scheme AND its rules. `true` →
    * compared and applied on every boot; `false` → the DB owns the rows after
@@ -647,6 +681,9 @@ export interface LTStartConfig {
    * enabled.
    */
   scanSchemes?: LTScanSchemeConfig[];
+
+  /** Label sheets: printer transports, extra media presets and the default media. */
+  labels?: LTLabelsConfig;
 
   /** Declarative topic catalog entries, owned per `configSource` / per-entry `reset`. */
   topics?: LTTopicConfig[];

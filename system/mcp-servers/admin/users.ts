@@ -9,7 +9,7 @@ import * as roleService from '../../../services/role';
 import { listSchemaRelationsError } from '../../../shared/list-schema';
 import { patchUserProperties as patchUserPropertiesApi } from '../../../api/users';
 import { mayGrantRole, mayGrantRoles, mayManageAccount, mayRevokeRole, type GrantDecision } from '../../../modules/capabilities';
-import { externalCaller, type ToolCallExtra } from '../caller-auth';
+import { callerAuth, externalCaller, type ToolCallExtra } from '../caller-auth';
 import {
   listUsersSchema,
   createUserSchema,
@@ -188,7 +188,7 @@ export function registerUserTools(server: McpServer): void {
         set: args.set,
         remove: args.remove,
         rename: args.rename,
-      });
+      }, await callerAuth(extra));
       if (result.error) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: result.error }) }],

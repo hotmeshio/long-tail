@@ -42,6 +42,7 @@ export { InMemoryEventAdapter } from './lib/events/memory';
 export { SocketIOEventAdapter, type SocketIOAuthenticator } from './lib/events/socketio';
 export { publishMilestoneEvent, publishTaskEvent, publishEscalationEvent, publishActivityEvent, publishWorkflowEvent, publishAgentEvent, publishKnowledgeEvent } from './lib/events/publish';
 export { messagingRegistry, MemoryMessagingProvider, DELIVERY } from './lib/messaging';
+export { labelTransportRegistry } from './lib/labels/transports';
 export { NatsMessagingProvider } from './lib/messaging/nats/provider';
 export { renderNatsConf, type NatsConfOptions, type EdgeAccount, type NatsUser } from './lib/messaging/nats/render-conf';
 export { jsPermissions } from './lib/messaging/nats/permissions';

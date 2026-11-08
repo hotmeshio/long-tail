@@ -96,7 +96,7 @@ describe('/mcp caller identity', () => {
     mocks.hasRole.mockClear();
     await rpc(signToken({ userId: MEMBER, role: 'member' }), 'tools/list', {});
     expect(mocks.isSuperAdmin).toHaveBeenCalledTimes(1);
-    expect(mocks.hasRole).toHaveBeenCalledTimes(1);
+    expect(mocks.hasRole).toHaveBeenCalledTimes(2);
   });
 
   it('a hidden tool gets the same reply as an unknown one', async () => {

@@ -91,8 +91,10 @@ export async function collectWorkers(startConfig: LTStartConfig): Promise<{
   loggerRegistry.info('[long-tail] system workflows loaded');
 
   if (startConfig.examples) {
-    const { exampleWorkers } = await import('../examples');
+    const { exampleWorkers, storageDropTransport, STORAGE_DROP_TRANSPORT } = await import('../examples');
     workers.push(...exampleWorkers);
+    const { labelTransportRegistry } = await import('../lib/labels/transports');
+    if (!labelTransportRegistry.has(STORAGE_DROP_TRANSPORT)) labelTransportRegistry.register(STORAGE_DROP_TRANSPORT, storageDropTransport);
     loggerRegistry.info('[long-tail] example workflows loaded');
   }
 
@@ -506,16 +508,21 @@ export async function startWorkers(
       seedScanScheme, seedScanRule, applyScanScheme, applyScanRule,
       listScanSchemes, listScanRules,
     } = await import('../services/scan-code');
+    const { applyLabelTemplate, seedLabelTemplate, listLabelTemplates } = await import('../services/labels/templates');
     const scanReport = newSurfaceReport();
     for (const scheme of startConfig.scanSchemes) {
       const codeOwned = ownedByCode(scheme.reset, configSource);
-      const { rules, reset: _reset, ...schemeInput } = scheme;
+      const { rules, labels, reset: _reset, ...schemeInput } = scheme;
       try {
         if (codeOwned) {
           let outcome = await applyScanScheme(schemeInput);
           for (const rule of rules ?? []) {
             const ruleOutcome = await applyScanRule({ scheme_version: scheme.version, ...rule });
             if (ruleOutcome === 'applied') outcome = 'applied';
+          }
+          for (const label of labels ?? []) {
+            const labelOutcome = await applyLabelTemplate({ scheme_version: scheme.version, ...label });
+            if (labelOutcome === 'applied') outcome = 'applied';
           }
           recordOutcome(scanReport, `scheme ${scheme.version}`, outcome);
           if (outcome === 'applied') loggerRegistry.info(`[long-tail] scan scheme applied: ${scheme.version}`);
@@ -526,10 +533,19 @@ export async function startWorkers(
               .filter((r) => !declaredCategories.has(r.category))
               .map((r) => `${scheme.version}/${r.category}`),
           );
+          const declaredLabels = new Set((labels ?? []).map((l) => l.name));
+          scanReport.orphans.push(
+            ...(await listLabelTemplates(scheme.version))
+              .filter((t) => !declaredLabels.has(t.name))
+              .map((t) => `${scheme.version}/label:${t.name}`),
+          );
         } else {
           const inserted = await seedScanScheme(schemeInput);
           for (const rule of rules ?? []) {
             await seedScanRule({ scheme_version: scheme.version, ...rule });
+          }
+          for (const label of labels ?? []) {
+            await seedLabelTemplate({ scheme_version: scheme.version, ...label });
           }
           recordOutcome(scanReport, `scheme ${scheme.version}`, 'db-owned');
           if (inserted) loggerRegistry.info(`[long-tail] scan scheme seeded: ${scheme.version}`);

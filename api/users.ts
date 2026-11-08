@@ -1,6 +1,20 @@
 import * as userService from '../services/user';
-import type { LTApiResult } from '../types/sdk';
-import type { LTReadScope, LTRoleType, LTWriteScope } from '../types';
+import { mayIssueCredentials } from '../modules/capabilities';
+import type { LTApiAuth, LTApiResult } from '../types/sdk';
+import type { LTReadScope, LTRoleType, LTUserRecord, LTWriteScope } from '../types';
+
+/** A user as the API returns it: identity keys redacted. */
+async function asRead(user: LTUserRecord): Promise<LTUserRecord> {
+  return userService.redactIdentityKeys(user, await userService.getIdentityPropertyKeys());
+}
+
+/** A refusal when a wholesale metadata write names an identity key; bindings go through patchUserProperties. */
+async function identityKeyInMetadata(metadata: Record<string, any> | undefined): Promise<LTApiResult | null> {
+  if (!metadata || !userService.identityKeysProtected()) return null;
+  const named = (await userService.getIdentityPropertyKeys()).filter((k) => k in metadata);
+  if (named.length === 0) return null;
+  return { status: 400, error: `"${named[0]}" is an identity binding; set it with patchUserProperties` };
+}
 
 /**
  * List users with optional filters for role, role type, status, and pagination.
@@ -23,7 +37,8 @@ export async function listUsers(input: {
 }): Promise<LTApiResult> {
   try {
     const result = await userService.listUsers(input as any);
-    return { status: 200, data: result };
+    const keys = await userService.getIdentityPropertyKeys();
+    return { status: 200, data: { ...result, users: result.users.map((u) => userService.redactIdentityKeys(u, keys)) } };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -61,7 +76,7 @@ export async function getUser(input: {
     if (!user) {
       return { status: 404, error: 'User not found' };
     }
-    return { status: 200, data: user };
+    return { status: 200, data: await asRead(user) };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -92,6 +107,8 @@ export async function createUser(input: {
     if (!input.external_id) {
       return { status: 400, error: 'external_id is required' };
     }
+    const identityRefusal = await identityKeyInMetadata(input.metadata);
+    if (identityRefusal) return identityRefusal;
     if (input.roles) {
       for (const r of input.roles) {
         if (!r.role || !r.type || !userService.isValidRoleType(r.type)) {
@@ -121,7 +138,7 @@ export async function createUser(input: {
       roles: input.roles as any,
       metadata: input.metadata,
     });
-    return { status: 201, data: user };
+    return { status: 201, data: await asRead(user) };
   } catch (err: any) {
     if (err.code === '23505') {
       return { status: 409, error: 'User with this external_id already exists' };
@@ -153,11 +170,13 @@ export async function updateUser(input: {
 }): Promise<LTApiResult> {
   try {
     const { id, ...fields } = input;
+    const identityRefusal = await identityKeyInMetadata(fields.metadata);
+    if (identityRefusal) return identityRefusal;
     const user = await userService.updateUser(id, fields as any);
     if (!user) {
       return { status: 404, error: 'User not found' };
     }
-    return { status: 200, data: user };
+    return { status: 200, data: await asRead(user) };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
@@ -169,13 +188,17 @@ export async function updateUser(input: {
  * (`remove`); a key absent from the patch is kept. `rename` preserves the
  * value with no key-absent window. Identity-binding keys (badge scan
  * scheme target facets) assert uniqueness among active users in the same
- * statement.
+ * statement. Touching an identity key binds a credential: it needs the
+ * credentialIssuer capability and is recorded in lt_label_jobs by the same
+ * statement as the patch.
  *
  * @param input.id — the user's unique identifier
  * @param input.set — properties to set (typed JSON values)
  * @param input.remove — property keys to delete
  * @param input.rename — `{ oldKey: newKey }` renames, values preserved
- * @returns `{ status: 200, data: User }`; 400 malformed patch; 404 unknown
+ * @param auth — the caller; required to touch an identity key
+ * @returns `{ status: 200, data: User }` with identity keys redacted; 400
+ *   malformed patch; 403 identity key without credentialIssuer; 404 unknown
  *   user; 409 when an identity value already belongs to another active user
  */
 export async function patchUserProperties(input: {
@@ -183,17 +206,29 @@ export async function patchUserProperties(input: {
   set?: Record<string, unknown>;
   remove?: string[];
   rename?: Record<string, string>;
-}): Promise<LTApiResult> {
+}, auth?: LTApiAuth): Promise<LTApiResult> {
   try {
-    const user = await userService.patchUserProperties(input.id, {
-      set: input.set,
-      remove: input.remove,
-      rename: input.rename,
-    });
+    const ops = { set: input.set, remove: input.remove, rename: input.rename };
+    const touched = await userService.identityKeysTouched(ops);
+    let user: LTUserRecord | null;
+    const protectedKeys = userService.identityKeysProtected();
+    if (touched.length > 0 && (protectedKeys || auth)) {
+      if (protectedKeys && (!auth || !(await mayIssueCredentials(auth)))) {
+        return { status: 403, error: `"${touched[0]}" is an identity binding; credential-issuer access required` };
+      }
+      const recorded = await userService.patchUserPropertiesRecorded(input.id, ops, {
+        action: 'bind',
+        requested_by: auth!.userId,
+        source: { keys: touched },
+      });
+      user = recorded?.user ?? null;
+    } else {
+      user = await userService.patchUserProperties(input.id, ops);
+    }
     if (!user) {
       return { status: 404, error: 'User not found' };
     }
-    return { status: 200, data: user };
+    return { status: 200, data: await asRead(user) };
   } catch (err: any) {
     if (err.status === 400 || err.status === 409) {
       return { status: err.status, error: err.message };

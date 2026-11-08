@@ -23,6 +23,7 @@ import { REL_ORIGINATOR_ROLE } from './workflows/related-escalations/forms';
 import * as transitionChainWorkflow from './workflows/transition-chain';
 import { TXN_STEP1_ROLE, TXN_STEP2_ROLE, TXN_STEP3_ROLE } from './workflows/transition-chain/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
+import * as relabelWorkflow from './workflows/relabel';
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as parameterizedFormWorkflow from './workflows/parameterized-form';
 import { VERDICT_ROLE } from './workflows/parameterized-form/forms';
@@ -240,6 +241,16 @@ const checklistConfirmationConfig: LTWorkerConfig = {
   envelopeSchema: {
     data: { count: 5 },
     metadata: { source: 'dashboard' },
+  },
+};
+
+const relabelConfig: LTWorkerConfig = {
+  description: 'Relabel — reprint a label when its text changes. Parks one escalation on relabeler asking for the label\'s second line, then prints the named template for the target with that line as {item.subtitle}, through the storage-drop label transport (labels/<jobId>.zpl in file storage). The print is recorded in the label ledger and keyed by the workflow id so a replay never prints twice.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: relabelWorkflow.RELABELER_ROLE,
+  envelopeSchema: {
+    data: { template: 'bin-label', target: 'A-3' },
   },
 };
 
@@ -683,6 +694,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: consolidationWorkflow.consolidationOrder, config: consolidationOrderConfig },
   { taskQueue: 'long-tail-examples', workflow: consolidationWorkflow.consolidationBin, config: consolidationBinConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
+  { taskQueue: 'long-tail-examples', workflow: relabelWorkflow.relabel, config: relabelConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },
   { taskQueue: 'long-tail-examples', workflow: lookupCascadeWorkflow.lookupCascade, config: lookupCascadeConfig },

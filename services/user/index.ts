@@ -1,4 +1,5 @@
-export { CreateUserInput, UpdateUserInput, UserPropertyOps, VALID_ROLE_TYPES } from './types';
+export { CreateUserInput, PropertyPatchRecord, UpdateUserInput, UserPropertyOps, VALID_ROLE_TYPES } from './types';
+export { redactIdentityKeys, setIdentityKeyProtection, identityKeysProtected } from './redact';
 export {
   createUser,
   getUser,
@@ -9,6 +10,8 @@ export {
   getUserByMetadataValue,
   updateUser,
   patchUserProperties,
+  patchUserPropertiesRecorded,
+  identityKeysTouched,
   getIdentityPropertyKeys,
   UserPropertyConflictError,
   UserPropertyValidationError,

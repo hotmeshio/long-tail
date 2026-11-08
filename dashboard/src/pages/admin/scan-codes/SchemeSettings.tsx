@@ -7,7 +7,10 @@ import { GrantScopeField } from './GrantScopeField';
 import { SchemeMatchFields, patternLines, patternsValid, type TargetMatch } from './SchemeMatchFields';
 import { SectionGroup } from './SectionGroup';
 
-/** The scheme's own settings: kind, name, target facet, grant policy, match, status. */
+/** A generated badge's length when the scheme sets none (matches the server). */
+const DEFAULT_BADGE_LENGTH = 10;
+
+/** The scheme's own settings: kind, name, target facet, grant policy, match, status, badge length. */
 export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; ruleCount: number }) {
   const navigate = useNavigate();
   const upsert = useUpsertScanScheme();
@@ -22,11 +25,14 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
   const [targetMatch, setTargetMatch] = useState<TargetMatch>(scheme.target_match ?? 'value');
   const [patternsText, setPatternsText] = useState((scheme.patterns ?? []).join('\n'));
   const [precedesGtin, setPrecedesGtin] = useState<boolean | null>(scheme.precedes_gtin ?? null);
+  const [badgeLength, setBadgeLength] = useState(scheme.target_length ?? DEFAULT_BADGE_LENGTH);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const isIdentity = kind === SCAN_SCHEME_KINDS.IDENTITY;
   const ttlValid = !isIdentity || (grantTtlSeconds >= 1 && grantTtlSeconds <= 86_400);
   const isPattern = scheme.encoding === 'pattern';
+  const mintsBadges = isIdentity && scheme.encoding === 'delimited';
+  const badgeLengthValid = !mintsBadges || (Number.isInteger(badgeLength) && badgeLength >= 8 && badgeLength <= 64);
   const fieldsValid = !isPattern || patternsValid(patternsText);
   const dirty = name !== scheme.name
     || targetMatch !== (scheme.target_match ?? 'value')
@@ -35,6 +41,7 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
     || targetFacet !== scheme.target_facet
     || enabled !== scheme.enabled
     || kind !== scheme.kind
+    || (mintsBadges && badgeLength !== (scheme.target_length ?? DEFAULT_BADGE_LENGTH))
     || (isIdentity && (grantTtlSeconds !== scheme.grant_ttl_seconds || grantMaxUses !== scheme.grant_max_uses
       || grantScope !== (scheme.grant_scope ?? 'action')));
 
@@ -106,6 +113,19 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
           </label>
         )}
         {isIdentity && <GrantScopeField value={grantScope} onChange={setGrantScope} />}
+        {mintsBadges && (
+          <label className="block">
+            <span className="block text-xs text-text-secondary mb-1">Badge length</span>
+            <span className="block text-2xs text-text-tertiary mb-1">Characters in a generated badge, before the {scheme.version}{scheme.delimiter}0{scheme.delimiter} prefix (8–64).</span>
+            <input
+              type="number" min={8} max={64}
+              value={badgeLength}
+              onChange={(e) => setBadgeLength(Number(e.target.value))}
+              className="input w-[12rem]"
+            />
+            {!badgeLengthValid && <span className="block text-2xs text-status-error mt-1">Enter 8–64 characters.</span>}
+          </label>
+        )}
         <SchemeMatchFields
           encoding={scheme.encoding}
           isIdentity={isIdentity}
@@ -127,7 +147,7 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
         {dirty && (
           <button
             type="button"
-            disabled={upsert.isPending || !name || !targetFacet || !ttlValid || !fieldsValid}
+            disabled={upsert.isPending || !name || !targetFacet || !ttlValid || !fieldsValid || !badgeLengthValid}
             onClick={() => upsert.mutate({
               version: scheme.version,
               name,
@@ -135,7 +155,7 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
               target_facet: targetFacet,
               encoding: scheme.encoding,
               delimiter: scheme.delimiter,
-              target_length: scheme.target_length,
+              target_length: mintsBadges ? badgeLength : scheme.target_length,
               patterns: isPattern ? patternLines(patternsText) : [],
               precedes_gtin: isPattern ? precedesGtin : null,
               target_match: isIdentity ? 'value' : targetMatch,

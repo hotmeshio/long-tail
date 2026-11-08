@@ -4,6 +4,12 @@ import { Link } from 'react-router-dom';
 import { useRoles } from '../../../api/roles';
 import { useAddUserRole, useRemoveUserRole, usePatchUserProperties, useSystemPropertyKeys } from '../../../api/users';
 import { PropertiesEditor } from '../../../components/common/form/PropertiesEditor';
+import { useAccess } from '../../../hooks/useAccess';
+import { useReissueBadge } from '../../../api/labels';
+import { printSheet } from '../../../lib/print-sheet';
+import { PrintLabelsPanel } from '../../../components/labels/PrintLabelsPanel';
+import { CredentialConfirmModal } from '../../../components/labels/CredentialConfirmModal';
+import { useBadgeTemplates } from '../../../components/labels/useBadgeTemplates';
 import {
   usePersonas,
   useUserPersonas,
@@ -44,15 +50,86 @@ function PropertiesBlock({ user }: { user: LTUserRecord }) {
   const { data: systemKeys } = useSystemPropertyKeys();
 
   return (
+    <>
+      <CredentialsBlock user={user} keys={systemKeys?.keys ?? []} />
+      <PanelSection>
+        <PropertiesEditor
+          value={user.metadata ?? {}}
+          systemKeys={systemKeys?.keys ?? []}
+          pending={patch.isPending}
+          error={patch.error ? (patch.error as Error).message : null}
+          onPatch={(ops) => patch.mutate({ id: user.id, ops })}
+        />
+      </PanelSection>
+    </>
+  );
+}
+
+/**
+ * The user's identity bindings (badge scheme facets). Values are printed
+ * credentials, so the panel shows only whether each one is bound.
+ */
+function CredentialsBlock({ user, keys }: { user: LTUserRecord; keys: string[] }) {
+  if (keys.length === 0) return null;
+  const bound = new Set(user.identity_bound ?? []);
+  return (
     <PanelSection>
-      <PropertiesEditor
-        value={user.metadata ?? {}}
-        systemKeys={systemKeys?.keys ?? []}
-        pending={patch.isPending}
-        error={patch.error ? (patch.error as Error).message : null}
-        onPatch={(ops) => patch.mutate({ id: user.id, ops })}
-      />
+      <p className="text-2xs font-semibold uppercase tracking-widest text-text-tertiary mb-2">Credentials</p>
+      <ul className="space-y-2">
+        {keys.map((key) => <CredentialRow key={key} user={user} identityKey={key} bound={bound.has(key)} />)}
+      </ul>
     </PanelSection>
+  );
+}
+
+/** One identity key: whether it is bound, and for credential issuers, print or reissue its badge. */
+function CredentialRow({ user, identityKey, bound }: { user: LTUserRecord; identityKey: string; bound: boolean }) {
+  const { canIssueCredentials } = useAccess();
+  const templates = useBadgeTemplates(identityKey);
+  const reissue = useReissueBadge();
+  const [printing, setPrinting] = useState(false);
+  const [confirmReissue, setConfirmReissue] = useState(false);
+  const canAct = canIssueCredentials && templates.length > 0 && user.status === 'active';
+
+  return (
+    <li className="text-xs">
+      <div className="flex items-center gap-2">
+        <span className="font-mono font-medium text-text-secondary">{identityKey}</span>
+        <span className={`ml-auto ${bound ? 'text-status-success' : 'text-text-tertiary'}`}>{bound ? 'Bound' : 'Not bound'}</span>
+      </div>
+      {canAct && (
+        <div className="flex gap-3 mt-1">
+          {bound && <button onClick={() => setPrinting(true)} className="text-accent hover:text-accent-hover">Print badge</button>}
+          <button onClick={() => setConfirmReissue(true)} className="text-accent hover:text-accent-hover">{bound ? 'Reissue badge' : 'Issue badge'}</button>
+        </div>
+      )}
+      {printing && (
+        <PrintLabelsPanel
+          open={printing}
+          onClose={() => setPrinting(false)}
+          title={`Print badge for ${user.display_name || user.external_id}`}
+          templates={templates}
+          source={{ kind: 'users', userIds: [user.id] }}
+          sourceCount={1}
+          identity
+        />
+      )}
+      <CredentialConfirmModal
+        open={confirmReissue}
+        count={1}
+        identity
+        action="reissue"
+        isPending={reissue.isPending}
+        error={reissue.error as Error | null}
+        onClose={() => setConfirmReissue(false)}
+        onConfirm={() => reissue.mutate({ userId: user.id, template: templates[0].name, output: 'sheet' }, {
+          onSuccess: (result) => {
+            setConfirmReissue(false);
+            if (result.sheet) printSheet(result.sheet);
+          },
+        })}
+      />
+    </li>
   );
 }
 

@@ -14,6 +14,7 @@ import {
   GET_USER_BY_ID,
   GET_USERS_BY_METADATA_VALUE,
   PATCH_USER_PROPERTIES,
+  PATCH_USER_PROPERTIES_RECORDED,
   USER_SAFE_COLUMNS_U,
   VERIFY_USER_BY_ID,
 } from './sql';
@@ -21,7 +22,7 @@ import { onlyUuids } from '../../lib/uuid';
 import { listScanSchemes } from '../scan-code';
 import { SCAN_SCHEME_KINDS } from '../../types/scan-code';
 import { DEFAULT_READ_SCOPE, DEFAULT_WRITE_SCOPE, effectiveScope } from './scope';
-import type { CreateUserInput, UpdateUserInput, UserPropertyOps } from './types';
+import type { CreateUserInput, PropertyPatchRecord, UpdateUserInput, UserPropertyOps } from './types';
 
 // ─── Private helpers (exported for internal use by auth.ts) ──────────────────
 
@@ -189,8 +190,14 @@ export async function updateUser(
     values.push(await bcrypt.hash(input.password, 10));
   }
   if (input.metadata !== undefined) {
-    sets.push(`metadata = $${idx++}`);
-    values.push(JSON.stringify(input.metadata));
+    // Identity bindings the replacement leaves out are kept, read in the same statement.
+    const keysIdx = idx++;
+    const metadataIdx = idx++;
+    sets.push(
+      `metadata = COALESCE((SELECT jsonb_object_agg(k, lt_users.metadata -> k) FROM unnest($${keysIdx}::text[]) AS k ` +
+      `WHERE COALESCE(lt_users.metadata, '{}'::jsonb) ? k), '{}'::jsonb) || $${metadataIdx}::jsonb`,
+    );
+    values.push(await getIdentityPropertyKeys(), JSON.stringify(input.metadata));
   }
 
   if (sets.length === 0) {
@@ -256,6 +263,40 @@ export async function patchUserProperties(
   id: string,
   ops: UserPropertyOps,
 ): Promise<LTUserRecord | null> {
+  const patched = await runPropertyPatch(id, ops, null);
+  return patched?.user ?? null;
+}
+
+/**
+ * The identity keys a patch touches: set, removed, or renamed from or to.
+ */
+export async function identityKeysTouched(ops: UserPropertyOps): Promise<string[]> {
+  const keys = new Set([
+    ...Object.keys(ops.set ?? {}),
+    ...(ops.remove ?? []),
+    ...Object.entries(ops.rename ?? {}).flat(),
+  ]);
+  return (await getIdentityPropertyKeys()).filter((k) => keys.has(k));
+}
+
+/**
+ * patchUserProperties, with an lt_label_jobs row written by the same
+ * statement. Returns the user and the ledger row id; null for an unknown user.
+ */
+export async function patchUserPropertiesRecorded(
+  id: string,
+  ops: UserPropertyOps,
+  record: PropertyPatchRecord,
+): Promise<{ user: LTUserRecord; jobId: string } | null> {
+  const patched = await runPropertyPatch(id, ops, record);
+  return patched ? { user: patched.user, jobId: patched.jobId! } : null;
+}
+
+async function runPropertyPatch(
+  id: string,
+  ops: UserPropertyOps,
+  record: PropertyPatchRecord | null,
+): Promise<{ user: LTUserRecord; jobId: string | null } | null> {
   const set = ops.set ?? {};
   const remove = ops.remove ?? [];
   const rename = ops.rename ?? {};
@@ -303,17 +344,20 @@ export async function patchUserProperties(
   const renamePairs = renameEntries.map(([prev, next]) => ({ prev, next }));
 
   const pool = getPool();
-  const { rows } = await pool.query(PATCH_USER_PROPERTIES, [
-    id,
-    removeAll,
-    JSON.stringify(renamePairs),
-    JSON.stringify(set),
-    JSON.stringify(guard),
-  ]);
-  if (rows[0]) return attachRoles(rows[0]);
+  const params: unknown[] = [id, removeAll, JSON.stringify(renamePairs), JSON.stringify(set), JSON.stringify(guard)];
+  const { rows } = record
+    ? await pool.query(PATCH_USER_PROPERTIES_RECORDED, [...params, JSON.stringify(record)])
+    : await pool.query(PATCH_USER_PROPERTIES, params);
+  if (rows[0]) {
+    const { ledger_id: jobId = null, ...row } = rows[0];
+    return { user: await attachRoles(row), jobId };
+  }
 
   const exists = await pool.query(VERIFY_USER_BY_ID, [id]);
   if (!exists.rows[0]) return null;
+  if (record?.require_active && exists.rows[0].status !== 'active') {
+    throw new UserPropertyValidationError('identity bindings are issued to active users only');
+  }
   // The user exists, so the identity guard is what blocked the write. Name
   // the first guarded key for the caller; the row was not touched.
   throw new UserPropertyConflictError(Object.keys(guard)[0] ?? 'identity binding');

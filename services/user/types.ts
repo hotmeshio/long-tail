@@ -30,7 +30,10 @@ export interface UpdateUserInput {
   display_name?: string;
   password?: string;
   status?: LTUserStatus;
-  /** Wholesale REPLACE of the properties dictionary — for per-key edits use patchUserProperties. */
+  /**
+   * Wholesale REPLACE of the properties dictionary — for per-key edits use
+   * patchUserProperties. Identity bindings absent from the replacement are kept.
+   */
   metadata?: Record<string, any>;
 }
 
@@ -43,4 +46,22 @@ export interface UserPropertyOps {
   set?: Record<string, unknown>;
   remove?: string[];
   rename?: Record<string, string>;
+}
+
+/** The lt_label_jobs row a recorded property patch writes beside the patch. */
+export interface PropertyPatchRecord {
+  action: 'bind' | 'reissue';
+  requested_by: string;
+  /** Patch only an active user; checked in the patch statement. */
+  require_active?: boolean;
+  /** Which identity keys changed; never their values. */
+  source: Record<string, unknown>;
+  label_count?: number;
+  template_name?: string;
+  template_revision?: number;
+  template_snapshot?: unknown;
+  scheme_version?: number;
+  scheme_kind?: string;
+  media?: unknown;
+  output?: string;
 }

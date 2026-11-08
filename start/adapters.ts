@@ -19,6 +19,10 @@ import { configureFeatureFlags } from '../modules/features';
 import { configureSearch } from '../modules/search';
 import { configureBranding } from '../modules/branding';
 import { configureDisplay } from '../modules/display';
+import { labelTransportRegistry } from '../lib/labels/transports';
+import { registerLabelMedia, setDefaultLabelMedia } from '../services/labels/media';
+import { registerLabelFonts } from '../services/labels/render-pdf';
+import { setIdentityKeyProtection } from '../services/user/redact';
 
 import { createSocketIOAuthenticator } from './socket-auth';
 import type { LTStartConfig } from '../types/startup';
@@ -33,6 +37,15 @@ export function registerAdapters(startConfig: LTStartConfig): void {
   configureSearch(startConfig.search);
   configureBranding(startConfig.branding);
   configureDisplay(startConfig.display);
+
+  // Label sheets: host media first, so the default may name one.
+  if (startConfig.labels?.media) registerLabelMedia(startConfig.labels.media);
+  if (startConfig.labels?.defaultMedia) setDefaultLabelMedia(startConfig.labels.defaultMedia);
+  if (startConfig.labels?.font) registerLabelFonts(startConfig.labels.font);
+  if (startConfig.labels?.protectIdentityKeys !== undefined) setIdentityKeyProtection(startConfig.labels.protectIdentityKeys);
+  for (const [name, transport] of Object.entries(startConfig.labels?.transports ?? {})) {
+    labelTransportRegistry.register(name, transport);
+  }
 
   // Logging (register first so subsequent log calls use it)
   if (startConfig.logging?.adapter) {

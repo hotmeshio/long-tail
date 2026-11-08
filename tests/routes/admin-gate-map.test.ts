@@ -27,6 +27,7 @@ vi.mock('../../api/workflows', (io) => stubApi(io as any));
 vi.mock('../../api/knowledge', (io) => stubApi(io as any));
 vi.mock('../../api/domain', (io) => stubApi(io as any));
 vi.mock('../../api/scan-codes', (io) => stubApi(io as any));
+vi.mock('../../api/labels', (io) => stubApi(io as any));
 vi.mock('../../api/announcements', (io) => stubApi(io as any));
 vi.mock('../../api/maintenance', (io) => stubApi(io as any));
 vi.mock('../../api/dba', (io) => stubApi(io as any));

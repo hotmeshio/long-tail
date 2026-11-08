@@ -480,3 +480,11 @@
   );
   background-color: rgb(var(--lt-status-pending-graphic));
 }
+
+/* Label sheets: the print root exists only while a sheet prints. */
+#lt-print-root { display: none; }
+@media print {
+  body.lt-printing > *:not(#lt-print-root) { display: none !important; }
+  body.lt-printing #lt-print-root { display: block; }
+  body.lt-printing #lt-print-root .lt-print-page { display: block; break-after: page; }
+}

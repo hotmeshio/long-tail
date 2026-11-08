@@ -63,7 +63,7 @@ The domain dictionary's override lives beside its declaration:
 | MCP servers | `mcp.serverFactories[].config` | description, tags, category, compile hints, credential providers | tool manifest, connection status |
 | Agents | `agents[]` | description, status, goals, rules, domain, schedules | capabilities, metadata, run history |
 | Agent subscriptions | `agents[].subscriptions` | reaction fields on (agent, topic) | `enabled` — the admin kill-switch |
-| Scan schemes | `scanSchemes[]` | whole scheme + its rules (one ownership unit; `enabled` is declarative here) | — |
+| Scan schemes | `scanSchemes[]` | whole scheme + its rules + its label templates (one ownership unit; `enabled` is declarative here) | the label ledger |
 | Domain dictionary | `mcp.domainDictionary` (inline) or `mcp.domainDictionaryPath` | whole document (version bumps once per change) | — |
 | Graph workflows | `graphWorkflows[]` | always compare-and-apply: description/schema sync, redeploy on YAML version bump | run history |
 | Machine lines | `machines.lines[]` | the whole line definition (`lt_machine_lines`; version bumps once per change) | lines declared through the API, their bot accounts, their rows |

@@ -27,6 +27,10 @@ const CHOICE_CODE = /^[A-Za-z0-9_-]{1,32}$/;
  * problem — a bad scheme silently misparsing every scan is far worse
  * than a loud upsert failure.
  */
+/** Generated badges on a delimited identity scheme: long enough to resist guessing, short enough to scan. */
+export const IDENTITY_TOKEN_MIN_LENGTH = 8;
+export const IDENTITY_TOKEN_MAX_LENGTH = 64;
+
 export function assertValidScheme(scheme: Partial<ScanScheme>): void {
   if (!Number.isInteger(scheme.version) || scheme.version! < 10 || scheme.version! > 99) {
     throw new Error('scheme version must be a two-digit integer between 10 and 99');
@@ -57,6 +61,12 @@ export function assertValidScheme(scheme: Partial<ScanScheme>): void {
   const kind = scheme.kind ?? SCAN_SCHEME_KINDS.ACTION;
   if (kind !== SCAN_SCHEME_KINDS.ACTION && kind !== SCAN_SCHEME_KINDS.IDENTITY) {
     throw new Error(`unknown scheme kind "${kind}"`);
+  }
+  if (kind === SCAN_SCHEME_KINDS.IDENTITY && encoding === SCAN_ENCODINGS.DELIMITED && scheme.target_length != null) {
+    const length = scheme.target_length;
+    if (!Number.isInteger(length) || length < IDENTITY_TOKEN_MIN_LENGTH || length > IDENTITY_TOKEN_MAX_LENGTH) {
+      throw new Error(`a delimited identity scheme's target_length (the length of a generated badge) must be ${IDENTITY_TOKEN_MIN_LENGTH} to ${IDENTITY_TOKEN_MAX_LENGTH}`);
+    }
   }
   if (kind === SCAN_SCHEME_KINDS.IDENTITY) {
     const ttl = scheme.grant_ttl_seconds;
