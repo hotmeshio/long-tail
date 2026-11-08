@@ -6,8 +6,9 @@
  * - `builder`: superadmin or the `engineer` role
  * - `roleManager`: admin, superadmin or the `engineer` role
  * - `superadmin`: superadmin only
+ * - `credentialIssuer`: superadmin or the `credential-issuer` role
  */
-export type CapabilityGate = 'caller' | 'admin' | 'builder' | 'roleManager' | 'superadmin';
+export type CapabilityGate = 'caller' | 'admin' | 'builder' | 'roleManager' | 'superadmin' | 'credentialIssuer';
 
 /** The capabilities a caller holds, resolved once per `/mcp` request. */
 export type CapabilitySet = Record<CapabilityGate, boolean>;

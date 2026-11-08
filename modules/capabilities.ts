@@ -24,9 +24,16 @@ export type GrantDecision = { allowed: true } | { allowed: false; error: string 
 
 const BUILDER_ROLE = 'engineer';
 
-async function hasBuilderRole(userId: string): Promise<boolean> {
+/** Holders of this role may print and reissue identity credentials (badges). */
+export const CREDENTIAL_ISSUER_ROLE = 'credential-issuer';
+
+async function holdsRole(userId: string, role: string): Promise<boolean> {
   const { hasRole } = await import('../services/user/roles');
-  return hasRole(userId, BUILDER_ROLE);
+  return hasRole(userId, role);
+}
+
+async function hasBuilderRole(userId: string): Promise<boolean> {
+  return holdsRole(userId, BUILDER_ROLE);
 }
 
 /** Admin or superadmin claim, or a superadmin in the database. */
@@ -42,6 +49,15 @@ export async function mayBuild(principal: CapabilityPrincipal | undefined): Prom
   if (principal.role === 'superadmin') return true;
   if (await isSuperAdmin(principal.userId)) return true;
   return hasBuilderRole(principal.userId);
+}
+
+/** Superadmin (claim or database), or holder of the credential-issuer role. Admin type alone never grants it. */
+export async function mayIssueCredentials(principal: CapabilityPrincipal | undefined): Promise<boolean> {
+  if (!principal?.userId) return false;
+  if (principal.grantRoles) return capabilitiesFromRoles(principal.grantRoles).credentialIssuer;
+  if (principal.role === 'superadmin') return true;
+  if (await isSuperAdmin(principal.userId)) return true;
+  return holdsRole(principal.userId, CREDENTIAL_ISSUER_ROLE);
 }
 
 /**
@@ -122,27 +138,38 @@ function capabilitiesFromRoles(roles: LTGrantRole[]): CapabilitySet {
   const superadmin = roles.some((r) => r.type === 'superadmin');
   const admin = superadmin || roles.some((r) => r.type === 'admin');
   const engineer = roles.some((r) => r.role === BUILDER_ROLE);
-  return { caller: true, admin, builder: superadmin || engineer, roleManager: admin || engineer, superadmin };
+  const issuer = roles.some((r) => r.role === CREDENTIAL_ISSUER_ROLE);
+  return {
+    caller: true, admin, builder: superadmin || engineer, roleManager: admin || engineer, superadmin,
+    credentialIssuer: superadmin || issuer,
+  };
 }
 
 const NO_CAPABILITIES: CapabilitySet = {
-  caller: false, admin: false, builder: false, roleManager: false, superadmin: false,
+  caller: false, admin: false, builder: false, roleManager: false, superadmin: false, credentialIssuer: false,
 };
 
 /**
  * Every capability the principal holds, with the same outcomes as the
  * predicates above. A superadmin claim costs no lookup; anyone else costs
- * at most one superadmin lookup and one engineer-role lookup.
+ * at most one superadmin lookup and two role lookups.
  */
 export async function resolveCapabilities(principal: CapabilityPrincipal | undefined): Promise<CapabilitySet> {
   if (!principal?.userId) return NO_CAPABILITIES;
   if (principal.grantRoles) return capabilitiesFromRoles(principal.grantRoles);
   if (principal.role === 'superadmin' || (await isSuperAdmin(principal.userId))) {
-    return { caller: true, admin: true, builder: true, roleManager: true, superadmin: true };
+    return { caller: true, admin: true, builder: true, roleManager: true, superadmin: true, credentialIssuer: true };
   }
   const admin = principal.role === 'admin';
-  const engineer = await hasBuilderRole(principal.userId);
-  return { caller: true, admin, builder: engineer, roleManager: admin || engineer, superadmin: false };
+  const { hasRole } = await import('../services/user/roles');
+  const [engineer, issuer] = await Promise.all([
+    hasRole(principal.userId, BUILDER_ROLE),
+    hasRole(principal.userId, CREDENTIAL_ISSUER_ROLE),
+  ]);
+  return {
+    caller: true, admin, builder: engineer, roleManager: admin || engineer, superadmin: false,
+    credentialIssuer: issuer,
+  };
 }
 
 /**

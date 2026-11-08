@@ -130,13 +130,13 @@ describe('resolveCapabilities', () => {
     expect((await resolveCapabilities({ userId: USER, role: 'member' })).superadmin).toBe(true);
   });
 
-  it('costs no lookup for a superadmin claim and at most two otherwise', async () => {
+  it('costs no lookup for a superadmin claim and at most three otherwise', async () => {
     await resolveCapabilities({ userId: USER, role: 'superadmin' });
     expect(lookups.isSuperAdmin).not.toHaveBeenCalled();
     expect(lookups.hasRole).not.toHaveBeenCalled();
     await resolveCapabilities({ userId: USER, role: 'member' });
     expect(lookups.isSuperAdmin).toHaveBeenCalledTimes(1);
-    expect(lookups.hasRole).toHaveBeenCalledTimes(1);
+    expect(lookups.hasRole).toHaveBeenCalledTimes(2);
   });
 
   it('propagates lookup errors', async () => {
@@ -160,7 +160,7 @@ describe('capabilityAccess', () => {
     expect(await access('admin')).toBe(false);
     expect(await access('roleManager')).toBe(true);
     expect(lookups.isSuperAdmin).toHaveBeenCalledTimes(1);
-    expect(lookups.hasRole).toHaveBeenCalledTimes(1);
+    expect(lookups.hasRole).toHaveBeenCalledTimes(2);
   });
 
   it('denies every gate without a user id', async () => {
@@ -176,10 +176,10 @@ describe('resolveCapabilities for an OAuth caller', () => {
 
   it('reads the token\'s memberships with no lookup', async () => {
     expect(await resolveCapabilities({ userId: USER, role: 'member', grantRoles: [member('engineer')] })).toEqual(
-      { caller: true, admin: false, builder: true, roleManager: true, superadmin: false },
+      { caller: true, admin: false, builder: true, roleManager: true, superadmin: false, credentialIssuer: false },
     );
     expect(await resolveCapabilities({ userId: USER, role: 'admin', grantRoles: [member('ops', 'admin')] })).toEqual(
-      { caller: true, admin: true, builder: false, roleManager: true, superadmin: false },
+      { caller: true, admin: true, builder: false, roleManager: true, superadmin: false, credentialIssuer: false },
     );
     expect((await resolveCapabilities({ userId: USER, role: 'superadmin', grantRoles: [member('x', 'superadmin')] })).builder).toBe(true);
     expect(lookups.isSuperAdmin).not.toHaveBeenCalled();

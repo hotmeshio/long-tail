@@ -99,7 +99,7 @@ router.patch('/:id/properties', requireBuilder, async (req, res) => {
     set,
     remove,
     rename,
-  });
+  }, req.auth!);
   res.status(result.status).json(result.data ?? { error: result.error });
 });
 

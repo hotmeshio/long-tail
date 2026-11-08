@@ -22,6 +22,8 @@ export interface LTUserRecord {
   display_name: string | null;
   status: LTUserStatus;
   metadata: Record<string, unknown> | null;
+  /** Identity keys (badge tokens) bound on the user; their values never reach the dashboard. */
+  identity_bound?: string[];
   roles: LTUserRole[];
   created_at: string;
   updated_at: string;

@@ -32,6 +32,8 @@ export interface LTUserRecord {
   account_type: LTAccountType;
   status: LTUserStatus;
   metadata: Record<string, any> | null;
+  /** Identity keys bound on this user, present when metadata was redacted for a reader. */
+  identity_bound?: string[];
   roles: LTUserRole[];
   created_at: Date;
   updated_at: Date;

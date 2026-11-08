@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { config } from './config';
 import { getSSOConfig } from './sso';
 import { loggerRegistry } from '../lib/logger';
-import { mayAdminister, mayBuild, mayManageRoles, mayReadWorkflowRun, type CapabilityPrincipal } from './capabilities';
+import { mayAdminister, mayBuild, mayIssueCredentials, mayManageRoles, mayReadWorkflowRun, type CapabilityPrincipal } from './capabilities';
 import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
 import { resolvePrincipal } from '../services/iam/principal';
@@ -217,6 +217,9 @@ export const requireBuilder = requireCapability(mayBuild, 'Forbidden: builder ac
 
 /** Role-management access: admin access or the 'engineer' role. Backend twin of `isBuilder || isOps`. */
 export const requireRoleManager = requireCapability(mayManageRoles, 'Forbidden: role-management access required');
+
+/** Credential access: superadmin or the 'credential-issuer' role. Gates badge printing and reissue. */
+export const requireCredentialIssuer = requireCapability(mayIssueCredentials, 'Forbidden: credential-issuer access required');
 
 /** Reads of one workflow run (`:workflowId`): builder access, or the person who started it or it runs as. */
 export const requireWorkflowReader: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {

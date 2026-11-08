@@ -73,6 +73,17 @@ export const config = {
   LT_ANALYTICS_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_CACHE_TTL_MS || '30000', 10),
   LT_ANALYTICS_PAST_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_PAST_CACHE_TTL_MS || '600000', 10),
   LT_ANALYTICS_CACHE_MAX_ENTRIES: parseInt(process.env.LT_ANALYTICS_CACHE_MAX_ENTRIES || '512', 10),
+
+  /** Identity keys (badge tokens) leave user reads and need credentialIssuer to write. `false` keeps the earlier behavior. */
+  LT_PROTECT_IDENTITY_KEYS: process.env.LT_PROTECT_IDENTITY_KEYS !== 'false',
+  /** Label sheets: the media a job prints on when neither the job nor the template names one. */
+  LT_LABELS_DEFAULT_MEDIA: process.env.LT_LABELS_DEFAULT_MEDIA || 'a4-l7160',
+  /** Most labels one print job may hold. */
+  LT_LABELS_MAX_PER_JOB: positiveInt('LT_LABELS_MAX_PER_JOB', 1000),
+  /** Most identity credentials (badges) one print job may hold. */
+  LT_LABELS_MAX_CREDENTIALS_PER_JOB: positiveInt('LT_LABELS_MAX_CREDENTIALS_PER_JOB', 200),
+  /** How long one process holds a print job's delivery before a retry may send it. */
+  LT_LABELS_DELIVERY_LEASE_SECONDS: positiveInt('LT_LABELS_DELIVERY_LEASE_SECONDS', 120),
 };
 
 export const postgres_options: Record<string, unknown> = {

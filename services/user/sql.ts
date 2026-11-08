@@ -80,7 +80,7 @@ export const GET_USERS_BY_METADATA_VALUE =
 
 /** Check if a user exists by id. Lightweight — returns only the id column. */
 export const VERIFY_USER_BY_ID =
-  'SELECT id FROM lt_users WHERE id = $1 LIMIT 1';
+  'SELECT id, status FROM lt_users WHERE id = $1 LIMIT 1';
 
 /**
  * Atomic per-key patch of the user's properties dictionary — ONE statement,
@@ -97,7 +97,7 @@ export const VERIFY_USER_BY_ID =
  * back means the user is missing OR the guard tripped — the caller
  * distinguishes with VERIFY_USER_BY_ID.
  */
-export const PATCH_USER_PROPERTIES = `
+const PATCH_USER_PROPERTIES_UPDATE = `
   UPDATE lt_users SET metadata = (
     (COALESCE(metadata, '{}'::jsonb) - $2::text[])
     || COALESCE((
@@ -114,6 +114,35 @@ export const PATCH_USER_PROPERTIES = `
       WHERE u2.id <> $1 AND u2.status = 'active' AND u2.metadata ->> g.k = g.v
     )
   RETURNING *`;
+
+export const PATCH_USER_PROPERTIES = PATCH_USER_PROPERTIES_UPDATE;
+
+/**
+ * The same patch, recorded in lt_label_jobs in the same statement: the ledger
+ * row exists exactly when the patch landed. $6 is the ledger row as JSON
+ * (action, requested_by, source, and for a reissue the template and media);
+ * it never carries the identity value. With `require_active`, only an active
+ * user is patched, checked in the same statement.
+ */
+export const PATCH_USER_PROPERTIES_RECORDED = `
+  WITH patched AS (${PATCH_USER_PROPERTIES_UPDATE.replace(
+    'WHERE id = $1',
+    "WHERE id = $1 AND (($6::jsonb->>'require_active')::boolean IS NOT TRUE OR status = 'active')",
+  )}),
+  recorded AS (
+    INSERT INTO lt_label_jobs (
+      action, requested_by, sensitive, source, subject_user_ids, label_count,
+      template_name, template_revision, template_snapshot, scheme_version, scheme_kind, media, output
+    )
+    SELECT $6::jsonb->>'action', ($6::jsonb->>'requested_by')::uuid, true,
+           COALESCE($6::jsonb->'source', '{}'::jsonb), ARRAY[patched.id],
+           COALESCE(($6::jsonb->>'label_count')::int, 0),
+           $6::jsonb->>'template_name', ($6::jsonb->>'template_revision')::int, $6::jsonb->'template_snapshot',
+           ($6::jsonb->>'scheme_version')::int, $6::jsonb->>'scheme_kind', $6::jsonb->'media', $6::jsonb->>'output'
+    FROM patched
+    RETURNING id
+  )
+  SELECT patched.*, (SELECT id FROM recorded) AS ledger_id FROM patched`;
 
 /** Fetch user + roles in a single query. Returns one row per role (or one row with nulls if no roles). */
 export const GET_USER_WITH_ROLES =
