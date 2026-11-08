@@ -48,6 +48,8 @@ export interface UnitRouteInput {
   operatorTimeout?: string;
   /** The role of the person who receives units at the end of the route; line-exit by default. */
   exitRole?: string;
+  /** The role of the person who decides a failed handoff: retry, manual or scrap; line-operator by default. */
+  operatorRole?: string;
   /** The role of the people who decide units a machine finished on hold; line-quality by default. */
   qualityRole?: string;
   /** The command the line's codec declares for a hold decision (`rowOps`); the decision is sent to the holding machine as that command. */

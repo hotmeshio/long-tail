@@ -10,7 +10,8 @@
  * 1. Put the file on the printer (it prints only files on its own storage) and hash it: the unit's artifact.
  * 2. Start the unit route: one print step at the station, then a person unloads.
  * 3. Print the route's rows and their lifecycle items as they change, until the
- *    route ends. The unload row is resolved by a person on the dashboard.
+ *    route ends. The unload row is resolved by a person on the dashboard, and
+ *    so is a failed print's decision, on the line's operator role.
  *
  * Env: LT_USERNAME and LT_PASSWORD (a Long Tail login that may invoke the route), BASE_URL
  * (http://localhost:3000), BAMBU_SITE_DIR (deploy/bambu-site), and the printers in .env.
@@ -25,6 +26,8 @@ import { basename, join } from 'path';
 import { BAMBU_ROLES, PRINT_PROCESS, PRINT_RECIPE, printersFromEnv } from '../examples/workflows/bambu-printer/env';
 import { stageFile } from '../examples/workflows/bambu-printer/files';
 import { UNIT_ROUTE_WORKFLOW, type UnitRouteInput } from '../examples/workflows/machine-line/workflows/route';
+import { exitRole, operatorRole } from '../lib/machines/line';
+import { ROW_TYPE } from '../services/machines/contracts';
 import type { LineDef } from '../types/machines';
 
 const env = process.env;
@@ -68,7 +71,8 @@ async function look(orderRef: string, workflowId: string, shown: Map<string, str
   const facets = encodeURIComponent(JSON.stringify({ orderRef }));
   const { escalations } = await api('GET', `/escalations?facets=${facets}&limit=20&sort_by=created_at&order=asc`);
   for (const row of escalations) {
-    const { items = [] } = await api('GET', `/escalations/${row.id}/items`);
+    // Handoff rows hold the lifecycle items; a decision row holds none.
+    const { items = [] } = row.type === ROW_TYPE.HANDOFF ? await api('GET', `/escalations/${row.id}/items`) : {};
     const view = `${row.type}/${row.role} ${row.status}${row.assigned_to ? ' claimed' : ''} [${items.map((i: any) => i.itemKey).join(', ')}]`;
     if (shown.get(row.id) !== view) say(`${row.id.slice(0, 8)} ${view}`);
     shown.set(row.id, view);
@@ -100,7 +104,7 @@ async function main(): Promise<void> {
     siteId: line.siteId, lineId: line.lineId, routeKey, orderRef: `ORD-${routeKey}`,
     units: [{ unitId: `U-${routeKey}`, carrierId: `PLATE-${routeKey}` }],
     steps: [{ machineId: station, process: PRINT_PROCESS, recipe: { ...PRINT_RECIPE } }],
-    artifact: { url, sha256 }, exitRole: BAMBU_ROLES.UNLOAD, handoffTimeout: env.BAMBU_HANDOFF_TIMEOUT || '6h',
+    artifact: { url, sha256 }, exitRole: exitRole(line), operatorRole: operatorRole(line), handoffTimeout: env.BAMBU_HANDOFF_TIMEOUT || '6h',
   };
   const workflowId = `bambu-${routeKey}`;
   await api('POST', `/workflows/${UNIT_ROUTE_WORKFLOW}/invoke`, { data: input, metadata: { source: 'bambu-print' }, workflowId });

@@ -28,7 +28,7 @@ When the printer stops on an error, a `line-alarm` row also goes to `print-servi
 
 The printer is held until its part is unloaded. A second print waits unclaimed in the printer's queue, and goes out once the `print-unload` row is resolved.
 
-A print that stops without finishing ends the print row as withdrawn, and a person decides on the `line-operator` row. The reason is `cancelled`, the printer's error code, or `did-not-print` (back to idle before printing, after a failed bed leveling, say).
+A print that stops without finishing ends the print row as withdrawn, and a `handoff-error` row asks `print-servicing`, the line's operator role, to retry, take it manual, or scrap. The reason is `cancelled`, the printer's error code, or `did-not-print` (back to idle before printing, after a failed bed leveling, say). A print the printer refuses (busy with another job, or Developer Mode off) asks the same way, as `dispatch-refused`. The driver passes the line's roles to the route as `exitRole` and `operatorRole`.
 
 If the printer drops off the network, a `machine-offline` row goes to `print-servicing`. The print row stays open. When the bridge reconnects, the gateway asks for the printer's full report, and a print that finished meanwhile resolves its row.
 
@@ -60,9 +60,58 @@ docker compose exec long-tail npm run bambu:print
 
 - **Setup:** `machine-site` renders the site into `deploy/bambu-site/`. That includes a bridge per printer, with the printer's CA read from the printer itself, and `line.json`.
 - **The driver:** copies the file to the printer's storage over FTPS (`files.ts`), starts the route with that file as the unit's artifact, and prints the rows as they change. A printer on the LAN prints only files on its own storage. It runs in the Long Tail container, which reaches the printer.
-- **The part:** clear the bed first. Without a file the driver prints the boat: a half-size [3DBenchy](https://www.3dbenchy.com) by Creative Tools in `boat/p1s-0.8-tpu.gcode.3mf`, sliced for a P1S with a 0.8 nozzle and TPU, about eleven minutes. Any other part is a file sliced for that printer, its nozzle and the filament loaded: `npm run bambu:print -- path/to/part.gcode.3mf`. Keep your own parts in `files/`, which is never checked in.
-- **A boat for your printer:** `npm run bambu:boat` runs on the host with [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) installed. It downloads the model, scales it (`BAMBU_BOAT_SCALE`, 0.5), slices it with the presets in `BAMBU_BOAT_PRINTER`, `_PROCESS` and `_FILAMENT` (system preset names or preset files; a stock P1S with a 0.4 nozzle and PLA by default), and writes `files/boat.gcode.3mf`.
+- **The part:** clear the bed first. Without a file the driver prints the boat: a half-size #3DBenchy in `boat/p1s-0.8-tpu.gcode.3mf`, sliced for a P1S with a 0.8 nozzle and TPU, about 11 minutes and 60 layers. Any other part is a file sliced for that printer, its nozzle and the filament loaded: `npm run bambu:print -- path/to/part.gcode.3mf`. Keep your own parts in `files/`, which is never checked in.
 - **Unload:** when the print finishes, resolve the `print-unload` row on the dashboard.
+
+## The boat
+
+[#3DBenchy](https://www.3dbenchy.com) by Creative Tools is in the public domain ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)); `boat/README.md` records it. `npm run bambu:boat` makes a boat on the host, with [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) installed. It downloads the model into `files/`, scales it (`BAMBU_BOAT_SCALE`, 0.5), slices it with the presets in `BAMBU_BOAT_PRINTER`, `_PROCESS` and `_FILAMENT` (each a system preset name or a preset file), and writes `files/boat.gcode.3mf`.
+
+- **A stock P1S, 0.4 nozzle and PLA:** leave the presets unset.
+- **The example's boat, 0.8 nozzle and TPU:** the presets in `boat/presets/`, which inherit OrcaSlicer's generic TPU and 0.40 mm process for a 0.8 nozzle. This slices the checked-in file again.
+
+```bash
+BAMBU_BOAT_PRINTER="Bambu Lab P1S 0.8 nozzle" \
+BAMBU_BOAT_PROCESS=examples/workflows/bambu-printer/boat/presets/tpu-0.8-process.json \
+BAMBU_BOAT_FILAMENT=examples/workflows/bambu-printer/boat/presets/tpu-0.8-filament.json \
+  npm run bambu:boat
+docker compose exec long-tail npm run bambu:print -- examples/workflows/bambu-printer/files/boat.gcode.3mf
+```
+## Run it without a printer
+
+`bambu-sim` plays a P1S on the network: its own broker on 8883 (Mosquitto, user bblp and the access code, a certificate issued to its serial), its storage over implicit FTPS on 990, and the same reports and acknowledgements a printer sends. A print takes a minute (`BAMBU_SIM_PRINT_SEC`), 60 layers. Describe it in `.env` in place of a real printer (`.env.example` has the block):
+
+```
+BAMBU_SITE_ID=site-1
+BAMBU_LINE_ID=print-1
+BAMBU_PRINTERS=p1s-01
+BAMBU_P1S_01_SERIAL=01P00A000000001
+BAMBU_P1S_01_HOST=bambu-sim
+BAMBU_P1S_01_CODE=12345678
+BAMBU_P1S_01_ENABLED=true
+```
+
+Then run the same stack with the `bambu-sim` profile:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
+  -f docker-compose.bambu.yml --profile bambu-sim up -d --build
+docker compose exec long-tail npm run bambu:print
+```
+
+`machine-site` reads the simulated printer's CA from 8883 and renders its bridge, exactly as for a printer. The driver copies the boat over FTPS, and the print row gains `started`, `progress` at 25, 50 and 75, and `arrived`. Resolve the `print-unload` row on the dashboard and the route ends `complete`.
+
+Drills on `:8092` play what someone at the printer would do:
+
+```bash
+curl localhost:8092/                    # the printer's state and the files on its storage
+curl -X POST localhost:8092/runout      # the spool runs out: a print-servicing alarm (07FF-8011), the print row pauses
+curl -X POST localhost:8092/resume      # filament loaded and resumed: the alarm resolves, the print row resumes
+curl -X POST localhost:8092/occupy      # a print started elsewhere: the next print is refused, a print-servicing decision
+curl -X POST localhost:8092/vacate      # the printer is idle again
+```
+
+The simulated printer's certificates live in `deploy/bambu-sim/`, and the CA the site read from it in `deploy/bambu-site/certs/bambu-ca-<serial>.pem`. Delete both to start over with new ones.
 
 ## Layout
 
@@ -72,8 +121,9 @@ docker compose exec long-tail npm run bambu:print
 | `report.ts` | The printer's report: the merged state, the print's phase, the job named in `subtask_name` |
 | `catalog.ts` | What an error code means, for the alarm row |
 | `files.ts` | Copies a print file to a printer's storage over FTPS |
-| `boat/` | The boat, the example's first print |
+| `boat/` | The boat, the example's first print, and the presets it was sliced with |
 | `env.ts` | The printers from `.env`, and the line they form |
 | `site/` | The printer bridges, and the site setup that renders them |
+| `sim/` | A simulated printer: its broker's files, its FTPS storage, the printer, and the drills |
 
-Tests: `tests/examples/bambu-printer/codec.test.ts` decodes reports taken from a real printer. `tests/workflows/bambu-print-route.test.ts` runs the route on the real orchestrator against a simulated printer, covering a print, a runout, a refused print, and a second print waiting for the unload.
+Tests: `tests/examples/bambu-printer/codec.test.ts` decodes reports taken from a real printer. `tests/examples/bambu-printer/sim/` covers the simulated printer, including `files.ts` uploading to its FTPS storage. `tests/workflows/bambu-print-route.test.ts` runs the route on the real orchestrator against the simulated printer, covering a print, a runout, a refused print decided on `print-servicing`, and a second print waiting for the unload.
