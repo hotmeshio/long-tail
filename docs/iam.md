@@ -251,6 +251,18 @@ The same keystore carries **acting-identity grants** for shared station devices.
 
 The grant rides scan requests as `actingToken` and is exchanged server-side before anything reads or writes: the verbs run **as the badged person under their own live RBAC**. The grant confers attribution, never privilege — a badged user without write scope on the queue is still denied. Mutations attribute to the person (`assigned_to`, `resolved_by`) with the device recorded beside them (`scanStation` provenance). A dead grant is a loud `not_primed` outcome, never a silent execution as the device. See [scan-codes.md](scan-codes.md#identity-schemes-and-acting-identity).
 
+### Printed credentials
+
+Badge tokens are credentials, so the platform treats printing one as issuing
+one. The `credentialIssuer` capability (superadmin, or the `credential-issuer`
+role; admin type alone does not grant it) gates printing, reissuing, and
+binding identity keys by hand. User reads leave identity keys out of
+`metadata` and name them in `identity_bound`. Every print, reissue, and binding
+writes a row to the label ledger (`lt_label_jobs`) naming the requester and the
+holders before any code is composed. The users API protections are on by
+default; `labels.protectIdentityKeys: false` (or `LT_PROTECT_IDENTITY_KEYS=false`)
+keeps the earlier behavior. See [label-sheets.md](label-sheets.md#badges-are-credentials).
+
 ## Dashboard
 
 The dashboard surfaces IAM across four pages:

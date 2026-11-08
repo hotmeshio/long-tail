@@ -2,6 +2,8 @@
 
 Users represent the humans who claim and resolve escalations. Each user has a unique `external_id` that maps to your application's identity system. All endpoints require authentication. Creating, updating, patching, and deleting users require builder access (superadmin or the `engineer` role). Adding and removing roles require admin access and follow the assignment rules in the [Roles API](roles.md#scoped-role-assignment). Only a superadmin may grant the `superadmin` type or change a superadmin account.
 
+User records leave identity keys (the target facets of identity scan schemes, such as `badge_id`) out of `metadata` and list the ones a user carries in `identity_bound`. A wholesale `metadata` write refuses identity keys and keeps the ones it leaves out; setting or removing one through `PATCH /api/users/:id/properties` needs the `credentialIssuer` capability and is recorded in the label ledger. These protections are on by default; `labels.protectIdentityKeys: false` keeps the earlier behavior. See [label-sheets.md](../../label-sheets.md#badges-are-credentials).
+
 For service identities (CI bots, schedulers, automated agents), use the [Service Accounts API](service-accounts.md) instead. Service accounts share the same RBAC system but authenticate with API keys rather than passwords or OAuth.
 
 ## List users

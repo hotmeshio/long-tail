@@ -31,6 +31,7 @@ canonical action surface. A scan is an **ECA rule** over that surface:
 - [Capture on the dashboard](#capture-on-the-dashboard)
 - [Scanner setup](#scanner-setup)
 - [Admin configuration](#admin-configuration)
+- [Printing labels](label-sheets.md)
 - [The printer demo](#the-printer-demo)
 - [The bag and bin demo](#the-bag-and-bin-demo)
 
@@ -788,10 +789,13 @@ checks its entries off the same way: a scan of an accepted scheme, with nothing
 focused, fills the row's first open entry for that code on the server, as the
 person acting. A scan no field accepts runs globally as usual.
 
-Badge tokens are printed credentials: seed them as long random strings,
-bind them server-side (`lt_users.metadata`), and treat badge possession
-with the same physical policy as any badge system. Unknown badges answer
-`identity_unknown` and are auditable.
+Badge tokens are printed credentials: bind them server-side
+(`lt_users.metadata`) as long random strings, and treat badge possession with
+the same physical policy as any badge system. User reads leave identity keys
+out of `metadata` and list them in `identity_bound`. Printing, reissuing and
+binding a badge needs the `credentialIssuer` capability and is recorded in
+the label ledger; see [label-sheets.md](label-sheets.md#badges-are-credentials).
+Unknown badges answer `identity_unknown`.
 
 ## The fallback screen
 
@@ -917,7 +921,8 @@ UPC-A where numeric-only labels are already in circulation.
 at a target facet — its two-digit index is assigned for you. A scheme's detail
 page lists its actions; **Add an action** opens the rule editor:
 
-1. **Name it** — the friendly label printed beside the physical code.
+1. **Name it** — the friendly label printed beside the physical code. Label
+   templates print it there; see [label-sheets.md](label-sheets.md).
 2. **Order the conditions** — each step picks a queue, a held-by filter,
    and its action; steps reorder with arrows. First match wins.
 3. **Set the fallback** — markdown for the no-match screen.

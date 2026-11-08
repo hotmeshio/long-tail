@@ -1,6 +1,6 @@
 # Admin
 
-Unified system management: tasks, escalations, workflows, diagnostics, agents, bot accounts, control plane, pipelines, topics, users, roles, personas, scan codes, announcements, and settings.
+Unified system management: tasks, escalations, workflows, diagnostics, agents, bot accounts, control plane, pipelines, topics, users, roles, personas, scan codes, label sheets, announcements, and settings.
 
 | Property | Value |
 |----------|-------|
@@ -2054,6 +2054,81 @@ Delete one scan rule by scheme version and category.
 |-------|------|----------|-------------|
 | scheme_version | integer | Yes | Scheme version |
 | category | string | Yes | Rule category |
+
+## Label Sheets
+
+Label templates say what one printed label of a scan scheme shows. See [label-sheets.md](../../label-sheets.md).
+
+### list_label_templates
+
+List label templates: the scheme each prints, its codes with captions, text, symbology and default media.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| scheme | integer | No | Only templates for this scheme version |
+
+### upsert_label_template
+
+Create or replace a label template. Codes are 1 to 4 of the scheme's rules, each beside a caption in a `solid`, `outline` or `plain` band; the title and up to two lines are written in label tokens.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | Yes | Template id: lowercase letters, digits and dashes |
+| scheme_version | integer | Yes | The scheme whose codes the label prints |
+| title | string | Yes | Display name |
+| codes | array | Yes | `{ category, caption?, tone }` |
+| text | object | No | `{ title?, lines? }` in label tokens |
+| symbology | string | No | `code128`, `qrcode` or `datamatrix` |
+| human_readable | boolean | No | Print the code as text under the symbol |
+| media | string | No | Default media preset id |
+| sensitive | boolean | No | Confirm and record subjects when printing |
+| enabled | boolean | No | |
+| expected_revision | integer | No | Write only if the stored revision matches |
+
+### delete_label_template
+
+Delete one label template by name.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | Yes | Template name |
+
+### render_label_sheet
+
+Issue a sheet of item labels as the caller and store it as a PDF (sheet stock) or ZPL (thermal media). Returns the job id, the file ref, a link valid for ten minutes, and warnings for codes that would fail on the floor. Sensitive and identity (badge) templates are refused.
+
+| | |
+|---|---|
+| Read-safe | No |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| template | string | Yes | Template name |
+| source | object | Yes | `list`, `range`, `escalations` or `facets` source |
+| format | string | Yes | `pdf` or `zpl` |
+| media | string | No | Media preset id |
+| startPosition | integer | No | First label to print on the first sheet |
+| copies | integer | No | Copies of each label |
 
 ## Announcements
 
