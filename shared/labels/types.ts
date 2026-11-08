@@ -104,7 +104,7 @@ export interface LabelPage {
 }
 
 export const LABEL_WARNING_KINDS = [
-  'scale', 'quiet_zone', 'unencodable', 'unparseable', 'rule_disabled', 'unresolved', 'overflow',
+  'scale', 'quiet_zone', 'unencodable', 'unparseable', 'rule_disabled', 'unresolved', 'overflow', 'missing_token',
 ] as const;
 export type LabelWarningKind = (typeof LABEL_WARNING_KINDS)[number];
 

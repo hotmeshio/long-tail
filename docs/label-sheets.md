@@ -48,7 +48,10 @@ Label tokens:
 | `{user.display_name}`, `{user.name}`, `{user.email}`, `{user.roles}`, `{user.<property>}` | The badge holder (identity schemes). |
 | `{scheme.name}` | The scheme's name. |
 
-A token with no value prints empty. Identity credentials never print as text:
+A token with no value prints empty, and the preview warns about it
+(`missing_token`, naming the facts the label does have). Captions take tokens
+too; a caption left blank prints the rule's name as written. Identity
+credentials never print as text:
 `{target}` and `{user.<identity key>}` are refused on identity templates.
 
 Manage templates on **Admin → Scan Codes → (scheme) → Labels**, through
@@ -120,6 +123,7 @@ recording it, and lists a warning for every label that would fail on the floor:
 - `unparseable`: the code does not read back as its scheme, or the scheme is disabled.
 - `rule_disabled`: the code's rule is disabled; scanning it does nothing.
 - `unresolved`: the target names no row today, or the badge holder is not an active user.
+- `missing_token`: the heading, a line or a caption reads `{item.<facet>}` or `{user.<key>}`, and the label's data has no such value.
 - `scale`, `quiet_zone`, `overflow`, `unencodable`: the code or text does not fit the label.
 
 The dashboard prints only after a preview of the same choice. In Chrome, the
@@ -148,7 +152,12 @@ replace keeps the identity keys it leaves out.
 
 **Reissue** (`POST /api/labels/badges/reissue`) mints a new credential that
 fits the scheme's encoding, writes it and its ledger row in one statement, and
-prints the new badge. The old code resolves to no one from that moment. An
+prints the new badge. On a delimited identity scheme the credential is
+`target_length` random characters (8 to 64, default 10; **Badge length** on
+the scheme page), and the badge encodes it with its prefix, for example
+`14:0:7KQ2M9XW4H`. On a fixed scheme it is `target_length` digits. Badges of
+any length keep scanning; the length only shapes new ones. Ten characters keep
+a Code 128 badge on an ID card comfortably above the minimum bar width. The old code resolves to no one from that moment. An
 acting grant minted from the old badge before the reissue lasts until its
 `grant_ttl_seconds` runs out.
 

@@ -54,7 +54,7 @@ describe('reissuing a badge', () => {
   it('rotates the credential, records reissue and print, and prints the new code', async () => {
     const result = await reissueBadge({ userId: holder, template: fx.badgeTemplate, output: 'sheet', confirm: true }, superadmin);
     const fresh = (await userService.getUser(holder))?.metadata?.[fx.badgeKey];
-    expect(fresh).toMatch(/^[0-9A-HJKMNP-TV-Z]{24}$/);
+    expect(fresh).toMatch(/^[0-9A-HJKMNP-TV-Z]{10}$/);
     expect(fresh).not.toBe(OLD);
     expect(await userService.getUserByMetadataValue(fx.badgeKey, OLD)).toBeNull();
     expect(JSON.stringify(result.sheet)).toContain(`${fx.badgeScheme}:0:${fresh}`);

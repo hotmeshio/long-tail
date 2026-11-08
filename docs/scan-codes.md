@@ -790,7 +790,8 @@ focused, fills the row's first open entry for that code on the server, as the
 person acting. A scan no field accepts runs globally as usual.
 
 Badge tokens are printed credentials: bind them server-side
-(`lt_users.metadata`) as long random strings, and treat badge possession with
+(`lt_users.metadata`) as random strings (generated badges are `target_length`
+characters, default 10), and treat badge possession with
 the same physical policy as any badge system. User reads leave identity keys
 out of `metadata` and list them in `identity_bound`. Printing, reissuing and
 binding a badge needs the `credentialIssuer` capability and is recorded in

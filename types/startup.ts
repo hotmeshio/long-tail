@@ -337,6 +337,11 @@ export interface LTScanSchemeConfig {
   target_facet: string;
   encoding?: ScanEncoding;
   delimiter?: string;
+  /**
+   * Fixed encoding: the target's digit count. Delimited identity schemes:
+   * the length of a generated badge (8 to 64, default 10); scans of any
+   * length still resolve.
+   */
   target_length?: number | null;
   /** 'action' (default) or 'identity' (badge grants). */
   kind?: ScanSchemeKind;
