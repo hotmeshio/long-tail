@@ -112,6 +112,17 @@ export const GATED_ROUTES: GatedRoute[] = [
   { method: 'PUT', path: '/scan-codes/schemes/1/actions/sample', gate: 'roleManager', body: {} },
   { method: 'DELETE', path: '/scan-codes/schemes/1/actions/sample', gate: 'roleManager' },
 
+  // routes/labels.ts (print access is checked by the service, per template)
+  { method: 'GET', path: '/labels/templates', gate: 'none' },
+  { method: 'GET', path: '/labels/templates/sample', gate: 'none' },
+  { method: 'PUT', path: '/labels/templates/sample', gate: 'roleManager', body: {} },
+  { method: 'DELETE', path: '/labels/templates/sample', gate: 'roleManager' },
+  { method: 'GET', path: '/labels/media', gate: 'none' },
+  { method: 'GET', path: '/labels/transports', gate: 'none' },
+  { method: 'POST', path: '/labels/preview', gate: 'none', body: {} },
+  { method: 'GET', path: '/labels/jobs', gate: 'none' },
+  { method: 'GET', path: `/labels/jobs/${ID}`, gate: 'none' },
+
   // routes/announcements.ts
   { method: 'GET', path: '/announcements', gate: 'none' },
   { method: 'POST', path: '/announcements', gate: 'roleManager', body: {} },

@@ -20,6 +20,7 @@ import { seedConsolidationRoles } from './seed-consolidation';
 import { seedPolicyDocumentRole } from './seed-policy-document';
 import { seedWorkbenchRole, seedWorkbenchEscalation } from './seed-workbench';
 import { seedChecklistRole } from './seed-checklist';
+import { seedLabelTemplates, seedRelabelerRole } from './seed-label-templates';
 import { seedConstraintFormRole, seedConstraintFormEscalations } from './seed-constraint-form';
 import { seedParameterizedFormRole, seedParameterizedFormEscalations } from './seed-parameterized-form';
 import { seedLookupCascadeKnowledge, seedLookupCascadeRole, seedLookupCascadeEscalations } from './seed-lookup-cascade';
@@ -124,6 +125,8 @@ export async function seedExamples(client: any): Promise<void> {
   await seedScanCodes();
   await seedBadgeScheme();
   await seedBinScanCodes();
+  await seedLabelTemplates();
+  await seedRelabelerRole();
   await seedRichFormRole();
   await seedAcmeRoles();
   await seedRelatedEscalationsRoles();

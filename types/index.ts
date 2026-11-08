@@ -183,6 +183,8 @@ export type {
   LTMachinesConfig,
   LTScanSchemeConfig,
   LTScanRuleConfig,
+  LTLabelTemplateConfig,
+  LTLabelsConfig,
 } from './startup';
 
 export type {
@@ -346,3 +348,5 @@ export type {
 } from './machines';
 
 export type * from './machines-view';
+
+export type * from './labels';
