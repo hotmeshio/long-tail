@@ -2,7 +2,7 @@
  * machineUnitRoute: one set of units through the line. Each hop parks a
  * handoff row for the receiver; a machine resolves it over MQTT through the
  * gateway, a person resolves the last one on the dashboard. A hop that ends
- * without a receipt parks a line-operator row: retry the hop, finish the
+ * without a receipt parks a row for the line's operator: retry the hop, finish the
  * units by hand, or scrap them. Units the sender finished as not ok are off
  * the line, and units split by a partial arrival are no longer all at the
  * sender, so those rows offer only manual and scrap.
@@ -83,7 +83,7 @@ async function askOperator(input: UnitRouteInput, hop: Hop, attempt: number, sen
   let refused = '';
   for (let round = 1; ; round++) {
     const answer = await conditional<OperatorResolution>(signalKeys.handoffError(input.routeKey, hop.index, attempt, round), {
-      role: LINE_ROLE.OPERATOR,
+      role: input.operatorRole ?? LINE_ROLE.OPERATOR,
       type: ROW_TYPE.HANDOFF_ERROR,
       subtype: outcome.errorCode,
       description: `${refused}${input.units.map((u) => u.unitId).join(', ')} stopped at ${where}: ${outcome.errorCode}. ${outcome.detail ?? ''} Choose ${decisions.join(', ')}.`.replace(/\s+/g, ' ').trim(),

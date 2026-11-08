@@ -36,7 +36,7 @@ try { require('dotenv/config'); } catch { /* dotenv optional */ }
 import { connect, StringCodec } from 'nats';
 
 import { DECISION, ROW_TYPE } from '../services/machines/contracts';
-import { exitRole, stationRoles } from '../lib/machines/line';
+import { exitRole, operatorRole, qualityRole, stationRoles } from '../lib/machines/line';
 import { FACTORY_LINE_PATH, automatedAt, loadManifests, manifestSteps } from '../examples/workflows/machine-line/manifests';
 import { loadLine } from '../examples/workflows/machine-line/line';
 import { MODE } from '../lib/machines/protocol';
@@ -208,7 +208,8 @@ async function startRoutes(artifact: { url: string; sha256: string }): Promise<s
     const name = automatedAt(i, MIX) ? MANIFEST.AUTOMATED : MANIFEST.MANUAL;
     const data: UnitRouteInput = {
       siteId: line.siteId, lineId: line.lineId, routeKey, orderRef: `ORD-${RUN}`, units,
-      steps: manifestSteps(line, manifests[name]), exitRole: exitRole(line), artifact, handoffTimeout: HANDOFF_TIMEOUT,
+      steps: manifestSteps(line, manifests[name]), exitRole: exitRole(line), operatorRole: operatorRole(line), qualityRole: qualityRole(line),
+      artifact, handoffTimeout: HANDOFF_TIMEOUT,
     };
     const workflowId = `mur-${routeKey}`;
     await api('POST', `/workflows/${UNIT_ROUTE_WORKFLOW}/invoke`, { workflowId, data, metadata: { source: 'machine-line', manifest: name } });

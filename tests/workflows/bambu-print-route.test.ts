@@ -14,11 +14,12 @@ import { CallbackEventAdapter } from '../../lib/events/callback';
 import { machineUnitRoute } from '../../examples/workflows/machine-line';
 import { bambuCodec } from '../../examples/workflows/bambu-printer/codec';
 import { BAMBU_ROLES, PRINT_PROCESS, PRINT_RECIPE, bambuLine } from '../../examples/workflows/bambu-printer/env';
-import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, signalKeys } from '../../services/machines/contracts';
+import { DECISION, HANDOFF_ERROR, ROW_TYPE, signalKeys } from '../../services/machines/contracts';
 import { MachineGateway } from '../../services/machines/gateway/gateway';
 import { ApiLineEscalations } from '../../services/machines/gateway/api-escalations';
 import { silentLog } from '../../services/machines/gateway/log';
 import { ensureLineBots } from '../../services/machines/identities';
+import { exitRole, operatorRole } from '../../lib/machines/line';
 import { lineFilter } from '../../lib/machines/protocol';
 import { CallbackEscalationFeed, MemoryBroker, MemoryMachineBus } from '../../lib/machines/transport';
 import { SimPrinter } from '../helpers/bambu-printer-sim';
@@ -78,7 +79,7 @@ describe('a Bambu print through the unit route (workflow + gateway + simulated p
     for (const [actor, id] of await ensureLineBots(LINE)) users.set(actor, id);
     const person = await userService.createUser({
       external_id: `print-person-${Date.now()}`,
-      roles: [BAMBU_ROLES.UNLOAD, BAMBU_ROLES.SERVICING, LINE_ROLE.OPERATOR].map((role) => ({ role, type: 'member' as const })),
+      roles: [BAMBU_ROLES.UNLOAD, BAMBU_ROLES.SERVICING].map((role) => ({ role, type: 'member' as const })),
     });
     personId = person.id;
 
@@ -119,7 +120,7 @@ describe('a Bambu print through the unit route (workflow + gateway + simulated p
     return client.workflow.start({
       args: [{ data: {
         siteId: LINE.siteId, lineId: LINE.lineId, routeKey, orderRef: `ORD-${routeKey}`, units: [{ unitId: `U-${routeKey}`, carrierId: `CR-${routeKey}` }],
-        steps: [STEP], artifact: ARTIFACT, exitRole: BAMBU_ROLES.UNLOAD,
+        steps: [STEP], artifact: ARTIFACT, exitRole: exitRole(LINE), operatorRole: operatorRole(LINE),
       } }],
       taskQueue: TASK_QUEUE, workflowName: 'machineUnitRoute', workflowId: `bpr-${routeKey}`, expire: 300,
     });
@@ -190,11 +191,12 @@ describe('a Bambu print through the unit route (workflow + gateway + simulated p
     expect((await handleB.result() as any).data).toMatchObject({ status: 'complete' });
   }, 60_000);
 
-  it('a print the printer refuses goes to a person to decide', async () => {
+  it('a print the printer refuses goes to the line operator to decide', async () => {
     const routeKey = `F${Durable.guid().slice(0, 8)}`;
     printer.occupy();
     const handle = await start(routeKey);
     const decide = await rowBySignal(signalKeys.handoffError(routeKey, 0, 1));
+    expect(decide.role).toBe(BAMBU_ROLES.SERVICING);
     expect((decide.metadata as any).errorCode).toBe(HANDOFF_ERROR.DISPATCH_REFUSED);
     await escalationApi.resolveEscalation({ id: decide.id, resolverPayload: { decision: DECISION.SCRAP } }, { userId: personId });
     expect((await handle.result() as any).data).toMatchObject({ status: 'scrapped' });
