@@ -6,10 +6,12 @@
  *   npm run bambu:boat
  *
  * 1. Download the model once into files/.
- * 2. Scale it (BAMBU_BOAT_SCALE, 0.5 by default: about ten minutes on a P1S).
+ * 2. Scale it (BAMBU_BOAT_SCALE, 0.5 by default).
  * 3. Slice it with the printer, process and filament presets. Each is an
  *    OrcaSlicer system preset name or a path to a preset JSON, which may
- *    inherit a system preset by name.
+ *    inherit a system preset by name. Unset, a P1S with a 0.4 nozzle and PLA;
+ *    the presets in examples/workflows/bambu-printer/boat/presets slice the
+ *    example's boat (0.8 nozzle, TPU, about 11 minutes).
  *
  * Env: BAMBU_BOAT_PRINTER, BAMBU_BOAT_PROCESS, BAMBU_BOAT_FILAMENT, BAMBU_BOAT_SCALE,
  * ORCA_SLICER (the OrcaSlicer executable) and ORCA_PROFILES (its BBL profiles directory).
