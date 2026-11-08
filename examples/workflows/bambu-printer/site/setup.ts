@@ -10,7 +10,7 @@
 
 import { existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { connect, type PeerCertificate } from 'tls';
+import { connect, type DetailedPeerCertificate } from 'tls';
 
 import { prepareSite } from '../../machine-line/site/setup';
 import { bambuCodec } from '../codec';
@@ -23,7 +23,7 @@ const CERT_MOUNT = '/certs';
 function readPrinterCa(printer: BambuPrinter): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = connect({ host: printer.host, port: PRINTER_ACCESS.MQTT_PORT, rejectUnauthorized: false, timeout: 8_000 }, () => {
-      let cert: PeerCertificate = socket.getPeerCertificate(true);
+      let cert: DetailedPeerCertificate = socket.getPeerCertificate(true);
       while (cert.issuerCertificate && cert.issuerCertificate !== cert) cert = cert.issuerCertificate;
       socket.end();
       const body = cert.raw.toString('base64').match(/.{1,64}/g)!.join('\n');

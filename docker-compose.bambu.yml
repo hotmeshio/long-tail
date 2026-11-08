@@ -6,6 +6,9 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.nats.yml -f docker-compose.machines.yml \
 #     -f docker-compose.bambu.yml up -d --build
+# Without a printer, add `--profile bambu-sim` and describe the simulated
+# printer in .env (.env.example has the block): bambu-sim plays a printer on
+# the network, its broker on 8883 and its storage on 990, drills on :8092.
 
 services:
   long-tail:
@@ -25,6 +28,10 @@ services:
     environment:
       MACHINE_SITE_DIR: /app/deploy/bambu-site
     command: ["npx", "ts-node", "--transpile-only", "examples/workflows/bambu-printer/site/setup.ts"]
+    depends_on:
+      bambu-sim-broker:
+        condition: service_healthy
+        required: false
 
   site-nats:
     volumes:
@@ -37,3 +44,47 @@ services:
 
   machine-mock:
     profiles: ["mock"]
+
+  bambu-sim:
+    profiles: ["bambu-sim"]
+    build:
+      context: .
+      target: development
+    entrypoint: []
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      BAMBU_SIM_STATION: ${BAMBU_SIM_STATION:-p1s-01}
+      BAMBU_SIM_DIR: /app/deploy/bambu-sim
+      BAMBU_SIM_PORT: "8092"
+    ports:
+      - "${BAMBU_SIM_DRILL_PORT:-8092}:8092"
+    command: ["npx", "ts-node", "--transpile-only", "examples/workflows/bambu-printer/sim/main.ts"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(990, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # The simulated printer's own broker, on bambu-sim's address.
+  bambu-sim-broker:
+    profiles: ["bambu-sim"]
+    image: eclipse-mosquitto:2.0.20
+    network_mode: service:bambu-sim
+    volumes:
+      - ./deploy/bambu-sim:/sim:ro
+    command: ["mosquitto", "-c", "/sim/mosquitto.conf"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 8883"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      bambu-sim:
+        condition: service_healthy
+    restart: unless-stopped
