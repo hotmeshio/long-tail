@@ -6,6 +6,7 @@ import {
   Network,
   Braces,
   ScanBarcode,
+  Tag,
 } from 'lucide-react';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSettings } from '../../api/settings';
@@ -30,6 +31,7 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
       { to: '/admin/roles', label: 'Roles', icon: Inbox },
       { to: '/admin/personas', label: 'Personas', icon: Drama },
       { to: '/admin/scan-codes', label: 'Scan Codes', icon: ScanBarcode },
+      { to: '/admin/labels/history', label: 'Label History', icon: Tag },
     ] : []),
   ];
 

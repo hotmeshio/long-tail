@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  // shared/labels imports bwip-js from outside the dashboard; resolve one copy, the dashboard's.
+  resolve: { dedupe: ['bwip-js'] },
   server: {
     port: 5173,
     proxy: {

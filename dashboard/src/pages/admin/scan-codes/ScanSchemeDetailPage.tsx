@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ScanBarcode, ListChecks, Plus } from 'lucide-react';
 import { useScanScheme, SCAN_SCHEME_KINDS, type ScanRule } from '../../../api/scan-codes';
@@ -5,6 +6,9 @@ import { PageHeader } from '../../../components/common/layout/PageHeader';
 import { ScanRuleEditor } from './ScanRuleEditor';
 import { SchemeSettings } from './SchemeSettings';
 import { SectionGroup } from './SectionGroup';
+import { LabelTemplatesSection } from './LabelTemplatesSection';
+import { useLabelTemplates } from '../../../api/labels';
+import { PrintLabelsPanel } from '../../../components/labels/PrintLabelsPanel';
 
 /** The first free single-digit category (0-9), or null when all are taken. */
 function nextCategory(used: Set<string>): string | null {
@@ -17,15 +21,19 @@ export function ScanSchemeDetailPage() {
   const version = Number(versionParam);
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, isLoading } = useScanScheme(Number.isInteger(version) ? version : null);
+  const { data: labelData } = useLabelTemplates(Number.isInteger(version) ? version : undefined);
+  const [printing, setPrinting] = useState(false);
 
   const selected = searchParams.get('category');
-  const selectCategory = (category: string | null) => {
+  const selectedLabel = searchParams.get('label');
+  const setParam = (key: string, value: string | null) => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
-      if (category) p.set('category', category); else p.delete('category');
+      if (value) p.set(key, value); else p.delete(key);
       return p;
     });
   };
+  const selectCategory = (category: string | null) => setParam('category', category);
 
   if (isLoading) return <div className="text-sm text-text-tertiary">Loading…</div>;
   if (!data) return <div className="text-sm text-text-tertiary">No scheme for version {versionParam}.</div>;
@@ -45,9 +53,21 @@ export function ScanSchemeDetailPage() {
         ? `${scheme.version}${category}${sampleTarget}`
         : `${scheme.version}${scheme.delimiter}${category}${scheme.delimiter}${sampleTarget}`;
 
+  const mintable = scheme.encoding === 'fixed' || scheme.encoding === 'delimited';
+  const identity = scheme.kind === SCAN_SCHEME_KINDS.IDENTITY;
+  const templates = (labelData?.templates ?? []).filter((t) => t.enabled);
+
   return (
     <div className="space-y-10">
-      <PageHeader title={scheme.name} />
+      <PageHeader
+        title={scheme.name}
+        actions={mintable && !identity && templates.length > 0 ? (
+          <button onClick={() => setPrinting(true)} className="btn-secondary text-xs">Print labels</button>
+        ) : undefined}
+      />
+      {printing && (
+        <PrintLabelsPanel open={printing} onClose={() => setPrinting(false)} title={`Print ${scheme.name} labels`} templates={templates} />
+      )}
 
       <p className="text-sm text-text-secondary max-w-form -mt-4">
         {scheme.encoding === 'gtin' || scheme.encoding === 'pattern'
@@ -124,6 +144,17 @@ export function ScanSchemeDetailPage() {
             onDeleted={() => selectCategory(null)}
           />
         </SectionGroup>
+      )}
+
+      {mintable && (
+        <LabelTemplatesSection
+          schemeVersion={scheme.version}
+          identity={identity}
+          rules={rules}
+          templates={labelData?.templates ?? []}
+          selected={selectedLabel}
+          onSelect={(name) => setParam('label', name)}
+        />
       )}
     </div>
   );

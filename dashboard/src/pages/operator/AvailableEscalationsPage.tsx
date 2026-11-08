@@ -49,6 +49,7 @@ import { RowAction, RowActionGroup } from '../../components/common/layout/RowAct
 import { createBulkHandlers } from './helpers';
 import { isEffectivelyClaimed } from '../../lib/escalation';
 import { ClaimModal } from './ClaimModal';
+import { SelectionLabelPrint } from './SelectionLabelPrint';
 import { EscalationTimeline } from '../../components/escalation/EscalationTimeline';
 import type { LTEscalationRecord } from '../../api/types';
 
@@ -520,6 +521,7 @@ export function AvailableEscalationsPage() {
         isCancelPending={bulkCancel.isPending}
         cancelLabel={cancelLabel}
       />
+      {canBulkManage && <SelectionLabelPrint selected={escalations.filter((esc) => selectedIds.has(esc.id))} />}
 
       {/* Active facet pills — ride the pinned band, opaque so timeline scrolls beneath */}
       {((facetFilters.facets && Object.keys(facetFilters.facets).length > 0) || facetFilters.jeopardy) && (

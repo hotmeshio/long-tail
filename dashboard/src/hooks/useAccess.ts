@@ -1,6 +1,9 @@
 import { useAuth } from './useAuth';
 import { getViewAs } from '../lib/view-as';
 
+/** Holders may print and reissue badges (mirrors modules/capabilities on the server). */
+export const CREDENTIAL_ISSUER_ROLE = 'credential-issuer';
+
 /**
  * Centralized dashboard access control.
  *
@@ -37,6 +40,9 @@ export function useAccess() {
   // Administering (declaring lines, retiring them) is the server's admin
   // capability: superadmin or the admin role type, the same tier as bulk.
   const canAdminister = canBulk;
+  // Printing and reissuing badges: the server's credentialIssuer capability.
+  // Admin type alone never grants it; any view-as override drops it.
+  const canIssueCredentials = viewAs ? false : isSuperAdmin || hasRole(CREDENTIAL_ISSUER_ROLE);
 
-  return { isBuilder, isOps, canBulk, canAdminister, viewAs, realIsBuilder };
+  return { isBuilder, isOps, canBulk, canAdminister, canIssueCredentials, viewAs, realIsBuilder };
 }

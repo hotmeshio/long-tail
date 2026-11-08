@@ -18,6 +18,8 @@ import { EditUserModal } from './EditUserModal';
 import { BotsPage } from '../bots/BotsPage';
 import { RolePanel } from './RolePanel';
 import { AccountTabToggle, type AccountTab } from './AccountTabToggle';
+import { PrintLabelsPanel } from '../../../components/labels/PrintLabelsPanel';
+import { useBadgeTemplates } from '../../../components/labels/useBadgeTemplates';
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -58,7 +60,11 @@ export function UsersPage() {
 }
 
 function UserAccountsPanel() {
-  const { isBuilder } = useAccess();
+  const { isBuilder, canIssueCredentials } = useAccess();
+  const badgeTemplates = useBadgeTemplates();
+  const canPrintBadges = canIssueCredentials && badgeTemplates.length > 0;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [printingBadges, setPrintingBadges] = useState(false);
   const { filters, setFilter, pagination } = useFilterParams({
     filters: { status: '', search: '' },
   });
@@ -79,12 +85,34 @@ function UserAccountsPanel() {
   const total = data?.total ?? 0;
   const users = data?.users ?? [];
 
+  const toggleSelect = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id));
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(users.map((u) => u.id)));
+
   const activeUser = useMemo(() => {
     if (!selectedUser) return null;
     return users.find((u) => u.id === selectedUser.id) ?? selectedUser;
   }, [users, selectedUser]);
 
   const columns: Column<LTUserRecord>[] = [
+    ...(canPrintBadges ? [{
+      key: 'select' as const,
+      label: <input type="checkbox" aria-label="Select all users" checked={allSelected} onChange={toggleAll} />,
+      render: (row: LTUserRecord) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${row.display_name || row.external_id}`}
+          checked={selectedIds.has(row.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleSelect(row.id)}
+        />
+      ),
+      className: 'w-10',
+    }] : []),
     {
       key: 'display_name',
       label: 'User',
@@ -158,12 +186,38 @@ function UserAccountsPanel() {
 
   return (
     <div>
-      {isBuilder && (
-        <div className="flex justify-end mb-4">
-          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
-            Add User
-          </button>
+      {(isBuilder || canPrintBadges) && (
+        <div className="flex justify-end gap-3 mb-4">
+          {canPrintBadges && (
+            <button onClick={() => setPrintingBadges(true)} className="btn-secondary text-xs">
+              {selectedIds.size > 0 ? `Print ${selectedIds.size} badges` : 'Print badges'}
+            </button>
+          )}
+          {isBuilder && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary text-xs">
+              Add User
+            </button>
+          )}
         </div>
+      )}
+
+      {canPrintBadges && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-3 py-2 bg-surface-sunken/60 border-l-2 border-l-accent text-xs">
+          <span className="text-text-secondary">{selectedIds.size} selected</span>
+          <button onClick={() => setPrintingBadges(true)} className="btn-secondary text-xs">Print badges</button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-text-tertiary hover:text-text-secondary">Clear</button>
+        </div>
+      )}
+      {printingBadges && (
+        <PrintLabelsPanel
+          open={printingBadges}
+          onClose={() => setPrintingBadges(false)}
+          title="Print badges"
+          templates={badgeTemplates}
+          source={selectedIds.size > 0 ? { kind: 'users', userIds: [...selectedIds] } : undefined}
+          sourceCount={selectedIds.size > 0 ? selectedIds.size : undefined}
+          identity
+        />
       )}
 
       {/* Same filter surface as the Service Accounts tab: search + status. */}

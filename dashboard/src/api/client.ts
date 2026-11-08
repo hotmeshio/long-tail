@@ -101,10 +101,14 @@ async function tryRefresh(): Promise<string | null> {
 // Dedup concurrent refresh attempts
 let refreshPromise: Promise<string | null> | null = null;
 
-export async function apiFetch<T>(
+/**
+ * One authenticated request: token refresh, acting-grant bookkeeping, and a
+ * thrown ApiError for any non-2xx answer. Returns the successful response.
+ */
+async function apiRequest(
   path: string,
   options: RequestInit = {},
-): Promise<T> {
+): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -190,5 +194,21 @@ export async function apiFetch<T>(
     throw new ApiError(body.message || body.error || res.statusText, res.status, body);
   }
 
-  return res.json();
+  return res;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  return (await apiRequest(path, options)).json();
+}
+
+/** An authenticated request whose answer is a file (PDF, ZPL), with its headers. */
+export async function apiFetchFile(
+  path: string,
+  options: RequestInit = {},
+): Promise<{ blob: Blob; headers: Headers }> {
+  const res = await apiRequest(path, options);
+  return { blob: await res.blob(), headers: res.headers };
 }
