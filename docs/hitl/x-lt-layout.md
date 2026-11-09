@@ -19,6 +19,25 @@ Set `"x-lt-layout": "two-column"` at the schema root to arrange fields in a 2-co
 
 ---
 
+## Split Layout
+
+Set `"x-lt-layout": "split"` to put the form's `document` fields in a pane beside the rest. The pane stays in view while the fields scroll, a lone document fills it, and two or more scroll within it. The form takes two measures of width; below the split width the pane stacks above the fields. Without a document field the form lays out as a single column.
+
+```json
+{
+  "x-lt-layout": "split",
+  "properties": {
+    "application": { "type": "string", "x-lt-widget": "document", "x-lt-source": "file.application" },
+    "first_name":  { "type": "string" },
+    "last_name":   { "type": "string" }
+  }
+}
+```
+
+See [files.md](files.md).
+
+---
+
 ## Field Ordering (`x-lt-order`)
 
 By default, fields render in JSON key order. `x-lt-order` sets an explicit sequence. Fields not listed in `x-lt-order` render after the listed ones in their original key order.

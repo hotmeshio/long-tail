@@ -180,6 +180,14 @@ export const ESCALATION_ENVELOPE_KEYS = {
    * `conditional`'s `lookups` config field.
    */
   LOOKUPS: 'lookups',
+  /**
+   * Stored file refs: `EscalationFileRef[]`. Each ref names one object in
+   * file storage; its presence on the row grants readers of the escalation
+   * a time-limited signed link to it via GET /escalations/:id/files, and the
+   * signed file addresses in forms as the `file.<as>` context domain. Set
+   * ergonomically via `conditional`'s `files` config field.
+   */
+  FILES: 'files',
 } as const;
 
 /** A lookup ref `version` that follows the entry's newest edition. */
@@ -235,6 +243,81 @@ export function assertLookupRefs(refs: unknown): asserts refs is EscalationLooku
     if (r.as !== undefined && (typeof r.as !== 'string' || r.as.length === 0)) {
       throw new Error(`Lookup ref ${r.domain}/${r.key}: "as" must be a non-empty string when present`);
     }
+  }
+}
+
+/** Most file refs one escalation may carry. */
+export const ESCALATION_FILE_REFS_MAX = 32;
+
+/**
+ * One stored file an escalation shows its reader: a PDF to verify, a scanned
+ * card, a photo. `path` is the storage key; `as` is the form-context address
+ * (`file.<as>`). `expiresIn` asks for the signed link's lifetime in seconds;
+ * the server bounds it. `contentType` and `name` override what the path
+ * implies, for keys without an extension.
+ */
+export interface EscalationFileRef {
+  path: string;
+  as: string;
+  name?: string;
+  contentType?: string;
+  expiresIn?: number;
+}
+
+const FILE_REF_ALIAS = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+const CONTENT_TYPE = /^[a-z]+\/[a-z0-9.+-]+$/i;
+
+/** The storage key a ref names, or null when it leaves the store or is not a key. */
+export function normalizeFileRefPath(path: unknown): string | null {
+  if (typeof path !== 'string') return null;
+  const key = path.replace(/^\/+/, '');
+  if (key.length === 0 || key.length > 1024 || key.includes('\0') || key.includes('\\')) return null;
+  if (key.split('/').some((segment) => segment === '..' || segment === '.')) return null;
+  return key;
+}
+
+/** Why one file ref is malformed, or null when it is well formed. */
+export function fileRefProblem(ref: unknown): string | null {
+  const r = (ref ?? {}) as Record<string, unknown>;
+  const label = typeof r.as === 'string' && r.as ? r.as : String(r.path ?? '?');
+  if (normalizeFileRefPath(r.path) === null) {
+    return `File ref ${label}: path must be a storage key without "." or ".." segments`;
+  }
+  if (typeof r.as !== 'string' || !FILE_REF_ALIAS.test(r.as)) {
+    return `File ref ${label}: "as" must start with a letter or underscore and hold letters, digits, "_" or "-"`;
+  }
+  if (r.name !== undefined && (typeof r.name !== 'string' || r.name.length === 0 || r.name.length > 255)) {
+    return `File ref ${label}: name must be a non-empty string of at most 255 characters`;
+  }
+  if (r.contentType !== undefined && (typeof r.contentType !== 'string' || !CONTENT_TYPE.test(r.contentType))) {
+    return `File ref ${label}: contentType must be a media type such as application/pdf`;
+  }
+  if (r.expiresIn !== undefined
+    && (typeof r.expiresIn !== 'number' || !Number.isInteger(r.expiresIn) || r.expiresIn < 1)) {
+    return `File ref ${label}: expiresIn must be a positive whole number of seconds`;
+  }
+  return null;
+}
+
+/**
+ * Fail-loud structural validation for file refs, run before the escalation
+ * row is written on every creation path. Dependency-free: the `conditional`
+ * fold runs workflow-side.
+ */
+export function assertFileRefs(refs: unknown): asserts refs is EscalationFileRef[] {
+  if (!Array.isArray(refs)) {
+    throw new Error('files must be an array of { path, as } refs');
+  }
+  if (refs.length > ESCALATION_FILE_REFS_MAX) {
+    throw new Error(`files holds ${refs.length} refs; an escalation carries at most ${ESCALATION_FILE_REFS_MAX}`);
+  }
+  const seen = new Set<string>();
+  for (const ref of refs) {
+    const problem = fileRefProblem(ref);
+    if (problem) throw new Error(problem);
+    const alias = (ref as EscalationFileRef).as;
+    if (seen.has(alias)) throw new Error(`File ref ${alias}: "as" names more than one file`);
+    seen.add(alias);
   }
 }
 

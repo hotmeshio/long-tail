@@ -10,6 +10,7 @@ import { useScanEnabled } from '../../../hooks/useScanInput';
 import {
   useEscalation,
   useEscalationLookups,
+  useEscalationFiles,
   useClaimEscalation,
   useRosterScan,
   useResolveEscalation,
@@ -129,14 +130,10 @@ function EscalationDetailView({ id }: { id: string }) {
   // Versioned knowledge lookups pinned on the row's envelope — one immutable
   // batch fetch, folded into the form context as the `lookup.*` domain.
   // Cascade levels resolve locally from this data; no network during edits.
-  const hasLookupRefs = useMemo(() => {
-    if (!esc?.envelope) return false;
-    try {
-      const parsed = JSON.parse(esc.envelope);
-      return Array.isArray(parsed?.lookups) && parsed.lookups.length > 0;
-    } catch {
-      return false;
-    }
+  const { hasLookupRefs, hasFileRefs } = useMemo(() => {
+    const parsed = safeParse(esc?.envelope) as Record<string, unknown> | null;
+    const has = (key: string) => Array.isArray(parsed?.[key]) && (parsed?.[key] as unknown[]).length > 0;
+    return { hasLookupRefs: has('lookups'), hasFileRefs: has('files') };
   }, [esc?.envelope]);
   const { data: lookupData } = useEscalationLookups(id, hasLookupRefs);
   const lookupCtx = useMemo(() => {
@@ -145,6 +142,13 @@ function EscalationDetailView({ id }: { id: string }) {
       lookupData.lookups.filter((l) => !l.missing).map((l) => [l.as ?? l.key, l.data]),
     );
   }, [lookupData]);
+  // Stored files the row names, signed for this reader: the `file.*` domain.
+  // The claim re-signs them, so a claimant's links cover the claim.
+  const { data: fileData } = useEscalationFiles(id, hasFileRefs);
+  const fileCtx = useMemo(() => {
+    if (!fileData?.files?.length) return null;
+    return Object.fromEntries(fileData.files.filter((f) => f.as).map((f) => [f.as, f]));
+  }, [fileData]);
   const claim = useClaimEscalation();
   const rosterScan = useRosterScan();
   const resolve = useResolveEscalation();
@@ -221,7 +225,7 @@ function EscalationDetailView({ id }: { id: string }) {
       const payload = JSON.parse(json) as Record<string, unknown>;
       const schema = payload._form_schema as Record<string, unknown> | undefined;
       if (!schema) { setFormErrors([]); return; }
-      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc, lookupCtx, rosterCtx)));
+      setFormErrors(validateResolverForm(schema, payload, buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx)));
     } catch { /* leave errors unchanged on parse failure */ }
   }, [json, submitAttempted, esc]);
   // Schema resolution, most specific first:
@@ -249,12 +253,12 @@ function EscalationDetailView({ id }: { id: string }) {
   const formValues = useMemo(() => formValuesOf(json), [json]);
   const rosters = useRosters(
     effectiveSchema as Record<string, unknown> | null,
-    esc ? { ...buildShowIfContext(esc, lookupCtx), resolver: formValues, input: formValues } : undefined,
+    esc ? { ...buildShowIfContext(esc, lookupCtx, null, fileCtx), resolver: formValues, input: formValues } : undefined,
   );
   const rosterCtx = rosterContext(rosters);
 
   const submitGuardDef = readSubmitGuard(effectiveSchema as Record<string, unknown> | null);
-  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc, lookupCtx, rosterCtx) : undefined, rosters);
+  const submitGuard = useSubmitGuard(submitGuardDef, esc ? buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx) : undefined, rosters);
 
   // Initialize json from the form exactly once. Fields are seeded in priority order:
   // metadata (facts stamped at enqueue) → envelope.formDefaults (workflow overrides)
@@ -410,7 +414,7 @@ function EscalationDetailView({ id }: { id: string }) {
       && (esc.assigned_to === effectiveActorId || isReadOnlyLogin(myRoles)),
     json,
     onJsonChange: setJson,
-    context: esc ? buildShowIfContext(esc, lookupCtx, rosterCtx) : undefined,
+    context: esc ? buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx) : undefined,
     onScanSubmit: (next) => scanSubmitRef.current(next),
     onRosterScan: (field, code) => new Promise((settle) => {
       guardEmbedWrite('check this off', async () => {
@@ -525,7 +529,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const resolveDoneDest = (): string | null => {
     const tmpl = readTransitionDone(effectiveSchema as Record<string, unknown> | null);
     if (!tmpl) return null;
-    return interpolateHelp(tmpl, buildShowIfContext(esc, lookupCtx, rosterCtx)) || null;
+    return interpolateHelp(tmpl, buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx)) || null;
   };
 
   // Navigate to a resolved destination — internal path in-app, else external —
@@ -633,7 +637,7 @@ function EscalationDetailView({ id }: { id: string }) {
     // parent with its children to work; the auto-resolve effect closes it once
     // they clear (pair submitOnClaim with autoResolveWhenEmpty for full flow).
     if (submitGuard.blocked) return;
-    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx));
     if (result.parseError) return; // seeded form is malformed — leave it claimed
     if (result.errors.length > 0) {
       setSubmitAttempted(true);
@@ -662,14 +666,14 @@ function EscalationDetailView({ id }: { id: string }) {
   // clears. Revalidates first — if the parent's own form is incomplete, leave it
   // for the person rather than auto-closing an invalid record.
   autoResolveActionRef.current = () => {
-    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx));
+    const result = buildResolverPayload(json, buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx));
     if (result.parseError || result.errors.length > 0) return;
     handleResolve(result.payload!);
   };
 
   scanSubmitRef.current = (nextJson: string) => {
     if (submitGuard.blocked) return;
-    const result = buildResolverPayload(nextJson, buildShowIfContext(esc, lookupCtx, rosterCtx));
+    const result = buildResolverPayload(nextJson, buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx));
     if (result.parseError) return;
     if (result.errors.length > 0) {
       setSubmitAttempted(true);
@@ -842,6 +846,7 @@ function EscalationDetailView({ id }: { id: string }) {
                 activeView={activeView}
                 lookup={lookupCtx}
                 roster={rosterCtx}
+                file={fileCtx}
                 metadataFormSchema={metadataFormSchema}
                 effectiveSchema={effectiveSchema as Record<string, unknown> | null}
                 json={json}
@@ -873,7 +878,7 @@ function EscalationDetailView({ id }: { id: string }) {
         )}
 
         {!isIframeMode && <EscalationActionBar
-          escalationContext={buildShowIfContext(esc, lookupCtx, rosterCtx)}
+          escalationContext={buildShowIfContext(esc, lookupCtx, rosterCtx, fileCtx)}
           mode={actionBarMode}
           activeView={activeView}
           onActiveViewChange={setActiveView}

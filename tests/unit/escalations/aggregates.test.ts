@@ -144,3 +144,21 @@ describe('timelineByFacet', () => {
     expect(result.overflow).toBe(false);
   });
 });
+
+describe('aggregateByFacets: resolved rows', () => {
+  it('maps the bucket and the count onto each group', async () => {
+    stubQueries([{ bucket: new Date('2026-10-05T00:00:00Z'), facet_review_outcome: 'corrected', count: 4, sample_count: 4 }]);
+    const result = await aggregateByFacets({
+      query: { role: 'intake-verifier' },
+      groupBy: { facets: ['review_outcome'] },
+      measure: { kind: 'resolved', window: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' }, bucket: 'week' },
+    });
+    expect(result.groups).toEqual([{
+      bucket: '2026-10-05T00:00:00.000Z',
+      facets: { review_outcome: 'corrected' },
+      count: 4,
+      sampleCount: 4,
+    }]);
+  });
+});
+

@@ -5,9 +5,11 @@ import {
   ESCALATION_METADATA_KEYS,
   ESCALATION_ENVELOPE_KEYS,
   assertLookupRefs,
+  assertFileRefs,
   type AccumulateConfig,
   type AccumulatorResult,
   type EscalationLookupRef,
+  type EscalationFileRef,
 } from '../../types/escalation';
 import * as interceptorActivities from '../interceptor/activities';
 
@@ -20,10 +22,11 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
  * role form version (lt_role_schemas) the resolve UI renders; `lookups` names
  * the knowledge entries the form may read (the `lookup.*` context domain, see
  * docs/hitl/lookups.md), each pinned to an edition or following the current
- * one. Both are LITERALS the workflow author sets, folded before the config
- * reaches the engine:
+ * one; `files` names the stored files the form shows (the `file.*` context
+ * domain, see docs/hitl/files.md). All are set by the workflow author and
+ * folded before the config reaches the engine:
  * schemaVersion into the GIN-indexed metadata (a queryable facet), lookups
- * into the unindexed envelope (form plumbing, never a facet). Folding is a
+ * and files into the unindexed envelope (form plumbing, never a facet). Folding is a
  * pure transform — no query, no activity — so a pinned `conditional` costs
  * exactly what an unpinned one does. Omit `schemaVersion` and the resolve UI
  * renders the role's latest form when the escalation is fetched.
@@ -31,30 +34,35 @@ const LT_ACTIVITY_QUEUE = 'lt-interceptor';
 export type ConditionEscalationConfig = Types.ConditionQueueConfig & {
   schemaVersion?: number;
   lookups?: EscalationLookupRef[];
+  files?: EscalationFileRef[];
 };
 
 /**
  * Fold the sugar before the config reaches the engine: schemaVersion into the
- * GIN-indexed metadata (it is a queryable pin), lookups into the unindexed
- * envelope (they are form plumbing, never a facet). Everything else passes
- * through.
+ * GIN-indexed metadata (it is a queryable pin), lookups and files into the
+ * unindexed envelope (they are form plumbing, never a facet). Everything
+ * else passes through.
  */
 function toEngineConfig(
   escalation?: ConditionEscalationConfig,
 ): Types.ConditionQueueConfig | undefined {
-  if (!escalation || (escalation.schemaVersion == null && escalation.lookups == null)) {
+  if (!escalation || (escalation.schemaVersion == null && escalation.lookups == null && escalation.files == null)) {
     return escalation;
   }
-  const { schemaVersion, lookups, ...config } = escalation;
+  const { schemaVersion, lookups, files, ...config } = escalation;
   if (lookups != null) assertLookupRefs(lookups);
+  if (files != null) assertFileRefs(files);
+  const envelope = {
+    ...config.envelope,
+    ...(lookups != null ? { [ESCALATION_ENVELOPE_KEYS.LOOKUPS]: lookups } : {}),
+    ...(files != null ? { [ESCALATION_ENVELOPE_KEYS.FILES]: files } : {}),
+  };
   return {
     ...config,
     ...(schemaVersion != null
       ? { metadata: { ...config.metadata, [ESCALATION_METADATA_KEYS.SCHEMA_VERSION]: schemaVersion } }
       : {}),
-    ...(lookups != null
-      ? { envelope: { ...config.envelope, [ESCALATION_ENVELOPE_KEYS.LOOKUPS]: lookups } }
-      : {}),
+    ...(lookups != null || files != null ? { envelope } : {}),
   };
 }
 
@@ -112,6 +120,20 @@ function toEngineConfig(
  *   role: 'catalog-picker',
  *   description: instructions,
  *   lookups: [{ domain: 'catalog', key: 'materials' }],
+ * });
+ * ```
+ *
+ * **Stored files: documents the form shows.** Each ref names an object in
+ * file storage and the address the form reads it at (`file.<as>`). The
+ * resolve UI fetches time-limited signed links when the page opens and again
+ * on claim; a `document` widget renders PDFs and images inline.
+ *
+ * ```typescript
+ * const decision = await conditional<IntakeReviewV1>(signalId, {
+ *   role: 'intake-verifier',
+ *   description: instructions,
+ *   envelope: { formDefaults: extracted, confidence: scores },
+ *   files: [{ path: `referrals/${referralId}.pdf`, as: 'referral' }],
  * });
  * ```
  *

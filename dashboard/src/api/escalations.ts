@@ -253,6 +253,37 @@ export function useEscalationLookups(id: string, enabled: boolean) {
   });
 }
 
+/** One stored file an escalation names, signed for this reader. */
+export interface EscalationFile {
+  as: string;
+  path: string;
+  name: string;
+  contentType: string;
+  url?: string;
+  expiresAt?: string;
+  error?: string;
+}
+
+export const escalationFilesKey = (id: string) => ['escalations', id, 'files'] as const;
+
+/**
+ * Time-limited links to the escalation's stored files. Signed again each time
+ * the detail page mounts and on claim (the claim resets every escalation
+ * query), so a claimant's links cover the claim. Never on focus or a timer;
+ * a viewer that finds its link expired asks again.
+ */
+export function useEscalationFiles(id: string, enabled: boolean) {
+  return useQuery<{ files: EscalationFile[] }>({
+    queryKey: escalationFilesKey(id),
+    queryFn: () => apiFetch(`/escalations/${id}/files`),
+    enabled: !!id && enabled,
+    // A re-sign keeps the last links in view, so an open document stays put.
+    placeholderData: (previous) => previous,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useClaimEscalation() {
   const queryClient = useQueryClient();
   return useMutation({

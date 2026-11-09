@@ -15,6 +15,23 @@ export { registerLT, createLTInterceptor } from './services/interceptor';
 export { createLTActivityInterceptor } from './services/interceptor/activity-interceptor';
 export { executeLT } from './services/orchestrator';
 export { conditional, conditionLT, conditionalAccumulator } from './services/orchestrator/condition';
+export {
+  readConfidenceSpec,
+  buildFormReview,
+  summarizeReview,
+  differsFromProposal,
+  trancheFor,
+  CONFIDENCE_TONES,
+  type ConfidenceSpec,
+  type ConfidenceTranche,
+  type FieldReview,
+} from './shared/form-validation/x-lt-confidence';
+export {
+  buildReviewFacets,
+  REVIEW_FACET_KEYS,
+  REVIEW_OUTCOMES,
+  type ReviewFacets,
+} from './shared/form-validation/x-lt-confidence-facets';
 export type { ConditionEscalationConfig, ConditionAccumulatorConfig } from './services/orchestrator/condition';
 export type { ExecuteLTOptions } from './services/orchestrator/types';
 export { JwtAuthAdapter, createAuthMiddleware, requireAuth, requireAdmin, signToken, setAuthAdapter } from './modules/auth';

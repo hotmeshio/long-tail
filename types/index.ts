@@ -26,6 +26,7 @@ export type {
   AccumulateItemOutcome,
   RemoveAccumulatedItemOutcome,
   EscalationLookupRef,
+  EscalationFileRef,
 } from './escalation';
 
 export {
@@ -37,6 +38,9 @@ export {
   ACCUMULATOR_RESULT_KEYS,
   LOOKUP_VERSION_CURRENT,
   isCurrentLookupRef,
+  ESCALATION_ENVELOPE_KEYS,
+  ESCALATION_FILE_REFS_MAX,
+  assertFileRefs,
 } from './escalation';
 
 export type {
@@ -73,10 +77,12 @@ export type {
   TimelineByFacetInput,
   TimelineInterval,
   TimelineByFacetResult,
+  ResolvedBucket,
 } from './analytics';
 
 export {
   GROUPABLE_COLUMNS,
+  RESOLVED_BUCKETS,
 } from './analytics';
 
 export type {

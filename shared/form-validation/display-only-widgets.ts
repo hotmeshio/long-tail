@@ -1,7 +1,7 @@
 /**
  * Widgets that render from the escalation context and produce no answer of
- * their own: navigation links, embedded records and lists, and invoke
- * controls. Their form slot exists only to place them in the layout, so
+ * their own: navigation links, embedded records and lists, invoke controls,
+ * and stored documents. Their form slot exists only to place them in the layout, so
  * the payload mapper drops them and the server never sees a value.
  */
 export const DISPLAY_ONLY_WIDGET_NAMES = {
@@ -10,6 +10,7 @@ export const DISPLAY_ONLY_WIDGET_NAMES = {
   ESCALATION_LIST: 'escalation-list',
   INVOKE: 'invoke',
   ROSTER: 'roster',
+  DOCUMENT: 'document',
 } as const;
 
 export const DISPLAY_ONLY_WIDGETS: ReadonlySet<string> = new Set(Object.values(DISPLAY_ONLY_WIDGET_NAMES));

@@ -6,8 +6,10 @@ import { loggerRegistry } from '../../lib/logger';
 import { callerAuth, type ToolCallExtra } from './caller-auth';
 import { registeredToolCount } from '../../services/mcp/registered-tools';
 import { registerEscalationLookupsTool } from './human-queue-lookups';
+import { registerEscalationFilesTool } from './human-queue-files';
 import * as escalationService from '../../services/escalation';
-import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
+import { assessResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
+import type { ReviewFacets } from '../../shared/form-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import { ESCALATION_METADATA_KEYS } from '../../types/escalation';
 import {
@@ -24,30 +26,40 @@ import {
 
 let server: McpServer | null = null;
 
+type ToolRejection = { content: Array<{ type: 'text'; text: string }>; isError: true };
+
 /**
  * Schema enforcement for the MCP resolve tools — the same gate the HTTP
  * surfaces run (agents and the sim workforce submit through these tools, so
  * they get the same contract and the same canonical violation body). Costs
  * zero reads when no role enforces (cached set); otherwise one row read.
- * Returns the MCP error content when the payload is rejected, null to proceed.
+ * Returns the MCP error content when the payload is rejected, and the review
+ * facets a passing single-row resolve stamps onto the row.
  */
+async function assessResolveToolPayload(
+  escalationId: string,
+  payload: Record<string, any>,
+): Promise<{ rejected: ToolRejection | null; facets: ReviewFacets | null }> {
+  const enforcing = await getEnforcingRoles();
+  if (enforcing.size === 0) return { rejected: null, facets: null };
+  const escalation = await escalationService.getEscalation(escalationId);
+  if (!escalation || !enforcing.has(escalation.role)) return { rejected: null, facets: null };
+  const { violation, facets } = await assessResolverPayload(escalation, payload);
+  if (!violation) return { rejected: null, facets };
+  return {
+    rejected: {
+      content: [{ type: 'text' as const, text: JSON.stringify(toValidationErrorBody(violation)) }],
+      isError: true,
+    },
+    facets: null,
+  };
+}
+
 async function checkResolveToolPayload(
   escalationId: string,
   payload: Record<string, any>,
-): Promise<{ content: Array<{ type: 'text'; text: string }>; isError: true } | null> {
-  const enforcing = await getEnforcingRoles();
-  if (enforcing.size === 0) return null;
-  const escalation = await escalationService.getEscalation(escalationId);
-  if (!escalation || !enforcing.has(escalation.role)) return null;
-  const report = await checkResolverPayload(escalation, payload);
-  if (!report) return null;
-  return {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify(toValidationErrorBody(report)),
-    }],
-    isError: true,
-  };
+): Promise<ToolRejection | null> {
+  return (await assessResolveToolPayload(escalationId, payload)).rejected;
 }
 
 /**
@@ -57,6 +69,7 @@ async function checkResolveToolPayload(
  * - escalate_to_human — create a new escalation (fire-and-forget)
  * - check_resolution — check escalation status
  * - get_escalation_lookups — read the knowledge editions pinned on an escalation the caller may read
+ * - get_escalation_files: sign the stored files an escalation the caller may read names
  * - get_available_work — list available escalations by role
  * - claim_and_resolve — claim + resolve in one step
  * - resolve_escalation — resolve an already-claimed escalation
@@ -163,6 +176,7 @@ export async function createHumanQueueServer(options?: {
   );
 
   registerEscalationLookupsTool(server);
+  registerEscalationFilesTool(server);
 
   // ── get_available_work ──────────────────────────────────────────────
   (server as any).registerTool(
@@ -205,7 +219,7 @@ export async function createHumanQueueServer(options?: {
     },
     async (args: z.infer<typeof claimAndResolveSchema>) => {
       // Validate BEFORE claiming — a rejected payload must never strand a claim.
-      const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+      const { rejected, facets } = await assessResolveToolPayload(args.escalation_id, args.payload);
       if (rejected) return rejected;
 
       const claimed = await escalationService.claimEscalation(
@@ -225,6 +239,7 @@ export async function createHumanQueueServer(options?: {
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
+        facets ?? undefined,
       );
       if (!resolved) {
         return {
@@ -257,12 +272,13 @@ export async function createHumanQueueServer(options?: {
       inputSchema: resolveEscalationSchema,
     },
     async (args: z.infer<typeof resolveEscalationSchema>) => {
-      const rejected = await checkResolveToolPayload(args.escalation_id, args.payload);
+      const { rejected, facets } = await assessResolveToolPayload(args.escalation_id, args.payload);
       if (rejected) return rejected;
 
       const resolved = await escalationService.resolveEscalation(
         args.escalation_id,
         args.payload,
+        facets ?? undefined,
       );
       if (!resolved) {
         return {

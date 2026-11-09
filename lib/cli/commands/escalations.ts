@@ -193,6 +193,7 @@ export async function claimByFacets(opts: { role: string; facets?: string; limit
 // --- Analytics commands -------------------------------------------------------
 
 const AGG_COLUMNS = [
+  { key: 'bucket', label: 'Bucket', width: 12, format: (v: any) => (v ? String(v).slice(0, 10) : '') },
   { key: 'state', label: 'State', width: 16 },
   { key: 'role', label: 'Role', width: 16 },
   { key: 'subtype', label: 'Subtype', width: 16 },
@@ -215,7 +216,7 @@ export async function aggregateByFacets(opts: {
   role?: string; roles?: string; entity?: string; facets?: string; exists?: string;
   prefix?: string; anyOf?: string;
   groupColumns?: string; groupFacets?: string; groupState?: boolean;
-  asOf?: string; window?: string; distinctBy?: string; liveStatuses?: string;
+  asOf?: string; window?: string; resolved?: string; bucket?: string; distinctBy?: string; liveStatuses?: string;
   orderBy?: string; limit?: string; offset?: string; json?: boolean;
 }): Promise<void> {
   const query: any = {};
@@ -230,10 +231,15 @@ export async function aggregateByFacets(opts: {
   if (opts.groupColumns) groupBy.columns = opts.groupColumns.split(',').map((s) => s.trim());
   if (opts.groupFacets) groupBy.facets = opts.groupFacets.split(',').map((s) => s.trim());
   if (opts.groupState) groupBy.state = true;
-  // --window switches the measure to dwell; otherwise membership (at --as-of, default now).
-  const measure: any = opts.window
-    ? { kind: 'dwell', window: parseJsonOption('--window', opts.window) }
-    : { kind: 'membership', ...(opts.asOf ? { asOf: opts.asOf } : {}) };
+  // --resolved counts rows resolved in a window, --window measures dwell;
+  // otherwise membership (at --as-of, default now).
+  if (opts.resolved && opts.window) throw new Error('Use one of --resolved (rows resolved) or --window (dwell)');
+  if (opts.bucket && !opts.resolved) throw new Error('--bucket applies to --resolved');
+  const measure: any = opts.resolved
+    ? { kind: 'resolved', window: parseJsonOption('--resolved', opts.resolved), ...(opts.bucket ? { bucket: opts.bucket } : {}) }
+    : opts.window
+      ? { kind: 'dwell', window: parseJsonOption('--window', opts.window) }
+      : { kind: 'membership', ...(opts.asOf ? { asOf: opts.asOf } : {}) };
   const body: any = { query, groupBy, measure };
   if (opts.distinctBy) body.distinctBy = opts.distinctBy;
   if (opts.liveStatuses) body.liveStatuses = opts.liveStatuses.split(',').map((s) => s.trim());

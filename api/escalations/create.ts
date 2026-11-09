@@ -2,7 +2,8 @@ import { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
 import { compileSchemaValidator, formatValidationErrors } from '../../services/role/schema-validator';
-import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
+import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs, assertFileRefs } from '../../types/escalation';
+import { mayBuild } from '../../modules/capabilities';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 
@@ -71,15 +72,20 @@ export async function createEscalation(
     // form at fetch time.
     const metadata = input.metadata ?? {};
 
-    // Lookup refs ride the envelope under a reserved key with a fixed
-    // contract: version required — a ref pins an immutable knowledge edition,
-    // never a moving target.
+    // Lookup and file refs ride the envelope under reserved keys with fixed
+    // contracts, checked before the row exists.
+    let carriesFiles = false;
     if (input.envelope) {
       try {
         const envelopeObj = JSON.parse(input.envelope);
-        if (envelopeObj && typeof envelopeObj === 'object'
-          && envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS] !== undefined) {
-          assertLookupRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+        if (envelopeObj && typeof envelopeObj === 'object') {
+          if (envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS] !== undefined) {
+            assertLookupRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+          }
+          if (envelopeObj[ESCALATION_ENVELOPE_KEYS.FILES] !== undefined) {
+            assertFileRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.FILES]);
+            carriesFiles = true;
+          }
         }
       } catch (refErr: any) {
         if (refErr instanceof SyntaxError) {
@@ -87,6 +93,12 @@ export async function createEscalation(
         }
         return { status: 400, error: refErr.message };
       }
+    }
+
+    // A file ref grants every reader of the row a link to that object, so
+    // naming one takes the same authority as reading storage directly.
+    if (carriesFiles && !(await mayBuild(auth))) {
+      return { status: 403, error: 'Referencing stored files takes builder access (superadmin or engineer)' };
     }
 
     const metadataSchema = await roleService.getRoleMetadataSchema(role);

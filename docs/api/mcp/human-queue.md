@@ -13,7 +13,7 @@ Built-in escalation and human queue management. Exposes the escalation API as MC
 
 These tools act with full authority. At `/mcp` they are listed for superadmin accounts only. Other accounts work the queue through the role-checked escalation tools on [long-tail-admin](admin.md).
 
-`get_escalation_lookups` is listed for every account. It runs as the caller, with the read check `GET /api/escalations/:id/lookups` runs.
+`get_escalation_lookups` and `get_escalation_files` are listed for every account. Each runs as the caller, with the read check its REST route runs.
 
 ## Compile Hints
 
@@ -70,6 +70,22 @@ Any caller who may read the escalation may call it: a superadmin, a member of th
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | escalation_id | string | Yes | The escalation whose pinned knowledge lookups to resolve |
+
+### get_escalation_files
+
+Sign the stored files an escalation names (`envelope.files`). Each ref answers with `as`, `path`, `name`, `contentType`, a time-limited `url` and its `expiresAt`; a ref that cannot be signed answers with `error`. A link stretches to cover the caller's own live claim. See [files.md](../../hitl/files.md).
+
+Any caller who may read the escalation may call it, under the same read check as `get_escalation_lookups`. An internal call reads as lt-system.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| escalation_id | string | Yes | The escalation whose stored files to sign |
 
 ### get_available_work
 

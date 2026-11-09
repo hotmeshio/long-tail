@@ -1,11 +1,23 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent, type ReactNode } from 'react';
 import { LockedFormFrame } from './LockedFormFrame';
 import { HelpCircle } from 'lucide-react';
 import { evaluateShowIf, isHiddenField, isHiddenIfEmpty, type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateField } from '../../../lib/field-validator';
+import { DISPLAY_ONLY_WIDGET_NAMES } from '../../../lib/display-only-widgets';
+import { buildFormReview, readConfidenceSpec, summarizeReview } from '../../../lib/x-lt-confidence';
 import { FieldRow } from './FieldRow';
+import { FieldReview } from './FieldReview';
+import { ReviewLegend } from './ReviewLegend';
+import { formatReviewValue } from './review-value';
 import { SectionGroup } from './SectionGroup';
+import { DocumentPaneContext } from './document-pane';
 import { type FormEntry, type JsonValue } from './form-cells';
+
+/** `x-lt-layout: "split"`: documents in a pane beside the fields they verify. */
+export const SPLIT_LAYOUT = 'split';
+
+/** Clicks inside a live region of a locked form stay there, not on the claim nudge. */
+const keepClick = (e: MouseEvent) => e.stopPropagation();
 
 /**
  * Renders a JSON object as an editable form with typed inputs.
@@ -127,6 +139,21 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
 
   const requiredFields = new Set(formSchema?.required as string[] ?? []);
   const layout = formSchema?.['x-lt-layout'] as string | undefined;
+  const isDocumentField = (key: string) =>
+    (formSchema?.properties?.[key] as Record<string, unknown> | undefined)?.['x-lt-widget'] === DISPLAY_ONLY_WIDGET_NAMES.DOCUMENT;
+  const isSplit = layout === SPLIT_LAYOUT && entries.some(([key]) => isDocumentField(key));
+  const paneEntries = isSplit ? entries.filter(([key]) => isDocumentField(key)) : [];
+  const fieldEntries = isSplit ? entries.filter(([key]) => !isDocumentField(key)) : entries;
+
+  // Model review: proposals and scores from the envelope, against the live
+  // answers (or, on a resolved row, the answers submitted).
+  const confidence = readConfidenceSpec(formSchema);
+  const review = confidence && formSchema
+    ? buildFormReview(confidence, formSchema, liveCtx as Record<string, unknown>, data as Record<string, unknown>)
+    : null;
+  const shownKeys = entries.map(([key]) => key);
+  const reviewSummary = confidence && review ? summarizeReview(confidence, review, shownKeys) : null;
+  const proposedCount = review ? shownKeys.filter((key) => review[key]?.hasProposal).length : 0;
   const schemaTitle = formSchema?.title as string | undefined;
   const schemaDescription = formSchema?.description as string | undefined;
   const hasAuthoredHelp =
@@ -136,7 +163,7 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   // Fields without x-lt-section or with an empty value form an unnamed group.
   type Section = { name: string | null; entries: FormEntry[] };
   const sectionGroups: Section[] = [];
-  for (const entry of entries) {
+  for (const entry of fieldEntries) {
     const [key] = entry;
     const fieldSchema = formSchema?.properties?.[key] as Record<string, unknown> | undefined;
     const sectionName = (fieldSchema?.['x-lt-section'] as string | undefined)?.trim() || null;
@@ -156,40 +183,90 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
     const isTouched = touched.has(key) || !!submitAttempted;
 
     const error = validateField(val, fieldSchema, isReq, isTouched, liveCtx as Record<string, unknown>);
+    // A locked form locks each field; a document stays readable and pageable.
+    const isLive = isDocumentField(key);
+    const locked = !!disabled && !isLive;
+    const fieldReview = review?.[key];
+
+    const row = (
+      <FieldRow
+        fieldKey={key}
+        value={val}
+        onChange={(v) => updateField(key, v)}
+        onBlur={() => markTouched(key)}
+        schema={formSchema}
+        isRequired={isReq}
+        isReadOnly={isReadOnly}
+        error={error}
+        escalationContext={liveCtx}
+        submitAttempted={!!submitAttempted}
+      />
+    );
 
     return (
       <div
         key={key}
-        className={`animate-[field-enter_0.2s_ease-out] ${layout === 'two-column' && span >= 2 ? 'col-span-full' : ''}`}
+        className={`animate-[field-enter_0.2s_ease-out] ${layout === 'two-column' && span >= 2 ? 'col-span-full' : ''} ${locked ? 'pointer-events-none' : ''}`}
+        inert={locked || undefined}
+        onClick={disabled && isLive ? keepClick : undefined}
       >
-        <FieldRow
-          fieldKey={key}
-          value={val}
-          onChange={(v) => updateField(key, v)}
-          onBlur={() => markTouched(key)}
-          schema={formSchema}
-          isRequired={isReq}
-          isReadOnly={isReadOnly}
-          error={error}
-          escalationContext={liveCtx}
-          submitAttempted={!!submitAttempted}
-        />
+        {fieldReview ? (
+          <FieldReview
+            fieldKey={key}
+            review={fieldReview}
+            proposedText={formatReviewValue(fieldReview.proposed, fieldSchema, liveCtx as Record<string, unknown>)}
+            currentText={formatReviewValue(val, fieldSchema, liveCtx as Record<string, unknown>)}
+            locked={!!disabled || isReadOnly}
+            onRestore={() => updateField(key, (fieldReview.proposed ?? '') as JsonValue)}
+          >
+            {row}
+          </FieldReview>
+        ) : row}
       </div>
     );
   };
 
-  // A locked form stays fully readable — no fade. `inert` (not just
-  // pointer-events) locks the body for keyboard and assistive-tech users —
-  // fields leave the tab order entirely — and makes it transparent to hit
-  // testing, so a click anywhere on the locked form lands on the frame,
-  // which reports the interaction and carries the cursor hint.
-  // max-w-form: the form holds a readable measure on any monitor.
+  const sections = (
+    <div className="space-y-8">
+      {sectionGroups.map((group, i) => (
+        <SectionGroup
+          key={group.name ?? `__s${i}`}
+          name={group.name}
+          entries={group.entries}
+          formSchema={formSchema}
+          layout={isSplit ? undefined : layout}
+          renderField={renderField}
+        />
+      ))}
+    </div>
+  );
+
+  // Split: the pane holds the documents and stays in view while the fields
+  // beside it scroll; below the split width the pane stacks above them.
+  const content = isSplit ? (
+    <div className="@container">
+      <div className="grid grid-cols-1 @split:grid-cols-2 gap-x-col-gap gap-y-8 items-start">
+        <DocumentPaneContext.Provider value={{ fill: paneEntries.length === 1 }}>
+          <div className="@split:sticky @split:top-0 @split:max-h-[calc(100dvh-10rem)] @split:overflow-y-auto space-y-12">
+            {paneEntries.map((entry) => renderField(entry))}
+          </div>
+        </DocumentPaneContext.Provider>
+        {sections}
+      </div>
+    </div>
+  ) : sections;
+
+  // A locked form stays fully readable, with no fade. `inert` (not just
+  // pointer-events) locks each field for keyboard and assistive-tech users,
+  // so fields leave the tab order entirely, and makes them transparent to hit
+  // testing, so a click on a locked field lands on the frame, which reports
+  // the interaction and carries the cursor hint. Documents and the review
+  // key stay live: reading is not editing.
+  // max-w-form: the form holds a readable measure on any monitor; a split
+  // form holds two.
   const body = (
-      <div
-        className={disabled ? 'pointer-events-none' : undefined}
-        inert={disabled || undefined}
-        aria-disabled={disabled || undefined}
-      >
+      <div aria-disabled={disabled || undefined}>
+      <div className={disabled ? 'pointer-events-none' : undefined} inert={disabled || undefined}>
       {schemaTitle && (
         <div className="mb-1 flex items-center gap-1.5">
           <h3 className="heading-3">{schemaTitle}</h3>
@@ -209,28 +286,25 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
       {schemaDescription && (
         <p className="text-sm text-text-secondary leading-relaxed mb-6">{schemaDescription}</p>
       )}
-
-      <div className="space-y-8">
-        {sectionGroups.map((group, i) => (
-          <SectionGroup
-            key={group.name ?? `__s${i}`}
-            name={group.name}
-            entries={group.entries}
-            formSchema={formSchema}
-            layout={layout}
-            renderField={renderField}
-          />
-        ))}
       </div>
+
+      {reviewSummary && (
+        <div onClick={disabled ? keepClick : undefined}>
+          <ReviewLegend summary={reviewSummary} proposedCount={proposedCount} />
+        </div>
+      )}
+
+      {content}
       </div>
   );
 
+  const measure = isSplit ? 'max-w-[min(112rem,100%)]' : 'max-w-form';
   if (disabled) {
     return (
-      <LockedFormFrame hint={disabledHint} onLockedClick={onDisabledClick}>
+      <LockedFormFrame hint={disabledHint} onLockedClick={onDisabledClick} measure={measure}>
         {body}
       </LockedFormFrame>
     );
   }
-  return <div className="pb-8 max-w-form">{body}</div>;
+  return <div className={`pb-8 ${measure}`}>{body}</div>;
 }

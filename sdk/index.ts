@@ -110,6 +110,7 @@ export function createClient(options: LTClientOptions = {}) {
       getStationMetrics: bindAuth(escalationsApi.getStationMetrics, auth),
       get: bindAuth(escalationsApi.getEscalation, auth),
       getLookups: bindAuth(escalationsApi.getEscalationLookups, auth),
+      getFiles: bindAuth(escalationsApi.getEscalationFiles, auth),
       getByWorkflowId: escalationsApi.getEscalationsByWorkflowId,
       escalate: bindAuth(escalationsApi.escalateToRole, auth),
       claim: bindAuth(escalationsApi.claimEscalation, auth),
@@ -365,6 +366,7 @@ export function createClient(options: LTClientOptions = {}) {
       getMetadata: filesApi.getFileMetadata,
       delete: filesApi.deleteFile,
       generateSignedUrl: filesApi.generateSignedUrl,
+      upload: filesApi.uploadFile,
     },
 
     // ── Knowledge ─────────────────────────────────────────────────────────

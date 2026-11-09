@@ -14,6 +14,13 @@ describe('package root exports', () => {
     expect(source).toMatch(/export type \{[^}]*\bConditionAccumulatorConfig\b[^}]*\} from '\.\/services\/orchestrator\/condition'/);
   });
 
+  it('exports the review helpers a workflow diffs a verified payload with', () => {
+    const review = source.match(/export \{([^}]*)\} from '\.\/shared\/form-validation\/x-lt-confidence'/)?.[1] ?? '';
+    for (const name of ['readConfidenceSpec', 'buildFormReview', 'differsFromProposal', 'ConfidenceSpec']) {
+      expect(review).toContain(name);
+    }
+  });
+
   it('exports the scan config types and validators dependents declare rules with', () => {
     const scan = source.match(/export \{([^}]*)\} from '\.\/services\/scan-code'/)?.[1] ?? '';
     for (const name of ['assertValidScanScheme', 'assertValidScanSteps', 'assertValidScanIdentityRule',

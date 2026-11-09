@@ -24,7 +24,7 @@ A role is a task queue with four verbs — **search** (list/get), **claim**, **a
 
 - `read_scope` governs which escalations a member **sees** — list, `/available`, get-by-id, find-by-metadata, and stats. `self` means escalations assigned to the member (`assigned_to = user`); `all` means the whole role queue.
 - `write_scope` governs which escalations a member may **act on** — claim, resolve, cancel. `self` means only items already assigned to them; `none` is read-only.
-- Releasing, escalating and assigning by query are queue-management verbs and require `write_scope=all`. Creating a standalone escalation (`POST /api/escalations`) requires `write_scope=all` or global escalation access.
+- Releasing, escalating and assigning by query are queue-management verbs and require `write_scope=all`. Creating a standalone escalation (`POST /api/escalations`) requires `write_scope=all` or global escalation access. An envelope that names stored files (`envelope.files`) also requires builder access (superadmin or engineer).
 
 Defaults are `read_scope=all` and `write_scope=all` — the full-queue worker — so a plain `member` works the whole queue. See [Work-Surface Scope](roles.md#work-surface-scope) in the Roles API for the five member profiles and the **write ⊆ read** constraint.
 
@@ -155,6 +155,28 @@ GET /api/escalations/:id
 
 ```json
 { "error": "Escalation not found" }
+```
+
+## Get escalation files
+
+```
+GET /api/escalations/:id/files
+```
+
+Signs the stored files the row names (`envelope.files`). The refs ARE the grant: any user who may read the escalation receives time-limited links to exactly those files. A link lives for the ref's `expiresIn` (default `LT_ESCALATION_FILE_URL_TTL_SECONDS`), stretched to cover the caller's own live claim, within the configured bounds. Answers with `Cache-Control: no-store`. See [files](../../hitl/files.md).
+
+**Scope:** Enforces the same read scope as `GET /api/escalations/:id`.
+
+**Response 200:**
+
+```json
+{
+  "files": [
+    { "as": "application", "path": "intake/APP-1042/application.pdf", "name": "application.pdf",
+      "contentType": "application/pdf", "url": "https://…", "expiresAt": "2026-11-09T15:39:31.859Z" },
+    { "as": "card", "path": "scans/8f2c41", "name": "ID card", "contentType": "image/jpeg", "error": "…" }
+  ]
+}
 ```
 
 ## Get escalation lookups
@@ -1356,7 +1378,7 @@ Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), a
 POST /api/escalations/aggregate-by-facets
 ```
 
-Grouped analytics over the escalation intervals. Every escalation is one open interval `[created_at, ended_at)` — `ended_at` is the instant the row left the live set (resolved / cancelled / expired), `NULL` while live. The aggregate reads that time-series two ways: **membership** (rows — or, with `distinctBy`, distinct entities — whose interval is open at an instant; a past `asOf` reconstructs the live set at that moment) and **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it on both ends). One call replaces N per-filter count round-trips. See [escalation-analytics.md](../../escalation-analytics.md) for the full guide.
+Grouped analytics over the escalation intervals. Every escalation is one open interval `[created_at, ended_at)` — `ended_at` is the instant the row left the live set (resolved / cancelled / expired), `NULL` while live. The aggregate reads that time-series three ways: **membership** (rows — or, with `distinctBy`, distinct entities — whose interval is open at an instant; a past `asOf` reconstructs the live set at that moment), **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it on both ends), and **resolved** (rows resolved within a half-open window, optionally per UTC `day`, `week` or `month` bucket: the trend measure). One call replaces N per-filter count round-trips. See [escalation-analytics.md](../../escalation-analytics.md) for the full guide.
 
 **Request body:**
 
@@ -1364,11 +1386,11 @@ Grouped analytics over the escalation intervals. Every escalation is one open in
 |-------|------|----------|-------------|
 | `query` | `object` | yes | The filter — `role`/`roles` (or `entity`), `facets`, `anyOf` (rows carrying ANY of the given facet sets, max 200 — target an explicit entity set such as one table page), `block`, `range`, `exists`, and `prefix` (case-insensitive prefix match on facet values — the locate affordance, e.g. `{"serialNumber":"PRN-00"}`). `entity` names an entity facet key and resolves server-side to every role declaring it as its `entity_facet` — the entity's **system**; mutually exclusive with `role`/`roles`, and it implies `exists: [entity]` so stray rows without the key stay out |
 | `groupBy` | `object` | yes | Group keys — `columns` (whitelisted: `role`, `subtype`, `status`), `facets` (metadata keys, projected as text; `NULL` group key when absent), and `state` (group by the derived state label: each role contributes per its `entity_state_source` — its subtypes or itself; mutually exclusive with `states[]`). An empty object yields one total row |
-| `measure` | `object` | yes | Exactly one kind: `{ "kind": "membership", "asOf"? }` (default anchor: now) or `{ "kind": "dwell", "window": { "from", "to" } }` |
-| `distinctBy` | `string` | no | Membership only — count DISTINCT of this metadata facet per group (entities, not rows). Omit to count rows |
+| `measure` | `object` | yes | Exactly one kind: `{ "kind": "membership", "asOf"? }` (default anchor: now), `{ "kind": "dwell", "window": { "from", "to" } }`, or `{ "kind": "resolved", "window": { "from", "to" }, "bucket"? }` (`bucket`: `day`, `week` or `month`; requires `role`, `roles` or `entity`; window up to `LT_ANALYTICS_MAX_RESOLVED_WINDOW_DAYS`, default 366) |
+| `distinctBy` | `string` | no | Membership and resolved: count DISTINCT of this metadata facet per group (entities, not rows). Omit to count rows |
 | `states` | `array` | no | Pure labeling: tag each group with the FIRST matching `{ name, match }` entry, evaluated top-to-bottom; `match` compares grouped columns/facets. Grouping is unchanged |
 | `liveStatuses` | `string[]` | no | Statuses considered live (default `["pending"]`) |
-| `orderBy` | `array` | no | Order the RESULT groups: `{ field, direction? }` — `count`, `dwellSeconds`, `sampleCount`, a grouped column, or a grouped facet key |
+| `orderBy` | `array` | no | Order the RESULT groups: `{ field, direction? }` — `count`, `dwellSeconds`, `sampleCount`, `bucket` (bucketed resolved), a grouped column, or a grouped facet key. Bucketed resolved results default to bucket order |
 | `limit` / `offset` | `integer` | no | Result-group paging, capped at `LT_ANALYTICS_MAX_GROUPS` |
 
 The filter takes the WHAT fields only. `status`, `available`, and `jeopardy` are rejected — liveness derives from the interval, `liveStatuses`, and the measure anchor. Query-level `orderBy`/`limit`/`offset` are rejected too — order and paginate the result groups with the top-level fields.
@@ -1402,6 +1424,30 @@ The filter takes the WHAT fields only. `status`, `available`, and `jeopardy` are
 
 Adding `"facets": ["model"]` to `groupBy` slices the same bands per model value (`p1s` vs `h2s`).
 
+**Example**: weekly review outcomes per extractor version. Rows resolved on a form with [review facets](../../hitl/x-lt-confidence.md#review-facets) carry `review_outcome`; the workflow records `extractor` when it creates the row:
+
+```json
+{
+  "query": { "role": "intake-verifier" },
+  "groupBy": { "facets": ["extractor", "review_outcome"] },
+  "measure": {
+    "kind": "resolved",
+    "window": { "from": "2026-10-01T00:00:00Z", "to": "2026-11-01T00:00:00Z" },
+    "bucket": "week"
+  }
+}
+```
+
+```json
+{
+  "groups": [
+    { "bucket": "2026-09-28T00:00:00.000Z", "facets": { "extractor": "intake-extractor-v1", "review_outcome": "accepted" }, "count": 1088, "sampleCount": 1088 },
+    { "bucket": "2026-09-28T00:00:00.000Z", "facets": { "extractor": "intake-extractor-v1", "review_outcome": "corrected" }, "count": 412, "sampleCount": 412 }
+  ],
+  "overflow": false
+}
+```
+
 **Response fields (per group):**
 
 | Field | Type | Description |
@@ -1409,13 +1455,14 @@ Adding `"facets": ["model"]` to `groupBy` slices the same bands per model value 
 | `role` / `subtype` / `status` | `string` | Present iff requested in `groupBy.columns`. `status` is the row's status NOW — status history is not stored, so a past `asOf` still groups by current status |
 | `facets` | `object` | One entry per `groupBy.facets` key; `null` when the facet is absent on the underlying rows |
 | `state` | `string` | Present when `groupBy.state` derived it or a `states[]` entry matched |
-| `count` | `number` | Membership: entities (with `distinctBy`) or rows (without) |
+| `count` | `number` | Membership and resolved: entities (with `distinctBy`) or rows (without) |
+| `bucket` | `string` | Bucketed resolved: the bucket's start instant (UTC, ISO) |
 | `dwellSeconds` | `number` | Dwell: summed open-seconds within the window |
 | `sampleCount` | `number` | Underlying escalation rows contributing to the group (pre-distinct) |
 
 `overflow: true` means the group cap was hit — more groups exist beyond this page.
 
-**Response 400** — a caller-input problem: a liveness field (`status`/`available`/`jeopardy`) or `orderBy`/`limit`/`offset` on the filter; `entity` together with `role`/`roles`; `groupBy.state` together with `states[]`; an unknown status in `liveStatuses`; an empty window or one wider than `LT_ANALYTICS_MAX_WINDOW_DAYS`; a future `asOf`; a malformed facet key; a `states[]` match referencing a key the query never groups by.
+**Response 400** — a caller-input problem: a liveness field (`status`/`available`/`jeopardy`) or `orderBy`/`limit`/`offset` on the filter; `entity` together with `role`/`roles`; `groupBy.state` together with `states[]`; an unknown status in `liveStatuses`; an empty window or one wider than `LT_ANALYTICS_MAX_WINDOW_DAYS` (`LT_ANALYTICS_MAX_RESOLVED_WINDOW_DAYS` for resolved); a resolved measure without a role scope, with `liveStatuses`, or with an unknown `bucket`; a future `asOf`; a malformed facet key; a `states[]` match referencing a key the query never groups by.
 
 **Response 403** — the caller must hold `read_all` on every role in scope (for `entity`, every role in the derived system); a filter with no role scope spans every pond and requires a global principal (superadmin/admin). While `features.publicPaceBoard` stands (default on), counts-only groupings — no `groupBy.facets` keys — are readable by any login, the same data class the Pace Board exposes; a facet-keyed grouping emits facet values (entity ids) as group keys and always takes the full gate.
 

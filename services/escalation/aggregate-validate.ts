@@ -158,10 +158,14 @@ export function toInstant(value: Date | string, label: string): Date {
   return d;
 }
 
-/** Half-open [from, to): ordered, and bounded by LT_ANALYTICS_MAX_WINDOW_DAYS. */
+/** Half-open [from, to): ordered, and bounded by LT_ANALYTICS_MAX_WINDOW_DAYS (or the env var naming `maxDays`). */
 export function resolveWindow(
   window: AnalyticsWindow | undefined,
   label = 'window',
+  maxDays: { days: number; envVar: string } = {
+    days: config.LT_ANALYTICS_MAX_WINDOW_DAYS,
+    envVar: 'LT_ANALYTICS_MAX_WINDOW_DAYS',
+  },
 ): { from: Date; to: Date; nowAnchored: boolean } | null {
   if (!window) return null;
   const from = toInstant(window.from, `${label}.from`);
@@ -170,9 +174,9 @@ export function resolveWindow(
     throw new AnalyticsInputError(`${label} is empty: from must be before to`);
   }
   const spanDays = (to.getTime() - from.getTime()) / 86_400_000;
-  if (spanDays > config.LT_ANALYTICS_MAX_WINDOW_DAYS) {
+  if (spanDays > maxDays.days) {
     throw new AnalyticsInputError(
-      `${label} spans ${spanDays.toFixed(1)} days; the maximum is ${config.LT_ANALYTICS_MAX_WINDOW_DAYS} (LT_ANALYTICS_MAX_WINDOW_DAYS)`,
+      `${label} spans ${spanDays.toFixed(1)} days; the maximum is ${maxDays.days} (${maxDays.envVar})`,
     );
   }
   return { from, to, nowAnchored: to.getTime() >= Date.now() };

@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { buildFacetWhere } from './facet-sql';
+import { buildResolvedAggregate, resolveBucket } from './aggregate-resolved-sql';
 import {
   AnalyticsInputError,
   requireCleanFilter,
@@ -48,10 +49,14 @@ export interface BuiltAggregateQuery {
   facets: string[];
   /** true when grouped by the derived state label (groupBy.state). */
   stateGrouped: boolean;
-  measureKind: 'membership' | 'dwell';
+  measureKind: AggregateMeasureKind;
+  /** true when the resolved measure groups by calendar bucket. */
+  bucketed: boolean;
   /** true = the anchor touches now (short cache); false = fully past (immutable). */
   nowAnchored: boolean;
 }
+
+export type AggregateMeasureKind = 'membership' | 'dwell' | 'resolved';
 
 /** Per-role state naming, from lt_roles.entity_state_source. */
 export type StateSources = Record<string, 'role' | 'subtype'>;
@@ -86,7 +91,7 @@ function statusLiterals(statuses: string[]): string {
 }
 
 /** The projected-facet output alias; the key is FACET_KEY-validated. */
-function facetAlias(key: string): string {
+export function facetAlias(key: string): string {
   return `"facet_${key}"`;
 }
 
@@ -107,25 +112,28 @@ function overlapsAfter(liveList: string, fromParam: string): string {
 /** ORDER BY over the RESULT groups: measure aliases and grouped keys only. */
 function buildAggregateOrder(
   orderBy: AggregateOrder[] | undefined,
-  measureKind: 'membership' | 'dwell',
+  measureKind: AggregateMeasureKind,
   columns: GroupableColumn[],
   facets: string[],
   stateGrouped = false,
+  bucketed = false,
 ): string {
-  if (!orderBy || !orderBy.length) return 'sample_count DESC';
+  if (!orderBy || !orderBy.length) return bucketed ? 'bucket ASC, sample_count DESC' : 'sample_count DESC';
   const parts: string[] = [];
   for (const o of orderBy) {
     const dir = o.direction === 'desc' ? 'DESC' : 'ASC';
     if (o.field === 'state' && stateGrouped) {
       parts.push(`state_label ${dir}`);
+    } else if (o.field === 'bucket' && bucketed) {
+      parts.push(`bucket ${dir}`);
     } else if (o.field === 'count') {
-      if (measureKind !== 'membership') {
-        throw new AnalyticsInputError('orderBy "count" applies to membership; use "dwellSeconds" for dwell');
+      if (measureKind === 'dwell') {
+        throw new AnalyticsInputError('orderBy "count" applies to membership and resolved; use "dwellSeconds" for dwell');
       }
       parts.push(`"count" ${dir}`);
     } else if (o.field === 'dwellSeconds') {
       if (measureKind !== 'dwell') {
-        throw new AnalyticsInputError('orderBy "dwellSeconds" applies to dwell; use "count" for membership');
+        throw new AnalyticsInputError('orderBy "dwellSeconds" applies to dwell; use "count" for membership and resolved');
       }
       parts.push(`dwell_seconds ${dir}`);
     } else if (o.field === 'sampleCount') {
@@ -136,7 +144,7 @@ function buildAggregateOrder(
       parts.push(`${facetAlias(o.field)} ${dir} NULLS LAST`);
     } else {
       throw new AnalyticsInputError(
-        `orderBy field "${o.field}" is not a measure (count, dwellSeconds, sampleCount) or a grouped key`,
+        `orderBy field "${o.field}" is not a measure (count, dwellSeconds, sampleCount), a bucket, or a grouped key`,
       );
     }
   }
@@ -174,13 +182,14 @@ export function buildAggregateQuery(
   const { pageLimit, offset } = resolvePage(input.limit, input.offset);
 
   const measure = input.measure;
-  if (measure?.kind !== 'membership' && measure?.kind !== 'dwell') {
-    throw new AnalyticsInputError('measure.kind must be "membership" or "dwell"');
+  if (measure?.kind !== 'membership' && measure?.kind !== 'dwell' && measure?.kind !== 'resolved') {
+    throw new AnalyticsInputError('measure.kind must be "membership", "dwell" or "resolved"');
   }
+  const bucket = measure.kind === 'resolved' ? resolveBucket(measure.bucket) : null;
 
   const params: unknown[] = [];
   const where = buildFacetWhere(query, params);
-  const order = buildAggregateOrder(input.orderBy, measure.kind, columns, facets, state);
+  const order = buildAggregateOrder(input.orderBy, measure.kind, columns, facets, state, bucket !== null);
 
   const groupSelect: string[] = [];
   const groupKeys: string[] = [];
@@ -196,6 +205,21 @@ export function buildAggregateQuery(
     groupSelect.push(`(metadata->>'${key}') AS ${facetAlias(key)}`);
     groupKeys.push(facetAlias(key));
   }
+  if (measure.kind === 'resolved') {
+    if (input.liveStatuses !== undefined) {
+      throw new AnalyticsInputError('liveStatuses does not apply to the resolved measure, which counts resolved rows');
+    }
+    if (!query.role && !query.roles?.length) {
+      throw new AnalyticsInputError('the resolved measure requires a role scope: query.role, query.roles or query.entity');
+    }
+    if (input.distinctBy !== undefined) requireFacetKey(input.distinctBy, 'distinctBy');
+    const built = buildResolvedAggregate({
+      window: measure.window, bucket, where, params, groupSelect, groupKeys, order,
+      distinctBy: input.distinctBy, pageLimit, offset,
+    });
+    return { ...built, pageLimit, columns, facets, stateGrouped: state, measureKind: 'resolved', bucketed: bucket !== null };
+  }
+
   const groupBySql = groupKeys.length ? `GROUP BY ${groupKeys.join(', ')}\n` : '';
 
   if (measure.kind === 'membership') {
@@ -221,13 +245,13 @@ WHERE ${where}
   AND ${intervalPred}
 ${groupBySql}ORDER BY ${order}
 LIMIT $${params.length - 1} OFFSET $${params.length}`;
-    return { sql, params, pageLimit, columns, facets, stateGrouped: state, measureKind: 'membership', nowAnchored: asOf === null };
+    return { sql, params, pageLimit, columns, facets, stateGrouped: state, measureKind: 'membership', bucketed: false, nowAnchored: asOf === null };
   }
 
   // Dwell: clip each overlapping interval to the window, sum open-seconds.
   if (input.distinctBy !== undefined) {
     throw new AnalyticsInputError(
-      'distinctBy is a membership concept — for per-entity dwell, put the entity facet in groupBy.facets',
+      'distinctBy applies to membership and resolved; for per-entity dwell, put the entity facet in groupBy.facets',
     );
   }
   const win = resolveWindow(measure.window, 'measure.window');
@@ -256,7 +280,7 @@ SELECT ${[...groupKeys, 'SUM(EXTRACT(EPOCH FROM (e - s)))::float8 AS dwell_secon
 FROM span
 ${groupBySql}ORDER BY ${order}
 LIMIT $${params.length - 1} OFFSET $${params.length}`;
-  return { sql, params, pageLimit, columns, facets, stateGrouped: state, measureKind: 'dwell', nowAnchored: win.nowAnchored };
+  return { sql, params, pageLimit, columns, facets, stateGrouped: state, measureKind: 'dwell', bucketed: false, nowAnchored: win.nowAnchored };
 }
 
 /** Build the single-entity interval sequence, created_at-ordered, gaps preserved. */

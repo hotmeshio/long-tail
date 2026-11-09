@@ -7,7 +7,7 @@ import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deploye
 import { createClient } from '../../workers';
 import { JOB_EXPIRE_SECS, ESCALATION_BULK_RESOLVE_MAX } from '../../modules/defaults';
 import { assertReadAccess, assertWriteAccess, assertLiveClaimant, getEscalationWriteScope } from './helpers';
-import { checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
+import { assessResolverPayload, checkResolverPayload, toValidationErrorBody } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import type { ResolverSchemaViolationReport } from '../../services/escalation/resolver-validation';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
@@ -66,7 +66,7 @@ export async function resolveEscalation(
     // the escalation's resolved form schema BEFORE any resolution path runs.
     // Costs nothing when the role does not enforce (cached role set); the
     // task-fallback envelope read only happens for enforcing roles.
-    const violation = await checkResolverPayload(
+    const { violation, facets } = await assessResolverPayload(
       escalation, resolverPayload, () => reconstructEnvelope(escalation), auth.userId,
     );
     if (violation) return validationFailure(violation);
@@ -80,8 +80,10 @@ export async function resolveEscalation(
     // `resolved_by` merges into the row's GIN-indexed metadata inside the same
     // atomic resolve, making "who resolved it" `@>`-queryable without a
     // follow-up read.
+    // Review facets (x-lt-confidence facets) are computed by the server, so
+    // they win over a caller's metadata of the same name.
     const resolvedBy = await resolverIdentity(auth);
-    const outcome = { ...metadata, resolved_by: auth.userId };
+    const outcome = { ...metadata, ...facets, resolved_by: auth.userId };
 
     // `outcome` (the outcome patch) is never written separately — it rides WITH the
     // resolverPayload to whichever path performs the resolve, so it merges inside the
@@ -162,7 +164,7 @@ export async function resolveBySignalKey(
 
     // Schema enforcement — the row (envelope included) is already loaded, so
     // this costs zero extra reads beyond the cached schema.
-    const violation = await checkResolverPayload(escalation, resolverPayload, undefined, auth.userId);
+    const { violation, facets } = await assessResolverPayload(escalation, resolverPayload, undefined, auth.userId);
     if (violation) return validationFailure(violation);
 
     // The payload is delivered as the signal the parked workflow's condition()
@@ -170,7 +172,7 @@ export async function resolveBySignalKey(
     // Same provenance contract as the interactive path: identity on the signal,
     // resolved_by in the row metadata.
     const resolvedBy = await resolverIdentity(auth);
-    const outcome = { ...metadata, resolved_by: auth.userId };
+    const outcome = { ...metadata, ...facets, resolved_by: auth.userId };
     return resolveViaSignalKey(escalation, resolverPayload, outcome, undefined, resolvedBy);
   } catch (err: any) {
     return { status: 500, error: err.message };

@@ -49,6 +49,25 @@ const result = await lt.files.delete({ filePath: 'screenshots/page.png' });
 
 **Returns:** `LTApiResult<{ deleted, path }>`
 
+## upload
+
+Store bytes at a path, with their SHA-256 kept beside them. Name the digest you expect and a mismatch answers `422` with nothing stored.
+
+```typescript
+const result = await lt.files.upload({
+  path: 'intake/APP-1042/application.pdf',
+  buffer: pdfBytes,
+});
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | `string` | Yes | Storage key |
+| `buffer` | `Buffer` | Yes | The bytes |
+| `sha256` | `string` | No | The expected digest, 64 hex characters |
+
+**Returns:** `LTApiResult<{ path, size, content_type, sha256 }>`
+
 ## generateSignedUrl
 
 Generate a time-limited signed URL for sharing.
