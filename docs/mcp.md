@@ -371,7 +371,7 @@ The Human Queue is a built-in MCP server that exposes Long Tail's escalation API
 
 These tools act with full authority, so at `/mcp` they are listed for superadmin accounts. Workflows and agents inside Long Tail call them directly. An external agent with any other role works the queue through the role-checked escalation tools: `find_escalations`, `claim_escalation`, `admin_resolve_escalation`.
 
-`get_escalation_lookups` is listed for every account and runs as the caller: anyone who may read the escalation reads the knowledge editions it names, the same grant `GET /api/escalations/:id/lookups` serves.
+`get_escalation_lookups` and `get_escalation_files` are listed for every account and run as the caller: anyone who may read the escalation reads the knowledge editions it names and receives signed links to the files it names, the same grants `GET /api/escalations/:id/lookups` and `GET /api/escalations/:id/files` serve.
 
 ### Tools
 
@@ -380,6 +380,7 @@ These tools act with full authority, so at `/mcp` they are listed for superadmin
 | `escalate_to_human` | Create an escalation for human review |
 | `check_resolution` | Check whether an escalation is resolved and read its payload |
 | `get_escalation_lookups` | Read the knowledge lookups pinned on an escalation |
+| `get_escalation_files` | Sign the stored files an escalation names |
 | `get_available_work` | List pending, unclaimed escalations for a role |
 | `claim_and_resolve` | Claim and resolve an escalation in one atomic call |
 | `resolve_escalation` | Resolve an escalation that is already claimed |

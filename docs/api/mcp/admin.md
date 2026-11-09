@@ -517,10 +517,12 @@ Batch-claim individual rows matching a facet query (`FOR UPDATE SKIP LOCKED`), a
 ### aggregate_by_facets
 
 Grouped analytics over the escalation intervals. Every escalation is one open
-interval `[created_at, ended_at)`; this tool reads it two ways: **membership**
+interval `[created_at, ended_at)`; this tool reads it three ways: **membership**
 (rows or, with `distinctBy`, distinct entities open at an instant — a past
-`asOf` reconstructs the live set then) and **dwell** (open-seconds per group
-within a half-open `[from, to)` window). Group by role/subtype/status columns
+`asOf` reconstructs the live set then), **dwell** (open-seconds per group
+within a half-open `[from, to)` window), and **resolved** (rows resolved within
+a window, optionally per `day`, `week` or `month`: trends such as weekly review
+outcomes per extractor). Group by role/subtype/status columns
 plus metadata facet keys; optional `states[]` label each group. One call
 replaces N per-filter count round-trips. Mirrors
 `POST /api/escalations/aggregate-by-facets`.
@@ -535,8 +537,8 @@ replaces N per-filter count round-trips. Mirrors
 |-------|------|----------|-------------|
 | query | object | Yes | The filter (WHAT only — no status/available/jeopardy): `role`/`roles` or `entity` (the entity facet key, resolved to every role declaring it — the entity's system), plus `facets`, `block`, `range`, `exists` |
 | groupBy | object | Yes | Group keys: `columns` (`role`, `subtype`, `status`), `facets` (metadata keys), `state` (derived state label per each role's `entity_state_source`; mutually exclusive with `states`). Empty object → one total row |
-| measure | object | Yes | `{ kind: "membership", asOf? }` or `{ kind: "dwell", window: { from, to } }` |
-| distinctBy | string | No | Membership only: count DISTINCT of this metadata facet (entities, not rows) |
+| measure | object | Yes | `{ kind: "membership", asOf? }`, `{ kind: "dwell", window: { from, to } }`, or `{ kind: "resolved", window: { from, to }, bucket? }` (requires `role`, `roles` or `entity`) |
+| distinctBy | string | No | Membership and resolved: count DISTINCT of this metadata facet (entities, not rows) |
 | states | array | No | Pure labeling: tag each group with the FIRST matching state name |
 | liveStatuses | string[] | No | Statuses considered live (default `["pending"]`) |
 | orderBy | array | No | Order the RESULT groups: `{ field, direction? }` |

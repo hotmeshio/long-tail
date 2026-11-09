@@ -88,6 +88,7 @@ export class S3StorageBackend implements StorageBackend {
       Bucket: this.bucket,
       Key: normalizeKey(key),
       Body: data,
+      ContentType: mimeFromPath(key),
       ...(options?.sha256 ? { Metadata: { [SHA256_METADATA]: options.sha256 } } : {}),
     }));
     return { ref: key, size: data.length };

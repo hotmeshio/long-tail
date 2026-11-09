@@ -77,6 +77,7 @@ describe('/mcp caller identity', () => {
     const token = signToken({ userId: MEMBER, role: 'member' });
     const names = (await rpc(token, 'tools/list', {})).result.tools.map((t: { name: string }) => t.name);
     expect(names).toContain('get_escalation_lookups');
+    expect(names).toContain('get_escalation_files');
     for (const hidden of ['get_knowledge', 'store_knowledge', 'check_resolution', 'claim_and_resolve']) {
       expect(names).not.toContain(hidden);
     }

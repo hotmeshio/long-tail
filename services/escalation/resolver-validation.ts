@@ -17,9 +17,16 @@
  * A role that enforces but declares no schema has no contract to enforce —
  * the gate passes.
  */
-import { mapPayloadToForm, validateResolverPayload, type ShowIfContext } from '../../shared/form-validation';
+import {
+  buildReviewFacets,
+  mapPayloadToForm,
+  validateResolverPayload,
+  type ReviewFacets,
+  type ShowIfContext,
+} from '../../shared/form-validation';
 import { checkSubmitGuard } from './submit-guard';
 import { loadRosterCounts } from './roster';
+import { fileContext } from './file-links';
 import { getEnforcingRoles, getEnforcedFormSchema } from '../role/enforcement-cache';
 import { resolveLookupContext } from '../knowledge';
 import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS } from '../../types/escalation';
@@ -60,6 +67,15 @@ function pinnedVersionOf(metadata: Record<string, any>): number | null {
   return null;
 }
 
+/** The gate's verdict, plus the review facets a passing answer stamps. */
+export interface ResolverPayloadAssessment {
+  violation: ResolverSchemaViolationReport | null;
+  /** Review summary for the row's metadata, when the form opts in (x-lt-confidence facets). */
+  facets: ReviewFacets | null;
+}
+
+const PASS: ResolverPayloadAssessment = { violation: null, facets: null };
+
 /**
  * Validate a submitted resolverPayload against the escalation's enforced form
  * schema. Returns null when the resolution may proceed (role does not enforce,
@@ -75,11 +91,27 @@ export async function checkResolverPayload(
   loadEnvelope?: () => Promise<Record<string, any>>,
   resolvingUserId?: string,
 ): Promise<ResolverSchemaViolationReport | null> {
+  const { violation } = await assessResolverPayload(escalation, resolverPayload, loadEnvelope, resolvingUserId);
+  return violation;
+}
+
+/**
+ * The same gate, also returning the review facets a passing answer stamps
+ * onto the row. Single-row resolve paths merge `facets` into the outcome
+ * patch, so they commit inside the guarded resolve UPDATE. Computed from the
+ * schema and context the gate already loaded: no extra reads.
+ */
+export async function assessResolverPayload(
+  escalation: ResolvableEscalationRow,
+  resolverPayload: Record<string, any>,
+  loadEnvelope?: () => Promise<Record<string, any>>,
+  resolvingUserId?: string,
+): Promise<ResolverPayloadAssessment> {
   const role = escalation.role;
-  if (!role) return null;
+  if (!role) return PASS;
 
   const enforcing = await getEnforcingRoles();
-  if (!enforcing.has(role)) return null;
+  if (!enforcing.has(role)) return PASS;
 
   const metadata = (escalation.metadata ?? {}) as Record<string, any>;
   const pin = pinnedVersionOf(metadata);
@@ -89,7 +121,7 @@ export async function checkResolverPayload(
     embedded && typeof embedded === 'object'
       ? (embedded as Record<string, any>)
       : await getEnforcedFormSchema(role, pin);
-  if (!schema) return null;
+  if (!schema) return PASS;
 
   const envelope = loadEnvelope
     ? await loadEnvelope()
@@ -99,6 +131,7 @@ export async function checkResolverPayload(
   // immutable snapshot cache, so enforcement reads the exact editions the
   // form rendered from. Rows without refs cost zero SQL here.
   const lookup = await resolveLookupContext(envelope[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+  const file = fileContext(envelope);
 
   const ctx: ShowIfContext = {
     escalation: escalation as Record<string, unknown>,
@@ -106,6 +139,7 @@ export async function checkResolverPayload(
     envelope,
     payload: parseJsonOrNull(escalation.escalation_payload),
     ...(lookup ? { lookup } : {}),
+    ...(file ? { file } : {}),
   };
 
   // Roster counts read the submitted form values (an `in` source may name a
@@ -121,9 +155,10 @@ export async function checkResolverPayload(
   // contract, so a raw-API resolve honors the gate the dashboard shows.
   const guardViolation = await checkSubmitGuard(schema, ctx, resolvingUserId);
   const allViolations = guardViolation ? [...violations, guardViolation] : violations;
-  if (allViolations.length === 0) return null;
-
-  return { role, schemaVersion: pin, violations: allViolations };
+  if (allViolations.length > 0) {
+    return { violation: { role, schemaVersion: pin, violations: allViolations }, facets: null };
+  }
+  return { violation: null, facets: buildReviewFacets(schema, ctx, formValues) };
 }
 
 /** The canonical 422 body for a violation report (types/validation.ts). */

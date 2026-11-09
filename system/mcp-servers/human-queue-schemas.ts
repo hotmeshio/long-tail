@@ -22,6 +22,10 @@ export const getEscalationLookupsSchema = z.object({
   escalation_id: z.string().describe('The escalation whose pinned knowledge lookups to resolve'),
 });
 
+export const getEscalationFilesSchema = z.object({
+  escalation_id: z.string().describe('The escalation whose stored files to sign'),
+});
+
 export const getAvailableWorkSchema = z.object({
   role: z.string().describe('Role to filter by'),
   limit: z.number().optional().default(10).describe('Max results to return'),

@@ -70,9 +70,19 @@ export const config = {
   // live longer; MAX_ENTRIES LRU-bounds the past cache.
   LT_ANALYTICS_MAX_GROUPS: parseInt(process.env.LT_ANALYTICS_MAX_GROUPS || '5000', 10),
   LT_ANALYTICS_MAX_WINDOW_DAYS: parseInt(process.env.LT_ANALYTICS_MAX_WINDOW_DAYS || '35', 10),
+  LT_ANALYTICS_MAX_RESOLVED_WINDOW_DAYS: parseInt(process.env.LT_ANALYTICS_MAX_RESOLVED_WINDOW_DAYS || '366', 10),
   LT_ANALYTICS_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_CACHE_TTL_MS || '30000', 10),
   LT_ANALYTICS_PAST_CACHE_TTL_MS: parseInt(process.env.LT_ANALYTICS_PAST_CACHE_TTL_MS || '600000', 10),
   LT_ANALYTICS_CACHE_MAX_ENTRIES: parseInt(process.env.LT_ANALYTICS_CACHE_MAX_ENTRIES || '512', 10),
+
+  /**
+   * Escalation file links: the default signed-link lifetime, and its bounds.
+   * A ref's expiresIn and the reader's live claim stretch the link within
+   * these bounds; nothing signs past the max.
+   */
+  LT_ESCALATION_FILE_URL_TTL_SECONDS: positiveInt('LT_ESCALATION_FILE_URL_TTL_SECONDS', 900),
+  LT_ESCALATION_FILE_URL_MIN_SECONDS: positiveInt('LT_ESCALATION_FILE_URL_MIN_SECONDS', 60),
+  LT_ESCALATION_FILE_URL_MAX_SECONDS: positiveInt('LT_ESCALATION_FILE_URL_MAX_SECONDS', 14400),
 
   /** Identity keys (badge tokens) leave user reads and need credentialIssuer to write. `false` keeps the earlier behavior. */
   LT_PROTECT_IDENTITY_KEYS: process.env.LT_PROTECT_IDENTITY_KEYS !== 'false',

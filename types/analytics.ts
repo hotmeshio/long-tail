@@ -45,12 +45,18 @@ export interface AnalyticsWindow {
   to: Date | string;
 }
 
+/** Calendar buckets for the `resolved` measure, truncated in UTC. */
+export const RESOLVED_BUCKETS = ['day', 'week', 'month'] as const;
+export type ResolvedBucket = (typeof RESOLVED_BUCKETS)[number];
+
 /**
  * The measure — exactly one kind.
  * - `membership`: count entities/rows whose interval is open at `asOf`
  *   (default now). A past `asOf` reconstructs the live set at that moment.
  * - `dwell`: seconds each group's intervals were open within the window,
  *   clipped to the window on both ends.
+ * - `resolved`: count rows resolved within the window, optionally per
+ *   calendar bucket. Requires a role scope; reads the resolved-rows index.
  */
 export type AggregateMeasure =
   | {
@@ -60,6 +66,11 @@ export type AggregateMeasure =
   | {
       kind: 'dwell';
       window: AnalyticsWindow;
+    }
+  | {
+      kind: 'resolved';
+      window: AnalyticsWindow;
+      bucket?: ResolvedBucket;
     };
 
 /** Predicate a group row must satisfy to receive a state label. */
@@ -75,7 +86,7 @@ export interface StateMatch {
 
 /** Order the RESULT groups (not the underlying rows). */
 export interface AggregateOrder {
-  /** `count`, `dwellSeconds`, `sampleCount`, a grouped column, or a grouped facet key. */
+  /** `count`, `dwellSeconds`, `sampleCount`, `bucket`, a grouped column, or a grouped facet key. */
   field: string;
   direction?: 'asc' | 'desc';
 }
@@ -91,7 +102,7 @@ export interface AggregateByFacetsInput {
   groupBy: FacetGroupBy;
   measure: AggregateMeasure;
   /**
-   * membership only: count DISTINCT of this metadata facet per group
+   * membership and resolved: count DISTINCT of this metadata facet per group
    * (e.g. a machine-id facet → entities, not rows). Omit → count rows.
    */
   distinctBy?: string;
@@ -120,8 +131,10 @@ export interface AggregateRow {
   facets: Record<string, string | null>;
   /** Present iff `states` supplied and one matched. */
   state?: string;
-  /** membership: entities (with distinctBy) or rows (without). */
+  /** membership and resolved: entities (with distinctBy) or rows (without). */
   count?: number;
+  /** resolved with a bucket: the bucket's start instant (UTC), ISO. */
+  bucket?: string;
   /** dwell: summed open-seconds within the window. */
   dwellSeconds?: number;
   /** Underlying escalation rows contributing to this group (pre-distinct). */

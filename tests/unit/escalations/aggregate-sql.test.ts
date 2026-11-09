@@ -58,10 +58,10 @@ describe('buildAggregateQuery — dwell', () => {
     expect(built.sql).toContain('SUM(EXTRACT(EPOCH FROM (e - s)))::float8 AS dwell_seconds');
   });
 
-  it('rejects distinctBy on dwell — a membership concept', () => {
+  it('rejects distinctBy on dwell, which counts seconds, not entities', () => {
     expect(() =>
       buildAggregateQuery(membership({ measure: { kind: 'dwell', window: dwellWindow }, distinctBy: 'serialNumber' })),
-    ).toThrow(/membership concept/);
+    ).toThrow(/distinctBy applies to membership and resolved/);
   });
 });
 

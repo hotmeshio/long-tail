@@ -11,6 +11,7 @@ import { EscalationWidget } from './EscalationWidget';
 import { EscalationListWidget } from './EscalationListWidget';
 import { InvokeWidget } from './InvokeWidget';
 import { RosterWidget } from './RosterWidget';
+import { DocumentWidget } from './DocumentWidget';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 
 export interface WidgetProps {
@@ -51,4 +52,7 @@ export const WIDGET_MAP: Record<string, ComponentType<WidgetProps>> = {
   'escalation-list': EscalationListWidget,
   'invoke': InvokeWidget,
   'roster': RosterWidget,
+  // A stored file shown in place (PDF pages, zoomable images), read from the
+  // escalation's signed files. Display-only.
+  'document': DocumentWidget,
 };

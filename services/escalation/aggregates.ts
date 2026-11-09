@@ -89,8 +89,9 @@ function toAggregateRow(
   for (const key of built.facets) facets[key] = raw[`facet_${key}`] ?? null;
   const row: AggregateRow = { facets, sampleCount: Number(raw.sample_count) };
   for (const column of built.columns) (row as any)[column] = raw[column] ?? undefined;
-  if (built.measureKind === 'membership') row.count = Number(raw.count);
-  else row.dwellSeconds = Number(raw.dwell_seconds);
+  if (built.measureKind === 'dwell') row.dwellSeconds = Number(raw.dwell_seconds);
+  else row.count = Number(raw.count);
+  if (built.bucketed) row.bucket = toIso(raw.bucket);
   if (built.stateGrouped) {
     row.state = raw.state_label;
   } else {

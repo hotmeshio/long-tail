@@ -128,6 +128,26 @@ The value is a data URL or a fetchable URL. Rendering dispatches on content type
 
 ---
 
+## Document
+
+A stored file shown in place: PDFs as continuous pages with paging, zoom and rotation; images with zoom and rotation; anything else as an open link. `x-lt-source` names the file, usually a signed ref from the escalation's `file.*` domain:
+
+```json
+{
+  "application": {
+    "type": "string",
+    "title": "Application",
+    "description": "The signed application as received.",
+    "x-lt-widget": "document",
+    "x-lt-source": "file.application"
+  }
+}
+```
+
+Display-only: the field carries no answer and never reaches the payload. It stays readable and pageable on a locked or resolved form. In a split form (`x-lt-layout: "split"`) documents sit in a pane beside the fields. See [files.md](files.md).
+
+---
+
 ## Markdown
 
 Without `readOnly`, the field is a markdown editor — the resolver writes source in a Write/Preview toggle and the submitted value is the markdown text.

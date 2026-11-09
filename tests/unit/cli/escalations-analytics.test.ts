@@ -37,6 +37,26 @@ describe('ltc esc aggregate-facets — flag → body mapping', () => {
     });
   });
 
+  it('maps --resolved and --bucket to the resolved measure', async () => {
+    await aggregateByFacets({
+      role: 'intake-verifier',
+      groupFacets: 'extractor,review_outcome',
+      resolved: '{"from":"2026-10-01T00:00:00Z","to":"2026-11-01T00:00:00Z"}',
+      bucket: 'week',
+    });
+    expect(sentBody()).toEqual({
+      query: { role: 'intake-verifier' },
+      groupBy: { facets: ['extractor', 'review_outcome'] },
+      measure: { kind: 'resolved', window: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' }, bucket: 'week' },
+    });
+  });
+
+  it('refuses --resolved with --window, and --bucket alone', async () => {
+    await expect(aggregateByFacets({ resolved: '{}', window: '{}' })).rejects.toThrow(/one of --resolved/);
+    await expect(aggregateByFacets({ bucket: 'week' })).rejects.toThrow(/--bucket applies to --resolved/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('defaults to membership-now; --as-of anchors a past instant', async () => {
     await aggregateByFacets({ role: 'printer-fleet' });
     expect(sentBody().measure).toEqual({ kind: 'membership' });

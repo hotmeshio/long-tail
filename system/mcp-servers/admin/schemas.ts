@@ -879,8 +879,13 @@ export const aggregateByFacetsSchema = z.object({
       kind: z.literal('dwell'),
       window: analyticsWindowSchema,
     }),
-  ]).describe('membership = rows/entities open at an instant; dwell = open-seconds per group within the window, clipped to it'),
-  distinctBy: z.string().optional().describe('membership only: count DISTINCT of this metadata facet (entities, not rows)'),
+    z.object({
+      kind: z.literal('resolved'),
+      window: analyticsWindowSchema.describe('Rows whose resolved_at falls in [from, to); up to a year'),
+      bucket: z.enum(['day', 'week', 'month']).optional().describe('Count per UTC calendar bucket; each group carries its bucket start'),
+    }),
+  ]).describe('membership = rows/entities open at an instant; dwell = open-seconds per group within the window, clipped to it; resolved = rows resolved in the window, optionally per day/week/month (requires role, roles or entity), the trend measure'),
+  distinctBy: z.string().optional().describe('membership and resolved: count DISTINCT of this metadata facet (entities, not rows)'),
   states: z.array(z.object({
     name: z.string(),
     match: z.object({
@@ -893,7 +898,7 @@ export const aggregateByFacetsSchema = z.object({
   })).optional().describe('Pure labeling: tag each group with the FIRST matching state name'),
   liveStatuses: z.array(z.string()).optional().describe("Statuses considered live (default ['pending'])"),
   orderBy: z.array(z.object({
-    field: z.string().describe('count | dwellSeconds | sampleCount | a grouped column or facet key'),
+    field: z.string().describe('count | dwellSeconds | sampleCount | bucket | a grouped column or facet key'),
     direction: z.enum(['asc', 'desc']).optional(),
   })).optional().describe('Order the RESULT groups'),
   limit: z.number().int().min(1).optional().describe('Max result groups (server-capped; overflow flag when more exist)'),

@@ -13,9 +13,10 @@ describe('human-queue manifest', () => {
     expect(registered).toEqual(HUMAN_QUEUE_TOOLS.map((t) => t.name).sort());
   });
 
-  it('opens get_escalation_lookups to any caller; every other tool stays superadmin', () => {
+  it('opens the lookups and files reads to any caller; every other tool stays superadmin', () => {
+    const callerTools = new Set(['get_escalation_lookups', 'get_escalation_files']);
     for (const entry of HUMAN_QUEUE_TOOLS) {
-      expect(entry.gate, entry.name).toBe(entry.name === 'get_escalation_lookups' ? 'caller' : 'superadmin');
+      expect(entry.gate, entry.name).toBe(callerTools.has(entry.name) ? 'caller' : 'superadmin');
     }
   });
 });

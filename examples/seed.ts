@@ -27,6 +27,7 @@ import { seedLookupCascadeKnowledge, seedLookupCascadeRole, seedLookupCascadeEsc
 import { seedFleetToolsKnowledge } from './seed-fleet-tools';
 import { seedPrinterFleetRoles, seedPrinterFleetEscalations } from './seed-fleet-sim';
 import { seedAutoResolveDemoRoles, seedAutoResolveDemoEscalations } from './seed-auto-resolve-demo';
+import { seedDocumentIntakeRole } from './seed-document-intake';
 
 // ── Seed functions ───────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export async function seedExamples(client: any): Promise<void> {
   await seedFleetToolsKnowledge();
   await seedLookupCascadeRole();
   await seedLookupCascadeEscalations();
+  await seedDocumentIntakeRole();
   await seedAutoResolveDemoRoles();
   await seedPersonas();
   await seedUsers();

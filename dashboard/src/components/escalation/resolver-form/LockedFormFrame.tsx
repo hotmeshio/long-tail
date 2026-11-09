@@ -15,10 +15,13 @@ const HINT_MS = 2600;
 export function LockedFormFrame({
   hint,
   onLockedClick,
+  measure = 'max-w-form',
   children,
 }: {
   hint?: ReactNode;
   onLockedClick?: () => void;
+  /** The form's width class: one measure, or two for a split form. */
+  measure?: string;
   children: ReactNode;
 }) {
   const [hintAt, setHintAt] = useState<{ x: number; y: number; n: number } | null>(null);
@@ -39,7 +42,7 @@ export function LockedFormFrame({
   };
 
   return (
-    <div className="pb-8 max-w-form" onClick={handleClick} data-testid="locked-form-frame">
+    <div className={`pb-8 ${measure}`} onClick={handleClick} data-testid="locked-form-frame">
       {children}
       {hint && hintAt && (
         <div

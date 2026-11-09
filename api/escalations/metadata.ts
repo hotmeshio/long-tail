@@ -5,7 +5,7 @@ import {
   resolveAssignee,
   type ProvisionIfAbsent,
 } from './helpers';
-import { checkResolverPayload } from '../../services/escalation/resolver-validation';
+import { assessResolverPayload } from '../../services/escalation/resolver-validation';
 import { getEnforcingRoles } from '../../services/role/enforcement-cache';
 import { validationFailure } from './resolve';
 import type { LTApiAuth, LTApiResult } from '../../types/sdk';
@@ -190,7 +190,7 @@ export async function resolveByMetadata(
     // writing; the payload validates here, then a second asserted pass claims
     // + resolves the same row with pending re-checked inside the statement.
     const enforcing = await getEnforcingRoles();
-    const outcome = { ...input.metadata, resolved_by: auth.userId };
+    let outcome: Record<string, any> = { ...input.metadata, resolved_by: auth.userId };
     let result = await escalationService.resolveByMetadataAtomic(
       input.key, input.value, resolveUserId,
       input.resolverPayload, outcome, writeAllRoles, writeSelfRoles,
@@ -199,8 +199,9 @@ export async function resolveByMetadata(
     );
 
     if (result.outcome === 'validation_required' && result.row) {
-      const report = await checkResolverPayload(result.row, input.resolverPayload, undefined, resolveUserId);
-      if (report) return validationFailure(report);
+      const { violation, facets } = await assessResolverPayload(result.row, input.resolverPayload, undefined, resolveUserId);
+      if (violation) return validationFailure(violation);
+      outcome = { ...input.metadata, ...facets, resolved_by: auth.userId };
       result = await escalationService.resolveByMetadataAtomic(
         input.key, input.value, resolveUserId,
         input.resolverPayload, outcome, writeAllRoles, writeSelfRoles,

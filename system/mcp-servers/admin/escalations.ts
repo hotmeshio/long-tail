@@ -425,9 +425,11 @@ export function registerEscalationTools(server: McpServer): void {
       title: 'Aggregate by Facets',
       description:
         'Grouped analytics over the escalation intervals. Every escalation is one open ' +
-        'interval [created_at, ended_at); this tool reads it two ways: membership (rows or, ' +
+        'interval [created_at, ended_at); this tool reads it three ways: membership (rows or, ' +
         'with distinctBy, distinct entities open at an instant — a past asOf reconstructs the ' +
-        'live set then) and dwell (open-seconds per group within a half-open [from,to) window). ' +
+        'live set then), dwell (open-seconds per group within a half-open [from,to) window), and ' +
+        'resolved (rows resolved within a window, optionally per day/week/month bucket: trends ' +
+        'such as weekly review outcomes by extractor; needs a role scope). ' +
         'Group by role/subtype/status columns plus metadata facet keys; optional states[] label ' +
         'each group. One call replaces N per-filter count round-trips. The filter takes the WHAT ' +
         'fields only — status/available/jeopardy are rejected (liveness derives from the measure).',

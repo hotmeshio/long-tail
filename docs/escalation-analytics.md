@@ -101,6 +101,23 @@ await client.escalations.aggregateByFacets({
 // → one group per state, count = printers (not rows)
 ```
 
+**Resolved** counts rows resolved within a window, optionally per UTC `day`,
+`week` or `month` bucket. It answers trend questions: throughput per station
+per week, or review outcomes per extractor version. It requires a role scope
+(`role`, `roles` or `entity`) and reads the role-led resolved-rows index, so
+its cost grows with the rows resolved in the window for those roles; the
+window may span up to `LT_ANALYTICS_MAX_RESOLVED_WINDOW_DAYS` (default 366).
+
+```typescript
+// Weekly review outcomes per extractor version
+await client.escalations.aggregateByFacets({
+  query: { role: 'intake-verifier' },
+  groupBy: { facets: ['extractor', 'review_outcome'] },
+  measure: { kind: 'resolved', window: { from, to }, bucket: 'week' },
+});
+// → one group per (bucket, extractor, review_outcome), each with its count
+```
+
 ### Q2 — the slice: the same, compared by any facet
 
 Q1 plus `groupBy.facets` — each value gets an independent state split, and a

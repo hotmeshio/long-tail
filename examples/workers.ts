@@ -24,6 +24,8 @@ import * as transitionChainWorkflow from './workflows/transition-chain';
 import { TXN_STEP1_ROLE, TXN_STEP2_ROLE, TXN_STEP3_ROLE } from './workflows/transition-chain/forms';
 import * as checklistConfirmationWorkflow from './workflows/checklist-confirmation';
 import * as relabelWorkflow from './workflows/relabel';
+import * as documentIntakeWorkflow from './workflows/document-intake';
+import { INTAKE_ROLE } from './workflows/document-intake/forms';
 import * as constraintFormWorkflow from './workflows/constraint-form';
 import * as parameterizedFormWorkflow from './workflows/parameterized-form';
 import { VERDICT_ROLE } from './workflows/parameterized-form/forms';
@@ -251,6 +253,17 @@ const relabelConfig: LTWorkerConfig = {
   defaultRole: relabelWorkflow.RELABELER_ROLE,
   envelopeSchema: {
     data: { template: 'bin-label', target: 'A-3' },
+  },
+};
+
+const documentIntakeConfig: LTWorkerConfig = {
+  description: 'Document intake — reference example for verifying model-extracted values beside the documents they came from. Stores a sample application (PDF) and ID card (image), proposes values with a confidence score each, and parks one review on intake-verifier: the documents sit in a pane beside the fields (x-lt-layout split, the document widget over signed file links), fields under 85% carry a tranche rule (x-lt-confidence), and every edit shows what the value was. The workflow records each correction.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: INTAKE_ROLE,
+  envelopeSchema: {
+    data: { applicationId: 'APP-1043' },
+    metadata: { source: 'dashboard' },
   },
 };
 
@@ -695,6 +708,7 @@ export const exampleWorkers = [
   { taskQueue: 'long-tail-examples', workflow: consolidationWorkflow.consolidationBin, config: consolidationBinConfig },
   { taskQueue: 'long-tail-examples', workflow: checklistConfirmationWorkflow.checklistConfirmation, config: checklistConfirmationConfig },
   { taskQueue: 'long-tail-examples', workflow: relabelWorkflow.relabel, config: relabelConfig },
+  { taskQueue: 'long-tail-examples', workflow: documentIntakeWorkflow.documentIntake, config: documentIntakeConfig },
   { taskQueue: 'long-tail-examples', workflow: constraintFormWorkflow.constraintForm, config: constraintFormConfig },
   { taskQueue: 'long-tail-examples', workflow: parameterizedFormWorkflow.parameterizedForm, config: parameterizedFormConfig },
   { taskQueue: 'long-tail-examples', workflow: lookupCascadeWorkflow.lookupCascade, config: lookupCascadeConfig },

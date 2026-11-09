@@ -197,6 +197,25 @@ const result = await lt.escalations.get({ id: 'esc_123' });
 
 ---
 
+## getFiles
+
+Sign the stored files an escalation names (`envelope.files`). Enforces the same read scope as `get`; the refs on the row grant links to exactly the files they name. See [files](../../hitl/files.md).
+
+```typescript
+const result = await lt.escalations.getFiles({ id: 'esc_123' });
+// result.data.files → [{ as, path, name, contentType, url?, expiresAt?, error? }]
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Escalation UUID |
+
+**Returns:** `LTApiResult<{ files }>`
+
+---
+
 ## getLookups
 
 Resolve the versioned knowledge lookups pinned on an escalation (`envelope.lookups`). Enforces the same read scope as `get`; the refs on the row grant exactly the pinned editions they name. See [lookups](../../hitl/lookups.md).
@@ -1150,7 +1169,7 @@ const result = await lt.escalations.claimByFacets({
 
 ## aggregateByFacets
 
-Grouped analytics over the escalation intervals — every escalation is one open interval `[created_at, ended_at)`, `ended_at` `NULL` while live. Two measures: **membership** (rows or, with `distinctBy`, distinct entities open at an instant; a past `asOf` reconstructs the live set then) and **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it). `query.entity` names an entity facet key and scopes to every role declaring it as its `entity_facet` — the entity's system (mutually exclusive with `role`/`roles`); `groupBy.state` groups by the derived state label, each role contributing per its `entity_state_source`.
+Grouped analytics over the escalation intervals — every escalation is one open interval `[created_at, ended_at)`, `ended_at` `NULL` while live. Three measures: **membership** (rows or, with `distinctBy`, distinct entities open at an instant; a past `asOf` reconstructs the live set then), **dwell** (open-seconds per group within a half-open `[from, to)` window, clipped to it), and **resolved** (rows resolved within a window, optionally per UTC `day`, `week` or `month` bucket; requires a role scope). `query.entity` names an entity facet key and scopes to every role declaring it as its `entity_facet` — the entity's system (mutually exclusive with `role`/`roles`); `groupBy.state` groups by the derived state label, each role contributing per its `entity_state_source`.
 
 ```typescript
 // The printer fleet: how the entities spent the window, one row per state
@@ -1167,19 +1186,26 @@ await lt.escalations.aggregateByFacets({
   groupBy: { state: true, facets: ['model'] },
   measure: { kind: 'dwell', window: { from: '2026-08-01T00:00:00Z', to: '2026-08-02T00:00:00Z' } },
 });
+
+// The trend: weekly review outcomes per extractor version
+await lt.escalations.aggregateByFacets({
+  query: { role: 'intake-verifier' },
+  groupBy: { facets: ['extractor', 'review_outcome'] },
+  measure: { kind: 'resolved', window: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' }, bucket: 'week' },
+});
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `query` | `AnalyticsQuery` | Yes | The filter — `role`/`roles` or `entity`, plus `facets`, `anyOf` (rows carrying ANY of the given facet sets, max 200), `block`, `range`, `exists`, and `prefix` (case-insensitive prefix match on facet values — the locate affordance). `status`/`available`/`jeopardy` and query-level paging are rejected with 400: liveness derives from the interval, `liveStatuses`, and the measure anchor |
 | `groupBy` | `FacetGroupBy` | Yes | `columns` (`role`, `subtype`, `status`), `facets` (metadata keys), `state` (derived state label; mutually exclusive with `states[]`). Empty object → one total row |
-| `measure` | `AggregateMeasure` | Yes | `{ kind: 'membership', asOf? }` or `{ kind: 'dwell', window }` |
-| `distinctBy` | `string` | No | Membership only — count DISTINCT of this facet (entities, not rows) |
+| `measure` | `AggregateMeasure` | Yes | `{ kind: 'membership', asOf? }`, `{ kind: 'dwell', window }`, or `{ kind: 'resolved', window, bucket? }` |
+| `distinctBy` | `string` | No | Membership and resolved: count DISTINCT of this facet (entities, not rows) |
 | `states` | `Array<{ name, match }>` | No | Pure labeling: tag each group with the first matching state name |
 | `liveStatuses` | `string[]` | No | Statuses considered live (default `['pending']`) |
 | `orderBy` / `limit` / `offset` | — | No | Order and page the RESULT groups (capped at `LT_ANALYTICS_MAX_GROUPS`) |
 
-**Returns:** `LTApiResult<{ groups: AggregateRow[]; overflow: boolean }>` — each group carries the grouped keys, `count` or `dwellSeconds`, and `sampleCount`. Gate: `read_all` on every role in scope (entity-derived roles included); a roleless filter requires a global principal; counts-only groupings (no `groupBy.facets`) are open to any login while `features.publicPaceBoard` stands. Mirrors `POST /api/escalations/aggregate-by-facets`.
+**Returns:** `LTApiResult<{ groups: AggregateRow[]; overflow: boolean }>` — each group carries the grouped keys, `count` or `dwellSeconds`, `bucket` when bucketed, and `sampleCount`. Gate: `read_all` on every role in scope (entity-derived roles included); a roleless filter requires a global principal; counts-only groupings (no `groupBy.facets`) are open to any login while `features.publicPaceBoard` stands. Mirrors `POST /api/escalations/aggregate-by-facets`.
 
 ## timelineByFacet
 

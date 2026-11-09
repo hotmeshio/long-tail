@@ -3,7 +3,7 @@ import { publishEscalationEvent } from '../../lib/events/publish';
 import { escalationEventData } from '../../lib/events/escalation-wire';
 import type { LTEscalationRecord, LTEscalationStatus, ScanAvailability } from '../../types';
 import { SCAN_AVAILABILITY } from '../../types/scan-code';
-import { ESCALATION_ENVELOPE_KEYS, assertLookupRefs } from '../../types/escalation';
+import { ESCALATION_ENVELOPE_KEYS, assertLookupRefs, assertFileRefs } from '../../types/escalation';
 
 import { isUuid, onlyUuids } from '../../lib/uuid';
 import { escalations, ensureEscalationCompatView } from './client';
@@ -47,6 +47,9 @@ export async function createEscalation(
   const envelopeObj = toEnvelopeObject(input.envelope);
   if (envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS] !== undefined) {
     assertLookupRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.LOOKUPS]);
+  }
+  if (envelopeObj[ESCALATION_ENVELOPE_KEYS.FILES] !== undefined) {
+    assertFileRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.FILES]);
   }
   const client = await escalations();
   const entry = await client.create({

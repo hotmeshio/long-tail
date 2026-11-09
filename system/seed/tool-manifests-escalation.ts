@@ -48,6 +48,19 @@ export const HUMAN_QUEUE_TOOLS: LTToolManifestEntry[] = [
     },
   },
   {
+    name: 'get_escalation_files',
+    gate: 'caller',
+    description: 'Sign the stored files an escalation names (envelope.files), for a caller who may read the escalation. Each ref answers with a time-limited url, its expiresAt, name and contentType; a ref that cannot be signed answers with error.',
+    read_safe: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        escalation_id: { type: 'string', description: 'The escalation whose stored files to sign' },
+      },
+      required: ['escalation_id'],
+    },
+  },
+  {
     name: 'get_available_work',
     gate: 'superadmin',
     description: 'List available escalations for a role. Returns pending, unassigned escalations.',

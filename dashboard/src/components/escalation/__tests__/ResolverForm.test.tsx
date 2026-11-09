@@ -186,10 +186,11 @@ describe('ResolverForm', () => {
     const json = formJson({ name: 'Alice' });
     const { container } = render(<ResolverForm value={json} onChange={vi.fn()} disabled />);
     const body = container.firstElementChild!.firstElementChild!;
-    // Full visibility: the lock is inert + pointer-events, never opacity.
+    // Full visibility: the lock is inert + pointer-events on each field, never opacity.
     expect(container.innerHTML).not.toContain('opacity');
-    expect(body.className).toContain('pointer-events-none');
     expect(body).toHaveAttribute('aria-disabled', 'true');
+    const field = container.querySelector('[data-field-key="name"]')!.closest('[inert]')!;
+    expect(field.className).toContain('pointer-events-none');
   });
 
   it('reports clicks on the locked form through onDisabledClick', () => {

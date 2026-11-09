@@ -17,6 +17,8 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Typed fields, formats, required | Plain JSON Schema | [form.md](hitl/form.md) |
 | Input guards (bounds, patterns, dynamic limits) | Validation keywords | [x-lt-validation.md](hitl/x-lt-validation.md) |
 | Option lists shared by thousands of rows, cascading selects | Versioned lookups | [lookups.md](hitl/lookups.md) |
+| Documents the reviewer reads in place: PDFs and images, signed per reader | Stored files + `document` widget | [files.md](hitl/files.md) |
+| Values a model proposed, marked by confidence, with what each was and became | `x-lt-confidence` | [x-lt-confidence.md](hitl/x-lt-confidence.md) |
 | Fields that appear based on another answer | `x-lt-showIf` | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Sections, columns, ordering, side-panel help | Layout keywords | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Runtime-driven items, files, signatures, SOP blocks | Widgets | [x-lt-widget.md](hitl/x-lt-widget.md) |
@@ -72,6 +74,8 @@ When you author a HITL-backed workflow, the platform handles:
 - **Credential security** — password fields use ephemeral tokens, never stored in plain text
 - **Schema enforcement** — roles with `enforce_schema` validate every resolver payload server-side (dashboard, API, MCP, CLI alike) with the same pass the form runs, rejecting violations as a structured 422 (see [schema-enforcement.md](schema-enforcement.md))
 - **Versioned lookups** — escalations reference knowledge entries for their option lists, following the newest edition or pinned to one; the refs grant readers exactly those entries, and cascading selects resolve locally from one batch fetch (see [lookups.md](hitl/lookups.md))
+- **Stored files** — escalations name files in storage; readers receive time-limited signed links, stretched to cover their claim, and the `document` widget shows PDFs and images in place (see [files.md](hitl/files.md))
+- **Confidence review** — proposed values carry their score's tranche on the field, and every edited value shows what it was, before and after submit (see [x-lt-confidence.md](hitl/x-lt-confidence.md))
 - **Telemetry** — trace IDs link escalations to OpenTelemetry traces
 - **Bulk operations** — bulk claim, assign, triage, and cancel for queue management
 - **Cancellation** — cancel pending escalations from the API or dashboard
@@ -88,6 +92,8 @@ Ordered as a learning path — each file adds one capability to the same form:
 |-------|------|
 | Creating escalations with `conditional`, schema versioning | [escalation.md](hitl/escalation.md) |
 | Versioned knowledge lookups, the `lookup.*` domain, cascading selects | [lookups.md](hitl/lookups.md) |
+| Stored files, the `file.*` domain, signed links | [files.md](hitl/files.md) |
+| Reviewing proposed values by confidence (`x-lt-confidence`) | [x-lt-confidence.md](hitl/x-lt-confidence.md) |
 | Field types, formats, required, read-only | [form.md](hitl/form.md) |
 | Pre-submission validation guards (min, max, pattern, dynamic bounds) | [x-lt-validation.md](hitl/x-lt-validation.md) |
 | Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`, `x-lt-hidden`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |

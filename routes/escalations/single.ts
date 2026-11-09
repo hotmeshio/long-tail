@@ -45,6 +45,21 @@ export function registerSingleRoutes(router: Router): void {
   });
 
   /**
+   * GET /api/escalations/:id/files
+   * Sign the escalation's stored files. The refs on the row are the grant:
+   * readers of the escalation receive time-limited links to exactly the
+   * files it names.
+   */
+  router.get('/:id/files', async (req, res) => {
+    const result = await api.getEscalationFiles(
+      { id: req.params.id },
+      req.auth!,
+    );
+    res.set('Cache-Control', 'no-store');
+    res.status(result.status).json(result.data ?? { error: result.error });
+  });
+
+  /**
    * GET /api/escalations/:id
    * Get a single escalation by ID.
    * RBAC: superadmin sees all; others must hold the escalation's role.

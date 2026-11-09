@@ -108,7 +108,7 @@ export const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
 // Process 5 -- "Basic Echo"
 //   Minimal durable workflow -- echoes a message and reveals IAM context.
 
-export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget' | 'transitionChain';
+export type SeedWorkflowName = 'reviewContent' | 'kitchenSink' | 'basicEcho' | 'basicSignal' | 'richForm' | 'policyDocument' | 'acmeWidget' | 'transitionChain' | 'documentIntake';
 
 export const SEED_ENVELOPES: Array<{
   workflowName: SeedWorkflowName;
@@ -314,6 +314,18 @@ export const SEED_ENVELOPES: Array<{
       },
     }),
   ),
+  // -- Process 10: Document Intake
+  //   A model read an account application; the review shows the application
+  //   and ID card beside the proposed values, each marked by its confidence.
+  {
+    label: 'Process 10 — Document Intake',
+    workflowName: 'documentIntake',
+    taskQueue: 'long-tail-examples',
+    envelope: {
+      data: { applicationId: 'APP-1042' },
+      metadata: { source: 'seed', process: 'document-intake' },
+    },
+  },
 ];
 
 // Escalation chains: reviewer -> admin -> engineer (and cross-links)

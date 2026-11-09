@@ -4,6 +4,7 @@ import { RoundsExhaustedContext } from '../../../components/escalation/RoundsExh
 import { IframeViewport } from '../../../components/escalation/IframeViewport';
 import { ResolverForm } from '../../../components/escalation/resolver-form/ResolverForm';
 import { mapPayloadToForm } from '../../../lib/x-lt-bind';
+import { DISPLAY_ONLY_WIDGET_NAMES } from '../../../lib/display-only-widgets';
 import type { ShowIfContext } from '../../../lib/x-lt-show-if';
 import { ResolverSection } from './ResolverSection';
 import type { ActiveView } from './EscalationActionBar';
@@ -21,6 +22,7 @@ export function buildShowIfContext(
   esc: LTEscalationRecord,
   lookup?: Record<string, unknown> | null,
   roster?: Record<string, unknown> | null,
+  file?: Record<string, unknown> | null,
 ): ShowIfContext {
   return {
     escalation: esc as unknown as Record<string, unknown>,
@@ -30,7 +32,17 @@ export function buildShowIfContext(
     resolver: null,
     ...(lookup ? { lookup } : {}),
     ...(roster ? { roster } : {}),
+    ...(file ? { file } : {}),
   };
+}
+
+/** Documents carry no answer, so a stored payload holds no slot for them; the review shows them again. */
+function documentSlots(formSchema: Record<string, any>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries((formSchema.properties ?? {}) as Record<string, Record<string, unknown>>)
+      .filter(([, def]) => def?.['x-lt-widget'] === DISPLAY_ONLY_WIDGET_NAMES.DOCUMENT)
+      .map(([key]) => [key, '']),
+  );
 }
 
 interface EscalationContextProps {
@@ -104,6 +116,8 @@ interface FormSectionProps {
   lookup?: Record<string, unknown> | null;
   /** Each roster field's counts, the form's `roster.*` context domain. */
   roster?: Record<string, unknown> | null;
+  /** Signed stored files, the form's `file.*` context domain. */
+  file?: Record<string, unknown> | null;
   json: string;
   onJsonChange: (v: string) => void;
   requestTriage: boolean;
@@ -140,6 +154,7 @@ export function EscalationFormSection({
   effectiveSchema,
   lookup,
   roster,
+  file,
   json,
   onJsonChange,
   requestTriage,
@@ -157,7 +172,7 @@ export function EscalationFormSection({
   disabledHint,
 }: FormSectionProps) {
   const schema = effectiveSchema;
-  const showIfCtx = buildShowIfContext(esc, lookup, roster);
+  const showIfCtx = buildShowIfContext(esc, lookup, roster, file);
 
   // Terminal: show the submitted resolution read-only. The stored payload is
   // the NESTED shape (mapped through x-lt-bind on submit) — reverse-map it
@@ -185,7 +200,7 @@ export function EscalationFormSection({
     if (!Object.keys(payload).some((k) => !k.startsWith('$') && !k.startsWith('_'))) return null;
     const formSchema = (effectiveSchema ?? (metadataFormSchema as Record<string, any> | null));
     const value = formSchema?.properties
-      ? { ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
+      ? { ...documentSlots(formSchema), ...mapPayloadToForm(payload, formSchema), _form_schema: formSchema }
       : payload;
     return (
       <div className="mt-3">
