@@ -4,6 +4,7 @@
  */
 
 import type { Disposition } from '../../../lib/machines/transport';
+import type { RowWorkflow } from '../../../lib/machines/protocol';
 import type { AccumulateConfig } from '../../../types/escalation';
 
 export const CONTROLLER = 'controller';
@@ -52,9 +53,12 @@ export type Action =
   | { kind: 'refuseBinding'; machineId: string; address: string; reason: string }
   /** Jobs a restarted machine lost that this gateway cannot send again: nothing of them is remembered. */
   | { kind: 'unrecoverable'; machineId: string; jobs: string[] }
-  /** A machine message asks the host for an answer: park its request row, once per message. `row.role` empty: the machine's own role. */
-  | { kind: 'parkRequest'; machineId: string; ref: string; row: CreateRowInput }
-  /** A message whose answer the gateway cannot ask for, and why. */
+  /**
+   * A machine message asks the host for an answer, or to record it: park its request or notice row,
+   * once per message, then start its workflow. `row.role` empty: the machine's own role.
+   */
+  | { kind: 'park'; machineId: string; ref: string; row: CreateRowInput; workflow?: RowWorkflow }
+  /** A message whose answer or notice the gateway cannot park, and why. */
   | { kind: 'refuseRequest'; machineId: string; reason: string }
   /** Send the answer a request row holds, then resolve the row. */
   | { kind: 'answer'; rowId: string }

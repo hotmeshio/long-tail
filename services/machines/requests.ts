@@ -7,20 +7,20 @@
  * the op named, naming the message it answers, then resolves the row.
  */
 
-import type { AnswerRequest, Inspection } from '../../lib/machines/protocol';
-import { REQUEST_ITEM, ROW_TYPE, requestSignalKey, type RequestAnswer, type RequestFacets } from './contracts';
+import type { AnswerRequest, Inspection, NoticeRequest } from '../../lib/machines/protocol';
+import { REQUEST_ITEM, ROW_TYPE, noticeSignalKey, requestSignalKey, type NoticeFacets, type RequestAnswer, type RequestFacets } from './contracts';
 import type { CreateRowInput } from './gateway/actions';
 
-/** The id an answer names: the codec's, else the message's receipt id, else its envelope id. */
-export function requestRef(seen: Pick<Inspection, 'answer' | 'receiptId' | 'body'>): string | null {
-  const ref = seen.answer?.ref ?? seen.receiptId ?? seen.body?.id;
+/** The id an answer or a notice names: the codec's, else the message's receipt id, else its envelope id. */
+export function requestRef(seen: Pick<Inspection, 'answer' | 'notice' | 'receiptId' | 'body'>): string | null {
+  const ref = (seen.answer ?? seen.notice)?.ref ?? seen.receiptId ?? seen.body?.id;
   return typeof ref === 'string' && ref ? ref : null;
 }
 
-/** What a request row's description says the machine asks. */
-function asked(event: Record<string, unknown>, op: string): string {
+/** The message's own name, for a row's description; `fallback` when it names none. */
+function messageName(event: Record<string, unknown>, fallback: string): string {
   const name = event.message_name ?? event.event ?? event.name;
-  return typeof name === 'string' && name ? name : `an answer sent as ${op}`;
+  return typeof name === 'string' && name ? name : fallback;
 }
 
 /** The row a machine message's request is parked as; `role` empty means the machine's own role. */
@@ -33,12 +33,50 @@ export function requestRow(siteId: string, lineId: string, machineId: string, re
     type: ROW_TYPE.MACHINE_REQUEST,
     subtype: answer.op,
     role: answer.role ?? '',
-    description: `${machineId} asks: ${asked(event, answer.op)}`,
+    description: `${machineId} asks: ${messageName(event, `an answer sent as ${answer.op}`)}`,
     priority: 2,
     metadata: metadata as unknown as Record<string, any>,
     signal_key: requestSignalKey(siteId, lineId, machineId, ref),
     accumulate: {},
   };
+}
+
+/** The row a machine message's notice is parked as; `role` empty means the machine's own role. */
+export function noticeRow(siteId: string, lineId: string, machineId: string, ref: string, notice: NoticeRequest, event: Record<string, unknown>): CreateRowInput {
+  const kind = typeof notice.kind === 'string' && notice.kind ? notice.kind : undefined;
+  const metadata: NoticeFacets = {
+    siteId, lineId, machineId, ref, event,
+    ...(kind ? { kind } : {}),
+    ...(typeof notice.withinMs === 'number' && notice.withinMs > 0 ? { withinMs: notice.withinMs } : {}),
+  };
+  return {
+    type: ROW_TYPE.MACHINE_NOTICE,
+    subtype: kind ?? ROW_TYPE.MACHINE_NOTICE,
+    role: notice.role ?? '',
+    description: `${machineId} reports: ${messageName(event, kind ?? 'a notice')}`,
+    priority: 2,
+    metadata: metadata as unknown as Record<string, any>,
+    signal_key: noticeSignalKey(siteId, lineId, machineId, ref),
+  };
+}
+
+/** A machine-notice row's facets; null when the line, machine or ref is missing. */
+export function readNoticeFacets(md: Record<string, any> = {}): NoticeFacets | null {
+  if (!md.siteId || !md.lineId || !md.machineId || !md.ref) return null;
+  const event = md.event && typeof md.event === 'object' && !Array.isArray(md.event) ? md.event : {};
+  const withinMs = typeof md.withinMs === 'number' && md.withinMs > 0 ? md.withinMs : undefined;
+  return {
+    siteId: String(md.siteId), lineId: String(md.lineId), machineId: String(md.machineId), ref: String(md.ref), event,
+    ...(typeof md.kind === 'string' && md.kind ? { kind: md.kind } : {}),
+    ...(withinMs ? { withinMs } : {}),
+  };
+}
+
+/** A parked row's facets by its type: a request's (with its op) or a notice's; null for any other row. */
+export function readParkedFacets(type: string | undefined, md: Record<string, any> = {}): (NoticeFacets & { op?: string }) | null {
+  if (type === ROW_TYPE.MACHINE_REQUEST) return readRequestFacets(md);
+  if (type === ROW_TYPE.MACHINE_NOTICE) return readNoticeFacets(md);
+  return null;
 }
 
 /** A machine-request row's facets; null when the line, machine, op or ref is missing. */

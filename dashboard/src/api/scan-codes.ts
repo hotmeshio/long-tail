@@ -197,8 +197,8 @@ export interface ScanStepParams {
     /** Into-subject: a per-key map naming the value each key belongs to; the held target's keys fill first. */
     prefer?: string;
   };
-  /** Bind verb options: the scheme the binding is kept under, and the held row's facet it binds to. */
-  bind?: { scheme?: number; facet?: string };
+  /** Bind verb options: the scheme the binding is kept under, the held row's facet it binds to, moving a bound value, and resolving the held row. */
+  bind?: { scheme?: number; facet?: string; move?: boolean; resolve?: { payload?: Record<string, unknown> } };
 }
 
 /** The station's pointer to the item it is holding. */

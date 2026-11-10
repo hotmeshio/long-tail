@@ -186,16 +186,21 @@ function completedBy(reciprocal: AccumulateReciprocal | undefined, userId: strin
 /** Validates the item payload against the container's versioned role form. */
 async function gatePayload(
   escalation: LTEscalationRecord,
+  itemKey: string,
   payload: Record<string, any> | undefined,
   userId: string,
 ): Promise<{ payload?: Record<string, any> } | { error: LTApiResult }> {
-  if (payload === undefined) return {};
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (payload !== undefined && (!payload || typeof payload !== 'object' || Array.isArray(payload))) {
     return { error: { status: 400, error: 'payload must be an object' } };
   }
-  const violation = await checkResolverPayload(escalation, payload, undefined, userId);
-  if (violation) return { error: validationFailure(violation) };
-  return { payload: await redactPasswords(payload, (escalation.metadata as any)?.form_schema) };
+  if (payload !== undefined) {
+    const violation = await checkResolverPayload(escalation, payload, undefined, userId);
+    if (violation) return { error: validationFailure(violation) };
+  }
+  // The row type's own check: a machine request refuses an answer its line cannot send.
+  const refusal = await escalationService.checkItem(escalation, itemKey, payload);
+  if (refusal) return { error: { status: 422, error: refusal } };
+  return payload === undefined ? {} : { payload: await redactPasswords(payload, (escalation.metadata as any)?.form_schema) };
 }
 
 /**
@@ -244,7 +249,7 @@ export async function accumulateItem(
 
     const reciprocal = await gateReciprocal(input.reciprocal, auth);
     if ('error' in reciprocal) return reciprocal.error;
-    const payload = await gatePayload(escalation, input.payload, auth.userId);
+    const payload = await gatePayload(escalation, itemKey, input.payload, auth.userId);
     if ('error' in payload) return payload.error;
 
     const result = await escalationService.accumulateItem(escalation.id, {
@@ -289,7 +294,7 @@ export async function accumulateItemBySignalKey(
 
     const reciprocal = await gateReciprocal(input.reciprocal, auth);
     if ('error' in reciprocal) return reciprocal.error;
-    const payload = await gatePayload(escalation, input.payload, auth.userId);
+    const payload = await gatePayload(escalation, itemKey, input.payload, auth.userId);
     if ('error' in payload) return payload.error;
 
     const result = await escalationService.accumulateItemBySignalKey(signalKey, {
@@ -364,7 +369,7 @@ export async function accumulateItemByMetadata(
     const row = await pickAccumulatorByFacet(key, value, allowedRoles, input.container, reciprocal.reciprocal?.id);
     if (!row) return { status: 404, error: NO_ACCUMULATOR_FOR_FACET };
     if (!isAccumulator(row)) return { status: 400, error: 'Escalation is not an accumulator' };
-    const payload = await gatePayload(row, input.payload, auth.userId);
+    const payload = await gatePayload(row, itemKey, input.payload, auth.userId);
     if ('error' in payload) return payload.error;
 
     const result = await escalationService.accumulateItem(row.id, {

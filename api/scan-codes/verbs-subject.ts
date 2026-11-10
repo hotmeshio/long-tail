@@ -2,7 +2,7 @@ import * as scanCodeService from '../../services/scan-code';
 import * as escalationService from '../../services/escalation';
 import { accumulateItem } from '../escalations/accumulate';
 import { getEscalationReadScope } from '../escalations/helpers';
-import { restrictScopeRoles } from '../escalations/metadata';
+import { resolveByMetadata, restrictScopeRoles } from '../escalations/metadata';
 import {
   ESCALATION_ACCUMULATE_KEYS,
 } from '../../types/escalation';
@@ -242,4 +242,18 @@ export function already(step: ScanStep, row: LTEscalationRecord, keepSubject = f
       clearSubject: !keepSubject,
     },
   };
+}
+
+/**
+ * Resolve the held subject's row by id, through the resolve verb's guarded
+ * statement (write scope, claim and the role's form checked inside it).
+ */
+export function resolveHeld(ctx: StepContext, subject: HeldSubject, resolverPayload: Record<string, any>): Promise<LTApiResult> {
+  return resolveByMetadata({
+    key: subject.scheme.target_facet,
+    value: targetValue({ scheme: subject.scheme, parsed: subject.parsed }),
+    resolverPayload,
+    metadata: provenance(ctx),
+    assertId: subject.row.id,
+  }, ctx.auth);
 }

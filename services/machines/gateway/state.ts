@@ -63,10 +63,14 @@ export interface AlarmTrack {
 }
 
 /** An open machine-request row this gateway answers (plan-request.ts). */
+/** A parked request or notice row the gateway watches until it ends. */
 export interface RequestTrack {
   rowId: string;
+  /** machine-request (answered and sent) or machine-notice (recorded; nothing sent). */
+  type: string;
   machineId: string;
-  op: string;
+  /** The command a request's answer is sent as; a notice has none. */
+  op?: string;
   ref: string;
   /** When the row was created (epoch ms); its window counts from here. */
   createdAt: number;

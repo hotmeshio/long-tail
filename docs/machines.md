@@ -196,7 +196,7 @@ A codec declares a command the machines never reply to as `{ op, reply: false }`
 
 ## Requests
 
-A machine may ask the host something: a material it was handed, a part it cannot place, a value only the host knows. Its codec marks the decoded message `answer: { op, ref?, role?, withinMs? }`, and the gateway parks one `machine-request` row for it, on `role` (the machine's own role by default). The row is created once per message, keyed by the machine and `ref` (the id the answer names: the codec's, else the message's receipt id, else its envelope id), so a redelivered or replayed message parks nothing new. The message is confirmed only once its row exists.
+A machine may ask the host something: a material it was handed, a part it cannot place, a value only the host knows. Its codec marks the decoded message `answer: { op, ref?, role?, withinMs?, workflow? }`, and the gateway parks one `machine-request` row for it, on `role` (the machine's own role by default). The row is created once per message, keyed by the machine and `ref` (the id the answer names: the codec's, else the message's receipt id, else its envelope id), so a redelivered or replayed message parks nothing new. The message is confirmed only once its row exists.
 
 The row's metadata holds `siteId`, `lineId`, `machineId`, `op`, `ref`, `withinMs` and `event`, the message as the codec decoded it. Whoever decides adds the answer as the row's `answer` item: a workflow or an activity through the accumulate API, a scan step that accumulates into the row, an agent through `accumulate_item`, or a person in the row's items panel:
 
@@ -216,6 +216,22 @@ It waits for no reply. An answer the codec has no message for resolves `unsuppor
 A request with `withinMs` still unanswered after that long raises one `machine-request-overdue` row on the line's operator role, naming the request. An answer added later is still sent, and the overdue row then resolves `answered`.
 
 A gateway taking the line reads back the open requests and their overdue rows. A request that already holds its answer is answered at once; the others are watched again from their creation. A gateway that stops between sending an answer and resolving its row leaves the row open, and the next one sends the answer again with the same `respondingTo`, so the machine drops the duplicate.
+
+An answer is checked when it is added, on any replica that runs the row's line: the codec encodes it as a dry run, with the row's machine, `op` and `respondingTo: ref`. An op the line cannot send, args that are not an object, or an `encode` that returns no messages or throws refuses the add with 422 and the reason, and the row stays open for a correct answer. `encode` must therefore be free of side effects.
+
+### Notices
+
+A message the host must record but not answer (material taken off a machine, a count) is marked `notice: { ref?, role?, kind?, withinMs?, workflow? }`. The gateway parks one `machine-notice` row for it, keyed like a request (`machine-notice:{site}:{line}:{machine}:{ref}`), with `kind` as its subtype and the same metadata less `op`, and confirms the message only once the row exists. Nothing is sent to the machine: whoever records the notice resolves the row. With `withinMs`, a notice still open after that long raises one `machine-request-overdue` row on the operator role, which resolves `recorded` once the notice ends. A message marked both ways is a request.
+
+### Starting a workflow
+
+`workflow: { type }` on an `answer` or a `notice` starts that workflow once the row exists, while it is open, before the message is confirmed. Its id is `{rowType}-{rowId}` (`machine-request-<id>`), so a redelivery, a second gateway or a crash before the confirm starts nothing twice. Its data is:
+
+```typescript
+{ rowId, type, siteId, lineId, machineId, op?, ref, event }   // op on a request only
+```
+
+The workflow answers a request the way anyone does, by adding the `answer` item, and records a notice by resolving its row. If it fails, the row stays open and its overdue row still reaches a person. The workflow needs an invocable config or a registered worker; one that cannot start (an unknown type, one not invocable) is logged as `machine_gateway.row_workflow.failed` and the message is confirmed. A gateway taking the line starts no workflows: every confirmed message already had its start.
 
 ## The wire
 
@@ -255,7 +271,7 @@ interface LineCodec {
 - Each command reaches `encode` with `attempt`, how many times this gateway has sent that `cmdId`, `retry`, true when the machine may already have it (sent earlier, or its row existed before this gateway took the line), and `issuedAt`, when it was issued. `issuedAt` is the same on every send of a `cmdId`, by this gateway or the next: a dispatch or a command row takes the start of its validity round, any other command the time of its first send. A protocol with a retransmission flag sets it from `retry` and stamps its time from `issuedAt`, so a resend repeats the first attempt with only the flag changed; the generic envelope's `at` is `issuedAt`.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
 - `rowOps` names the machines' own commands, beyond the line protocol's control ops and `snapshot`, that a machine-command row may ask for. Each goes through `encode` with the row's `args` and the row resolves with the reply. An entry `{ op, reply: false }` is a command the machines never reply to: it is sent once and its row resolves `sent`. Every entry names a non-empty op; the gateway refuses to start on a codec whose entries do not.
-- `decode` marks a message that asks the host for an answer with `answer: { op, ref?, role?, withinMs? }` (see [Requests](#requests)). The answer goes out through `encode` with `respondingTo` set to `ref`; the generic codec carries it in the command body.
+- `decode` marks a message that asks the host for an answer with `answer: { op, ref?, role?, withinMs?, workflow? }`, and one the host must only record with `notice: { ref?, role?, kind?, withinMs?, workflow? }` (see [Requests](#requests)). The answer goes out through `encode` with `respondingTo` set to `ref`; the generic codec carries it in the command body.
 - A reply may carry `code`, a string the machine chooses, beside its `reason` text. The gateway puts it on the row as `code`, on a command row's resolution and on a `dispatch-refused` or `dispatch-failed` handoff, so a workflow branches on the code and a person reads the reason.
 - Presence may carry `sessionId`, one per connection, and `reason` on a goodbye. A presence with a new `sessionId` while the machine is online is a reconnect whose offline presence was never heard: the gateway asks for a snapshot, as it does when a machine comes back. An offline row records the `reason` the machine gave.
 

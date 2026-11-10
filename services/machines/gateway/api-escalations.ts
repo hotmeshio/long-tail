@@ -6,7 +6,7 @@
 import * as escalationApi from '../../../api/escalations';
 import { isUuid } from '../../../lib/uuid';
 import type { Actor, CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type RowItem, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
 import type { OpenRowQuery } from '../rows';
@@ -39,10 +39,12 @@ export class ApiLineEscalations implements LineEscalations {
     return this.verb(await escalationApi.resolveEscalation({ id, resolverPayload: payload }, this.auth(as)));
   }
 
-  async create(as: Actor, input: CreateRowInput): Promise<{ id: string }> {
+  async create(as: Actor, input: CreateRowInput): Promise<CreatedRow> {
     const result = await escalationApi.createEscalation({ ...input }, this.auth(as));
     if (result.status >= 300) throw new Error(`create failed ${result.status}: ${result.error}`);
-    return { id: (result.data as any).id };
+    const row = result.data as { id: string; status?: string; created_at?: string | Date };
+    const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at;
+    return { id: row.id, ...(row.status ? { status: row.status } : {}), ...(createdAt ? { created_at: createdAt } : {}) };
   }
 
   async itemKeys(id: string): Promise<string[]> {
@@ -53,7 +55,7 @@ export class ApiLineEscalations implements LineEscalations {
     const result = await escalationApi.getEscalationItems({ id }, this.auth(CONTROLLER));
     if (result.status === NO_ITEMS_STATUS) return [];
     if (result.status >= 300) throw new Error(`items failed ${result.status}: ${result.error}`);
-    return (result.data as any).items.map((i: any) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
+    return (result.data as any).items.map((i: any) => ({ itemKey: i.itemKey, payload: i.payload ?? {}, ...(i.actor ? { actor: i.actor } : {}) }));
   }
 
   async get(id: string): Promise<Record<string, any> | null> {
