@@ -142,7 +142,7 @@ Verbs are the canonical escalation actions:
 | `escalate` | Create an escalation in another queue, optionally closing the located one | `targetRole`, `closeCurrent`, `escalationType`, `description`, `metadata` |
 | `cancel` | Claim-as-lock, then cancel | — |
 | `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey` (template), `resolverPayload`, `metadata`, `accumulate: { containerFacet, container, containerRoles, reciprocal }` |
-| `bind` | Bind the scanned value to the held item's target ([identifier bindings](identifiers.md)); a value bound to something else is refused, and the same pair again answers already | `bind: { scheme?, facet? }`: the scheme the binding is kept under (the scanned code's by default) and the held row's facet it binds to (its scheme's target facet by default). Needs a subject gate |
+| `bind` | Bind the scanned value to the held item's target ([identifier bindings](identifiers.md)); a value bound to something else is refused (or moved here with `move`), and the same pair again answers already | `bind: { scheme?, facet?, move?, resolve? }`: the scheme the binding is kept under (the scanned code's by default), the held row's facet it binds to (its scheme's target facet by default), `move: true` to move a value bound elsewhere, and `resolve: { payload? }` to resolve the held row once bound and release it. Needs a subject gate |
 
 `availability` names the claim state a step's row must be in:
 

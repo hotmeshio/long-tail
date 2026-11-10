@@ -19,6 +19,7 @@ import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher, GatewayStopped } from './dispatcher';
 import { failHandoff } from './plan-shared';
 import { RequestRunner } from './requests-runner';
+import type { LineWorkflows } from './workflows';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { plannedAction, type WireRecorder } from './wire';
 
@@ -40,6 +41,8 @@ export interface ExecutorDeps {
   addresses: AddressBook;
   /** Records each command sent, for the line's wire view. */
   wire?: Pick<WireRecorder, 'command'>;
+  /** Starts the workflow a parked request or notice names. */
+  workflows: LineWorkflows;
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
@@ -156,7 +159,7 @@ export class Executor {
       case 'unrecoverable':
         this.d.log.warn(GATEWAY_LOG.DISPATCH_UNRECOVERABLE, { machine: a.machineId, jobs: a.jobs });
         return [plannedAction(a)];
-      case 'parkRequest':
+      case 'park':
         return [await this.requests.park(a)];
       case 'refuseRequest':
         this.d.log.warn(GATEWAY_LOG.REQUEST_REFUSED, { machine: a.machineId, reason: a.reason });

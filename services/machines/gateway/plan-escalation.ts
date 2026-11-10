@@ -35,7 +35,7 @@ const ACCUMULATE_MAX = 'accumulate_max';
 
 const LINE_ROW_TYPES: string[] = [
   ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION,
-  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.REQUEST_OVERDUE,
+  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.MACHINE_NOTICE, ROW_TYPE.REQUEST_OVERDUE,
 ];
 
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
@@ -88,7 +88,7 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   if (type === ROW_TYPE.MACHINE_COMMAND) return planCommandRow(state, line, event);
   if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, line, event) : [];
-  if (type === ROW_TYPE.MACHINE_REQUEST) return planRequestRow(state, event);
+  if (type === ROW_TYPE.MACHINE_REQUEST || type === ROW_TYPE.MACHINE_NOTICE) return planRequestRow(state, event);
   if (type === ROW_TYPE.REQUEST_OVERDUE) return event.role === operatorRole(line) ? planOverdueRow(state, event) : [];
   return [];
 }

@@ -103,6 +103,10 @@ export interface ScanBindParams {
   scheme?: number;
   /** The subject's facet the value is bound to; its scheme's target facet by default. */
   facet?: string;
+  /** A value bound elsewhere moves here (its old binding retired), instead of being refused. */
+  move?: boolean;
+  /** Once bound, resolve the held row with this payload (scan templates allowed) and release it. */
+  resolve?: { payload?: Record<string, unknown> };
 }
 
 export interface ScanAccumulateParams {

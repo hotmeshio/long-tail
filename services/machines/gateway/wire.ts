@@ -184,7 +184,7 @@ export function plannedAction(a: Action): WireAction {
     case 'unrecoverable': return { verb: 'none', detail: `${a.machineId} lost ${a.jobs.join(', ')}; nothing remembered to send again` };
     case 'bindAddress': return { verb: 'ack', detail: `bind ${a.machineId} to ${a.address}` };
     case 'refuseBinding': return { verb: 'refuse', detail: a.reason };
-    case 'parkRequest': return { verb: 'create-row', detail: `${a.row.type} ${a.ref} for ${a.machineId}` };
+    case 'park': return { verb: 'create-row', detail: `${a.row.type} ${a.ref} for ${a.machineId}${a.workflow ? `, then start ${a.workflow.type}` : ''}` };
     case 'refuseRequest': return { verb: 'refuse', detail: a.reason };
     case 'answer': return { verb: 'none', rowId: a.rowId, detail: 'send the answer the row holds' };
     case 'watchLate': return { verb: 'none', rowId: a.rowId, detail: 'watching for the answer' };

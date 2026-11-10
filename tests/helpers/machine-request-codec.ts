@@ -1,4 +1,4 @@
-import { CHANNEL, buildEnvelope, genericCodec, machineTopic, type AnswerRequest, type LineCodec, type RowOp } from '../../lib/machines/protocol';
+import { CHANNEL, buildEnvelope, genericCodec, machineTopic, type AnswerRequest, type LineCodec, type NoticeRequest, type RowOp } from '../../lib/machines/protocol';
 import { identOf, type LineDef } from '../../lib/machines/line';
 import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import { ROOT } from './machine-line-fixtures';
@@ -9,6 +9,8 @@ export const RECEIVED = 'material-received';
 
 export interface RequestCodecOptions {
   answer?: Partial<AnswerRequest>;
+  /** The report is a notice instead; with `answer` too, it carries both. */
+  notice?: NoticeRequest;
   rowOps?: RowOp[];
   /** The codec has a message for the answer op. */
   encodes?: boolean;
@@ -22,7 +24,8 @@ export function requestCodec(opts: RequestCodecOptions = {}): LineCodec {
     rowOps: opts.rowOps ?? [{ op: ACK_OP, reply: false }],
     decode: (topic, payload, retained) => base.decode(topic, payload, retained).map((seen) => {
       if (seen.parsed?.kind !== 'report' || !topic.endsWith(RECEIVED) || !seen.body) return seen;
-      return { ...seen, receiptId: seen.body.id, answer: { op: ACK_OP, ...opts.answer } };
+      const answer = !opts.notice || opts.answer ? { answer: { op: ACK_OP, ...opts.answer } } : {};
+      return { ...seen, receiptId: seen.body.id, ...answer, ...(opts.notice ? { notice: opts.notice } : {}) };
     }),
     encode: (ident, command) => (opts.encodes === false && command.op === ACK_OP ? [] : base.encode(ident, command)),
     receipt: (ident, ids) => [{ topic: machineTopic(ROOT, ident, 'receipt'), payload: JSON.stringify({ ids }) }],

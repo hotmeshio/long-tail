@@ -30,6 +30,7 @@ import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
 import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
 import { WireWindow } from './wire-window';
+import { NO_WORKFLOWS, type LineWorkflows } from './workflows';
 
 export interface GatewaySettings {
   topicRoot: string;
@@ -67,6 +68,8 @@ export interface GatewayDeps {
   addresses?: AddressBook;
   /** Where wire records go; Long Tail's events by default. */
   wire?: WireSink;
+  /** Starts the workflow a parked request or notice names; without one, such a start is refused and logged. */
+  workflows?: LineWorkflows;
 }
 
 export class MachineGateway {
@@ -103,6 +106,7 @@ export class MachineGateway {
       bus: deps.bus, lt: deps.lt, replies: new ReplyWaiter(), state: this.state, line: deps.line,
       codec: this.codec, replyTimeoutMs: deps.settings.replyTimeoutMs,
       dispatchAttempts: deps.settings.dispatchAttempts, offlineDebounceMs: deps.settings.offlineDebounceMs, log: this.log,
+      workflows: deps.workflows ?? NO_WORKFLOWS,
     });
     this.admission = { state: this.state, line: deps.line, executor: this.executor, log: this.log, pace: () => this.pace(), openRows: (q) => deps.lt.listOpen(q) };
     this.receipts = new ReceiptBatcher({ bus: deps.bus, codec: this.codec, delayMs: deps.settings.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS, log: this.log, wire: this.wire });

@@ -140,6 +140,13 @@ function assertValidBind(step: ScanStep, at: string): void {
   if (bind.facet !== undefined && (typeof bind.facet !== 'string' || !FACET_KEY.test(bind.facet))) {
     throw new Error(`${at}: params.bind.facet must be a facet key`);
   }
+  if (bind.move !== undefined && typeof bind.move !== 'boolean') throw new Error(`${at}: params.bind.move must be a boolean`);
+  if (bind.resolve !== undefined) {
+    if (!isPlainObject(bind.resolve)) throw new Error(`${at}: params.bind.resolve must be an object`);
+    const { payload, ...other } = bind.resolve as Record<string, unknown>;
+    if (Object.keys(other).length) throw new Error(`${at}: params.bind.resolve takes payload; not ${Object.keys(other).join(', ')}`);
+    if (payload !== undefined && !isPlainObject(payload)) throw new Error(`${at}: params.bind.resolve.payload must be an object`);
+  }
 }
 
 function assertValidItemSelector(accumulate: NonNullable<ScanStepParams['accumulate']>, at: string): void {

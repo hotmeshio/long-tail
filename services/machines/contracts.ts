@@ -24,7 +24,9 @@ export const ROW_TYPE = {
   QUALITY_HOLD: 'quality-hold',
   /** A machine asks the host something: the host answers, and the gateway sends the answer to the machine. */
   MACHINE_REQUEST: 'machine-request',
-  /** A machine request still unanswered past its window, shown to the line's operators. */
+  /** A machine reports something the host must record, with nothing sent back: whoever records it resolves the row. */
+  MACHINE_NOTICE: 'machine-notice',
+  /** A machine request or notice still open past its window, shown to the line's operators. */
   REQUEST_OVERDUE: 'machine-request-overdue',
 } as const;
 
@@ -210,6 +212,8 @@ export const DECISION = {
   REWORK: 'rework',
   /** The machine request an overdue row named has ended. */
   ANSWERED: 'answered',
+  /** The machine notice an overdue row named has ended. */
+  RECORDED: 'recorded',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
@@ -293,6 +297,31 @@ export interface RequestFacets {
   event: Record<string, unknown>;
 }
 
+/** Metadata on a machine-notice row: a request's, with what it reports in place of an op. */
+export interface NoticeFacets {
+  siteId: string;
+  lineId: string;
+  machineId: string;
+  /** The id of the machine message the notice records. */
+  ref: string;
+  kind?: string;
+  /** How long the notice may stay unrecorded before the line's operators are shown it. */
+  withinMs?: number;
+  event: Record<string, unknown>;
+}
+
+/** What a workflow started for a parked request or notice row receives as its data. */
+export interface RowWorkflowInput {
+  rowId: string;
+  type: string;
+  siteId: string;
+  lineId: string;
+  machineId: string;
+  op?: string;
+  ref: string;
+  event: Record<string, unknown>;
+}
+
 /** The item an answerer adds to a machine-request row; the gateway sends it and resolves the row. */
 export const REQUEST_ITEM = { ANSWER: 'answer' } as const;
 
@@ -317,6 +346,11 @@ export interface RequestResolution {
 /** The key a machine request is created under, once per machine message. */
 export const requestSignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
   `machine-request:${siteId}:${lineId}:${machineId}:${ref}`;
+/** The key a machine notice is created under, once per machine message. */
+export const noticeSignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
+  `machine-notice:${siteId}:${lineId}:${machineId}:${ref}`;
+/** The id of the workflow started for a parked row, once per row. */
+export const rowWorkflowId = (rowType: string, rowId: string) => `${rowType}-${rowId}`;
 /** The key a request's overdue row is created under, once per request. */
 export const overdueSignalKey = (requestId: string) => `machine-request-overdue:${requestId}`;
 /** The command that carries a request's answer. */

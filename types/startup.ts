@@ -5,6 +5,7 @@ import type { EscalationLookupRef } from './escalation';
 import type { LTAuthAdapter, LTSSOConfig } from './auth';
 import type { CapabilityGate } from './capability';
 import type { ScanEncoding, ScanGrantScope, ScanSchemeKind, ScanStep, ScanRuleFallback } from './scan-code';
+import type { SchemeIdentifier } from './identifiers';
 import type { LTOAuthStartConfig } from './oauth';
 import type { LTOAuthServerConfig } from './oauth-server';
 import type { LTTelemetryAdapter } from './telemetry';
@@ -350,6 +351,8 @@ export interface LTScanSchemeConfig {
   /** Identity kind: 'action' (default) spends a use per act; 'subject' binds to one held subject. */
   grant_scope?: ScanGrantScope;
   enabled?: boolean;
+  /** Binding settings: who may bind this scheme's values, and whether a target holds one live value. Left out, the stored settings stay. */
+  identifier?: SchemeIdentifier;
   /** The scheme's rules, one per category. */
   rules?: LTScanRuleConfig[];
   /** Label templates that print this scheme's codes, owned with the scheme. */

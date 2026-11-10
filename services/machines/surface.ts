@@ -17,6 +17,12 @@ import type { InboundMessage } from '../../lib/machines/transport';
 import type { InspectResult, LineSummary, LineView, WireEvent, WireWindowQuery } from '../../types/machines-view';
 import { ESCALATION_FEED, MACHINE_TRANSPORT, loadMachineLineConfig, type MachineLineConfig } from './config';
 import { ApiLineEscalations } from './gateway/api-escalations';
+import { ApiLineWorkflows } from './gateway/api-workflows';
+import { CONTROLLER } from './gateway/actions';
+import { identFor } from './gateway/registration';
+import { answerRefusal, type AnswerLine } from './answer-check';
+import { ROW_TYPE } from './contracts';
+import { registerItemCheck, unregisterItemCheck, type ItemCheck } from '../escalation/item-checks';
 import { MachineGateway } from './gateway/gateway';
 import { GATEWAY_LOG, composeLogs, consoleLog, eventsLog, type GatewayLog } from './gateway/log';
 import { BotAddressBook, ensureLineBots } from './identities';
@@ -162,6 +168,7 @@ class LineRun {
       rows: this.opts.rows,
       feed: createEscalationFeed(config, line, this.opts.callbacks),
       lt: new ApiLineEscalations(userFor),
+      workflows: new ApiLineWorkflows(() => userFor(CONTROLLER)),
       addresses: new BotAddressBook(ids),
       line,
       log: this.log,
@@ -187,13 +194,28 @@ export class MachineSurface implements LineSurface {
   static start(opts: MachineSurfaceOptions): MachineSurface {
     const config = surfaceConfig(opts.env ?? process.env);
     const surface = new MachineSurface(config, opts, opts.log ?? consoleLog);
+    registerItemCheck(ROW_TYPE.MACHINE_REQUEST, surface.checkAnswer);
     for (const line of opts.lines) surface.begin(line);
     return surface;
   }
 
   async stop(): Promise<void> {
+    unregisterItemCheck(ROW_TYPE.MACHINE_REQUEST, this.checkAnswer);
     for (const run of this.runs.values()) await run.stop();
     this.runs.clear();
+  }
+
+  /** Refuses an answer the codec of the row's line cannot send, when this replica runs that line. */
+  readonly checkAnswer: ItemCheck = (row, itemKey, payload) => answerRefusal(row, itemKey, payload, (siteId, lineId) => this.answerLine(siteId, lineId));
+
+  private answerLine(siteId: string, lineId: string): AnswerLine | undefined {
+    const run = this.run(siteId, lineId);
+    if (!run) return undefined;
+    const leader = run.leader();
+    return {
+      line: run.line, codec: run.codec, ops: commandOpsOf(run.codec),
+      ...(leader ? { ident: (machineId: string) => identFor(leader.state, run.line, machineId) } : {}),
+    };
   }
 
   async declare(line: LineDef): Promise<DeclareOutcome> {

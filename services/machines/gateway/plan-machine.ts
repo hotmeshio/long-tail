@@ -21,7 +21,7 @@ import { dispatchAction, latestArrival } from './pacing';
 import { failHandoff, holdForResolver } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
 import { noteJobEvent, notePause, noteResume } from './lifecycle';
-import { planRequest } from './plan-request';
+import { planParked, type ParkedSeen } from './plan-request';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type AlarmTrack, type GatewayState, type HandoffRow } from './state';
 
@@ -30,12 +30,12 @@ const nak: Plan = { actions: [], disposition: DISPOSITION.NAK };
 
 /** `seen`: the codec's inspection, when the message may ask the host for an answer (plan-request.ts). */
 export function planMachineMessage(
-  state: GatewayState, parsed: ParsedTopic, env: Envelope | null, dispatchTtlMs: number, seen?: Pick<Inspection, 'answer' | 'receiptId' | 'body'>,
+  state: GatewayState, parsed: ParsedTopic, env: Envelope | null, dispatchTtlMs: number, seen?: ParkedSeen,
 ): Plan {
   const m = parsed.ident.machineId;
   const b: Record<string, any> = env?.body ?? {};
   const plan = planByKind(state, m, parsed, env, b, dispatchTtlMs);
-  return { ...plan, actions: [...heard(state, m), ...plan.actions, ...planRequest(state, parsed, seen)] };
+  return { ...plan, actions: [...heard(state, m), ...plan.actions, ...planParked(state, parsed, seen)] };
 }
 
 function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: Envelope | null, b: Record<string, any>, ttl: number): Plan {

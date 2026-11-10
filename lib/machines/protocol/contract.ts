@@ -88,6 +88,30 @@ export interface AnswerRequest {
   role?: string;
   /** Unanswered this long, the request is shown to the line's operators. */
   withinMs?: number;
+  /** A workflow started once the row exists, once per row. */
+  workflow?: RowWorkflow;
+}
+
+/**
+ * A message the host must record but not answer: the gateway parks a
+ * machine-notice row for it, once per message, and sends nothing back.
+ */
+export interface NoticeRequest {
+  /** The message's id; its receipt id, else its envelope id. */
+  ref?: string;
+  /** The role the row is parked on; the machine's own role by default. */
+  role?: string;
+  /** What the notice reports; the row's subtype. */
+  kind?: string;
+  /** Unrecorded this long, the notice is shown to the line's operators. */
+  withinMs?: number;
+  /** A workflow started once the row exists, once per row. */
+  workflow?: RowWorkflow;
+}
+
+/** A workflow the gateway starts for a parked row, by its registered type. */
+export interface RowWorkflow {
+  type: string;
 }
 
 export interface Inspection {
@@ -100,6 +124,8 @@ export interface Inspection {
   claim?: string;
   /** Set by a codec when the message asks the host for an answer. */
   answer?: AnswerRequest;
+  /** Set by a codec when the message must be recorded, with no answer; `answer` wins when both are set. */
+  notice?: NoticeRequest;
 }
 
 const errorsOf = (prefix: string, fn: ValidateFunction) =>

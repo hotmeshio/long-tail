@@ -4,6 +4,8 @@ export * from './gateway';
 export * from './log';
 export * from './lt-http';
 export * from './api-escalations';
+export * from './workflows';
+export * from './api-workflows';
 export * from './provision';
 export * from './state';
 export * from './address-book';

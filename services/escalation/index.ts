@@ -7,6 +7,7 @@ export * from './accumulate';
 export * from './bulk';
 export * from './queries';
 export * from './resolver-validation';
+export { checkItem, registerItemCheck, unregisterItemCheck, type ItemCheck } from './item-checks';
 export { ensureEscalationCompatView } from './client';
 export {
   ensureFacetReady,
