@@ -2020,6 +2020,7 @@ Create or replace a scan scheme: which metadata facet the scanned target resolve
 | kind | string | No | `action` (steps over escalations, default) or `identity` (a badge that mints a short-lived acting-identity grant) |
 | grant_ttl_seconds | integer | No | Identity kind: lifetime of a minted grant |
 | grant_max_uses | integer | No | Identity kind: `0` = TTL-bound; `n` = the grant covers n scan requests |
+| identifier | object or null | No | Binding settings: `binders` (roles that may bind this scheme's values besides role managers) and `exclusiveTarget` (one live value per target). Left out, the stored settings are kept; `null` clears them. See [identifiers.md](../../identifiers.md) |
 | enabled | boolean | No | Whether the scheme is active |
 
 ### upsert_scan_rule
@@ -2056,6 +2057,29 @@ Delete one scan rule by scheme version and category.
 |-------|------|----------|-------------|
 | scheme_version | integer | Yes | Scheme version |
 | category | string | Yes | Rule category |
+
+## Identifier Bindings
+
+A binding pairs a scanned value with the thing it stands for, under one scan scheme. See [identifiers.md](../../identifiers.md).
+
+### list_identifier_bindings
+
+List a scheme's identifier bindings: live ones by default, newest first. `raw` answers one value's live target.
+
+| | |
+|---|---|
+| Read-safe | Yes |
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| scheme | integer | Yes | The scan scheme the bindings are kept under |
+| raw | string | No | A scanned value |
+| target | string | No | A target: the values bound to it |
+| includeRetired | boolean | No | Retired bindings too |
+| limit | integer | No | 1-500, default 100 |
+| offset | integer | No | Rows to skip |
 
 ## Label Sheets
 

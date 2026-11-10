@@ -58,6 +58,7 @@ import { registerOverviewTools } from './overview';
 import { registerDiagnosticsTools } from './diagnostics';
 import { registerScanCodeTools } from './scan-codes';
 import { registerLabelTools } from './labels';
+import { registerIdentifierTools } from './identifiers';
 import { registerDomainContextTools } from './domain-context';
 import { registerAnnouncementTools } from './announcements';
 
@@ -97,6 +98,7 @@ export async function createAdminServer(options?: {
   registerDiagnosticsTools(instance);
   registerScanCodeTools(instance);
   registerLabelTools(instance);
+  registerIdentifierTools(instance);
   registerDomainContextTools(instance);
   registerAnnouncementTools(instance);
 

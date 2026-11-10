@@ -33,7 +33,7 @@ function isPlainObject(value: unknown): boolean {
 export function assertValidSubjectStep(step: ScanStep, at: string): void {
   const accumulate = step.params?.accumulate;
   const subjectMode = accumulate?.from === 'subject' || accumulate?.into === 'subject'
-    || (step.verb === SCAN_VERBS.FILL && step.params?.fill?.into === 'subject');
+    || (step.verb === SCAN_VERBS.FILL && step.params?.fill?.into === 'subject') || step.verb === SCAN_VERBS.BIND;
 
   if (step.subject !== undefined) {
     if (!isPlainObject(step.subject) || !isSchemeList(step.subject.schemes)) {
@@ -55,12 +55,12 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
         }
       }
     }
-    if (step.verb !== SCAN_VERBS.ACCUMULATE && step.verb !== SCAN_VERBS.FILL) {
-      throw new Error(`${at}: a subject gate applies only to accumulate and fill steps`);
+    if (step.verb !== SCAN_VERBS.ACCUMULATE && step.verb !== SCAN_VERBS.FILL && step.verb !== SCAN_VERBS.BIND) {
+      throw new Error(`${at}: a subject gate applies only to accumulate, fill and bind steps`);
     }
     if (step.confirm) throw new Error(`${at}: a subject step acts on the scan; it cannot carry confirm`);
     if (!subjectMode) {
-      throw new Error(`${at}: a subject step must act on it (accumulate from/into 'subject', or fill into 'subject')`);
+      throw new Error(`${at}: a subject step must act on it (accumulate from/into 'subject', fill into 'subject', or bind)`);
     }
   } else if (subjectMode) {
     throw new Error(`${at}: acting on the held subject requires a subject gate`);
@@ -124,6 +124,22 @@ export function assertValidSubjectStep(step: ScanStep, at: string): void {
 
   if (step.verb === SCAN_VERBS.FILL) assertValidFill(step, at);
   else if (step.params?.fill !== undefined) throw new Error(`${at}: params.fill applies only to fill steps`);
+
+  if (step.verb === SCAN_VERBS.BIND) assertValidBind(step, at);
+  else if (step.params?.bind !== undefined) throw new Error(`${at}: params.bind applies only to bind steps`);
+}
+
+function assertValidBind(step: ScanStep, at: string): void {
+  if (step.confirm) throw new Error(`${at}: a bind step acts on the scan; it cannot carry confirm`);
+  const bind = step.params?.bind;
+  if (bind === undefined) return;
+  if (!isPlainObject(bind)) throw new Error(`${at}: params.bind must be an object`);
+  if (bind.scheme !== undefined && (!Number.isInteger(bind.scheme) || bind.scheme < 10 || bind.scheme > 99)) {
+    throw new Error(`${at}: params.bind.scheme must be a scheme version (10-99)`);
+  }
+  if (bind.facet !== undefined && (typeof bind.facet !== 'string' || !FACET_KEY.test(bind.facet))) {
+    throw new Error(`${at}: params.bind.facet must be a facet key`);
+  }
 }
 
 function assertValidItemSelector(accumulate: NonNullable<ScanStepParams['accumulate']>, at: string): void {

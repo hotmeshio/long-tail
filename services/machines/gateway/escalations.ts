@@ -29,6 +29,15 @@ export interface VerbResult {
 export interface RowItem {
   itemKey: string;
   payload: Record<string, any>;
+  /** Who added the item, when Long Tail recorded it. */
+  actor?: string;
+}
+
+/** A created row, or the row that already held the create's key. */
+export interface CreatedRow {
+  id: string;
+  status?: string;
+  created_at?: string;
 }
 
 export interface LineEscalations {
@@ -36,7 +45,7 @@ export interface LineEscalations {
   /** `metadata` is merged (shallow) into the row's metadata in the same statement as the item. */
   accumulate(as: Actor, id: string, itemKey: string, payload: Record<string, any>, metadata?: Record<string, any>): Promise<VerbResult>;
   resolve(as: Actor, id: string, payload: Record<string, any>): Promise<VerbResult>;
-  create(as: Actor, input: CreateRowInput): Promise<{ id: string }>;
+  create(as: Actor, input: CreateRowInput): Promise<CreatedRow>;
   /** The item keys an accumulator row holds. */
   itemKeys(id: string): Promise<string[]>;
   /** The items an accumulator row holds, with their payloads. */

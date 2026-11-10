@@ -103,6 +103,11 @@ export const SCAN_VERBS = {
   HOLD: 'hold',
   /** Fill one open batch slot whose key is the scanned code. */
   FILL: 'fill',
+  /**
+   * Bind the scanned value to the held subject's target (identifier
+   * bindings): one live target per value; a value bound elsewhere is refused.
+   */
+  BIND: 'bind',
 } as const;
 export type ScanVerb = (typeof SCAN_VERBS)[keyof typeof SCAN_VERBS];
 
@@ -116,6 +121,7 @@ export const SCAN_MUTATING_VERBS: readonly ScanVerb[] = [
   SCAN_VERBS.CANCEL,
   SCAN_VERBS.ACCUMULATE,
   SCAN_VERBS.FILL,
+  SCAN_VERBS.BIND,
 ];
 
 export const SCAN_OUTCOMES = {

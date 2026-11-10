@@ -31,7 +31,12 @@ export interface MachineCommand {
    * start of its validity round; any other command the time of its first send.
    */
   issuedAt?: string;
+  /** The id of the machine message this command answers, when it answers one (a machine request). */
+  respondingTo?: string;
 }
+
+/** A codec's own row op: its name, or the name and whether the machine replies to it (it does unless `reply: false`). */
+export type RowOp = string | { op: string; reply?: boolean };
 
 /** MQTT filters under each machine's topic, e.g. `job` or `alarm/+`. */
 export interface CodecChannels {
@@ -87,10 +92,11 @@ export interface LineCodec {
   readonly retainedAlarms?: boolean;
   /**
    * Commands of the machines' own, beyond the line protocol's control ops, that a machine-command row
-   * may ask for. Each is sent through `encode` and the row resolves with the reply. Every entry is a
+   * may ask for. Each is sent through `encode` and the row resolves with the reply. An op declared with
+   * `reply: false` is sent once and its row resolves `sent`, waiting for nothing. Every name is a
    * non-empty string; the gateway refuses a codec whose entries are not.
    */
-  readonly rowOps?: readonly string[];
+  readonly rowOps?: readonly RowOp[];
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   /** The command as wire messages; none when the machines have no such command, and the gateway then sends nothing. */
@@ -102,13 +108,24 @@ export interface LineCodec {
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];
 }
 
-/** The codec's own row ops, each a non-empty string; anything else is a misconfigured codec and throws. */
+const rowOpName = (entry: RowOp): unknown => (typeof entry === 'string' ? entry : entry?.op);
+
+/** The names of the codec's own row ops; an entry without a non-empty name is a misconfigured codec and throws. */
 export function declaredRowOps(codec: Pick<LineCodec, 'rowOps'>): readonly string[] {
   const ops = codec.rowOps ?? [];
-  if (!Array.isArray(ops) || ops.some((op) => typeof op !== 'string' || !op)) {
-    throw new Error('codec.rowOps must be a list of non-empty strings');
+  if (!Array.isArray(ops)) throw new Error('codec.rowOps must be a list of op names or { op, reply } entries');
+  const names = ops.map(rowOpName);
+  if (names.some((op) => typeof op !== 'string' || !op)) {
+    throw new Error('codec.rowOps entries must each name a non-empty op');
   }
-  return ops;
+  return names as string[];
+}
+
+/** The row ops the machines never reply to: sent once, done on publish. */
+export function oneWayOps(codec: Pick<LineCodec, 'rowOps'>): ReadonlySet<string> {
+  declaredRowOps(codec);
+  const ops = (codec.rowOps ?? []).filter((e): e is { op: string; reply?: boolean } => typeof e === 'object' && e.reply === false);
+  return new Set(ops.map((e) => e.op));
 }
 
 export const DISPATCH_ON = { CREATED: 'created', ARRIVAL: 'arrival' } as const;

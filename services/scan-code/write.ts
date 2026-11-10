@@ -21,6 +21,7 @@ import {
 } from './sql';
 import { assertSchemesCoexist, assertValidIdentityRule, assertValidScheme, assertValidSteps } from './validate';
 import { getScanScheme, listScanSchemes } from './read';
+import type { SchemeIdentifier } from '../../types/identifiers';
 
 /** Field validation, then the cross-scheme check against what is stored. */
 async function assertSchemeInput(input: ScanSchemeInput): Promise<void> {
@@ -43,6 +44,8 @@ export interface ScanSchemeInput {
   patterns?: string[];
   precedes_gtin?: boolean | null;
   target_match?: ScanScheme['target_match'];
+  /** Binding settings; an upsert that leaves it out keeps the stored value, and null clears it. */
+  identifier?: SchemeIdentifier | null;
   enabled?: boolean;
 }
 
@@ -73,6 +76,7 @@ function schemeParams(input: ScanSchemeInput): unknown[] {
     JSON.stringify(input.patterns ?? []),
     input.encoding === SCAN_ENCODINGS.PATTERN ? input.precedes_gtin ?? null : null,
     input.target_match ?? SCAN_TARGET_MATCH.VALUE,
+    input.identifier ? JSON.stringify(input.identifier) : null,
   ];
 }
 
@@ -100,7 +104,7 @@ async function assertStepsForScheme(input: ScanRuleInput): Promise<void> {
 
 export async function upsertScanScheme(input: ScanSchemeInput): Promise<ScanScheme> {
   await assertSchemeInput(input);
-  const { rows } = await getPool().query(UPSERT_SCHEME, schemeParams(input));
+  const { rows } = await getPool().query(UPSERT_SCHEME, [...schemeParams(input), input.identifier !== undefined]);
   return rows[0];
 }
 

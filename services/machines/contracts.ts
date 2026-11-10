@@ -22,6 +22,10 @@ export const ROW_TYPE = {
   MACHINE_REGISTRATION: 'machine-registration',
   /** Units a machine finished on hold wait for a quality decision: release, rework or scrap. */
   QUALITY_HOLD: 'quality-hold',
+  /** A machine asks the host something: the host answers, and the gateway sends the answer to the machine. */
+  MACHINE_REQUEST: 'machine-request',
+  /** A machine request still unanswered past its window, shown to the line's operators. */
+  REQUEST_OVERDUE: 'machine-request-overdue',
 } as const;
 
 export const LINE_ROLE = {
@@ -204,6 +208,8 @@ export const DECISION = {
   RELEASE: 'release',
   /** A quality decision on held units: they run again from a station on the route. */
   REWORK: 'rework',
+  /** The machine request an overdue row named has ended. */
+  ANSWERED: 'answered',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
@@ -252,7 +258,8 @@ export interface CommandFacets {
   args: Record<string, unknown>;
 }
 
-export const COMMAND_STATUS = { ...REPLY_STATUS, NO_REPLY: 'no-reply', UNSUPPORTED: 'unsupported' } as const;
+/** `sent`: a one-way command published, with no reply to wait for. */
+export const COMMAND_STATUS = { ...REPLY_STATUS, NO_REPLY: 'no-reply', UNSUPPORTED: 'unsupported', SENT: 'sent' } as const;
 export type CommandStatus = typeof COMMAND_STATUS[keyof typeof COMMAND_STATUS];
 
 /** What resolves a machine-command row: the machine's reply, as data. */
@@ -271,3 +278,46 @@ export const dispatchCommandId = (escalationId: string, round = 1) => (round > 1
 /** A command row's command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
 export const controlCommandId = (escalationId: string, round = 1) => (round > 1 ? `${escalationId}:command:r${round}` : `${escalationId}:command`);
 export const cancelCommandId = (escalationId: string) => `${escalationId}:cancel`;
+
+/** Metadata on a machine-request row. `ref` is the id of the machine message the answer names. */
+export interface RequestFacets {
+  siteId: string;
+  lineId: string;
+  machineId: string;
+  /** The command the answer is sent as, unless the answer names another. */
+  op: string;
+  ref: string;
+  /** How long the request may wait for an answer before the line's operators are shown it. */
+  withinMs?: number;
+  /** The machine's message as the codec decoded it. */
+  event: Record<string, unknown>;
+}
+
+/** The item an answerer adds to a machine-request row; the gateway sends it and resolves the row. */
+export const REQUEST_ITEM = { ANSWER: 'answer' } as const;
+
+/** What an answer item holds: the command's arguments, and the op when it is not the request's. */
+export interface RequestAnswer {
+  args: Record<string, unknown>;
+  op?: string;
+}
+
+/** What resolves a machine-request row, from the gateway. */
+export interface RequestResolution {
+  answered: boolean;
+  machineId: string;
+  op: string;
+  ref: string;
+  status: typeof COMMAND_STATUS.SENT | typeof COMMAND_STATUS.UNSUPPORTED;
+  reason?: string;
+  /** Who added the answer. */
+  answeredBy?: string;
+}
+
+/** The key a machine request is created under, once per machine message. */
+export const requestSignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
+  `machine-request:${siteId}:${lineId}:${machineId}:${ref}`;
+/** The key a request's overdue row is created under, once per request. */
+export const overdueSignalKey = (requestId: string) => `machine-request-overdue:${requestId}`;
+/** The command that carries a request's answer. */
+export const answerCommandId = (escalationId: string) => `${escalationId}:answer`;

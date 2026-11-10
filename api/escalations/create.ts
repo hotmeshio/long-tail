@@ -2,10 +2,12 @@ import { type ValidateFunction } from 'ajv';
 import * as escalationService from '../../services/escalation';
 import * as roleService from '../../services/role';
 import { compileSchemaValidator, formatValidationErrors } from '../../services/role/schema-validator';
-import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs, assertFileRefs } from '../../types/escalation';
+import { ESCALATION_METADATA_KEYS, ESCALATION_ENVELOPE_KEYS, assertLookupRefs, assertFileRefs, type AccumulateConfig } from '../../types/escalation';
 import { mayBuild } from '../../modules/capabilities';
 import { assertQueueManageAccess } from './helpers';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
+
+const SIGNAL_KEY_MAX = 255;
 
 // ── Create ────────────────────────────────────────────────────────────────
 
@@ -24,8 +26,10 @@ import type { LTApiResult, LTApiAuth } from '../../types/sdk';
  * @param input.envelope — serialized context for the resolver
  * @param input.metadata — arbitrary key-value data (e.g. signal_routing)
  * @param input.escalation_payload — serialized payload for the resolver UI
+ * @param input.accumulate opens the row as an accumulator (`{ max?, unique?, resolveAtMax? }`), so items are added before it resolves
+ * @param input.signal_key creates the row once per key: a repeat returns the existing row (200)
  * @param auth — authenticated user context (must hold target role or be superadmin)
- * @returns `{ status: 201, data: <escalation record> }`
+ * @returns `{ status: 201, data: <escalation record> }`; 200 with the existing row for a held key on the same role; 409 when another role's row holds it
  */
 export async function createEscalation(
   input: {
@@ -45,6 +49,8 @@ export async function createEscalation(
     workflow_id?: string;
     task_queue?: string;
     workflow_type?: string;
+    signal_key?: string;
+    accumulate?: AccumulateConfig;
   },
   auth: LTApiAuth,
 ): Promise<LTApiResult> {
@@ -55,6 +61,12 @@ export async function createEscalation(
     }
     if (!role || typeof role !== 'string') {
       return { status: 400, error: 'role is required' };
+    }
+    const accumulateError = accumulateRefusal(input.accumulate);
+    if (accumulateError) return { status: 400, error: accumulateError };
+    const signalKey = input.signal_key;
+    if (signalKey !== undefined && (typeof signalKey !== 'string' || !signalKey || signalKey.length > SIGNAL_KEY_MAX)) {
+      return { status: 400, error: `signal_key must be a non-empty string of at most ${SIGNAL_KEY_MAX} characters` };
     }
 
     // RBAC: creating an escalation injects work into a role's queue — a write_all
@@ -116,7 +128,7 @@ export async function createEscalation(
       }
     }
 
-    const escalation = await escalationService.createEscalation({
+    const row = {
       type,
       subtype: input.subtype ?? type,
       description: input.description,
@@ -131,12 +143,28 @@ export async function createEscalation(
       workflow_id: input.workflow_id,
       task_queue: input.task_queue,
       workflow_type: input.workflow_type,
-    });
+      ...(input.accumulate ? { accumulate: input.accumulate } : {}),
+    };
 
     // Event published by service layer (services/escalation/crud.ts)
-
-    return { status: 201, data: escalation };
+    if (signalKey === undefined) return { status: 201, data: await escalationService.createEscalation(row) };
+    const { escalation, created } = await escalationService.createEscalationOnce(row, signalKey);
+    if (created) return { status: 201, data: escalation };
+    if (escalation.role !== role) return { status: 409, error: 'signal_key is held by another row' };
+    return { status: 200, data: escalation };
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+/** Why an accumulate declaration is refused; null when it is absent or well formed. */
+function accumulateRefusal(accumulate: unknown): string | null {
+  if (accumulate === undefined) return null;
+  if (!accumulate || typeof accumulate !== 'object' || Array.isArray(accumulate)) return 'accumulate must be an object';
+  const { max, unique, resolveAtMax, ...other } = accumulate as Record<string, unknown>;
+  if (Object.keys(other).length) return `accumulate takes max, unique and resolveAtMax; not ${Object.keys(other).join(', ')}`;
+  if (max !== undefined && (!Number.isInteger(max) || (max as number) < 1)) return 'accumulate.max must be a positive integer';
+  if (unique !== undefined && typeof unique !== 'boolean') return 'accumulate.unique must be a boolean';
+  if (resolveAtMax !== undefined && typeof resolveAtMax !== 'boolean') return 'accumulate.resolveAtMax must be a boolean';
+  return null;
 }

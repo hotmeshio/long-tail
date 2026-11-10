@@ -42,6 +42,28 @@ const LOOKUP_LIMIT = 1000;
 export async function createEscalation(
   input: CreateEscalationInput,
 ): Promise<LTEscalationRecord> {
+  const entry = await insertEscalation(input);
+  return announceCreated(toEscalationRecord(entry));
+}
+
+/**
+ * Create a row once per `signalKey`: the first call creates it; a later call
+ * with the same key returns the row that holds the key, created by nobody.
+ * The store's unique signal key decides, so concurrent callers agree.
+ */
+export async function createEscalationOnce(
+  input: CreateEscalationInput,
+  signalKey: string,
+): Promise<{ escalation: LTEscalationRecord; created: boolean }> {
+  const entry = await insertEscalation(input, signalKey);
+  if (entry) return { escalation: announceCreated(toEscalationRecord(entry)), created: true };
+  const existing = await getEscalationBySignalKey(signalKey);
+  if (!existing) throw new Error(`no escalation holds signal key ${signalKey}`);
+  return { escalation: existing, created: false };
+}
+
+/** The row as stored; undefined when `signalKey` is already held. */
+async function insertEscalation(input: CreateEscalationInput, signalKey?: string) {
   // Lookup refs must pin immutable knowledge editions — reject malformed refs
   // before the row exists rather than let a broken grant reach the queue.
   const envelopeObj = toEnvelopeObject(input.envelope);
@@ -52,7 +74,7 @@ export async function createEscalation(
     assertFileRefs(envelopeObj[ESCALATION_ENVELOPE_KEYS.FILES]);
   }
   const client = await escalations();
-  const entry = await client.create({
+  return client.create({
     type: input.type,
     subtype: input.subtype,
     description: input.description,
@@ -69,9 +91,12 @@ export async function createEscalation(
     envelope: envelopeObj,
     metadata: input.metadata,
     escalationPayload: toJsonObject(input.escalation_payload),
+    ...(input.accumulate ? { accumulate: input.accumulate } : {}),
+    ...(signalKey ? { signalKey } : {}),
   });
-  const escalation = toEscalationRecord(entry);
+}
 
+function announceCreated(escalation: LTEscalationRecord): LTEscalationRecord {
   publishEscalationChange({
     type: 'escalation.created',
     source: 'service',
@@ -83,7 +108,6 @@ export async function createEscalation(
     status: 'pending',
     data: escalationEventData(escalation),
   });
-
   return escalation;
 }
 

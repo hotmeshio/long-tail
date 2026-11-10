@@ -36,6 +36,7 @@ export const SCAN_VERBS = {
   PRESENT: 'present',
   HOLD: 'hold',
   FILL: 'fill',
+  BIND: 'bind',
 } as const;
 export type ScanVerb = (typeof SCAN_VERBS)[keyof typeof SCAN_VERBS];
 
@@ -68,7 +69,14 @@ export interface ScanScheme {
   grant_max_uses: number;
   /** Identity kind only: 'action' spends a use per act; 'subject' binds to one held subject. */
   grant_scope: 'action' | 'subject';
+  /** Binding settings: who may bind this scheme's values, and whether a target holds one live value. */
+  identifier?: SchemeIdentifier | null;
   enabled: boolean;
+}
+
+export interface SchemeIdentifier {
+  binders?: string[];
+  exclusiveTarget?: boolean;
 }
 
 export interface ScanStep {
@@ -189,6 +197,8 @@ export interface ScanStepParams {
     /** Into-subject: a per-key map naming the value each key belongs to; the held target's keys fill first. */
     prefer?: string;
   };
+  /** Bind verb options: the scheme the binding is kept under, and the held row's facet it binds to. */
+  bind?: { scheme?: number; facet?: string };
 }
 
 /** The station's pointer to the item it is holding. */

@@ -44,8 +44,12 @@ const result = await lt.escalations.create({
 | `envelope` | `string` | No | JSON-serialized workflow envelope |
 | `metadata` | `object` | No | Arbitrary metadata; include `form_schema` for typed resolver forms |
 | `escalation_payload` | `string` | No | JSON context data shown to the reviewer |
+| `signal_key` | `string` | No | Creates the row once per key (1-255 characters). A repeat on the same role returns the row that holds the key, whatever its status |
+| `accumulate` | `object` | No | Opens the row as an accumulator, `{ max?, unique?, resolveAtMax? }`, so items are added before it resolves |
 
-**Returns:** `LTApiResult<Escalation>` with status 201.
+**Returns:** `LTApiResult<Escalation>` with status 201 for a new row; 200 with the existing row when `signal_key` is already held on the same role; 409 when a row on another role holds it.
+
+A keyed row resolves through `resolveBySignalKey` like a workflow's. Use a key prefix of your own (`machine-request:`, `plate-swap:`), so a key never collides with a `conditional()` signal id: a workflow that later waits on a held key parks no row of its own.
 
 **Auth:** Required (RBAC enforced)
 

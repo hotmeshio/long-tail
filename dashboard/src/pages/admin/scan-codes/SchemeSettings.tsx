@@ -6,6 +6,7 @@ import { ConfirmDeleteModal } from '../../../components/common/modal/ConfirmDele
 import { GrantScopeField } from './GrantScopeField';
 import { SchemeMatchFields, patternLines, patternsValid, type TargetMatch } from './SchemeMatchFields';
 import { SectionGroup } from './SectionGroup';
+import { SchemeBindingFields, bindersText, identifierOf } from './SchemeBindingFields';
 
 /** A generated badge's length when the scheme sets none (matches the server). */
 const DEFAULT_BADGE_LENGTH = 10;
@@ -26,6 +27,8 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
   const [patternsText, setPatternsText] = useState((scheme.patterns ?? []).join('\n'));
   const [precedesGtin, setPrecedesGtin] = useState<boolean | null>(scheme.precedes_gtin ?? null);
   const [badgeLength, setBadgeLength] = useState(scheme.target_length ?? DEFAULT_BADGE_LENGTH);
+  const [binders, setBinders] = useState(bindersText(scheme.identifier));
+  const [exclusiveTarget, setExclusiveTarget] = useState(scheme.identifier?.exclusiveTarget === true);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const isIdentity = kind === SCAN_SCHEME_KINDS.IDENTITY;
@@ -41,6 +44,7 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
     || targetFacet !== scheme.target_facet
     || enabled !== scheme.enabled
     || kind !== scheme.kind
+    || JSON.stringify(identifierOf(binders, exclusiveTarget)) !== JSON.stringify(identifierOf(bindersText(scheme.identifier), scheme.identifier?.exclusiveTarget === true))
     || (mintsBadges && badgeLength !== (scheme.target_length ?? DEFAULT_BADGE_LENGTH))
     || (isIdentity && (grantTtlSeconds !== scheme.grant_ttl_seconds || grantMaxUses !== scheme.grant_max_uses
       || grantScope !== (scheme.grant_scope ?? 'action')));
@@ -136,6 +140,14 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
           precedesGtin={precedesGtin}
           onPrecedesGtin={setPrecedesGtin}
         />
+        {!isIdentity && (
+          <SchemeBindingFields
+            binders={binders}
+            onBinders={setBinders}
+            exclusiveTarget={exclusiveTarget}
+            onExclusiveTarget={setExclusiveTarget}
+          />
+        )}
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Status</span>
           <span className="block text-2xs text-text-tertiary mb-1">Disable to reject every scan of this version.</span>
@@ -163,6 +175,7 @@ export function SchemeSettings({ scheme, ruleCount }: { scheme: ScanScheme; rule
               grant_ttl_seconds: isIdentity ? grantTtlSeconds : null,
               grant_max_uses: isIdentity ? grantMaxUses : 0,
               grant_scope: isIdentity ? grantScope : 'action',
+              identifier: isIdentity ? scheme.identifier ?? null : identifierOf(binders, exclusiveTarget),
               enabled,
             })}
             className="btn-primary text-xs"

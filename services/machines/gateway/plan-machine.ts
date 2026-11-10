@@ -13,7 +13,7 @@
  */
 
 import { DECISION, HANDOFF_ERROR, LINE_ROLE, ROW_TYPE, itemKeys } from '../contracts';
-import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type Envelope, type ParsedTopic } from '../../../lib/machines/protocol';
+import { JOB_EVENT, JOB_RESULT, LEVEL, MESSAGE_KIND, OP, STOPPING_LEVELS, type Envelope, type Inspection, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION } from '../../../lib/machines/transport';
 import { ESCALATION_ENVELOPE_KEYS, type EscalationLookupRef } from '../../../types/escalation';
 import { CONTROLLER, type Action, type Plan } from './actions';
@@ -21,17 +21,21 @@ import { dispatchAction, latestArrival } from './pacing';
 import { failHandoff, holdForResolver } from './plan-shared';
 import { dispatchJobs, jobOwns } from './jobs';
 import { noteJobEvent, notePause, noteResume } from './lifecycle';
+import { planRequest } from './plan-request';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type AlarmTrack, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
 const nak: Plan = { actions: [], disposition: DISPOSITION.NAK };
 
-export function planMachineMessage(state: GatewayState, parsed: ParsedTopic, env: Envelope | null, dispatchTtlMs: number): Plan {
+/** `seen`: the codec's inspection, when the message may ask the host for an answer (plan-request.ts). */
+export function planMachineMessage(
+  state: GatewayState, parsed: ParsedTopic, env: Envelope | null, dispatchTtlMs: number, seen?: Pick<Inspection, 'answer' | 'receiptId' | 'body'>,
+): Plan {
   const m = parsed.ident.machineId;
   const b: Record<string, any> = env?.body ?? {};
   const plan = planByKind(state, m, parsed, env, b, dispatchTtlMs);
-  return { ...plan, actions: [...heard(state, m), ...plan.actions] };
+  return { ...plan, actions: [...heard(state, m), ...plan.actions, ...planRequest(state, parsed, seen)] };
 }
 
 function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: Envelope | null, b: Record<string, any>, ttl: number): Plan {

@@ -18,6 +18,7 @@ export const VERB_LABELS: Record<ScanVerb, string> = {
   [SCAN_VERBS.PRESENT]: 'Show reality + choices',
   [SCAN_VERBS.HOLD]: 'Hold it for the next scan',
   [SCAN_VERBS.FILL]: 'Check off one expected item',
+  [SCAN_VERBS.BIND]: 'Bind the code to the held item',
 };
 
 /** One condition/action step: the query, the verb, and the verb's parameters. */
@@ -123,11 +124,12 @@ export function StepRow({
             onChange={(e) => {
               const verb = e.target.value as ScanVerb;
               const fills = verb === SCAN_VERBS.FILL;
+              const holds = fills || verb === SCAN_VERBS.BIND;
               onPatch({
                 verb,
                 params: fills ? { fill: { into: 'subject' } } : undefined,
                 confirm: undefined, choices: undefined, autoSelectSingle: undefined,
-                subject: fills ? { schemes: [] } : undefined, match: undefined, refuse: undefined,
+                subject: holds ? { schemes: [] } : undefined, match: undefined, refuse: undefined,
               });
             }}
             className="select"

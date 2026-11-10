@@ -4,6 +4,7 @@
  */
 
 import type { Disposition } from '../../../lib/machines/transport';
+import type { AccumulateConfig } from '../../../types/escalation';
 
 export const CONTROLLER = 'controller';
 export type Actor = string;
@@ -19,6 +20,10 @@ export interface CreateRowInput {
   envelope?: string;
   /** What the row shows a person, serialized. */
   escalation_payload?: string;
+  /** The row is created once per key; a repeat returns the row that holds it. */
+  signal_key?: string;
+  /** Open the row as an accumulator, so items are added before it resolves. */
+  accumulate?: AccumulateConfig;
 }
 
 export type Action =
@@ -46,7 +51,15 @@ export type Action =
   /** An approved registration the gateway will not bind, and why. */
   | { kind: 'refuseBinding'; machineId: string; address: string; reason: string }
   /** Jobs a restarted machine lost that this gateway cannot send again: nothing of them is remembered. */
-  | { kind: 'unrecoverable'; machineId: string; jobs: string[] };
+  | { kind: 'unrecoverable'; machineId: string; jobs: string[] }
+  /** A machine message asks the host for an answer: park its request row, once per message. `row.role` empty: the machine's own role. */
+  | { kind: 'parkRequest'; machineId: string; ref: string; row: CreateRowInput }
+  /** A message whose answer the gateway cannot ask for, and why. */
+  | { kind: 'refuseRequest'; machineId: string; reason: string }
+  /** Send the answer a request row holds, then resolve the row. */
+  | { kind: 'answer'; rowId: string }
+  /** Raise an overdue row once the request's window passes unanswered. */
+  | { kind: 'watchLate'; rowId: string };
 
 /** Once the row holds every one of `keys`: resolve it with `payload`, or run `then` instead. */
 export interface Completion {

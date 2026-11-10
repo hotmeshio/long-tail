@@ -40,7 +40,7 @@ function planOne(ctx: DryRunContext, state: GatewayState, raw: Inspection): Wire
   if (!admitted.seen) return admitted.actions;
   if (raw.violations.length && ctx.codec.strict) return [...admitted.actions, { verb: 'hold', detail: raw.violations.join('; ') }];
   try {
-    const plan = planMachineMessage(state, admitted.seen.parsed!, admitted.seen.body, ctx.dispatchTtlMs);
+    const plan = planMachineMessage(state, admitted.seen.parsed!, admitted.seen.body, ctx.dispatchTtlMs, admitted.seen);
     const actions = [...admitted.actions, ...plan.actions.map(plannedAction)];
     return appliedActions({ disposition: plan.disposition, failed: false, actions }, 1);
   } catch (err: any) {
