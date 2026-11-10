@@ -82,6 +82,7 @@ router.put('/schemes/:version', requireRoleManager, async (req, res) => {
     patterns: req.body.patterns,
     precedes_gtin: req.body.precedes_gtin,
     target_match: req.body.target_match,
+    identifier: req.body.identifier,
     enabled: req.body.enabled,
   });
   res.status(result.status).json(result.data ?? { error: result.error });

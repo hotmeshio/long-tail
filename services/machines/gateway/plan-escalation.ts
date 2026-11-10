@@ -10,11 +10,12 @@
 
 import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
-import { CONTROL_OPS, OP } from '../../../lib/machines/protocol';
+import { OP } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action } from './actions';
-import { cancelDispatch } from './plan-shared';
+import { cancelDispatch, rowOpsOf } from './plan-shared';
+import { planOverdueRow, planRequestRow } from './plan-request';
 import { jobOwns } from './jobs';
 import { admit, dispatchAction, hasRoom, jobRefusal, refuseUnfit, softwareRefusal } from './pacing';
 import { readTrace } from './trace';
@@ -22,17 +23,20 @@ import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './s
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { planRegistrationRow, reachable } from './registration';
 
-const VERB = { CREATED: 'created', CLAIMED: 'claimed', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
+const VERB = { CREATED: 'created', CLAIMED: 'claimed', UPDATED: 'updated', RESOLVED: 'resolved', CANCELLED: 'cancelled', EXPIRED: 'expired' } as const;
 
 /** The stored status a row must have for each verb the gateway acts on. */
 const STATUS_FOR_VERB: Record<string, string> = {
-  [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
+  [VERB.CREATED]: 'pending', [VERB.CLAIMED]: 'pending', [VERB.UPDATED]: 'pending', [VERB.RESOLVED]: 'resolved', [VERB.CANCELLED]: 'cancelled', [VERB.EXPIRED]: 'expired',
 };
 
 /** The metadata key an accumulator row parked with an item limit carries. */
 const ACCUMULATE_MAX = 'accumulate_max';
 
-const LINE_ROW_TYPES: string[] = [ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION];
+const LINE_ROW_TYPES: string[] = [
+  ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION,
+  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.REQUEST_OVERDUE,
+];
 
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
   const metadata = data?.metadata;
@@ -52,6 +56,8 @@ function onThisLine(line: LineDef, at: { siteId?: unknown; lineId?: unknown }): 
 /** Whether an event names a row this line acts on; only then is the stored row read. */
 export function concernsLine(state: GatewayState, line: LineDef, event: EscalationEvent, rows: HandoffRowAdapter = standardRows): boolean {
   if (!STATUS_FOR_VERB[event.verb]) return false;
+  // An added item matters only on a request row, where it may be the answer.
+  if (event.verb === VERB.UPDATED) return event.data?.type === ROW_TYPE.MACHINE_REQUEST && onThisLine(line, event.data?.metadata ?? {});
   if (state.get(event.escalationId)) return true;
   const facets = rows.toHandoff({ ...event.data, id: event.escalationId, role: event.role });
   if (facets) return onThisLine(line, facets);
@@ -82,6 +88,8 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.MACHINE_OFFLINE || type === ROW_TYPE.MACHINE_QUIET) return planLinkRow(state, event);
   if (type === ROW_TYPE.MACHINE_COMMAND) return planCommandRow(state, line, event);
   if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, line, event) : [];
+  if (type === ROW_TYPE.MACHINE_REQUEST) return planRequestRow(state, event);
+  if (type === ROW_TYPE.REQUEST_OVERDUE) return event.role === operatorRole(line) ? planOverdueRow(state, event) : [];
   return [];
 }
 
@@ -90,7 +98,7 @@ function commandRefusal(state: GatewayState, line: LineDef, c: CommandFacets, ro
   if (!onLine(line, c.machineId)) return `${c.machineId} is not on ${line.siteId}/${line.lineId}`;
   const own = machineRole(machineById(line, c.machineId));
   if (role !== own) return `commands for ${c.machineId} are parked on ${own}, not ${role}`;
-  const allowed = rowOps(state);
+  const allowed = rowOpsOf(state);
   if (!allowed.includes(c.op)) return `${c.op} is not a command a row may ask for; one of ${allowed.join(', ')}`;
   if (c.op === OP.CANCEL && typeof c.args.jobId !== 'string') return `${OP.CANCEL} needs args.jobId, the job to withdraw or stop`;
   if (!reachable(state, line, c.machineId)) return `${c.machineId} has not registered an address yet`;
@@ -112,11 +120,6 @@ function planCommandRow(state: GatewayState, line: LineDef, event: EscalationEve
   }
   const createdAt = event.data?.created_at ? new Date(event.data.created_at).getTime() : NaN;
   return [{ kind: 'control', rowId: id, machineId: c.machineId, op: c.op, args: c.args, ...(Number.isFinite(createdAt) ? { createdAt } : {}) }];
-}
-
-/** The ops a machine-command row may ask for: the control ops, a snapshot, and the codec's own. */
-function rowOps(state: GatewayState): string[] {
-  return [...CONTROL_OPS, OP.SNAPSHOT, ...state.rowOps];
 }
 
 function onLine(line: LineDef, machineId: string | null): machineId is string {

@@ -211,7 +211,7 @@ describe('the badge layer', () => {
     // acting), but their OWN RBAC denies the mutation.
     const { data: users } = await admin.get('/api/users');
     const engineer = users.users.find((u: any) => u.external_id === 'engineer');
-    await admin.put(`/api/users/${engineer.id}`, { metadata: { badge_id: 'BADGE-ENGINEER-0001' } });
+    await admin.patch(`/api/users/${engineer.id}/properties`, { set: { badge_id: 'BADGE-ENGINEER-0001' } });
     for (const role of ['printer-fleet', 'printer-harvest', 'printer-service']) {
       await admin.post(`/api/users/${engineer.id}/roles`, {
         role, type: 'member', read_scope: 'all', write_scope: 'none',

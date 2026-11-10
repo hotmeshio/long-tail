@@ -1,3 +1,4 @@
+import type { AccumulateConfig } from '../../types/escalation';
 import type { LTEscalationRecord } from '../../types';
 
 export interface CreateEscalationInput {
@@ -17,6 +18,8 @@ export interface CreateEscalationInput {
   workflow_type?: string;
   trace_id?: string;
   span_id?: string;
+  /** Open the row as an accumulator: items are added to it before it resolves. */
+  accumulate?: AccumulateConfig;
 }
 
 export interface ClaimResult {

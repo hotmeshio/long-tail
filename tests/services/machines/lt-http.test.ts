@@ -64,6 +64,18 @@ describe('Long Tail HTTP client', () => {
     expect(server.seen.every((s) => s.auth === 'Bearer tok-controller')).toBe(true);
   });
 
+  it('a keyed create sends its key and accumulate declaration, and reads back the row that holds the key, with its status', async () => {
+    server = await new FakeLtServer()
+      .on('POST', /^\/escalations$/, () => ({ status: 200, body: { id: 'e4', status: 'resolved', created_at: '2026-11-09T00:00:00.000Z', role: 'press' } }))
+      .on('GET', /\/items$/, () => ({ status: 200, body: { items: [{ itemKey: 'answer', payload: { args: {} }, actor: 'bot-1' }] } }))
+      .start();
+    const lt = client(server);
+    const row = await lt.create('controller', { type: 'machine-request', role: 'press', description: 'd', priority: 2, metadata: {}, signal_key: 'k-1', accumulate: {} });
+    expect(row).toEqual({ id: 'e4', status: 'resolved', created_at: '2026-11-09T00:00:00.000Z' });
+    expect(server.seen[0].body).toMatchObject({ signal_key: 'k-1', accumulate: {} });
+    expect(await lt.items('e4')).toEqual([{ itemKey: 'answer', payload: { args: {} }, actor: 'bot-1' }]);
+  });
+
   it('sends an accumulate metadata patch in the body, and none when there is none', async () => {
     server = await new FakeLtServer().on('POST', /accumulate$/, () => ({ status: 200, body: { outcome: 'accepted' } })).start();
     const lt = client(server);

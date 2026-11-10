@@ -18,6 +18,7 @@ import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher, GatewayStopped } from './dispatcher';
 import { failHandoff } from './plan-shared';
+import { RequestRunner } from './requests-runner';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 import { plannedAction, type WireRecorder } from './wire';
 
@@ -42,7 +43,7 @@ export interface ExecutorDeps {
 }
 
 type DispatchAction = Extract<Action, { kind: 'dispatch' }>;
-type CommandAction = Extract<Action, { kind: 'command' | 'control' }>;
+type CommandAction = Extract<Action, { kind: 'command' | 'control' | 'answer' }>;
 
 /** A verb's outcome as the wire records it: done, already done, or refused by Long Tail. */
 function outcomeOf(verb: WireVerb, rowId: string, result: VerbResult): WireAction {
@@ -58,9 +59,13 @@ export class Executor {
   private stopped = false;
 
   private readonly dispatcher: Dispatcher;
+  private readonly requests: RequestRunner;
 
   constructor(private readonly d: ExecutorDeps) {
     this.dispatcher = new Dispatcher(d);
+    this.requests = new RequestRunner({
+      ...d, dispatcher: this.dispatcher, live: () => this.live(), track: (work) => this.track(work), schedule: (fn, ms) => this.after(ms, fn),
+    });
   }
 
   /** Dispatches and commands run detached so one slow reply never holds up the feed. */
@@ -70,6 +75,7 @@ export class Executor {
       if (action.kind === 'dispatch') this.track(this.dispatcher.dispatch(action));
       else if (action.kind === 'command') this.track(this.dispatcher.command(action));
       else if (action.kind === 'control') this.track(this.dispatcher.control(action));
+      else if (action.kind === 'answer') this.track(this.requests.answer(action));
       else {
         done.push(...await this.run(action));
         continue;
@@ -149,6 +155,14 @@ export class Executor {
         return [plannedAction(a)];
       case 'unrecoverable':
         this.d.log.warn(GATEWAY_LOG.DISPATCH_UNRECOVERABLE, { machine: a.machineId, jobs: a.jobs });
+        return [plannedAction(a)];
+      case 'parkRequest':
+        return [await this.requests.park(a)];
+      case 'refuseRequest':
+        this.d.log.warn(GATEWAY_LOG.REQUEST_REFUSED, { machine: a.machineId, reason: a.reason });
+        return [plannedAction(a)];
+      case 'watchLate':
+        this.requests.watchLate(a.rowId);
         return [plannedAction(a)];
     }
   }
@@ -271,10 +285,15 @@ export class Executor {
   }
 
   private watchOffline(machineId: string): void {
+    this.after(this.d.offlineDebounceMs, () => this.track(this.raiseOffline(machineId)));
+  }
+
+  /** Run `fn` after `ms`, unless the gateway stops first. */
+  private after(ms: number, fn: () => void): void {
     const timer = setTimeout(() => {
       this.timers.delete(timer);
-      this.track(this.raiseOffline(machineId));
-    }, this.d.offlineDebounceMs);
+      fn();
+    }, ms);
     this.timers.add(timer);
   }
 

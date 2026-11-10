@@ -9,7 +9,7 @@
 import { isUuid } from '../../../lib/uuid';
 import type { OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type LineEscalations, type RowItem, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 
 export class LtHttpError extends Error {
   readonly cause?: unknown;
@@ -79,9 +79,9 @@ export class HttpLineEscalations implements LineEscalations {
     return this.verb(as, 'POST', `/escalations/${id}/resolve`, { resolverPayload: payload });
   }
 
-  async create(as: Actor, input: CreateRowInput): Promise<{ id: string }> {
-    const row = await this.http.request<{ id: string }>('POST', '/escalations', this.tokenFor(as), input);
-    return { id: row.id };
+  async create(as: Actor, input: CreateRowInput): Promise<CreatedRow> {
+    const row = await this.http.request<CreatedRow>('POST', '/escalations', this.tokenFor(as), input);
+    return { id: row.id, ...(row.status ? { status: row.status } : {}), ...(row.created_at ? { created_at: row.created_at } : {}) };
   }
 
   async itemKeys(id: string): Promise<string[]> {
@@ -90,10 +90,10 @@ export class HttpLineEscalations implements LineEscalations {
 
   async items(id: string): Promise<RowItem[]> {
     try {
-      const view = await this.http.request<{ items: { itemKey: string; payload?: Record<string, any> }[] }>(
+      const view = await this.http.request<{ items: { itemKey: string; payload?: Record<string, any>; actor?: string | null }[] }>(
         'GET', `/escalations/${id}/items`, this.tokenFor(CONTROLLER),
       );
-      return view.items.map((i) => ({ itemKey: i.itemKey, payload: i.payload ?? {} }));
+      return view.items.map((i) => ({ itemKey: i.itemKey, payload: i.payload ?? {}, ...(i.actor ? { actor: i.actor } : {}) }));
     } catch (err) {
       if (err instanceof LtHttpError && err.status === NO_ITEMS_STATUS) return [];
       throw err;

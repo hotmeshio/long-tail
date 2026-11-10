@@ -91,6 +91,12 @@ A scheme (`lt_config_scan_schemes`, indexed 10–99) declares:
     leaves it to the gtin scheme. A write that leaves the order undeclared
     while both are enabled is refused, naming both schemes.
 
+- **`identifier`** — binding settings, for schemes whose values are bound
+  to targets ([identifier bindings](identifiers.md)): `binders`, the roles
+  that may bind and retire values besides role managers, and
+  `exclusiveTarget`, which holds one live value per target. A save that
+  leaves `identifier` out keeps the stored settings; `null` clears them.
+
 ## Rules and steps
 
 A rule (`lt_config_scan_actions`) is a friendly name — print it beside the
@@ -136,6 +142,7 @@ Verbs are the canonical escalation actions:
 | `escalate` | Create an escalation in another queue, optionally closing the located one | `targetRole`, `closeCurrent`, `escalationType`, `description`, `metadata` |
 | `cancel` | Claim-as-lock, then cancel | — |
 | `accumulate` | Add the scanned item to an open accumulator escalation | `itemKey` (template), `resolverPayload`, `metadata`, `accumulate: { containerFacet, container, containerRoles, reciprocal }` |
+| `bind` | Bind the scanned value to the held item's target ([identifier bindings](identifiers.md)); a value bound to something else is refused, and the same pair again answers already | `bind: { scheme?, facet? }`: the scheme the binding is kept under (the scanned code's by default) and the held row's facet it binds to (its scheme's target facet by default). Needs a subject gate |
 
 `availability` names the claim state a step's row must be in:
 

@@ -88,6 +88,8 @@ export interface ScanExecuteResponse {
   verb?: ScanVerb;
   /** Single matched escalation (show-detail, claim, resolve, escalate, cancel outcomes). */
   escalation?: Record<string, any>;
+  /** The binding a bind step made, or found already standing. */
+  binding?: { id: string; scheme_version: number; raw: string; target: string };
   /** Multiple matches (show-list). */
   escalations?: Record<string, any>[];
   total?: number;

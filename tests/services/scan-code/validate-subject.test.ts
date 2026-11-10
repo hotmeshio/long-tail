@@ -36,8 +36,8 @@ describe('subject steps', () => {
     expect(check(binIt({ subject: { schemes: [11], facets: { binState: ['x'] as any } } }))).toThrow(/string, number, or boolean/);
   });
 
-  it('a subject gate applies only to accumulate and fill', () => {
-    expect(check(binIt({ verb: 'resolve', params: { resolverPayload: {} } }))).toThrow(/only to accumulate and fill/);
+  it('a subject gate applies only to accumulate, fill and bind', () => {
+    expect(check(binIt({ verb: 'resolve', params: { resolverPayload: {} } }))).toThrow(/only to accumulate, fill and bind/);
   });
 
   it('from-subject needs an item key; from and into are exclusive; no item-mode facet', () => {

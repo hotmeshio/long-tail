@@ -84,6 +84,11 @@ export class Dispatcher {
     if (this.stopping.signal.aborted) throw new GatewayStopped();
   }
 
+  /** Throws once the gateway has stopped: work still running changes no row. */
+  assertLive(): void {
+    this.live();
+  }
+
   /**
    * This send's attempt number, whether the machine may have the command already, and when it was
    * issued: the time given (a round's start, the same for every gateway), else the first send's.
@@ -99,10 +104,10 @@ export class Dispatcher {
   }
 
   /** False when the codec has no message for the command. `since` is when the command's row was created. */
-  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number, issuedAt?: number): Promise<boolean> {
+  async publish(machineId: string, op: string, cmdId: string, args: Record<string, any>, since?: number, issuedAt?: number, respondingTo?: string): Promise<boolean> {
     this.live();
     const ident = identFor(this.d.state, this.d.line, machineId);
-    const command = { cmdId, op, args, ...this.countSend(cmdId, since, issuedAt) };
+    const command = { cmdId, op, args, ...this.countSend(cmdId, since, issuedAt), ...(respondingTo ? { respondingTo } : {}) };
     const wires = this.d.codec.encode(ident, command);
     for (const wire of wires) {
       await this.d.bus.publish(wire.topic, wire.payload);
@@ -126,6 +131,11 @@ export class Dispatcher {
     return null;
   }
 
+  /** Publish once and wait for nothing: for commands the machine never replies to. False when the codec has no message for it. */
+  async tell(machineId: string, op: string, cmdId: string, args: Record<string, any>, respondingTo?: string): Promise<boolean> {
+    return this.publish(machineId, op, cmdId, args, undefined, undefined, respondingTo);
+  }
+
   async command(a: CommandAction): Promise<void> {
     const reply = await this.ask(a.machineId, a.op, a.cmdId, a.args);
     if (!reply) this.d.log.warn(GATEWAY_LOG.COMMAND_UNANSWERED, { machine: a.machineId, op: a.op, cmdId: a.cmdId });
@@ -143,6 +153,7 @@ export class Dispatcher {
    * again by a new gateway is the same command with the same arguments.
    */
   async control(a: ControlAction): Promise<void> {
+    if (this.d.state.oneWayOps.has(a.op)) return this.controlOneWay(a);
     const now = Date.now();
     const ttlMs = this.d.replyTimeoutMs * this.d.dispatchAttempts;
     const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, ttlMs);
@@ -157,6 +168,19 @@ export class Dispatcher {
     if (outcome.accepted) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
     else this.d.log.warn(!reply ? GATEWAY_LOG.COMMAND_UNANSWERED : fromMachine(reply) ? GATEWAY_LOG.COMMAND_REFUSED : GATEWAY_LOG.COMMAND_UNSUPPORTED, context);
     this.check(a.rowId, 'resolve', await this.d.lt.resolve(fromMachine(reply) ? a.machineId : CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
+  }
+
+  /** A one-way command row: sent once, resolved `sent` by the controller; nothing is waited for or sent again. */
+  private async controlOneWay(a: ControlAction): Promise<void> {
+    const sent = await this.tell(a.machineId, a.op, controlCommandId(a.rowId), a.args);
+    this.live();
+    const outcome: CommandResolution = sent
+      ? { accepted: true, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.SENT }
+      : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.UNSUPPORTED, reason: `the line's codec has no ${a.op} command` };
+    const context = { row: a.rowId, machine: a.machineId, op: a.op, status: outcome.status };
+    if (sent) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
+    else this.d.log.info(GATEWAY_LOG.COMMAND_UNSUPPORTED, context);
+    this.check(a.rowId, 'resolve', await this.d.lt.resolve(CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
   }
 
   async dispatch(a: DispatchAction): Promise<void> {

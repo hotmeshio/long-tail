@@ -6,8 +6,8 @@
  */
 
 import { CONTROLLER, type Actor, type CreateRowInput } from '../gateway/actions';
-import { VERB_OUTCOME, type LineEscalations, type RowItem, type VerbResult } from '../gateway/escalations';
-import { ROW_TYPE, type HandoffFacets } from '../contracts';
+import { VERB_OUTCOME, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from '../gateway/escalations';
+import { REQUEST_ITEM, ROW_TYPE, type HandoffFacets } from '../contracts';
 import type { MemoryEscalationFeed } from '../../../lib/machines/transport';
 import { until } from './wait';
 import type { OpenRowQuery } from '../rows';
@@ -33,6 +33,8 @@ export interface Call { verb: string; as: Actor; id: string; payload?: any }
 export class FakeLongTail implements LineEscalations {
   readonly rows = new Map<string, FakeRow>();
   readonly calls: Call[] = [];
+  /** Rows by the key they were created under, as Long Tail's unique signal key keeps them. */
+  private readonly keyed = new Map<string, string>();
   private seq = 0;
   private failing = new Map<string, number>();
 
@@ -124,6 +126,7 @@ export class FakeLongTail implements LineEscalations {
     if (row.items.some((i) => i.itemKey === itemKey)) return { outcome: VERB_OUTCOME.ALREADY };
     row.items.push({ itemKey, payload, actor: as });
     if (metadata) row.metadata = { ...row.metadata, ...metadata };
+    this.emit(row, 'updated');
     return { outcome: VERB_OUTCOME.DONE, itemKeys: row.items.map((i) => i.itemKey) };
   }
 
@@ -141,9 +144,19 @@ export class FakeLongTail implements LineEscalations {
     return { outcome: VERB_OUTCOME.DONE };
   }
 
-  async create(_as: Actor, input: CreateRowInput): Promise<{ id: string }> {
+  async create(_as: Actor, input: CreateRowInput): Promise<CreatedRow> {
     this.outage('create');
-    return { id: this.add({ ...input }).id };
+    this.calls.push({ verb: 'create', as: _as, id: input.signal_key ?? '', payload: input });
+    const held = input.signal_key ? this.rows.get(this.keyed.get(input.signal_key) ?? '') : undefined;
+    const { signal_key: key, accumulate: _accumulate, ...fields } = input;
+    const row = held ?? this.add({ ...fields });
+    if (key && !held) this.keyed.set(key, row.id);
+    return { id: row.id, status: row.status, created_at: row.created_at };
+  }
+
+  /** An answerer adding the answer to a machine-request row, as a workflow or a person would. */
+  answer(id: string, args: Record<string, unknown>, actor = 'answerer-1', op?: string): Promise<VerbResult> {
+    return this.accumulate(actor, id, REQUEST_ITEM.ANSWER, { args, ...(op ? { op } : {}) });
   }
 
   async itemKeys(id: string): Promise<string[]> {
@@ -151,7 +164,7 @@ export class FakeLongTail implements LineEscalations {
   }
 
   async items(id: string): Promise<RowItem[]> {
-    return (this.rows.get(id)?.items ?? []).map((i) => ({ itemKey: i.itemKey, payload: i.payload }));
+    return (this.rows.get(id)?.items ?? []).map((i) => ({ itemKey: i.itemKey, payload: i.payload, actor: i.actor }));
   }
 
   async get(id: string): Promise<Record<string, any> | null> {

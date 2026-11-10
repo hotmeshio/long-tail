@@ -1,4 +1,5 @@
 import type { ContainerSelector } from '../facets';
+import type { SchemeIdentifier } from '../identifiers';
 import type { ScanChoice } from '../scan-choice';
 import type {
   ScanAvailability,
@@ -46,6 +47,8 @@ export interface ScanScheme {
   grant_max_uses: number;
   /** Identity kind only: how the grant is spent (default 'action'). */
   grant_scope: ScanGrantScope;
+  /** Binding settings: who may bind this scheme's values, and whether a target holds one live value. */
+  identifier?: SchemeIdentifier | null;
   enabled: boolean;
   created_at?: string;
   updated_at?: string;
@@ -91,6 +94,15 @@ export interface ScanStepParams {
   hold?: ScanHoldParams;
   /** Fill verb options. */
   fill?: ScanFillParams;
+  bind?: ScanBindParams;
+}
+
+/** A bind step: the scanned value is bound to the held subject's target. */
+export interface ScanBindParams {
+  /** The scheme the binding is kept under; the scanned code's own scheme by default. */
+  scheme?: number;
+  /** The subject's facet the value is bound to; its scheme's target facet by default. */
+  facet?: string;
 }
 
 export interface ScanAccumulateParams {

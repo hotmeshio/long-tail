@@ -1,5 +1,6 @@
 import { SCAN_VERBS, type ScanStep } from '../../../api/scan-codes';
 import { IntoSubjectItemFields } from './IntoSubjectItemFields';
+import { BindStepFields } from './BindStepFields';
 
 type Params = NonNullable<ScanStep['params']>;
 
@@ -101,7 +102,8 @@ export function SubjectStepFields({
   }
 
   const fillsSubject = step.verb === SCAN_VERBS.FILL;
-  if (step.verb !== SCAN_VERBS.ACCUMULATE && !fillsSubject) return null;
+  const binds = step.verb === SCAN_VERBS.BIND;
+  if (step.verb !== SCAN_VERBS.ACCUMULATE && !fillsSubject && !binds) return null;
 
   const setMode = (next: '' | 'from' | 'into') => {
     const { from: _f, into: _i, item, ...rest } = accumulate;
@@ -121,11 +123,13 @@ export function SubjectStepFields({
   };
 
   const fill = params.fill ?? { into: 'subject' as const };
-  const actsOnSubject = fillsSubject ? fill.into === 'subject' : !!mode;
+  const actsOnSubject = binds || (fillsSubject ? fill.into === 'subject' : !!mode);
 
   return (
     <div className="flex flex-wrap gap-4">
-      {fillsSubject ? (
+      {binds ? (
+        <BindStepFields bind={params.bind ?? {}} onBind={(bind) => patchParams({ bind: Object.keys(bind).length ? bind : undefined })} />
+      ) : fillsSubject ? (
         <label className="block">
           <span className="block text-xs text-text-secondary mb-1">Check off on</span>
           <span className="block text-2xs text-text-tertiary mb-1">The row whose expected items the scan checks off.</span>

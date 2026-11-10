@@ -1032,6 +1032,10 @@ export const upsertScanSchemeSchema = z.object({
   patterns: z.array(z.string()).max(10).optional().describe('Pattern encoding: 1-10 regular expressions over the whole code, e.g. "1Z[0-9A-Z]{16}"'),
   precedes_gtin: z.boolean().nullable().optional().describe('Pattern encoding: which reads a digits-only code first beside an enabled gtin scheme; true = these patterns, false = the gtin scheme. Required while an enabled gtin scheme exists'),
   target_match: z.enum(['value', 'member']).optional().describe("'value' = the target facet holds one value (default); 'member' = the facet holds a list and a row matches when the list contains the target (action schemes)"),
+  identifier: z.object({
+    binders: z.array(z.string()).optional().describe('Roles that may bind and retire this scheme\'s values, besides role managers'),
+    exclusiveTarget: z.boolean().optional().describe('A target holds one live value: binding a new one retires the old'),
+  }).nullable().optional().describe('Binding settings; left out, the stored settings are kept; null clears them'),
   enabled: z.boolean().optional(),
 });
 
@@ -1104,4 +1108,13 @@ export const upsertScanRuleSchema = z.object({
 export const deleteScanRuleSchema = z.object({
   scheme_version: z.number().int().min(10).max(99),
   category: z.string().regex(/^[0-9]$/),
+});
+
+export const listIdentifierBindingsSchema = z.object({
+  scheme: z.number().int().min(10).max(99).describe('The scan scheme the bindings are kept under'),
+  raw: z.string().optional().describe('A scanned value: answers its live binding'),
+  target: z.string().optional().describe('A target: answers the values bound to it'),
+  includeRetired: z.boolean().optional().describe('Retired bindings too, newest first'),
+  limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().min(0).optional(),
 });

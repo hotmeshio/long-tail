@@ -9,11 +9,11 @@
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
-import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows } from './reconcile';
+import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { publishMachineWireEvent } from '../../../lib/events/publish';
 import type { InspectResult } from '../../../types/machines-view';
@@ -90,6 +90,7 @@ export class MachineGateway {
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
     this.state.rowOps = declaredRowOps(this.codec);
+    this.state.oneWayOps = oneWayOps(this.codec);
     this.state.lifecycle = deps.settings.lifecycle === true;
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
@@ -172,9 +173,11 @@ export class MachineGateway {
       await this.executor.apply(await arrivalsOnRows(this.state, this.deps.lt, this.deps.settings.dispatchTtlMs));
       await notesOnRows(this.state, this.deps.lt);
       const commands = await this.reconcileCommands();
+      const requests = await restoreRequests(this.state, this.deps.lt, this.deps.line);
+      await this.executor.apply(requests.actions);
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();
-      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, addresses, ...restored });
+      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, requests: requests.open, addresses, ...restored });
     } finally {
       this.state.holdDispatch = false;
     }
@@ -226,7 +229,7 @@ export class MachineGateway {
           }
           const { seen } = admitted;
           if (seen.parsed!.kind === MESSAGE_KIND.ALARM && seen.body?.body?.active) active.add(this.state.alarmKey(seen.parsed!.ident.machineId, seen.parsed!.key!));
-          const applied = await this.applyMachine(msg.topic, seen.parsed!, seen.body);
+          const applied = await this.applyMachine(msg.topic, seen);
           this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, 1);
         }
       }
@@ -285,7 +288,7 @@ export class MachineGateway {
       }
       let applied = seen.violations.length && this.codec.strict
         ? await holdViolation(this.admission, msg, seen)
-        : await this.applyMachine(msg.topic, seen.parsed!, seen.body);
+        : await this.applyMachine(msg.topic, seen);
       // An arrival still waiting for its row after every delivery is shown to a person instead; one that read no id at once.
       const waited = msg.deliveries >= MAX_DELIVERIES || isUnreadableArrival(seen);
       if (applied.disposition === DISPOSITION.NAK && !applied.failed && waited && isArrival(seen)) {
@@ -328,10 +331,10 @@ export class MachineGateway {
     }
   }
 
-  private async applyMachine(topic: string, parsed: ParsedTopic, body: Envelope | null): Promise<Applied> {
+  private async applyMachine(topic: string, seen: Inspection): Promise<Applied> {
     let plan: ReturnType<typeof planMachineMessage>;
     try {
-      plan = planMachineMessage(this.state, parsed, body, this.deps.settings.dispatchTtlMs);
+      plan = planMachineMessage(this.state, seen.parsed!, seen.body, this.deps.settings.dispatchTtlMs, seen);
     } catch (err: any) {
       this.log.warn(GATEWAY_LOG.UNREADABLE, { topic, error: err.message });
       return { disposition: DISPOSITION.TERM, failed: false, actions: [{ verb: 'unreadable', detail: err.message }] };

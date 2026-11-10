@@ -22,6 +22,7 @@ import * as filesApi from '../api/files';
 import * as knowledgeApi from '../api/knowledge';
 import * as agentsApi from '../api/agents';
 import * as agentSubsApi from '../api/agent-subscriptions';
+import * as identifiersApi from '../api/identifiers';
 import { eventRegistry } from '../lib/events';
 import { CallbackEventAdapter } from '../lib/events/callback';
 import type { LTApiAuth, LTApiResult } from '../types/sdk';
@@ -380,6 +381,14 @@ export function createClient(options: LTClientOptions = {}) {
       setField: knowledgeApi.setField,
       removeField: knowledgeApi.removeField,
       deleteEntry: knowledgeApi.deleteEntry,
+    },
+
+    // ── Identifier bindings ─────────────────────────────────────────────────
+    identifiers: {
+      listBindings: identifiersApi.listIdentifierBindings,
+      bind: bindAuth(identifiersApi.bindIdentifier, auth),
+      rebind: bindAuth(identifiersApi.rebindIdentifier, auth),
+      retire: bindAuth(identifiersApi.retireIdentifierBinding, auth),
     },
 
     // ── Agents ──────────────────────────────────────────────────────────────

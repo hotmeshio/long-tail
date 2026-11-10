@@ -20,7 +20,7 @@ export function registerListRoutes(router: Router): void {
    * RBAC: caller must hold the target role or be superadmin.
    *
    * Body: { type, role, subtype?, description?, priority?, envelope?,
-   *         metadata?, escalation_payload? }
+   *         metadata?, escalation_payload?, signal_key?, accumulate? }
    */
   router.post('/', async (req, res) => {
     const result = await api.createEscalation(
@@ -40,6 +40,8 @@ export function registerListRoutes(router: Router): void {
         workflow_id: req.body?.workflow_id,
         task_queue: req.body?.task_queue,
         workflow_type: req.body?.workflow_type,
+        signal_key: req.body?.signal_key,
+        accumulate: req.body?.accumulate,
       },
       req.auth!,
     );

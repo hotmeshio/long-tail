@@ -35,6 +35,7 @@ export function assertValidScheme(scheme: Partial<ScanScheme>): void {
   if (!Number.isInteger(scheme.version) || scheme.version! < 10 || scheme.version! > 99) {
     throw new Error('scheme version must be a two-digit integer between 10 and 99');
   }
+  assertValidIdentifier(scheme.identifier);
   if (!scheme.name) throw new Error('scheme name is required');
   if (!scheme.target_facet) throw new Error('scheme target_facet is required');
   const encoding = scheme.encoding ?? SCAN_ENCODINGS.FIXED;
@@ -142,7 +143,7 @@ function assertValidChoices(choices: ScanChoice[] | undefined, at: string): void
     if (!choice.label) throw new Error(`${cat}: label is required`);
     if (!VALID_VERBS.has(choice.verb)) throw new Error(`${cat}: unknown verb "${choice.verb}"`);
     if (choice.verb === SCAN_VERBS.PRESENT || choice.verb === SCAN_VERBS.SHOW_LIST
-      || choice.verb === SCAN_VERBS.FILL) {
+      || choice.verb === SCAN_VERBS.FILL || choice.verb === SCAN_VERBS.BIND) {
       throw new Error(`${cat}: ${choice.verb} cannot be a choice verb`);
     }
     if (choice.roles !== undefined && (!Array.isArray(choice.roles) || choice.roles.length === 0
@@ -357,4 +358,21 @@ function assertValidTemplateTokens(step: ScanStep, at: string): void {
   check(step.refuse, true);
   check(step.done, true);
   check(step.facts, false, true);
+}
+
+const IDENTIFIER_KEYS = ['binders', 'exclusiveTarget'];
+
+/** A scheme's binding settings: binder role names and the exclusive-target switch, nothing else. */
+export function assertValidIdentifier(identifier: unknown): void {
+  if (identifier === undefined || identifier === null) return;
+  if (typeof identifier !== 'object' || Array.isArray(identifier)) throw new Error('scheme identifier must be an object');
+  const extra = Object.keys(identifier).filter((k) => !IDENTIFIER_KEYS.includes(k));
+  if (extra.length) throw new Error(`scheme identifier takes ${IDENTIFIER_KEYS.join(' and ')}; not ${extra.join(', ')}`);
+  const { binders, exclusiveTarget } = identifier as Record<string, unknown>;
+  if (binders !== undefined && (!Array.isArray(binders) || binders.some((r) => typeof r !== 'string' || !r))) {
+    throw new Error('scheme identifier.binders must be a list of role names');
+  }
+  if (exclusiveTarget !== undefined && typeof exclusiveTarget !== 'boolean') {
+    throw new Error('scheme identifier.exclusiveTarget must be a boolean');
+  }
 }

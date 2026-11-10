@@ -62,6 +62,22 @@ export interface AlarmTrack {
   noted?: string[];
 }
 
+/** An open machine-request row this gateway answers (plan-request.ts). */
+export interface RequestTrack {
+  rowId: string;
+  machineId: string;
+  op: string;
+  ref: string;
+  /** When the row was created (epoch ms); its window counts from here. */
+  createdAt: number;
+  withinMs?: number;
+  /** An answer is being sent; a second event for the row sends nothing. */
+  sending?: boolean;
+  /** An overdue row was raised for it, by this gateway or an earlier one. */
+  overdue?: boolean;
+  overdueRowId?: string;
+}
+
 export interface LinkTrack {
   online: boolean;
   since: number;
@@ -98,6 +114,8 @@ export class GatewayState {
   dispatchOnArrival = false;
   /** Commands of the machines' own that a machine-command row may ask for, from the codec. */
   rowOps: readonly string[] = [];
+  /** Row ops the machines never reply to: sent once, done on publish. */
+  oneWayOps: ReadonlySet<string> = new Set();
   /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
   lifecycle = false;
   /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
@@ -127,6 +145,8 @@ export class GatewayState {
   private dispatches = new Map<string, string>();
   private endedCommands = new Set<string>();
   readonly links = new Map<string, LinkTrack>();
+  /** Open machine-request rows by row id. */
+  readonly requests = new Map<string, RequestTrack>();
   /** Messages already shown to a person as contract violations. */
   private violations = new Set<string>();
   /** Learned addresses, both ways: station → address and address → station. */
@@ -402,7 +422,7 @@ export class GatewayState {
   clone(): GatewayState {
     const copy = new GatewayState();
     Object.assign(copy, {
-      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, lifecycle: this.lifecycle,
+      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
       retainedAlarms: this.retainedAlarms, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));
@@ -415,6 +435,7 @@ export class GatewayState {
     copyInto(this.openCommands, copy.openCommands);
     copyInto(this.dispatches, copy.dispatches);
     copyInto(this.links, copy.links, (link) => ({ ...link }));
+    copyInto(this.requests, copy.requests, (track) => ({ ...track }));
     copyInto(this.addressOfStation, copy.addressOfStation);
     copyInto(this.stationOfAddress, copy.stationOfAddress);
     copyInto(this.claims, copy.claims);

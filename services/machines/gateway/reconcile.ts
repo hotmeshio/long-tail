@@ -5,10 +5,12 @@
  * handoff saw arrive, so the receiver holds them again.
  */
 
-import { ROW_TYPE, arrivedUnit, handoffProgress } from '../contracts';
+import { DECISION, ROW_TYPE, arrivedUnit, handoffProgress } from '../contracts';
+import { readAnswer } from '../requests';
 import { learnsAddress, operatorRole, type LineDef } from '../../../lib/machines/line';
 import type { AddressBook } from './address-book';
-import type { Action } from './actions';
+import { CONTROLLER, type Action } from './actions';
+import { trackRequest } from './plan-request';
 import type { LineEscalations } from './escalations';
 import { dispatchJobs } from './jobs';
 import { dispatchAction, latestArrival } from './pacing';
@@ -97,4 +99,34 @@ export async function notesOnRows(state: GatewayState, lt: LineEscalations): Pro
   for (const row of state.open()) {
     if (row.fromMachine && !row.noted) row.noted = (await lt.items(row.id)).map((i) => i.itemKey);
   }
+}
+
+/**
+ * The line's open machine requests and their overdue rows. A request that holds
+ * its answer is answered now; one with a window is watched again from its
+ * creation. An overdue row whose request has ended is closed.
+ */
+export async function restoreRequests(state: GatewayState, lt: LineEscalations, line: LineDef): Promise<{ open: number; actions: Action[] }> {
+  const mine = (row: Record<string, any>) => row.metadata?.siteId === line.siteId && row.metadata?.lineId === line.lineId;
+  const actions: Action[] = [];
+  const requests = (await lt.listOpen({ type: ROW_TYPE.MACHINE_REQUEST })).filter(mine);
+  for (const row of requests) {
+    const track = trackRequest(state, row.id, row.metadata, row.created_at);
+    if (!track) continue;
+    if (readAnswer(await lt.items(row.id))) {
+      track.sending = true;
+      actions.push({ kind: 'answer', rowId: row.id });
+    }
+  }
+  for (const row of (await lt.listOpen({ type: ROW_TYPE.REQUEST_OVERDUE, role: operatorRole(line) })).filter(mine)) {
+    const track = state.requests.get(row.metadata?.requestId);
+    if (!track) {
+      actions.push({ kind: 'resolve', as: CONTROLLER, rowId: row.id, payload: { decision: DECISION.ANSWERED, note: `request ${row.metadata?.requestId} has ended` } });
+      continue;
+    }
+    track.overdue = true;
+    track.overdueRowId = row.id;
+  }
+  for (const track of state.requests.values()) if (track.withinMs && !track.overdue) actions.push({ kind: 'watchLate', rowId: track.rowId });
+  return { open: requests.length, actions };
 }

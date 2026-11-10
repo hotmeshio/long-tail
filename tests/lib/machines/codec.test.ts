@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildEnvelope, genericCodec, RECEIPT_FROM, topicOf } from '../../../lib/machines/protocol';
+import { buildEnvelope, declaredRowOps, genericCodec, oneWayOps, RECEIPT_FROM, topicOf } from '../../../lib/machines/protocol';
 
 const ident = { siteId: 'site-1', lineId: 'line-1', machineId: 'cut-01' };
 const topic = (channel: string) => `line/v1/site-1/line-1/cut-01/${channel}`;
@@ -74,3 +74,26 @@ describe('generic codec', () => {
   });
 });
 
+describe('row ops', () => {
+  it('names every op, whether declared by name or as { op, reply }', () => {
+    const rowOps = ['purge', { op: 'beacon', reply: false }, { op: 'probe' }];
+    expect(declaredRowOps({ rowOps })).toEqual(['purge', 'beacon', 'probe']);
+    expect(declaredRowOps({})).toEqual([]);
+  });
+
+  it('one-way ops are the entries declared with reply: false', () => {
+    expect([...oneWayOps({ rowOps: ['purge', { op: 'beacon', reply: false }, { op: 'probe', reply: true }] })]).toEqual(['beacon']);
+    expect(oneWayOps({}).size).toBe(0);
+  });
+
+  it('an entry without a non-empty name is refused', () => {
+    expect(() => declaredRowOps({ rowOps: [{ op: '' }] })).toThrow(/rowOps/);
+    expect(() => declaredRowOps({ rowOps: [{ reply: false } as any] })).toThrow(/rowOps/);
+    expect(() => oneWayOps({ rowOps: [''] })).toThrow(/rowOps/);
+  });
+
+  it('the generic codec carries respondingTo in the command body', () => {
+    const [wire] = genericCodec({ root: 'line/v1' }).encode(ident, { cmdId: 'c1', op: 'ack', args: {}, respondingTo: 'm-7' });
+    expect(JSON.parse(wire.payload).body).toMatchObject({ cmdId: 'c1', respondingTo: 'm-7' });
+  });
+});

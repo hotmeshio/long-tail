@@ -184,12 +184,38 @@ The gateway sends the command and resolves the row with the reply, as the machin
 | `refused`, `failed` | The machine said no; its reason is in `reason` (a changeover to a version it does not hold is refused), and `code` is the reply's structured code when it carried one |
 | `no-reply` | No reply after every attempt. The command expired at the end of the asking, so a copy that reaches the machine later is refused, never run |
 | `unsupported` | Not a command a row may ask for (a control op, `snapshot`, or one the codec declares), not a machine on this line, or a command the line's codec has no message for; nothing was sent |
+| `sent` | A one-way command (`rowOps` entry `{ op, reply: false }`): published once, with nothing to wait for |
 
 A `snapshot` row resolves with the reply like any command, and the machine's snapshot follows on its own channel; a dashboard or a workflow asks for a machine's state this way.
 
 A command is sent again, under the same `cmdId` and with the same arguments, by a gateway that takes over the line while its row is open. Its `expiresAt` counts in rounds of the asking from the row's creation, and a round begins only once the one before it has expired; a command sent in a later round goes out as a new one, `<row>:command:r<n>`, never as an old one with changed arguments. Dispatches work the same way with `MACHINE_DISPATCH_TTL_MS`, counted from the row's creation, or for `dispatchOn: 'arrival'` from the last unit's arrival, so a machine never holds two valid commands for one row.
 
 The example's `machineCommand` workflow is this one step.
+
+A codec declares a command the machines never reply to as `{ op, reply: false }` in `rowOps`. Its row is sent once and resolves `sent` by the controller at once; it is never sent again and never expires.
+
+## Requests
+
+A machine may ask the host something: a material it was handed, a part it cannot place, a value only the host knows. Its codec marks the decoded message `answer: { op, ref?, role?, withinMs? }`, and the gateway parks one `machine-request` row for it, on `role` (the machine's own role by default). The row is created once per message, keyed by the machine and `ref` (the id the answer names: the codec's, else the message's receipt id, else its envelope id), so a redelivered or replayed message parks nothing new. The message is confirmed only once its row exists.
+
+The row's metadata holds `siteId`, `lineId`, `machineId`, `op`, `ref`, `withinMs` and `event`, the message as the codec decoded it. Whoever decides adds the answer as the row's `answer` item: a workflow or an activity through the accumulate API, a scan step that accumulates into the row, an agent through `accumulate_item`, or a person in the row's items panel:
+
+```typescript
+const { itemKey, payload } = Machines.answerItem({ accepted: true, lot: 'LOT-7', quantity: 4 });
+await lt.escalations.accumulate({ id: requestRowId, itemKey, payload });
+```
+
+The gateway sends the answer once, through `encode`, as the request's `op` (or the `op` the answer names, one a command row may ask for), with `respondingTo: ref` on the command, and resolves the row as the controller:
+
+```typescript
+{ answered: true, machineId: 'loader-1', op: 'material-ack', ref: 'm-81f3', status: 'sent', answeredBy: '<user id>' }
+```
+
+It waits for no reply. An answer the codec has no message for resolves `unsupported`. A request that someone resolves or cancels directly ends with no answer sent.
+
+A request with `withinMs` still unanswered after that long raises one `machine-request-overdue` row on the line's operator role, naming the request. An answer added later is still sent, and the overdue row then resolves `answered`.
+
+A gateway taking the line reads back the open requests and their overdue rows. A request that already holds its answer is answered at once; the others are watched again from their creation. A gateway that stops between sending an answer and resolving its row leaves the row open, and the next one sends the answer again with the same `respondingTo`, so the machine drops the duplicate.
 
 ## The wire
 
@@ -205,7 +231,7 @@ interface LineCodec {
   strict?: boolean;                                       // broken messages go to a person, never acted on
   snapshotOnStart?: boolean;                              // ask every machine for a snapshot on taking the line
   retainedAlarms?: boolean;                               // active alarms stay retained on the broker until they clear
-  rowOps?: readonly string[];                             // the machines' own commands a machine-command row may ask for
+  rowOps?: readonly (string | { op: string; reply?: boolean })[]; // the machines' own commands; reply: false sends once
   decode(topic: string, payload: string, retained?: boolean): Inspection[];
   encode(ident: MachineIdent, command: MachineCommand): WireMessage[];      // [] when the machines lack the command
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];       // for machines that keep an outbox
@@ -228,7 +254,8 @@ interface LineCodec {
 - A receiver that reads only the carrier may report `arrived`, or `transfer-failed` with `unreadable-id`, with `carrierId` and no `unitId` or `jobId`. The gateway finds the unit an open handoff into that machine carries on that carrier.
 - Each command reaches `encode` with `attempt`, how many times this gateway has sent that `cmdId`, `retry`, true when the machine may already have it (sent earlier, or its row existed before this gateway took the line), and `issuedAt`, when it was issued. `issuedAt` is the same on every send of a `cmdId`, by this gateway or the next: a dispatch or a command row takes the start of its validity round, any other command the time of its first send. A protocol with a retransmission flag sets it from `retry` and stamps its time from `issuedAt`, so a resend repeats the first attempt with only the flag changed; the generic envelope's `at` is `issuedAt`.
 - When `encode` returns no messages, the machines have no such command. The gateway sends nothing and waits for nothing: a machine-command row resolves `unsupported`, and a cancel or snapshot the machines lack is logged as unsupported.
-- `rowOps` names the machines' own commands, beyond the line protocol's control ops and `snapshot`, that a machine-command row may ask for. Each goes through `encode` with the row's `args` and the row resolves with the reply. Every entry is a non-empty string; the gateway refuses to start on a codec whose entries are not.
+- `rowOps` names the machines' own commands, beyond the line protocol's control ops and `snapshot`, that a machine-command row may ask for. Each goes through `encode` with the row's `args` and the row resolves with the reply. An entry `{ op, reply: false }` is a command the machines never reply to: it is sent once and its row resolves `sent`. Every entry names a non-empty op; the gateway refuses to start on a codec whose entries do not.
+- `decode` marks a message that asks the host for an answer with `answer: { op, ref?, role?, withinMs? }` (see [Requests](#requests)). The answer goes out through `encode` with `respondingTo` set to `ref`; the generic codec carries it in the command body.
 - A reply may carry `code`, a string the machine chooses, beside its `reason` text. The gateway puts it on the row as `code`, on a command row's resolution and on a `dispatch-refused` or `dispatch-failed` handoff, so a workflow branches on the code and a person reads the reason.
 - Presence may carry `sessionId`, one per connection, and `reason` on a goodbye. A presence with a new `sessionId` while the machine is online is a reconnect whose offline presence was never heard: the gateway asks for a snapshot, as it does when a machine comes back. An offline row records the `reason` the machine gave.
 
@@ -254,9 +281,10 @@ The generic protocol's topics are `{root}/{site}/{line}/{machine}/{channel}`. Ev
 | `contract-violation` | A strict codec decodes a message that breaks the contract. The row holds the raw message and the violations | A person resolves it |
 | `handoff-error` (`unmatched-arrival`) | A machine reports an arrival no open handoff into it expects: a carrier no row carries, once every delivery has passed, or a read that found no id at all (`transfer-failed` with `failure: unreadable-id`, no unit, no carrier), at once. One row per machine and carrier, holding the raw arrival, so the unit is re-scanned or routed | A person resolves it; the next such arrival raises a row again |
 | `quality-hold` | The example route's row for units a machine finished on hold (`sender-rejected` with `result: hold`), on the quality role | A person answers `release` (the hop runs again from the holding machine), `rework` with an optional `station` (the route runs again from that station), or `scrap` |
+| `machine-request-overdue` | A machine request with `withinMs` is still unanswered after that long. One row per request, naming it | The request ends: answered, resolved or cancelled (`answered`) |
 | `machine-registration` | On a line that learns addresses, an address claims a station bound to another address, or an address bound to one station claims another | A person resolves it with `{ decision: 'approve' }`, which binds the station to the claimant, or `reject` |
 
-A replica taking a line reads back its learned addresses, its open handoff, command, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids, and, from the gateway that sent them, the ready jobs of rows that already ended whose units it still holds; jobs it lost that no row and no memory covers are logged as unrecoverable. An alarm id reused with a new raise time counts as a new alarm.
+A replica taking a line reads back its learned addresses, its open handoff, command, request, alarm, offline, quiet and registration rows, and each open handoff's arrivals, so the receiver holds those units again. It then reads the machines' retained state, so a clear or a return that happened while no gateway was listening still resolves its row. A machine that restarts with a new boot id gets its accepted jobs dispatched again under the same command ids, and, from the gateway that sent them, the ready jobs of rows that already ended whose units it still holds; jobs it lost that no row and no memory covers are logged as unrecoverable. An alarm id reused with a new raise time counts as a new alarm.
 
 ## Lines view
 

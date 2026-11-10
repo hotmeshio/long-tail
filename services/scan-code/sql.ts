@@ -22,8 +22,8 @@ export const UPSERT_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
    kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
-   patterns, precedes_gtin, target_match)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+   patterns, precedes_gtin, target_match, identifier)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 ON CONFLICT (version) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
@@ -38,6 +38,7 @@ ON CONFLICT (version) DO UPDATE SET
   patterns = EXCLUDED.patterns,
   precedes_gtin = EXCLUDED.precedes_gtin,
   target_match = EXCLUDED.target_match,
+  identifier = CASE WHEN $17::boolean THEN EXCLUDED.identifier ELSE lt_config_scan_schemes.identifier END,
   enabled = EXCLUDED.enabled
 RETURNING *`;
 
@@ -67,8 +68,8 @@ export const SEED_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
    kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
-   patterns, precedes_gtin, target_match)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+   patterns, precedes_gtin, target_match, identifier)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 ON CONFLICT (version) DO NOTHING`;
 
 export const SEED_ACTION = `\
@@ -90,8 +91,8 @@ export const APPLY_SCHEME = `\
 INSERT INTO lt_config_scan_schemes
   (version, name, description, target_facet, encoding, delimiter, target_length,
    kind, grant_ttl_seconds, grant_max_uses, enabled, grant_scope,
-   patterns, precedes_gtin, target_match)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+   patterns, precedes_gtin, target_match, identifier)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 ON CONFLICT (version) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
@@ -106,6 +107,7 @@ ON CONFLICT (version) DO UPDATE SET
   patterns = EXCLUDED.patterns,
   precedes_gtin = EXCLUDED.precedes_gtin,
   target_match = EXCLUDED.target_match,
+  identifier = EXCLUDED.identifier,
   enabled = EXCLUDED.enabled,
   updated_at = NOW()
 WHERE (lt_config_scan_schemes.name, lt_config_scan_schemes.description,
@@ -114,13 +116,14 @@ WHERE (lt_config_scan_schemes.name, lt_config_scan_schemes.description,
        lt_config_scan_schemes.kind, lt_config_scan_schemes.grant_ttl_seconds,
        lt_config_scan_schemes.grant_max_uses, lt_config_scan_schemes.enabled,
        lt_config_scan_schemes.grant_scope, lt_config_scan_schemes.patterns,
-       lt_config_scan_schemes.precedes_gtin, lt_config_scan_schemes.target_match)
+       lt_config_scan_schemes.precedes_gtin, lt_config_scan_schemes.target_match,
+       lt_config_scan_schemes.identifier)
   IS DISTINCT FROM
       (EXCLUDED.name, EXCLUDED.description, EXCLUDED.target_facet,
        EXCLUDED.encoding, EXCLUDED.delimiter, EXCLUDED.target_length,
        EXCLUDED.kind, EXCLUDED.grant_ttl_seconds, EXCLUDED.grant_max_uses,
        EXCLUDED.enabled, EXCLUDED.grant_scope, EXCLUDED.patterns,
-       EXCLUDED.precedes_gtin, EXCLUDED.target_match)
+       EXCLUDED.precedes_gtin, EXCLUDED.target_match, EXCLUDED.identifier)
 RETURNING (xmax = 0) AS inserted`;
 
 export const APPLY_ACTION = `\

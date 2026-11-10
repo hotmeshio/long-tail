@@ -76,6 +76,20 @@ const BODY_V = Object.fromEntries(Object.entries(BODY).map(([k, s]) => [k, ajv.c
 
 const RETAINED: readonly MessageKind[] = [MESSAGE_KIND.PRESENCE, MESSAGE_KIND.SNAPSHOT, MESSAGE_KIND.ALARM];
 
+/**
+ * A message that asks the host for an answer: the gateway parks a machine-request row for it, and sends
+ * the answer added there as `op` (one of the codec's row ops), naming `ref`.
+ */
+export interface AnswerRequest {
+  op: string;
+  /** The id the answer names; the message's receipt id, else its envelope id. */
+  ref?: string;
+  /** The role the row is parked on; the machine's own role by default. */
+  role?: string;
+  /** Unanswered this long, the request is shown to the line's operators. */
+  withinMs?: number;
+}
+
 export interface Inspection {
   parsed: ParsedTopic | null;
   body: Envelope | null;
@@ -84,6 +98,8 @@ export interface Inspection {
   receiptId?: string;
   /** The station the message says it comes from, when the wire names one apart from the address (a line that learns addresses). */
   claim?: string;
+  /** Set by a codec when the message asks the host for an answer. */
+  answer?: AnswerRequest;
 }
 
 const errorsOf = (prefix: string, fn: ValidateFunction) =>

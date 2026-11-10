@@ -9,6 +9,7 @@ import { withOpen } from './open';
 import { presentStep } from './present';
 import { resolveSubject } from './subject';
 import { fillStep } from './verb-fill';
+import { bindStep } from './verb-bind';
 import { accumulateStep, cancelStep, claimStep, escalateStep, releaseStep, resolveStep } from './verbs';
 import {
   SCAN_OUTCOMES,
@@ -209,6 +210,8 @@ async function executeStep(
       return accumulateStep(step, ctx);
     case SCAN_VERBS.FILL:
       return fillStep(step, ctx);
+    case SCAN_VERBS.BIND:
+      return bindStep(step, ctx);
     default:
       throw new Error(`unknown scan verb "${step.verb}"`);
   }

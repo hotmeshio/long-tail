@@ -1,5 +1,5 @@
 import { cancelCommandId, type HandoffResolution } from '../contracts';
-import { OP } from '../../../lib/machines/protocol';
+import { CONTROL_OPS, OP } from '../../../lib/machines/protocol';
 import type { Action, Actor } from './actions';
 import { dispatchJobs, type DispatchJob } from './jobs';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
@@ -49,4 +49,9 @@ export function resolverOf(row: HandoffRow, reporter: Actor): Actor {
  */
 export function holdForResolver(row: HandoffRow, reporter: Actor): Action {
   return { kind: 'claim', as: resolverOf(row, reporter), rowId: row.id };
+}
+
+/** The ops a machine-command row or a request's answer may name: the control ops, a snapshot, and the codec's own. */
+export function rowOpsOf(state: GatewayState): string[] {
+  return [...CONTROL_OPS, OP.SNAPSHOT, ...state.rowOps];
 }

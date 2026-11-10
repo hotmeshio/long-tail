@@ -14,6 +14,7 @@ function mapScheme(row: any): ScanScheme {
     patterns: Array.isArray(row.patterns) ? row.patterns : [],
     precedes_gtin: row.precedes_gtin ?? null,
     target_match: row.target_match ?? 'value',
+    identifier: row.identifier ?? null,
     kind: row.kind ?? 'action',
     grant_ttl_seconds: row.grant_ttl_seconds ?? null,
     grant_max_uses: row.grant_max_uses ?? 0,
