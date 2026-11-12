@@ -99,6 +99,7 @@ The relay runs in every Long Tail container:
 - The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`.
 - Reconcile asks the provider for each workflow with a pending escalation. When the workflow is no longer running, Long Tail cancels the escalation.
 - Opening a wait again after its outcome was delivered clears the delivery, so the outcome is sent again. This covers an engine that re-runs the wait without its checkpoint.
+- After a delivery, the relay checks the workflow with `provider.describe` at growing intervals for about 25 seconds. When the engine reports it closed, Long Tail publishes `workflow.completed` or `workflow.failed`, the events HotMesh publishes, so the dashboard's workflow pages refresh. A workflow still running after that refreshes on its next escalation event.
 
 Waits are stored in `lt_durable_waits`, one row per wait, keyed by the escalation id.
 
@@ -108,6 +109,7 @@ The escalation, role, identity and admin surfaces work the same on every engine.
 
 | Endpoint | Behavior with a provider |
 |---|---|
+| `GET /api/workflow-states/jobs` | The executions list from `provider.list`, in the same shape HotMesh returns. `search` is a workflow id prefix, `entity` one workflow type, `status` one of `running`, `completed`, `failed`; `namespace`, `registered` and sorting do not apply |
 | `GET /api/workflow-states/:id/execution` | The execution timeline from `provider.export`, in the same shape HotMesh returns |
 | `POST /api/workflows/:id/terminate` | `provider.terminate`, then the workflow's pending escalations are cancelled |
 | `GET /api/workflows/:id/describe` | `provider.describe`: the workflow's state, type and times |
@@ -125,10 +127,12 @@ The matching MCP tools are not registered.
 "engine": {
   "provider": "temporal",
   "native": false,
-  "capabilities": { "execution": true, "terminate": true },
+  "capabilities": { "execution": true, "terminate": true, "list": true },
   "consoleUrl": "https://temporal.example.com/namespaces/default/workflows/{workflowId}"
 }
 ```
+
+With `list`, the sidebar shows Workflows, Executions, and the executions page lists the engine's workflows. Without it, the page and the entry are hidden.
 
 ## Writing a provider
 
@@ -137,11 +141,12 @@ import type { LTDurableProvider } from '@hotmeshio/long-tail';
 
 export const myProvider: LTDurableProvider = {
   name: 'my-engine',
-  capabilities: { native: false, execution: true, terminate: true },
+  capabilities: { native: false, execution: true, terminate: true, list: true },
   async deliver(ref, outcome) { /* signal ref.workflowId with outcome; return 'delivered' or 'gone' */ },
   async describe(workflowId) { /* return { workflowId, state, providerState } */ },
   async export(workflowId) { /* return an LTWorkflowExecution; summarizeExecution(events) fills summary */ },
   async terminate(workflowId, reason) { /* stop the workflow */ },
+  async list(query) { /* return { workflows, total }: one page, newest first, and the count of every match */ },
 };
 ```
 
