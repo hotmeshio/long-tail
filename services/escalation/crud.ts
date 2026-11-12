@@ -96,7 +96,8 @@ async function insertEscalation(input: CreateEscalationInput, signalKey?: string
   });
 }
 
-function announceCreated(escalation: LTEscalationRecord): LTEscalationRecord {
+/** Publish `escalation.created` for a row written outside `createEscalation`. */
+export function announceCreated(escalation: LTEscalationRecord): LTEscalationRecord {
   publishEscalationChange({
     type: 'escalation.created',
     source: 'service',

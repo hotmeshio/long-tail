@@ -21,6 +21,7 @@ import { DocsDrawer } from './DocsDrawer';
 import { HelpButton } from './HelpButton';
 import { HelpPanel } from './HelpPanel';
 import { HelpAssistantProvider } from '../../hooks/useHelpAssistant';
+import { useEngine } from '../../hooks/useEngine';
 import { ScanInputProvider } from '../../hooks/useScanInput';
 import { ActingIdentityProvider } from '../../hooks/useActingIdentity';
 import { ScanToast } from '../scan/ScanToast';
@@ -50,7 +51,9 @@ function ShellLayout() {
   // during render so every child formats with it in the same pass.
   setDisplayTimeZone(settings?.display?.timeZone);
   const aiOverride = getAiOverride();
-  const aiEnabled = aiOverride !== null ? aiOverride : !!settings?.ai?.enabled;
+  // AI surfaces (help assistant, Designer, triage) run as HotMesh workflows.
+  const { native } = useEngine();
+  const aiEnabled = native && (aiOverride !== null ? aiOverride : !!settings?.ai?.enabled);
   const showLines = !!settings?.machines;
   const { collapsed, toggle } = useSidebar();
   const [feedOpen, setFeedOpen] = useState(false);

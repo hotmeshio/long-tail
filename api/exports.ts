@@ -3,6 +3,9 @@ import { resolveWorkflowHandle } from '../services/task/resolve';
 import type { LTApiResult } from '../types/sdk';
 import type { LTExportField } from '../types';
 import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
+import { durableProviderRegistry } from '../services/durable-provider';
+import { JOB_STATE } from '../types/durable-provider';
+import { listFromProvider } from './provider-list';
 
 /**
  * List export jobs with optional filtering, sorting, and pagination.
@@ -16,9 +19,12 @@ import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
  * @param input.order — sort direction (asc or desc)
  * @param input.registered — filter by registration status
  * @returns `{ status: 200, data: { jobs, total, ... } }` on success
+ *
+ * With a non-HotMesh engine the list comes from the provider and `app_id`,
+ * `registered` and sorting do not apply.
  */
 export async function listJobs(input: {
-  app_id: string;
+  app_id?: string;
   limit?: number;
   offset?: number;
   entity?: string;
@@ -28,6 +34,8 @@ export async function listJobs(input: {
   order?: string;
   registered?: string;
 }): Promise<LTApiResult> {
+  if (!durableProviderRegistry.isNative) return listFromProvider(input);
+  if (!input.app_id) return { status: 400, error: 'app_id (or namespace) query parameter is required' };
   try {
     const result = await exportService.listJobs(input.app_id, input);
     return { status: 200, data: result };
@@ -105,6 +113,7 @@ export async function exportWorkflowExecution(input: {
   maxDepth?: number;
 }): Promise<LTApiResult> {
   try {
+    if (!durableProviderRegistry.isNative) return exportFromProvider(input);
     let resolved;
     try {
       resolved = await resolveWorkflowHandle(input.workflowId);
@@ -135,6 +144,29 @@ export async function exportWorkflowExecution(input: {
         : err.message,
     };
   }
+}
+
+/** The execution timeline from the configured provider, in the shape the dashboard renders. */
+async function exportFromProvider(input: {
+  workflowId: string;
+  excludeSystem?: boolean;
+  omitResults?: boolean;
+  mode?: ExportMode;
+  maxDepth?: number;
+}): Promise<LTApiResult> {
+  const provider = durableProviderRegistry.current;
+  if (!provider.export) {
+    return { status: 501, error: `The ${provider.name} provider does not export executions` };
+  }
+  const status = await provider.describe(input.workflowId);
+  if (status.state === JOB_STATE.UNKNOWN) return { status: 404, error: 'Workflow not found' };
+  const execution = await provider.export(input.workflowId, {
+    excludeSystem: input.excludeSystem,
+    omitResults: input.omitResults,
+    mode: input.mode,
+    maxDepth: input.maxDepth,
+  });
+  return { status: 200, data: execution };
 }
 
 /**

@@ -1,4 +1,5 @@
 export { createEscalation } from './create';
+export { openDurableWait } from './waits';
 export { listEscalations, listAvailableEscalations, listDistinctTypes, listFacetKeys, listFacetValues, getEscalationStats, getStationMetrics } from './list';
 export { getEscalation, getEscalationsByWorkflowId, escalateToRole } from './single';
 export { getEscalationLookups } from './lookups';

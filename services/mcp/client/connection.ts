@@ -15,5 +15,6 @@ export { testConnection } from './connection-test';
 
 export {
   dispatchBuiltinTool,
+  registeredBuiltinToolNames,
   listServerTools,
 } from './connection-dispatch';

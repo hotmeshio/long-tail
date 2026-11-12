@@ -12,6 +12,8 @@ import { RequireInvocable } from './components/layout/RequireInvocable';
 import { RequireAI } from './components/layout/RequireAI';
 import { RequireFeature } from './components/layout/RequireFeature';
 import { RequireMachines } from './components/layout/RequireMachines';
+import { RequireNativeEngine } from './components/layout/RequireNativeEngine';
+import { RequireEngineCapability } from './components/layout/RequireEngineCapability';
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
@@ -285,9 +287,14 @@ const router = createBrowserRouter([
       // Home — outcome-driven overview
       { index: true, element: <Lazy><HomePage /></Lazy> },
 
-      // Processes section (all authenticated users)
-      { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
-      { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
+      // Processes section (all authenticated users; HotMesh workflows only)
+      {
+        element: <RequireNativeEngine />,
+        children: [
+          { path: 'processes/all', element: <Lazy><ProcessesListPage /></Lazy> },
+          { path: 'processes/detail/:originId', element: <Lazy><ProcessDetailPage /></Lazy> },
+        ],
+      },
 
       // Credentials (all authenticated users) — legacy path redirects
       { path: 'credentials', element: <Lazy><CredentialsPage /></Lazy> },
@@ -324,10 +331,15 @@ const router = createBrowserRouter([
 
       // Invoke: open to anyone the server lists an invokable workflow for
       {
-        element: <RequireInvocable />,
+        element: <RequireNativeEngine />,
         children: [
-          { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
-          { path: 'workflows/durable/invoke', element: <Lazy><DurableInvokePage /></Lazy> },
+          {
+            element: <RequireInvocable />,
+            children: [
+              { path: 'workflows/start', element: <Lazy><StartWorkflowPage /></Lazy> },
+              { path: 'workflows/durable/invoke', element: <Lazy><DurableInvokePage /></Lazy> },
+            ],
+          },
         ],
       },
 
@@ -335,18 +347,29 @@ const router = createBrowserRouter([
       {
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
-          { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-          { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
-          { path: 'workflows/durable/executions', element: <Lazy><DurableExecutionsPage /></Lazy> },
+          // The execution timeline renders on every engine that exports one.
           { path: 'workflows/durable/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
-          { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
-          { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
           { path: 'workflows/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
-          { path: 'workflows/cron', element: <Navigate to="/workflows/start?mode=schedule" replace /> },
-          { path: 'workflows/workers', element: <Lazy><WorkersPage /></Lazy> },
-          { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
-          { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
-          { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+          {
+            element: <RequireEngineCapability capability="list" />,
+            children: [
+              { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
+            ],
+          },
+          {
+            element: <RequireNativeEngine />,
+            children: [
+              { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
+              { path: 'workflows/durable/executions', element: <Lazy><DurableExecutionsPage /></Lazy> },
+              { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
+              { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
+              { path: 'workflows/cron', element: <Navigate to="/workflows/start?mode=schedule" replace /> },
+              { path: 'workflows/workers', element: <Lazy><WorkersPage /></Lazy> },
+              { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
+              { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+              { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+            ],
+          },
         ],
       },
 
@@ -355,11 +378,16 @@ const router = createBrowserRouter([
         element: <RequireRole roleTypes={['superadmin']} roleNames={['engineer']} />,
         children: [
           // Graph flows + executions — durable orchestration, available without an AI key
-          { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
-          { path: 'mcp/workflows/invoke', element: <Lazy><GraphInvokePage /></Lazy> },
-          { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
-          { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
-          { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
+          {
+            element: <RequireNativeEngine />,
+            children: [
+              { path: 'mcp/workflows', element: <Lazy><YamlWorkflowsPage /></Lazy> },
+              { path: 'mcp/workflows/invoke', element: <Lazy><GraphInvokePage /></Lazy> },
+              { path: 'mcp/workflows/:id', element: <Lazy><YamlWorkflowDetailPage /></Lazy> },
+              { path: 'mcp/executions', element: <Lazy><McpRunsPage /></Lazy> },
+              { path: 'mcp/executions/:jobId', element: <Lazy><McpRunDetailPage /></Lazy> },
+            ],
+          },
 
           // Files section
           { path: 'files', element: <Lazy><FilesPage /></Lazy> },
@@ -372,9 +400,14 @@ const router = createBrowserRouter([
           {
             element: <RequireAI />,
             children: [
-              { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
-              { path: 'mcp/queries', element: <Lazy><McpQueryPage /></Lazy> },
-              { path: 'mcp/queries/:workflowId', element: <Lazy><McpQueryDetailPage /></Lazy> },
+              {
+                element: <RequireNativeEngine />,
+                children: [
+                  { path: 'mcp', element: <Lazy><McpOverview /></Lazy> },
+                  { path: 'mcp/queries', element: <Lazy><McpQueryPage /></Lazy> },
+                  { path: 'mcp/queries/:workflowId', element: <Lazy><McpQueryDetailPage /></Lazy> },
+                ],
+              },
               { path: 'mcp/tools', element: <Navigate to="/mcp/servers" replace /> },
               { path: 'mcp/servers', element: <Lazy><McpServersPage /></Lazy> },
               { path: 'mcp/servers/new', element: <Lazy><McpServerDetailPage /></Lazy> },
@@ -432,13 +465,18 @@ const router = createBrowserRouter([
         children: [
           { path: 'admin/bots', element: <Navigate to="/admin/users?tab=service-accounts" replace /> },
           {
-            element: <RequireFeature flag="dbMaintenance" />,
+            element: <RequireNativeEngine />,
             children: [
-              { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
+              {
+                element: <RequireFeature flag="dbMaintenance" />,
+                children: [
+                  { path: 'admin/maintenance', element: <Lazy><MaintenancePage /></Lazy> },
+                ],
+              },
+              { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
+              { path: 'admin/streams', element: <Lazy><StreamMessagesPage /></Lazy> },
             ],
           },
-          { path: 'admin/controlplane', element: <Lazy><ControlPlanePage /></Lazy> },
-          { path: 'admin/streams', element: <Lazy><StreamMessagesPage /></Lazy> },
         ],
       },
     ],

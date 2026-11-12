@@ -16,6 +16,7 @@ import { escalationStrategyRegistry } from '../services/escalation-strategy';
 
 import { applyDatabaseConfig, applyServerAuthConfig } from './config';
 import { registerAdapters } from './adapters';
+import { durableProviderRegistry, startDurableRelay, stopDurableRelay } from '../services/durable-provider';
 import { buildConnection, collectWorkers, startWorkers } from './workers';
 import { startServer } from './server';
 import { LTExpressAdapter } from '../adapters/express';
@@ -87,6 +88,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
   }
   const { workers, builtinMcpServerFactories } = await collectWorkers(startConfig);
   const { adminUserId } = await startWorkers(startConfig, workers, builtinMcpServerFactories);
+  startDurableRelay();
 
   // 5b. Machines, after the workers exist so their rows publish lifecycle events.
   // Code lines land in the registry under the configSource rules; the surface runs every line the registry holds.
@@ -115,6 +117,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
 
   const shutdown = async () => {
     loggerRegistry.info('[long-tail] shutting down...');
+    await stopDurableRelay();
     if (httpServer) {
       await new Promise<void>((resolve) => httpServer!.close(() => resolve()));
     }
@@ -140,6 +143,7 @@ export async function start(startConfig: LTStartConfig): Promise<LTInstance> {
       await telemetryRegistry.disconnect();
     }
     escalationStrategyRegistry.clear();
+    durableProviderRegistry.clear();
     await Durable.shutdown();
     loggerRegistry.info('[long-tail] shutdown complete');
   };

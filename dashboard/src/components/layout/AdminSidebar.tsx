@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSettings } from '../../api/settings';
+import { useEngine } from '../../hooks/useEngine';
 import { getInfrastructureEnabled } from '../../lib/view-as';
 
 /**
@@ -24,6 +25,8 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
   const { data: settings } = useSettings();
   // Default-on: only hide DB Maintenance when the deployment explicitly disables it.
   const showMaintenance = settings?.features?.dbMaintenance !== false;
+  // Routers, Messages and DB Maintenance operate HotMesh streams and jobs.
+  const { native } = useEngine();
 
   const identityItems: NavItem[] = [
     { to: '/admin/users', label: 'Accounts', icon: Users },
@@ -44,7 +47,7 @@ export function AdminSidebar({ isBuilder = false, isOps = false }: { isBuilder?:
   return (
     <>
       <SidebarNav heading="Identity & Access" entries={identityItems} />
-      {isBuilder && getInfrastructureEnabled() && <SidebarNav heading="Infrastructure" entries={infraItems} />}
+      {native && isBuilder && getInfrastructureEnabled() && <SidebarNav heading="Infrastructure" entries={infraItems} />}
     </>
   );
 }

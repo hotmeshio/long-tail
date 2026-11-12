@@ -17,7 +17,7 @@ interface YamlWorkflowFilters {
   offset?: number;
 }
 
-export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
+export function useYamlWorkflows(filters: YamlWorkflowFilters = {}, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.graph_topic) params.set('graph_topic', filters.graph_topic);
@@ -30,6 +30,7 @@ export function useYamlWorkflows(filters: YamlWorkflowFilters = {}) {
   return useQuery<YamlWorkflowListResponse>({
     queryKey: ['yamlWorkflows', filters],
     queryFn: () => apiFetch(`/yaml-workflows?${params}`),
+    enabled: options?.enabled ?? true,
   });
 }
 

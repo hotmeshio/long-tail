@@ -20,6 +20,7 @@ import { displayMetadataEntries } from '../../lib/metadata-display';
 import { ITEM_LABEL_KEY, escalationItems } from '../../lib/escalation-items';
 import { EscalationItemsPanel } from './EscalationItemsPanel';
 import type { LTEscalationRecord } from '../../api/types';
+import { useEngine, engineConsoleUrl } from '../../hooks/useEngine';
 import type { FieldError } from '../../lib/field-validator';
 
 export const ESCALATION_PANEL_VIEWS = {
@@ -97,6 +98,9 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
   isBuilder: boolean;
   traceUrl: string | null;
 }) {
+  // Task, queue and origin views read HotMesh records; other engines link to their console.
+  const engine = useEngine();
+  const consoleUrl = esc.workflow_id ? engineConsoleUrl(engine, esc.workflow_id) : null;
   return (
     <div className="space-y-5">
       <dl className="space-y-3.5">
@@ -131,19 +135,30 @@ function DetailsList({ esc, claimed, isTerminal, isBuilder, traceUrl }: {
           <hr className="border-surface-border/60" />
           <div className="space-y-3.5">
             <CopyableId label="Escalation ID" value={esc.id} />
-            {esc.task_id && (
+            {engine.native && esc.task_id && (
               <CopyableId label="Task ID" value={esc.task_id} href={`/workflows/tasks/detail/${esc.task_id}`} />
             )}
             {esc.workflow_type && (
-              <CopyableId label="Workflow Name" value={esc.workflow_type} href={`/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}`} />
+              <CopyableId
+                label="Workflow Name"
+                value={esc.workflow_type}
+                href={engine.native ? `/workflows/executions?entity=${encodeURIComponent(esc.workflow_type)}` : undefined}
+              />
             )}
             {esc.workflow_id && (
-              <CopyableId label="Workflow ID" value={esc.workflow_id} href={`/workflows/executions/${esc.workflow_id}`} />
+              <CopyableId
+                label="Workflow ID"
+                value={esc.workflow_id}
+                href={engine.capabilities.execution ? `/workflows/executions/${esc.workflow_id}` : undefined}
+              />
             )}
-            {esc.task_queue && (
+            {consoleUrl && (
+              <CopyableId label={`Open in ${engine.provider}`} value={esc.workflow_id!} href={consoleUrl} external />
+            )}
+            {engine.native && esc.task_queue && (
               <CopyableId label="Task Queue" value={esc.task_queue} href={`/admin/controlplane?queue=${encodeURIComponent(esc.task_queue)}`} />
             )}
-            {esc.origin_id && esc.origin_id !== esc.workflow_id && (
+            {engine.native && esc.origin_id && esc.origin_id !== esc.workflow_id && (
               <CopyableId label="Origin" value={esc.origin_id} href={`/processes/detail/${esc.origin_id}`} />
             )}
             {esc.trace_id && (

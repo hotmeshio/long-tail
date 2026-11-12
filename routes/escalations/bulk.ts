@@ -1,6 +1,7 @@
 import { Router } from '../../lib/http';
 
 import * as api from '../../api/escalations';
+import { requireNativeEngine } from '../native-engine';
 
 export function registerBulkRoutes(router: Router): void {
   router.post('/release-expired', async (_req, res) => {
@@ -52,7 +53,7 @@ export function registerBulkRoutes(router: Router): void {
     res.status(result.status).json(result.data ?? { error: result.error });
   });
 
-  router.post('/bulk-triage', async (req, res) => {
+  router.post('/bulk-triage', requireNativeEngine(), async (req, res) => {
     const result = await api.bulkTriage(
       { ids: req.body?.ids, hint: req.body?.hint },
       req.auth!,

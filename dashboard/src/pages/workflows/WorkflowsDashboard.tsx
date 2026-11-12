@@ -7,6 +7,7 @@ import { DateValue } from '../../components/common/display/DateValue';
 import { useJobs, useWorkflowConfigs, useDiscoveredWorkflows } from '../../api/workflows';
 import { useAuth } from '../../hooks/useAuth';
 import { useNamespace } from '../../hooks/useNamespace';
+import { useEngine } from '../../hooks/useEngine';
 import { useWorkflowListEvents } from '../../hooks/useEventHooks';
 import { useFilterParams } from '../../hooks/useFilterParams';
 import { buildApiPath } from '../../lib/api-path';
@@ -45,6 +46,7 @@ function buildColumns(
   isSuperAdmin: boolean,
   navigate: (path: string) => void,
   tierMap: Map<string, WorkflowTier>,
+  native: boolean,
 ): Column<LTJob>[] {
   return [
     {
@@ -55,7 +57,7 @@ function buildColumns(
         const pulseClass = row.status === 'running' ? ' animate-pulse' : '';
         return (
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${dotClass}${pulseClass}`} title={row.status} />
+            <span className={`w-2.5 h-2.5 shrink-0 rounded-full dot-ring ${dotClass}${pulseClass}`} title={row.provider_status ?? row.status} />
             <span className="font-mono text-xs text-text-primary truncate">{row.workflow_id}</span>
           </div>
         );
@@ -72,14 +74,14 @@ function buildColumns(
       label: 'Created',
       render: (row) => <DateValue date={row.created_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
       className: 'w-32',
-      sortable: true,
+      sortable: native,
     },
     {
       key: 'updated_at',
       label: 'Updated',
       render: (row) => <DateValue date={row.updated_at} format="relative" className="text-xs text-text-secondary whitespace-nowrap" />,
       className: 'w-32',
-      sortable: true,
+      sortable: native,
     },
     {
       key: 'duration',
@@ -112,7 +114,7 @@ function buildColumns(
               <circle cx="12" cy="12" r="6" />
             </svg>
           </button>
-          {isSuperAdmin && (
+          {isSuperAdmin && native && (
             <RowAction
               icon={Settings}
               title="View config"
@@ -130,7 +132,9 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
   useWorkflowListEvents();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
-  const { namespace } = useNamespace();
+  // Another engine lists its own workflows: no namespace, registry tiers or sorting.
+  const { native } = useEngine();
+  const { namespace } = useNamespace('namespace', { enabled: native });
 
   const { filters, setFilter, pagination, sort, setSort } = useFilterParams({
     filters: { search: '', entity: '', status: '', tier: initialTier },
@@ -143,8 +147,8 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     : activeTier === 'durable' ? 'false'
     : undefined;
 
-  const { data: configs } = useWorkflowConfigs();
-  const { data: discoveredData } = useDiscoveredWorkflows();
+  const { data: configs } = useWorkflowConfigs({ enabled: native });
+  const { data: discoveredData } = useDiscoveredWorkflows({ enabled: native });
 
   const tierMap = useMemo(() => {
     const map = new Map<string, WorkflowTier>();
@@ -160,6 +164,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
     isSuperAdmin,
     navigate,
     tierMap,
+    native,
   );
   const [searchInput, setSearchInput] = useState(filters.search);
 
@@ -185,8 +190,9 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
   const jobs = jobsData?.jobs ?? [];
 
   const entities = useMemo(() => {
+    if (!native) return filters.entity ? [filters.entity] : [];
     return [...new Set((configs ?? []).map((c) => c.workflow_type))].sort();
-  }, [configs]);
+  }, [configs, native, filters.entity]);
 
   const pageTitle = 'Workflow Executions';
 
@@ -219,7 +225,7 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
       }>
         <input
           type="text"
-          placeholder="Search workflow ID..."
+          placeholder={native ? 'Search workflow ID...' : 'Workflow ID starts with...'}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="input text-2xs py-1 px-2 w-56"
@@ -242,16 +248,20 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
             { value: 'failed', label: 'Failed' },
           ]}
         />
-        <FilterDivider />
-        <FilterSelect
-          label="Tier"
-          value={filters.tier === 'all' ? '' : filters.tier}
-          onChange={(v) => setFilter('tier', v || 'all')}
-          options={[
-            { value: 'certified', label: 'Certified' },
-            { value: 'durable', label: 'Durable' },
-          ]}
-        />
+        {native && (
+          <>
+            <FilterDivider />
+            <FilterSelect
+              label="Tier"
+              value={filters.tier === 'all' ? '' : filters.tier}
+              onChange={(v) => setFilter('tier', v || 'all')}
+              options={[
+                { value: 'certified', label: 'Certified' },
+                { value: 'durable', label: 'Durable' },
+              ]}
+            />
+          </>
+        )}
       </FilterBar>
 
       <DataTable
@@ -261,8 +271,8 @@ export function WorkflowsDashboard({ tier: initialTier = 'all' }: { tier?: Execu
         onRowClick={(row) => navigate(`/workflows/executions/${row.workflow_id}`)}
         isLoading={isLoading}
         emptyMessage={emptyMessage}
-        sort={sort}
-        onSort={setSort}
+        sort={native ? sort : undefined}
+        onSort={native ? setSort : undefined}
       />
 
       <StickyPagination

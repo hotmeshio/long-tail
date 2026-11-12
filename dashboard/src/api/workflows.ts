@@ -12,34 +12,37 @@ export function useActiveWorkers() {
   });
 }
 
-export function useDiscoveredWorkflows() {
+export function useDiscoveredWorkflows(options?: { enabled?: boolean }) {
   return useQuery<DiscoveredWorkflow[]>({
     queryKey: ['discoveredWorkflows'],
     queryFn: async () => {
       const res = await apiFetch<{ workflows: DiscoveredWorkflow[] }>('/workflows/discovered');
       return res.workflows;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useWorkflowConfigs() {
+export function useWorkflowConfigs(options?: { enabled?: boolean }) {
   return useQuery<LTWorkflowConfig[]>({
     queryKey: ['workflowConfigs'],
     queryFn: async () => {
       const res = await apiFetch<{ workflows: LTWorkflowConfig[] }>('/workflows/config');
       return res.workflows;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
 /** The workflows the caller may invoke, decided server-side by the invoke gate's own predicate. */
-export function useInvocableWorkflows() {
+export function useInvocableWorkflows(options?: { enabled?: boolean }) {
   return useQuery<InvocableWorkflow[]>({
     queryKey: ['invocableWorkflows'],
     queryFn: async () => {
       const res = await apiFetch<{ workflows: InvocableWorkflow[] }>('/workflows/invocable');
       return res.workflows;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 

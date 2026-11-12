@@ -35,7 +35,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
-import { registeredToolCount } from '../../../services/mcp/registered-tools';
+import { registeredToolCount, removeTools } from '../../../services/mcp/registered-tools';
+import { durableProviderRegistry } from '../../../services/durable-provider';
 
 import { registerTaskTools } from './tasks';
 import { registerEscalationTools } from './escalations';
@@ -62,6 +63,19 @@ import { registerIdentifierTools } from './identifiers';
 import { registerDomainContextTools } from './domain-context';
 import { registerAnnouncementTools } from './announcements';
 
+/** Tools in engine-neutral groups that read or start HotMesh workflows. */
+const HOTMESH_ONLY_TOOLS = [
+  'list_export_jobs',
+  'export_workflow_state',
+  'get_workflow_envelopes',
+  'get_export_status',
+  'list_discovered_workflows',
+  'invoke_workflow',
+  'invoke_workflow_read_safe',
+  'get_workflow_status',
+  'bulk_triage',
+];
+
 let server: McpServer | null = null;
 
 export async function createAdminServer(options?: {
@@ -77,30 +91,32 @@ export async function createAdminServer(options?: {
     server = instance;
   }
 
-  registerTaskTools(instance);
+  const native = durableProviderRegistry.isNative;
+  if (native) registerTaskTools(instance);
   registerEscalationTools(instance);
-  registerWorkflowConfigTools(instance);
+  if (native) registerWorkflowConfigTools(instance);
   registerWorkflowTools(instance);
   registerMcpServerTools(instance);
-  registerYamlWorkflowTools(instance);
+  if (native) registerYamlWorkflowTools(instance);
   registerUserTools(instance);
   registerPersonaTools(instance);
-  registerMaintenanceTools(instance);
+  if (native) registerMaintenanceTools(instance);
   registerAgentTools(instance);
   registerAgentSubscriptionTools(instance);
   registerBotAccountTools(instance);
-  registerControlPlaneTools(instance);
-  registerPipelineTools(instance);
+  if (native) registerControlPlaneTools(instance);
+  if (native) registerPipelineTools(instance);
   registerTopicTools(instance);
   registerSettingsTools(instance);
   registerExportTools(instance);
   registerOverviewTools(instance);
-  registerDiagnosticsTools(instance);
+  if (native) registerDiagnosticsTools(instance);
   registerScanCodeTools(instance);
   registerLabelTools(instance);
   registerIdentifierTools(instance);
   registerDomainContextTools(instance);
   registerAnnouncementTools(instance);
+  if (!native) removeTools(instance, HOTMESH_ONLY_TOOLS);
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;

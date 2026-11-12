@@ -21,6 +21,7 @@ import { configureBranding } from '../modules/branding';
 import { configureDisplay } from '../modules/display';
 import { labelTransportRegistry } from '../lib/labels/transports';
 import { registerLabelMedia, setDefaultLabelMedia } from '../services/labels/media';
+import { registerDurableProvider } from '../services/durable-provider';
 import { registerLabelFonts } from '../services/labels/render-pdf';
 import { setIdentityKeyProtection } from '../services/user/redact';
 
@@ -32,6 +33,9 @@ import type { LTStartConfig } from '../types/startup';
  * escalation strategy, MCP) based on the startup config.
  */
 export function registerAdapters(startConfig: LTStartConfig): void {
+  // Durable engine first: an invalid provider config fails before anything connects.
+  registerDurableProvider(startConfig);
+
   // Dashboard feature flags (default permissive; deployment opts out).
   configureFeatureFlags(startConfig.features);
   configureSearch(startConfig.search);

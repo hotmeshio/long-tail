@@ -11,6 +11,7 @@ import { useMcpRuns } from '../../api/pipelines';
 import { useControlPlaneApps } from '../../api/controlplane';
 import { useAuth } from '../../hooks/useAuth';
 import { useAccess } from '../../hooks/useAccess';
+import { useEngine } from '../../hooks/useEngine';
 import { usePersona } from '../../hooks/usePersona';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
 import { useEscalationStatsEvents, useWorkflowListEvents, useStationMetricsEvents } from '../../hooks/useEventHooks';
@@ -199,9 +200,10 @@ export function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isBuilder } = useAccess();
+  const { native } = useEngine();
   const persona = usePersona();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: cpData } = useControlPlaneApps({ enabled: isBuilder });
+  const { data: cpData } = useControlPlaneApps({ enabled: isBuilder && native });
   const allAppIds = useMemo(() => (cpData?.apps ?? []).map((a: any) => a.appId).sort(), [cpData]);
   const firstAppId = allAppIds[0] ?? '';
   const pipelineNs = searchParams.get('pipelinenamespace') || firstAppId;
@@ -219,7 +221,8 @@ export function HomePage() {
 
   // Gate each data source to the tiers that render it.
   const builderHome = !persona.showTaskQueueCards;
-  const showWorkflowColumns = persona.canSeeWorkflows && !persona.canSeePaceBoard;
+  // Workflow and pipeline columns list HotMesh jobs.
+  const showWorkflowColumns = native && persona.canSeeWorkflows && !persona.canSeePaceBoard;
   const rolesQ = useRoleDetails({ enabled: persona.canSeePaceBoard });
   // The device's link-variable bindings scope the home board too — same as the
   // full Pace Board and the pins. (opts is the THIRD arg; facets is the second.)

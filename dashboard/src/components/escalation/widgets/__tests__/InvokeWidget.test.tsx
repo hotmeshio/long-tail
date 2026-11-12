@@ -16,6 +16,7 @@ vi.mock('../../../../api/workflows', () => ({
   foldWorkflowLookups: () => ({}),
 }));
 vi.mock('../../../../hooks/useAccess', () => ({ useAccess: () => ({ realIsBuilder: false }) }));
+vi.mock('../../../../hooks/useEngine', () => ({ useEngine: () => ({ native: true }) }));
 vi.mock('../../../../hooks/useEventContext', () => ({
   useEventSubscriptions: (p: string[], h: (event: unknown) => void) => { if (p.length) { patterns = p; handler = h; } },
   useEventStatus: () => ({ connected: true }),

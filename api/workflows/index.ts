@@ -4,6 +4,7 @@ export {
   getWorkflowResult,
   terminateWorkflow,
   exportWorkflow,
+  describeWorkflow,
 } from './invocation';
 
 export {

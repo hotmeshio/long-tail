@@ -13,10 +13,6 @@ const router = Router();
  */
 router.get('/jobs', requireBuilder, async (req, res) => {
   const app_id = (req.query.app_id || req.query.namespace) as string | undefined;
-  if (!app_id) {
-    res.status(400).json({ error: 'app_id (or namespace) query parameter is required' });
-    return;
-  }
   const result = await api.listJobs({
     app_id,
     limit: parseInt(req.query.limit as string) || undefined,

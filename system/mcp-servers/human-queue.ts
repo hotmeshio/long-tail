@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
 import { callerAuth, type ToolCallExtra } from './caller-auth';
-import { registeredToolCount } from '../../services/mcp/registered-tools';
+import { registeredToolCount, removeTools } from '../../services/mcp/registered-tools';
+import { durableProviderRegistry } from '../../services/durable-provider';
 import { registerEscalationLookupsTool } from './human-queue-lookups';
 import { registerEscalationFilesTool } from './human-queue-files';
 import * as escalationService from '../../services/escalation';
@@ -497,6 +498,8 @@ export async function createHumanQueueServer(options?: {
     },
   );
 
+  // escalate_and_wait hands back a HotMesh signal id; other engines wait through conditional().
+  if (!durableProviderRegistry.isNative) removeTools(server, ['escalate_and_wait']);
   loggerRegistry.info(`[lt-mcp:server] ${name} ready (${registeredToolCount(server)} tools registered)`);
   return server;
 }
