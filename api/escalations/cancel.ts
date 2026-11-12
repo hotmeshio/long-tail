@@ -1,4 +1,5 @@
 import * as escalationService from '../../services/escalation';
+import { kickDurableRelay } from '../../services/durable-provider';
 import { getRoleProperties } from '../../services/role';
 import { ROLE_PROPERTY_KEYS } from '../../services/role/types';
 import { validateIds, checkBulkPermission, assertWriteAccess } from './helpers';
@@ -70,6 +71,7 @@ export async function bulkCancel(
     if (!perm.allowed) return perm;
 
     const result = await escalationService.bulkCancelEscalations(ids);
+    kickDurableRelay();
     return { status: 200, data: result };
   } catch (err: any) {
     return { status: 500, error: err.message };

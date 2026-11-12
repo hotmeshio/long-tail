@@ -377,6 +377,9 @@ export type {
   LTDurableConfig,
   LTOpenWaitInput,
   LTOpenWaitResult,
+  LTWorkflowListState,
+  LTWorkflowListQuery,
+  LTWorkflowPage,
 } from './durable-provider';
 
 export {
@@ -384,4 +387,5 @@ export {
   WAIT_OUTCOME_STATUS,
   DELIVERY_RESULT,
   JOB_STATE,
+  WORKFLOW_LIST_STATE,
 } from './durable-provider';

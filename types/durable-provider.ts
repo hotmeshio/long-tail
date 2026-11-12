@@ -59,6 +59,8 @@ export interface LTDurableCapabilities {
   execution: boolean;
   /** `terminate()` is available. */
   terminate: boolean;
+  /** `list()` is available. */
+  list: boolean;
 }
 
 export const JOB_STATE = {
@@ -80,6 +82,33 @@ export interface LTJobStatus {
   providerState: string;
   startedAt?: string;
   closedAt?: string;
+}
+
+// ── Listing workflows ────────────────────────────────────────────────────────
+
+/** States the executions list filters on. Failed covers every unsuccessful close. */
+export const WORKFLOW_LIST_STATE = {
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const;
+
+export type LTWorkflowListState = typeof WORKFLOW_LIST_STATE[keyof typeof WORKFLOW_LIST_STATE];
+
+export interface LTWorkflowListQuery {
+  limit: number;
+  offset: number;
+  workflowType?: string;
+  /** Matches workflow ids that start with this value. */
+  idPrefix?: string;
+  state?: LTWorkflowListState;
+}
+
+/** One page of workflows in the engine's order, newest first where the engine allows. */
+export interface LTWorkflowPage {
+  workflows: LTJobStatus[];
+  /** Every workflow matching the query, across pages. */
+  total: number;
 }
 
 // ── Execution timeline ───────────────────────────────────────────────────────
@@ -140,6 +169,7 @@ export interface LTDurableProvider {
   describe(workflowId: string): Promise<LTJobStatus>;
   export?(workflowId: string, options?: LTExecutionExportOptions): Promise<LTWorkflowExecution>;
   terminate?(workflowId: string, reason: string): Promise<void>;
+  list?(query: LTWorkflowListQuery): Promise<LTWorkflowPage>;
 }
 
 export interface LTDurableRelayConfig {

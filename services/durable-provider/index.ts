@@ -10,6 +10,7 @@ import { DurableRelay } from './relay';
 export { durableProviderRegistry } from './registry';
 export { createHotMeshProvider } from './hotmesh';
 export { DurableRelay, backoffMs, type RelayPassResult } from './relay';
+export { WorkflowFollower } from './follow';
 export { openWait, getWaitByEscalationId, type DurableWaitRow, type OpenedWait } from './waits';
 export { summarizeExecution } from './summary';
 export { DURABLE_LOG, RELAY_DEFAULTS, WAIT_LIMITS } from './constants';

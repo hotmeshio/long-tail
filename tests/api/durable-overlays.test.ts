@@ -52,7 +52,7 @@ describe('engine-neutral workflow endpoints', () => {
     expect(data.engine).toEqual({
       provider: 'temporal',
       native: false,
-      capabilities: { execution: true, terminate: true },
+      capabilities: { execution: true, terminate: true, list: true },
       consoleUrl: 'https://temporal.example/namespaces/{namespace}/workflows/{workflowId}',
     });
     expect(data.ai.enabled).toBe(false);

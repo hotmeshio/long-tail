@@ -47,6 +47,7 @@ const WORKFLOW_NEUTRAL_ROUTES = [
   { method: 'GET', path: /^\/[^/]+\/describe$/ },
 ];
 const WORKFLOW_STATE_NEUTRAL_ROUTES = [
+  { method: 'GET', path: /^\/jobs$/ },
   { method: 'GET', path: /^\/[^/]+\/execution$/ },
 ];
 

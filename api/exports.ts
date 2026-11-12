@@ -5,6 +5,7 @@ import type { LTExportField } from '../types';
 import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
 import { durableProviderRegistry } from '../services/durable-provider';
 import { JOB_STATE } from '../types/durable-provider';
+import { listFromProvider } from './provider-list';
 
 /**
  * List export jobs with optional filtering, sorting, and pagination.
@@ -18,9 +19,12 @@ import { JOB_STATE } from '../types/durable-provider';
  * @param input.order — sort direction (asc or desc)
  * @param input.registered — filter by registration status
  * @returns `{ status: 200, data: { jobs, total, ... } }` on success
+ *
+ * With a non-HotMesh engine the list comes from the provider and `app_id`,
+ * `registered` and sorting do not apply.
  */
 export async function listJobs(input: {
-  app_id: string;
+  app_id?: string;
   limit?: number;
   offset?: number;
   entity?: string;
@@ -30,6 +34,8 @@ export async function listJobs(input: {
   order?: string;
   registered?: string;
 }): Promise<LTApiResult> {
+  if (!durableProviderRegistry.isNative) return listFromProvider(input);
+  if (!input.app_id) return { status: 400, error: 'app_id (or namespace) query parameter is required' };
   try {
     const result = await exportService.listJobs(input.app_id, input);
     return { status: 200, data: result };

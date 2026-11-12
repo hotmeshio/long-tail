@@ -25,7 +25,7 @@ describe('HotMesh provider', () => {
 
   it('is native with every capability', () => {
     expect(provider.name).toBe('hotmesh');
-    expect(provider.capabilities).toEqual({ native: true, execution: true, terminate: true });
+    expect(provider.capabilities).toEqual({ native: true, execution: true, terminate: true, list: true });
   });
 
   it('never delivers: HotMesh rows wake through signal_key', async () => {

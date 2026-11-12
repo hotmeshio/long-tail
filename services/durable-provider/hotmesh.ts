@@ -19,7 +19,7 @@ import { cancelEscalationsByWorkflowId } from '../escalation';
 export function createHotMeshProvider(): LTDurableProvider {
   return {
     name: DURABLE_PROVIDER.HOTMESH,
-    capabilities: { native: true, execution: true, terminate: true },
+    capabilities: { native: true, execution: true, terminate: true, list: true },
 
     async deliver() {
       throw new Error('HotMesh escalations resume through signal_key; the relay never delivers to HotMesh');

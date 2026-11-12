@@ -6,7 +6,10 @@ import {
   type LTJobState,
   type LTWaitOutcome,
   type LTWaitRef,
+  type LTJobStatus,
   type LTWorkflowExecution,
+  type LTWorkflowListQuery,
+  type LTWorkflowPage,
 } from '../../types/durable-provider';
 
 export interface FakeDelivery {
@@ -20,9 +23,11 @@ export interface FakeDelivery {
  */
 export class FakeDurableProvider implements LTDurableProvider {
   readonly name: string;
-  readonly capabilities = { native: false, execution: true, terminate: true };
+  readonly capabilities = { native: false, execution: true, terminate: true, list: true };
   readonly deliveries: FakeDelivery[] = [];
   readonly terminated: string[] = [];
+  readonly listQueries: LTWorkflowListQuery[] = [];
+  listed: LTJobStatus[] = [];
   private states = new Map<string, LTJobState>();
   private failures = new Map<string, number>();
   private goneWorkflows = new Set<string>();
@@ -81,6 +86,12 @@ export class FakeDurableProvider implements LTDurableProvider {
         signals: 0,
       },
     };
+  }
+
+  /** Returns `listed` paged by the query; filtering is the engine's job, so the fake only records it. */
+  async list(query: LTWorkflowListQuery): Promise<LTWorkflowPage> {
+    this.listQueries.push(query);
+    return { workflows: this.listed.slice(query.offset, query.offset + query.limit), total: this.listed.length };
   }
 
   async terminate(workflowId: string): Promise<void> {

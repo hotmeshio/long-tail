@@ -2,6 +2,24 @@ import { loggerRegistry } from '../../../lib/logger';
 import type { LTMcpToolManifest } from '../../../types';
 import { getClients, getBuiltinFactories, getBuiltinServers } from './connection-lifecycle';
 
+/** The cached instance of a built-in server, created on first use. Null when no factory has that name. */
+export async function ensureBuiltinServer(name: string): Promise<any | null> {
+  const builtinServers = getBuiltinServers();
+  if (!builtinServers.has(name)) {
+    const factory = getBuiltinFactories().get(name);
+    if (!factory) return null;
+    builtinServers.set(name, await factory());
+    loggerRegistry.info(`[lt-mcp:builtin] ${name} ready (direct dispatch)`);
+  }
+  return builtinServers.get(name);
+}
+
+/** Names of the tools a built-in server registered. Null when the server is not built in. */
+export async function registeredBuiltinToolNames(name: string): Promise<Set<string> | null> {
+  const server = await ensureBuiltinServer(name);
+  return server ? new Set(Object.keys(server._registeredTools ?? {})) : null;
+}
+
 /**
  * Dispatch a tool call directly to a built-in server's handler,
  * bypassing MCP Client/Transport entirely. Returns null if the server
@@ -18,7 +36,6 @@ export async function dispatchBuiltinTool(
   extra?: { authInfo?: { userId: string; role?: string } },
 ): Promise<{ dispatched: true; result: any } | null> {
   const builtinFactories = getBuiltinFactories();
-  const builtinServers = getBuiltinServers();
 
   // Normalize and match against builtin factories
   const norm = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -33,15 +50,7 @@ export async function dispatchBuiltinTool(
   }
   if (!matchedName) return null;
 
-  // Lazily create and cache the server instance
-  if (!builtinServers.has(matchedName)) {
-    const factory = builtinFactories.get(matchedName)!;
-    const server = await factory();
-    builtinServers.set(matchedName, server);
-    loggerRegistry.info(`[lt-mcp:builtin] ${matchedName} ready (direct dispatch)`);
-  }
-
-  const server = builtinServers.get(matchedName)!;
+  const server = await ensureBuiltinServer(matchedName);
   const tool = server._registeredTools?.[toolName];
   if (!tool?.handler) return null;
 

@@ -62,7 +62,7 @@ export const CLAIM_DELIVERIES = `
       ORDER BY y.updated_at
       LIMIT $2
       FOR UPDATE OF x SKIP LOCKED)
-  RETURNING w.escalation_id, w.provider, w.workflow_id, w.run_scope, w.wait_key, w.attempts,
+  RETURNING w.escalation_id, w.provider, w.workflow_id, w.workflow_type, w.run_scope, w.wait_key, w.attempts,
             e.status, e.resolver_payload, e.resolved_at, e.updated_at,
             COALESCE(e.metadata->>'resolved_by', e.assigned_to) AS resolved_by`;
 

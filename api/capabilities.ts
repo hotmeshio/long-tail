@@ -1,5 +1,7 @@
 import { getPool } from '../lib/db';
 import { capabilityAccess } from '../modules/capabilities';
+import { registeredBuiltinToolNames } from '../services/mcp/client';
+import { durableProviderRegistry } from '../services/durable-provider';
 import { builtinServerFor, builtinToolGate } from './mcp/tools';
 import type { LTApiAuth, LTApiResult } from '../types/sdk';
 
@@ -60,6 +62,7 @@ function resolveCategory(server: { category?: string; tags?: string[] }): string
  * Every tool the caller may run, by category. A built-in server's tool is
  * listed only when its manifest gate admits the caller, the same rule the
  * tool-call route applies; an external server's tools are listed as before.
+ * With a non-HotMesh engine, a built-in server lists only the tools it registered.
  */
 export async function listCapabilities(auth?: LTApiAuth): Promise<LTApiResult> {
   try {
@@ -78,7 +81,9 @@ export async function listCapabilities(auth?: LTApiAuth): Promise<LTApiResult> {
       }
 
       const builtin = await builtinServerFor(server.name);
+      const registered = builtin && !durableProviderRegistry.isNative ? await registeredBuiltinToolNames(builtin) : null;
       for (const tool of tools) {
+        if (registered && !registered.has(tool.name)) continue;
         if (builtin && !(await access(builtinToolGate(builtin, tool.name)))) continue;
         categoryMap.get(category)!.push({
           name: tool.name,

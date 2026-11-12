@@ -4,6 +4,7 @@ export {
   connectToServer,
   disconnectFromServer,
   listServerTools,
+  registeredBuiltinToolNames,
   resolveClient,
   resolveBuiltinServerName,
   connectAutoServers,

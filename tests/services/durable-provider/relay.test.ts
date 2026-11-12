@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { Client as Postgres } from 'pg';
 import { Durable } from '@hotmeshio/hotmesh';
 
@@ -8,6 +8,13 @@ import { getPool } from '../../../lib/db';
 import { DurableRelay, openWait, getWaitByEscalationId, backoffMs, RELAY_DEFAULTS } from '../../../services/durable-provider';
 import * as escalationService from '../../../services/escalation';
 import { FakeDurableProvider } from '../../helpers/fake-durable-provider';
+import { JOB_STATE } from '../../../types/durable-provider';
+
+const publishWorkflowEvent = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../../lib/events/publish', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/events/publish')>()),
+  publishWorkflowEvent: (...a: unknown[]) => publishWorkflowEvent(...a),
+}));
 
 const { Connection } = Durable;
 const PROVIDER = 'relay-test';
@@ -55,6 +62,19 @@ describe('durable relay', () => {
     expect(provider.deliveries[0].ref).toMatchObject({ provider: PROVIDER, workflowId: `${runId}-a`, waitKey: 'decide' });
     expect(provider.deliveries[0].outcome).toMatchObject({ status: 'resolved', escalationId: id, data: { approved: true, notes: 'ok' } });
     expect((await getWaitByEscalationId(id))?.delivery).toBe('delivered');
+  });
+
+  it('publishes the workflow\'s completion after delivering, once the engine reports it closed', async () => {
+    const workflowId = `${runId}-follow`;
+    const id = await open(workflowId, { workflowType: 'reviewOrder' });
+    await escalationService.resolveEscalation(id, { approved: true });
+    provider.setState(workflowId, JOB_STATE.COMPLETED);
+    expect((await relay.run()).delivered).toBe(1);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(publishWorkflowEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'workflow.completed', workflowId, workflowName: 'reviewOrder', source: 'durable-relay',
+    }));
+    await relay.stop();
   });
 
   it('leaves a pending wait alone', async () => {

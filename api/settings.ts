@@ -128,6 +128,7 @@ function engineSettings() {
     capabilities: {
       execution: provider ? provider.capabilities.execution : true,
       terminate: provider ? provider.capabilities.terminate : true,
+      list: provider ? provider.capabilities.list : true,
     },
     consoleUrl: durableProviderRegistry.settings.consoleUrl ?? null,
   };

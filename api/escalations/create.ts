@@ -69,8 +69,8 @@ export async function createEscalation(
       return { status: 400, error: `signal_key must be a non-empty string of at most ${SIGNAL_KEY_MAX} characters` };
     }
 
-    const refused = await assertCreatable(role, input.metadata ?? {}, auth);
-    if (refused) return refused;
+    const denied = await refuseQueueAccess(role, auth);
+    if (denied) return denied;
 
     // Lookup and file refs ride the envelope under reserved keys with fixed
     // contracts, checked before the row exists.
@@ -100,6 +100,9 @@ export async function createEscalation(
     if (carriesFiles && !(await mayBuild(auth))) {
       return { status: 403, error: 'Referencing stored files takes builder access (superadmin or engineer)' };
     }
+
+    const invalidMetadata = await refuseMetadata(role, input.metadata ?? {});
+    if (invalidMetadata) return invalidMetadata;
 
     const row = {
       type,
@@ -132,21 +135,29 @@ export async function createEscalation(
 
 /**
  * Why `auth` may not create an escalation in `role` with `metadata`, or null.
- *
- * Creating injects work into a role's queue, a write_all (or global) action.
- * The caller's metadata must match the role's metadata_schema (the queryable
- * facet contract). The form-version pin (metadata.schema_version) is a system
- * key chosen by the workflow author, so it is excluded from validation.
+ * The queue access and metadata checks `createEscalation` applies, in one call.
  */
 export async function assertCreatable(
   role: string,
   metadata: Record<string, any>,
   auth: LTApiAuth,
 ): Promise<LTApiResult | null> {
+  return (await refuseQueueAccess(role, auth)) ?? refuseMetadata(role, metadata);
+}
+
+/** Creating injects work into a role's queue, a write_all (or global) action. */
+async function refuseQueueAccess(role: string, auth: LTApiAuth): Promise<LTApiResult | null> {
   const denied = await assertQueueManageAccess(auth.userId, role);
-  if (denied) {
-    return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
-  }
+  if (!denied) return null;
+  return { status: 403, error: `You must have write access to the "${role}" role or be a superadmin to create escalations for it` };
+}
+
+/**
+ * The caller's metadata must match the role's metadata_schema (the queryable
+ * facet contract). The form-version pin (metadata.schema_version) is a system
+ * key chosen by the workflow author, so it is excluded from validation.
+ */
+async function refuseMetadata(role: string, metadata: Record<string, any>): Promise<LTApiResult | null> {
   const metadataSchema = await roleService.getRoleMetadataSchema(role);
   if (!metadataSchema) return null;
   let validate: ValidateFunction;

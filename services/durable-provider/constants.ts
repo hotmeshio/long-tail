@@ -8,6 +8,8 @@ export const DURABLE_LOG = {
   RELAY_FAILED: 'durable_provider.relay.failed',
   WAITS_EXPIRED: 'durable_provider.waits.expired',
   WAITS_RECONCILED: 'durable_provider.waits.reconciled',
+  FOLLOW_SKIPPED: 'durable_provider.follow.skipped',
+  FOLLOW_FAILED: 'durable_provider.follow.failed',
 } as const;
 
 export const RELAY_DEFAULTS = {
@@ -18,6 +20,12 @@ export const RELAY_DEFAULTS = {
   BACKOFF_BASE_MS: 1_000,
   BACKOFF_MAX_MS: 5 * 60_000,
   KICK_DEBOUNCE_MS: 50,
+} as const;
+
+/** After a delivery, describe checks at these delays (about 25 s in all), until the workflow closes. */
+export const FOLLOW_DEFAULTS = {
+  DELAYS_MS: [100, 200, 400, 800, 1_600, 3_200, 6_400, 12_800],
+  MAX_FOLLOWED: 1_000,
 } as const;
 
 /** Namespace and app id the escalation store uses for rows Long Tail creates. */
