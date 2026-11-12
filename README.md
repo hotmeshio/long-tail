@@ -250,6 +250,7 @@ All modes share PostgreSQL and scale independently. See [Cloud Deployment](https
 | [Compiler](https://github.com/hotmeshio/long-tail/blob/main/docs/donotpublish/compiler.md) | `ltc compile` — durable TypeScript to YAML DAGs |
 | [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md) | `ltc` — terminal access to workflows, escalations, knowledge, MCP |
 | [Escalation Strategies](https://github.com/hotmeshio/long-tail/blob/main/docs/escalation-strategies.md) | Default, MCP triage, custom handlers |
+| [Durable Providers](https://github.com/hotmeshio/long-tail/blob/main/docs/durable-providers.md) | Temporal and DBOS workflows wait on people with `conditional()`; Long Tail owns the escalation boundary |
 | [Schema Enforcement](https://github.com/hotmeshio/long-tail/blob/main/docs/schema-enforcement.md) | form_schema as an enforced API contract on every resolve surface |
 | [Code-Owned Configuration](https://github.com/hotmeshio/long-tail/blob/main/docs/code-owned-configuration.md) | `configSource` — declared config compared and applied at every boot |
 | [Faceted Routing](https://github.com/hotmeshio/long-tail/blob/main/docs/faceted-routing.md) | Query and atomically claim the queue by facets; dispatcher pattern |
