@@ -3,6 +3,8 @@ import { resolveWorkflowHandle } from '../services/task/resolve';
 import type { LTApiResult } from '../types/sdk';
 import type { LTExportField } from '../types';
 import type { ExportMode } from '@hotmeshio/hotmesh/build/types/exporter';
+import { durableProviderRegistry } from '../services/durable-provider';
+import { JOB_STATE } from '../types/durable-provider';
 
 /**
  * List export jobs with optional filtering, sorting, and pagination.
@@ -105,6 +107,7 @@ export async function exportWorkflowExecution(input: {
   maxDepth?: number;
 }): Promise<LTApiResult> {
   try {
+    if (!durableProviderRegistry.isNative) return exportFromProvider(input);
     let resolved;
     try {
       resolved = await resolveWorkflowHandle(input.workflowId);
@@ -135,6 +138,29 @@ export async function exportWorkflowExecution(input: {
         : err.message,
     };
   }
+}
+
+/** The execution timeline from the configured provider, in the shape the dashboard renders. */
+async function exportFromProvider(input: {
+  workflowId: string;
+  excludeSystem?: boolean;
+  omitResults?: boolean;
+  mode?: ExportMode;
+  maxDepth?: number;
+}): Promise<LTApiResult> {
+  const provider = durableProviderRegistry.current;
+  if (!provider.export) {
+    return { status: 501, error: `The ${provider.name} provider does not export executions` };
+  }
+  const status = await provider.describe(input.workflowId);
+  if (status.state === JOB_STATE.UNKNOWN) return { status: 404, error: 'Workflow not found' };
+  const execution = await provider.export(input.workflowId, {
+    excludeSystem: input.excludeSystem,
+    omitResults: input.omitResults,
+    mode: input.mode,
+    maxDepth: input.maxDepth,
+  });
+  return { status: 200, data: execution };
 }
 
 /**

@@ -19,6 +19,7 @@ import type { HandoffRowAdapter } from '../services/machines/rows';
 import type { LTMaintenanceConfig } from './maintenance';
 import type { LTMcpAdapter } from './mcp';
 import type { LTEscalationStrategy } from './escalation-strategy';
+import type { LTDurableConfig } from './durable-provider';
 import type { LabelTemplateInput, LTLabelTransport } from './labels';
 import type { LabelMedia } from '../shared/labels/types';
 
@@ -617,6 +618,14 @@ export interface LTStartConfig {
     strategy?: 'default' | 'mcp';
     adapter?: LTEscalationStrategy;
   };
+
+  /**
+   * The durable engine running customer workflows. Omit for HotMesh. With a
+   * provider such as Temporal or DBOS, workflows open escalations through
+   * `POST /api/escalations/waits` and the relay delivers each terminal outcome.
+   * HotMesh-only surfaces (YAML, pipelines, control plane, triage) are off.
+   */
+  durable?: LTDurableConfig;
 
   /**
    * Seed data applied after migrations, before workers start.

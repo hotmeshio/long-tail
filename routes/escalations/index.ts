@@ -9,6 +9,7 @@ import { registerResolveRoutes } from './resolve';
 import { registerFacetRoutes } from './facets';
 import { registerAnalyticsRoutes } from './analytics';
 import { registerRelatedRoutes } from './related';
+import { registerWaitRoutes } from './waits';
 
 const router = Router();
 
@@ -16,6 +17,9 @@ const router = Router();
 
 // GET /, /available, /types, /stats
 registerListRoutes(router);
+
+// POST /waits
+registerWaitRoutes(router);
 
 // POST /release-expired, PATCH /priority, POST /bulk-claim,
 // POST /bulk-assign, PATCH /bulk-escalate, POST /bulk-triage

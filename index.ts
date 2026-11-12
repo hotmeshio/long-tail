@@ -79,6 +79,7 @@ export * as McpVisionServer from './system/mcp-servers/vision';
 export { escalationStrategyRegistry } from './services/escalation-strategy';
 export { DefaultEscalationStrategy } from './services/escalation-strategy/default';
 export { McpEscalationStrategy } from './services/escalation-strategy/mcp';
+export { durableProviderRegistry, createHotMeshProvider, summarizeExecution } from './services/durable-provider';
 export { getActivityIdentity } from './services/iam/activity';
 export { getToolContext } from './services/iam/context';
 export { registerMcpTool } from './services/mcp/register-tool';

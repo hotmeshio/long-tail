@@ -358,3 +358,30 @@ export type * from './machines-view';
 export type * from './labels';
 
 export type * from './identifiers';
+
+export type {
+  LTWaitRef,
+  LTWaitOutcome,
+  LTWaitOutcomeStatus,
+  LTDeliveryResult,
+  LTDurableCapabilities,
+  LTJobState,
+  LTJobStatus,
+  LTExecutionEventCategory,
+  LTWorkflowExecution,
+  LTWorkflowExecutionEvent,
+  LTWorkflowExecutionSummary,
+  LTExecutionExportOptions,
+  LTDurableProvider,
+  LTDurableRelayConfig,
+  LTDurableConfig,
+  LTOpenWaitInput,
+  LTOpenWaitResult,
+} from './durable-provider';
+
+export {
+  DURABLE_PROVIDER,
+  WAIT_OUTCOME_STATUS,
+  DELIVERY_RESULT,
+  JOB_STATE,
+} from './durable-provider';

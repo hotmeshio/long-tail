@@ -17,6 +17,7 @@ import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import { hasLLMApiKey } from '../services/llm';
 import type { LTApiResult } from '../types/sdk';
+import { durableProviderRegistry } from '../services/durable-provider';
 
 /**
  * Resolve the NATS WebSocket URL for the browser.
@@ -95,8 +96,10 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
           oauthServer: getOAuthServerSettings() !== null,
         },
         ai: {
-          enabled: hasLLMApiKey(),
+          // AI surfaces (triage, query, compile) run as HotMesh workflows.
+          enabled: hasLLMApiKey() && durableProviderRegistry.isNative,
         },
+        engine: engineSettings(),
         features: getFeatureFlags(),
         search: getSearchConfig(),
         branding: getBranding(),
@@ -114,4 +117,18 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+/** The durable engine running workflows, and what the dashboard can show for it. */
+function engineSettings() {
+  const provider = durableProviderRegistry.hasProvider ? durableProviderRegistry.current : null;
+  return {
+    provider: durableProviderRegistry.name,
+    native: durableProviderRegistry.isNative,
+    capabilities: {
+      execution: provider ? provider.capabilities.execution : true,
+      terminate: provider ? provider.capabilities.terminate : true,
+    },
+    consoleUrl: durableProviderRegistry.settings.consoleUrl ?? null,
+  };
 }

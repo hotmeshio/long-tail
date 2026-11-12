@@ -1,6 +1,7 @@
 import { Router } from '../lib/http';
 
 import { requireAuth } from '../modules/auth';
+import { requireNativeEngine } from './native-engine';
 import authRouter from './auth';
 import authSSORouter from './auth-sso';
 import oauthRouter from './oauth';
@@ -40,6 +41,15 @@ import domainRouter from './domain';
 import announcementsRouter from './announcements';
 import machinesRouter from './machines';
 
+// Routes that work on every durable engine; the rest of their routers are HotMesh-only.
+const WORKFLOW_NEUTRAL_ROUTES = [
+  { method: 'POST', path: /^\/[^/]+\/terminate$/ },
+  { method: 'GET', path: /^\/[^/]+\/describe$/ },
+];
+const WORKFLOW_STATE_NEUTRAL_ROUTES = [
+  { method: 'GET', path: /^\/[^/]+\/execution$/ },
+];
+
 const router = Router();
 
 // Public routes (no auth required — they handle their own auth)
@@ -55,27 +65,27 @@ router.use('/settings', settingsRouter);
 router.use(requireAuth);
 
 router.use('/nats-credentials', natsCredentialsRouter);
-router.use('/tasks', tasksRouter);
+router.use('/tasks', requireNativeEngine(), tasksRouter);
 router.use('/escalations', escalationsRouter);
-router.use('/workflows', workflowsRouter);
-router.use('/workflow-states', workflowStatesRouter);
-router.use('/config/maintenance', maintenanceRouter);
+router.use('/workflows', requireNativeEngine(WORKFLOW_NEUTRAL_ROUTES), workflowsRouter);
+router.use('/workflow-states', requireNativeEngine(WORKFLOW_STATE_NEUTRAL_ROUTES), workflowStatesRouter);
+router.use('/config/maintenance', requireNativeEngine(), maintenanceRouter);
 router.use('/users', usersRouter);
 router.use('/me', meRouter);
 router.use('/roles', rolesRouter);
 router.use('/personas', personasRouter);
-router.use('/dba', dbaRouter);
+router.use('/dba', requireNativeEngine(), dbaRouter);
 router.use('/mcp', mcpRouter);
-router.use('/insight', insightRouter);
-router.use('/yaml-workflows', yamlWorkflowsRouter);
-router.use('/pipelines', pipelinesRouter);
-router.use('/mcp-runs', pipelinesRouter); // backward-compat alias
-router.use('/namespaces', namespacesRouter);
+router.use('/insight', requireNativeEngine(), insightRouter);
+router.use('/yaml-workflows', requireNativeEngine(), yamlWorkflowsRouter);
+router.use('/pipelines', requireNativeEngine(), pipelinesRouter);
+router.use('/mcp-runs', requireNativeEngine(), pipelinesRouter); // backward-compat alias
+router.use('/namespaces', requireNativeEngine(), namespacesRouter);
 router.use('/file-browser', fileBrowserRouter);
-router.use('/controlplane', controlplaneRouter);
+router.use('/controlplane', requireNativeEngine(), controlplaneRouter);
 router.use('/bot-accounts', botAccountsRouter);
 router.use('/docs', docsRouter);
-router.use('/workflow-sets', workflowSetsRouter);
+router.use('/workflow-sets', requireNativeEngine(), workflowSetsRouter);
 router.use('/knowledge', knowledgeRouter);
 router.use('/agents', agentsRouter);
 router.use('/capabilities', capabilitiesRouter);
@@ -91,6 +101,6 @@ import overviewRouter from './overview';
 router.use('/overview', overviewRouter);
 
 import diagnosticsRouter from './diagnostics';
-router.use('/diagnostics', diagnosticsRouter);
+router.use('/diagnostics', requireNativeEngine(), diagnosticsRouter);
 
 export default router;

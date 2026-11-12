@@ -2,6 +2,7 @@ import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
+import { durableProviderRegistry, getWaitByEscalationId, kickDurableRelay } from '../../services/durable-provider';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
@@ -91,6 +92,12 @@ export async function resolveEscalation(
     // resolve here pass it as the 3rd arg; paths that resume a workflow carry it on the
     // signal so the downstream resolve commits it atomically.
 
+    // Provider wait: a workflow on Temporal/DBOS waits on this row. Resolve it;
+    // the relay delivers the outcome. Triage and re-run never apply.
+    if (!durableProviderRegistry.isNative && await getWaitByEscalationId(escalation.id)) {
+      return resolveProviderWait(escalation.id, resolverPayload, outcome, auth.userId);
+    }
+
     // Path A: conditional signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
     if (metadataSignalId && escalation.workflow_id && escalation.task_queue && escalation.workflow_type) {
@@ -137,6 +144,19 @@ export async function resolveEscalation(
   } catch (err: any) {
     return { status: 500, error: err.message };
   }
+}
+
+/** Resolve a provider wait's row; the relay delivers the outcome to the workflow. */
+async function resolveProviderWait(
+  id: string,
+  resolverPayload: Record<string, any>,
+  outcome: Record<string, any>,
+  userId: string,
+): Promise<LTApiResult> {
+  const resolved = await escalationService.resolveEscalation(id, resolverPayload, outcome, userId);
+  if (!resolved) return { status: 409, error: 'Escalation not available for resolution' };
+  kickDurableRelay();
+  return { status: 200, data: { acknowledged: true, escalationId: id } };
 }
 
 /**

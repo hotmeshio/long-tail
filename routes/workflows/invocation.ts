@@ -53,6 +53,15 @@ router.get('/:workflowId/status', requireBuilder, async (req, res) => {
 });
 
 /**
+ * GET /api/workflows/:workflowId/describe
+ * The workflow's state on the configured durable engine (HotMesh, Temporal, DBOS).
+ */
+router.get('/:workflowId/describe', requireBuilder, async (req, res) => {
+  const result = await api.describeWorkflow({ workflowId: String(req.params.workflowId) });
+  res.status(result.status).json(result.data ?? { error: result.error });
+});
+
+/**
  * GET /api/workflows/:workflowId/result
  * Return the workflow result if complete, or 202 if still running.
  * Never blocks — always returns immediately. Optional `app_id` query param

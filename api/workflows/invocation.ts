@@ -11,6 +11,8 @@ import { cancelEscalationsByWorkflowId } from '../../services/escalation/crud';
 import * as configService from '../../services/config';
 import { checkInvokeInput, inputValidationFailure } from './input-validation';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
+import { durableProviderRegistry } from '../../services/durable-provider';
+import { JOB_STATE } from '../../types/durable-provider';
 
 function isResolveError(err: any): boolean {
   return err?.message?.includes('Cannot resolve workflow');
@@ -176,6 +178,7 @@ export async function terminateWorkflow(input: {
   workflowId: string;
 }): Promise<LTApiResult> {
   try {
+    if (!durableProviderRegistry.isNative) return terminateOnProvider(input.workflowId);
     const resolved = await resolveWorkflowHandle(input.workflowId);
 
     const client = createClient();
@@ -197,6 +200,34 @@ export async function terminateWorkflow(input: {
       status: 200,
       data: { terminated: true, workflowId: input.workflowId },
     };
+  } catch (err: any) {
+    if (isResolveError(err)) return { status: 404, error: err.message };
+    return { status: 500, error: err.message };
+  }
+}
+
+/** Terminate through the configured provider, then close the workflow's open escalations. */
+async function terminateOnProvider(workflowId: string): Promise<LTApiResult> {
+  const provider = durableProviderRegistry.current;
+  if (!provider.terminate) {
+    return { status: 501, error: `The ${provider.name} provider does not terminate workflows` };
+  }
+  await provider.terminate(workflowId, 'terminated from Long Tail');
+  await cancelEscalationsByWorkflowId(workflowId);
+  return { status: 200, data: { terminated: true, workflowId } };
+}
+
+/**
+ * Describe a workflow on the configured durable engine: state, type and
+ * start/close times in one engine-neutral shape.
+ *
+ * @returns `{ status: 200, data: LTJobStatus }`; 404 when the engine does not know it
+ */
+export async function describeWorkflow(input: { workflowId: string }): Promise<LTApiResult> {
+  try {
+    const status = await durableProviderRegistry.current.describe(input.workflowId);
+    if (status.state === JOB_STATE.UNKNOWN) return { status: 404, error: 'Workflow not found' };
+    return { status: 200, data: status };
   } catch (err: any) {
     if (isResolveError(err)) return { status: 404, error: err.message };
     return { status: 500, error: err.message };
