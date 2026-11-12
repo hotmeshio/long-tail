@@ -12,13 +12,14 @@ export function useActiveWorkers() {
   });
 }
 
-export function useDiscoveredWorkflows() {
+export function useDiscoveredWorkflows(options?: { enabled?: boolean }) {
   return useQuery<DiscoveredWorkflow[]>({
     queryKey: ['discoveredWorkflows'],
     queryFn: async () => {
       const res = await apiFetch<{ workflows: DiscoveredWorkflow[] }>('/workflows/discovered');
       return res.workflows;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 

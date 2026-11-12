@@ -13,6 +13,7 @@ import { RequireAI } from './components/layout/RequireAI';
 import { RequireFeature } from './components/layout/RequireFeature';
 import { RequireMachines } from './components/layout/RequireMachines';
 import { RequireNativeEngine } from './components/layout/RequireNativeEngine';
+import { RequireEngineCapability } from './components/layout/RequireEngineCapability';
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded route sections
@@ -350,10 +351,15 @@ const router = createBrowserRouter([
           { path: 'workflows/durable/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           { path: 'workflows/executions/:workflowId', element: <Lazy><WorkflowExecutionPage /></Lazy> },
           {
+            element: <RequireEngineCapability capability="list" />,
+            children: [
+              { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
+            ],
+          },
+          {
             element: <RequireNativeEngine />,
             children: [
               { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
-              { path: 'workflows/executions', element: <Lazy><CertifiedExecutionsPage /></Lazy> },
               { path: 'workflows/durable/executions', element: <Lazy><DurableExecutionsPage /></Lazy> },
               { path: 'workflows/tasks', element: <Lazy><TasksListPage /></Lazy> },
               { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },

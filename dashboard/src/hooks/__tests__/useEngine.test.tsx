@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react';
 let settings: { data: unknown } = { data: undefined };
 vi.mock('../../api/settings', () => ({ useSettings: () => settings }));
 
-import { useEngine, engineConsoleUrl } from '../useEngine';
+import { useEngine, engineConsoleUrl, engineListsExecutions } from '../useEngine';
 
 const TEMPORAL = {
   provider: 'temporal',
@@ -44,5 +44,17 @@ describe('engineConsoleUrl', () => {
 
   it('is null without a template', () => {
     expect(engineConsoleUrl({ ...TEMPORAL, consoleUrl: null }, 'wf-1')).toBeNull();
+  });
+});
+
+describe('engineListsExecutions', () => {
+  it('is true on HotMesh and on a provider that lists', () => {
+    expect(engineListsExecutions({ ...TEMPORAL, native: true })).toBe(true);
+    expect(engineListsExecutions({ ...TEMPORAL, capabilities: { ...TEMPORAL.capabilities, list: true } })).toBe(true);
+  });
+
+  it('is false on a provider without list, including servers that predate the flag', () => {
+    expect(engineListsExecutions(TEMPORAL)).toBe(false);
+    expect(engineListsExecutions({ ...TEMPORAL, capabilities: { ...TEMPORAL.capabilities, list: false } })).toBe(false);
   });
 });

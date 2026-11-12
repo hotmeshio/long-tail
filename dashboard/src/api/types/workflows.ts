@@ -158,6 +158,8 @@ export interface LTJob {
   workflow_id: string;
   entity: string;
   status: 'running' | 'completed' | 'failed';
+  /** The engine's own status name, on engines other than HotMesh. */
+  provider_status?: string;
   is_live: boolean;
   created_at: string;
   updated_at: string;

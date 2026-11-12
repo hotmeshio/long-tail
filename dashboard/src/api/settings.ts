@@ -71,7 +71,8 @@ export interface EngineSettings {
   provider: string;
   /** HotMesh runs workflows: every HotMesh-specific surface applies. */
   native: boolean;
-  capabilities: { execution: boolean; terminate: boolean };
+  /** `list` is absent on servers that predate the executions list. */
+  capabilities: { execution: boolean; terminate: boolean; list?: boolean };
   /** Engine console link template: `{workflowId}`, `{namespace}`. */
   consoleUrl: string | null;
 }

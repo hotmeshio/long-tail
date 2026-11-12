@@ -7,9 +7,9 @@ import { useControlPlaneApps } from '../api/controlplane';
  * auto-selects the first one if no URL param, and keeps the URL
  * in sync. Uses replaceState (not pushState) to avoid history spam.
  */
-export function useNamespace(paramName = 'namespace') {
+export function useNamespace(paramName = 'namespace', options?: { enabled?: boolean }) {
   const [params, setParams] = useSearchParams();
-  const { data: apps, isLoading } = useControlPlaneApps();
+  const { data: apps, isLoading } = useControlPlaneApps(options);
 
   const selected = params.get(paramName) || '';
   const available = (apps?.apps ?? []).map((a) => a.appId).sort();

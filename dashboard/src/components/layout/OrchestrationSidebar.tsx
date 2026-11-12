@@ -1,6 +1,7 @@
 import { SlidersHorizontal, Play, ListChecks, Code2, Workflow } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import { useSettings } from '../../api/settings';
+import { useEngine } from '../../hooks/useEngine';
 import { getGraphEnabled } from '../../lib/view-as';
 
 /**
@@ -13,9 +14,17 @@ import { getGraphEnabled } from '../../lib/view-as';
  * When Graph is hidden (the default) the Procedural group label is dropped —
  * the three items sit directly under "Orchestrate" with no sub-heading.
  * When Graph is enabled both sections are labelled so users can tell them apart.
+ *
+ * With another durable engine only Executions applies, when the engine lists.
  */
 export function OrchestrationSidebar() {
   const { data: settings } = useSettings();
+  const engine = useEngine();
+
+  if (!engine.native) {
+    if (!engine.capabilities.list) return null;
+    return <SidebarNav heading="Workflows" entries={[{ to: '/workflows/executions', label: 'Executions', icon: ListChecks }]} />;
+  }
 
   // Graph section visibility:
   //   features.graphWorkflows === false → always hidden (easter egg suppressed)

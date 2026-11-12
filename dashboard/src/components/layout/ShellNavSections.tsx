@@ -23,14 +23,14 @@ export interface ShellNavSectionsProps {
  * drawer — one nav, two homes.
  */
 export function ShellNavSections({ aiEnabled, isBuilder, isOps, viewAs, canSeePaceBoard, showLines }: ShellNavSectionsProps) {
-  // Invoke and Orchestrate drive HotMesh workflows; other engines start their own.
+  // Invoke drives HotMesh workflows; other engines start their own.
   const { native } = useEngine();
   return (
     <>
       <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} showLines={showLines} />
       <PinnedViewsSidebar />
       {native && !isBuilder && <ToolsSidebar />}
-      {native && isBuilder && <OrchestrationSidebar />}
+      {isBuilder && <OrchestrationSidebar />}
       {isBuilder && aiEnabled && <DesignSidebar />}
       {isBuilder && <StorageSidebar />}
       {(isBuilder || isOps) && <AdminSidebar isBuilder={isBuilder} isOps={isOps} />}
