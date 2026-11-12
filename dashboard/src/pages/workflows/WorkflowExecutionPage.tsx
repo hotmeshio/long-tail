@@ -5,6 +5,7 @@ import { useWorkflowDetailEvents } from '../../hooks/useEventHooks';
 import { useCollapsedSections } from '../../hooks/useCollapsedSections';
 import { useTaskByWorkflowId, useChildTasks } from '../../api/tasks';
 import { useEscalationsByWorkflowId } from '../../api/escalations';
+import { useEngine, engineConsoleUrl } from '../../hooks/useEngine';
 
 import { PanelRightClose, PanelRightOpen, ChevronDown, Info, Activity, List } from 'lucide-react';
 import { PageHeader } from '../../components/common/layout/PageHeader';
@@ -20,10 +21,15 @@ type WfTab = 'details' | 'timeline' | 'events';
 const WF_TABS = ['details', 'timeline', 'events'] as const;
 const WF_TAB_KEY = 'lt:workflow-execution:tab';
 
-function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
+function ActionsDropdown({ isRunning, hasToolCalls, workflowId, native, canTerminate, consoleUrl, provider, onAction }: {
   isRunning: boolean;
   hasToolCalls: boolean;
   workflowId: string;
+  /** HotMesh runs workflows: restart, pipeline and stream views apply. */
+  native: boolean;
+  canTerminate: boolean;
+  consoleUrl: string | null;
+  provider: string;
   onAction: (action: 'restart' | 'terminate') => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,13 +56,15 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-surface-border rounded-md shadow-lg z-[100]">
-          <button
-            onClick={() => { onAction('restart'); setOpen(false); }}
-            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-          >
-            Restart Workflow
-          </button>
-          {isRunning && (
+          {native && (
+            <button
+              onClick={() => { onAction('restart'); setOpen(false); }}
+              className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+            >
+              Restart Workflow
+            </button>
+          )}
+          {canTerminate && isRunning && (
             <button
               onClick={() => { onAction('terminate'); setOpen(false); }}
               className="block w-full text-left px-4 py-2 text-xs text-status-error hover:bg-surface-hover"
@@ -64,7 +72,18 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
               Terminate
             </button>
           )}
-          {hasToolCalls && (
+          {consoleUrl && (
+            <a
+              href={consoleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
+              onClick={() => setOpen(false)}
+            >
+              Open in {provider}
+            </a>
+          )}
+          {native && hasToolCalls && (
             <Link
               to={`/mcp/queries/${workflowId}?step=3`}
               className="block w-full text-left px-4 py-2 text-xs text-accent hover:bg-surface-hover"
@@ -73,27 +92,31 @@ function ActionsDropdown({ isRunning, hasToolCalls, workflowId, onAction }: {
               Compile into Pipeline
             </Link>
           )}
-          <Link
-            to={`/mcp/executions/${encodeURIComponent(workflowId)}?namespace=durable`}
-            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-            onClick={() => setOpen(false)}
-          >
-            View Pipeline Execution
-          </Link>
-          <Link
-            to={`/admin/streams?source=worker&jid=${encodeURIComponent(workflowId)}`}
-            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-            onClick={() => setOpen(false)}
-          >
-            Worker Messages
-          </Link>
-          <Link
-            to={`/admin/streams?source=engine&jid=${encodeURIComponent(workflowId)}`}
-            className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
-            onClick={() => setOpen(false)}
-          >
-            Engine Messages
-          </Link>
+          {native && (
+            <>
+              <Link
+                to={`/mcp/executions/${encodeURIComponent(workflowId)}?namespace=durable`}
+                className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                onClick={() => setOpen(false)}
+              >
+                View Pipeline Execution
+              </Link>
+              <Link
+                to={`/admin/streams?source=worker&jid=${encodeURIComponent(workflowId)}`}
+                className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                onClick={() => setOpen(false)}
+              >
+                Worker Messages
+              </Link>
+              <Link
+                to={`/admin/streams?source=engine&jid=${encodeURIComponent(workflowId)}`}
+                className="block w-full text-left px-4 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+                onClick={() => setOpen(false)}
+              >
+                Engine Messages
+              </Link>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -106,8 +129,10 @@ export function WorkflowExecutionPage() {
 
   const executionTitle = 'Workflow Execution';
   const { data: execution, isLoading, error, refetch, isFetching } = useWorkflowExecution(workflowId!);
-  const { data: task } = useTaskByWorkflowId(workflowId!);
-  const { data: childTasksData } = useChildTasks(workflowId!);
+  // Task records and stream messages are HotMesh's; other engines export the timeline only.
+  const engine = useEngine();
+  const { data: task } = useTaskByWorkflowId(workflowId!, { enabled: engine.native });
+  const { data: childTasksData } = useChildTasks(workflowId!, { enabled: engine.native });
   const { data: escalationsData } = useEscalationsByWorkflowId(workflowId);
   const navigate = useNavigate();
   const terminateMutation = useTerminateWorkflow();
@@ -253,7 +278,7 @@ export function WorkflowExecutionPage() {
             <SwimlaneTimeline
               events={execution.events}
               childTasks={childTasksData?.tasks}
-              jid={workflowId}
+              jid={engine.native ? workflowId : undefined}
               appId="durable"
             />
           )}
@@ -261,7 +286,7 @@ export function WorkflowExecutionPage() {
             <EventTable
               events={execution.events}
               childTasks={childTasksData?.tasks}
-              jid={workflowId}
+              jid={engine.native ? workflowId : undefined}
               appId="durable"
             />
           )}
@@ -284,6 +309,10 @@ export function WorkflowExecutionPage() {
               isRunning={isRunning}
               hasToolCalls={hasToolCalls}
               workflowId={workflowId!}
+              native={engine.native}
+              canTerminate={engine.capabilities.terminate}
+              consoleUrl={engineConsoleUrl(engine, workflowId!)}
+              provider={engine.provider}
               onAction={handleAction}
             />
           </>

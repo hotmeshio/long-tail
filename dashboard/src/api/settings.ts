@@ -56,6 +56,8 @@ export interface AppSettings {
   machines?: { declared: number };
   /** Deployment display: an IANA time zone every dashboard date renders in (null = the browser's). */
   display?: { timeZone: string | null };
+  /** The durable engine running workflows. Absent on older servers, which run HotMesh. */
+  engine?: EngineSettings;
   environment?: {
     longTailVersion: string;
     hotmeshVersion: string;
@@ -63,6 +65,15 @@ export interface AppSettings {
     nodeVersion: string;
     eventTransport: string;
   };
+}
+
+export interface EngineSettings {
+  provider: string;
+  /** HotMesh runs workflows: every HotMesh-specific surface applies. */
+  native: boolean;
+  capabilities: { execution: boolean; terminate: boolean };
+  /** Engine console link template: `{workflowId}`, `{namespace}`. */
+  consoleUrl: string | null;
 }
 
 const AI_OVERRIDE_KEY = 'lt_ai_override';

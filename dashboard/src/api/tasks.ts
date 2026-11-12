@@ -39,7 +39,7 @@ export interface ProcessDetail {
   escalations: LTEscalationRecord[];
 }
 
-export function useTasks(filters: TaskFilters) {
+export function useTasks(filters: TaskFilters, options?: { enabled?: boolean }) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.lt_type) params.set('lt_type', filters.lt_type);
@@ -51,6 +51,7 @@ export function useTasks(filters: TaskFilters) {
   return useQuery<TaskListResponse>({
     queryKey: ['tasks', filters],
     queryFn: () => apiFetch(`/tasks?${params}`),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -67,18 +68,18 @@ export function useTask(id: string) {
  * Tries workflow_id first (leaf workflows), then falls back to
  * parent_workflow_id (orchestrators whose child task carries the envelope).
  */
-export function useChildTasks(parentWorkflowId: string) {
+export function useChildTasks(parentWorkflowId: string, options?: { enabled?: boolean }) {
   return useQuery<TaskListResponse>({
     queryKey: ['tasks', 'children', parentWorkflowId],
     queryFn: () =>
       apiFetch<TaskListResponse>(
         `/tasks?parent_workflow_id=${encodeURIComponent(parentWorkflowId)}&limit=50`,
       ),
-    enabled: !!parentWorkflowId,
+    enabled: !!parentWorkflowId && (options?.enabled ?? true),
   });
 }
 
-export function useTaskByWorkflowId(workflowId: string) {
+export function useTaskByWorkflowId(workflowId: string, options?: { enabled?: boolean }) {
   return useQuery<LTTaskRecord | null>({
     queryKey: ['tasks', 'byWorkflow', workflowId],
     queryFn: async () => {
@@ -94,7 +95,7 @@ export function useTaskByWorkflowId(workflowId: string) {
       );
       return child.tasks[0] ?? null;
     },
-    enabled: !!workflowId,
+    enabled: !!workflowId && (options?.enabled ?? true),
   });
 }
 

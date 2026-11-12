@@ -30,6 +30,7 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { seedFormJson } from '../../../lib/seed-form-json';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
+import { useEngine } from '../../../hooks/useEngine';
 import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
@@ -158,8 +159,10 @@ function EscalationDetailView({ id }: { id: string }) {
   const bulkUnassign = useBulkUnassignEscalations();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
-  const { data: workflowConfigs } = useWorkflowConfigs();
   const { data: settings } = useSettings();
+  // Triage and workflow configs are HotMesh's; other engines never offer them.
+  const { native } = useEngine();
+  const { data: workflowConfigs } = useWorkflowConfigs({ enabled: native });
 
   const { isBuilder } = useAccess();
 
@@ -404,7 +407,7 @@ function EscalationDetailView({ id }: { id: string }) {
     void run().finally(() => { if (!keepBadge) clearActing(); });
   }, [acting, pendingEmbedWrite, clearActing]);
 
-  const isRoundsExhausted = esc?.subtype === 'rounds_exhausted';
+  const isRoundsExhausted = native && esc?.subtype === 'rounds_exhausted';
 
   // An open, editable form takes scans its x-lt-scan fields accept.
   const sinkClaimed = !!esc && isEffectivelyClaimed(esc);
@@ -475,7 +478,7 @@ function EscalationDetailView({ id }: { id: string }) {
   const envelopeObj = safeParse(esc.envelope) as Record<string, any> | null;
   const isCertified = !!(envelopeObj?.metadata?.certified);
   const aiOverride = getAiOverride();
-  const hasAI = aiOverride !== null ? aiOverride : !!(settings as any)?.ai?.enabled;
+  const hasAI = native && (aiOverride !== null ? aiOverride : !!(settings as any)?.ai?.enabled);
 
   const payloadObj = (typeof escalationPayload === 'object' && escalationPayload !== null && !Array.isArray(escalationPayload))
     ? escalationPayload as Record<string, unknown>

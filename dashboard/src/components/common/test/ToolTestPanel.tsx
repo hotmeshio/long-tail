@@ -8,6 +8,7 @@ import { ToolPill } from '../display/ToolPill';
 import { ServerName } from '../display/ServerName';
 import type { McpToolManifest } from '../../../api/types';
 import { buildSkeleton } from '../../../pages/mcp/mcp-query-detail/helpers';
+import { useEngine } from '../../../hooks/useEngine';
 
 function ToolErrorDisplay({ error }: { error: Error | null }) {
   const msg = error instanceof Error ? error.message : '';
@@ -33,10 +34,12 @@ function ToolErrorDisplay({ error }: { error: Error | null }) {
 }
 
 function ExecutionLink({ data }: { data: unknown }) {
+  const { native } = useEngine();
   const res = (data as any)?.result;
   const jobId = res?.job_id;
   const ns = res?.namespace || '';
-  if (!jobId) return null;
+  // Pipeline executions are HotMesh jobs.
+  if (!native || !jobId) return null;
   return (
     <Link
       to={`/mcp/executions/${encodeURIComponent(jobId)}?namespace=${encodeURIComponent(ns)}`}

@@ -3,10 +3,13 @@ import { useEscalations } from '../../api/escalations';
 import { useEscalationListEvents } from '../../hooks/useEventHooks';
 import { useMcpServers } from '../../api/mcp';
 import { PageHeaderWithStats } from '../../components/common/layout/PageHeaderWithStats';
+import { useEngine } from '../../hooks/useEngine';
 
 export function AdminDashboard() {
   useEscalationListEvents();
-  const { data: taskData } = useTasks({ limit: 1 });
+  // Tasks are the HotMesh interceptor's records.
+  const { native } = useEngine();
+  const { data: taskData } = useTasks({ limit: 1 }, { enabled: native });
   const { data: pendingEsc } = useEscalations({ status: 'pending', limit: 1 });
   const { data: mcpData } = useMcpServers();
 
@@ -19,7 +22,7 @@ export function AdminDashboard() {
       <PageHeaderWithStats
         title="Admin"
         stats={[
-          { label: 'Tasks', value: taskData?.total ?? '—' },
+          ...(native ? [{ label: 'Tasks', value: taskData?.total ?? '—' }] : []),
           { label: 'Pending Escalations', value: pendingEsc?.total ?? '—', dotClass: 'bg-status-pending' },
           { label: 'MCP Servers', value: mcpLabel },
           { label: 'System', value: 'Healthy', dotClass: 'bg-status-success' },

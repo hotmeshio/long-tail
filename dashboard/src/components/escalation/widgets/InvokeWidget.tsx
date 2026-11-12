@@ -16,6 +16,7 @@ import { RunOutcomeLabel, RunOutline, RUN_OUTCOMES, useRunOutcome } from '../../
 import { useInvokeSubmit } from '../../../pages/workflows/start/use-invoke-submit';
 import { FieldLabel, FieldHelper } from '../resolver-form/FieldChrome';
 import type { WidgetProps } from './index';
+import { useEngine } from '../../../hooks/useEngine';
 
 const CONTROL_CLASS: Record<InvokeConfig['variant'], string> = {
   [INVOKE_VARIANTS.LINK]: 'inline-flex items-center gap-1.5 text-xs text-accent hover:text-accent-hover transition-colors',
@@ -39,12 +40,14 @@ const CONTROL_CLASS: Record<InvokeConfig['variant'], string> = {
  */
 export function InvokeWidget({ fieldKey, schema, escalationContext }: WidgetProps) {
   const config = useMemo(() => readInvokeConfig(schema), [schema]);
-  const { data: workflows, isPending } = useInvocableWorkflows();
+  // The widget starts HotMesh workflows; other engines start their own.
+  const { native } = useEngine();
+  const { data: workflows, isPending } = useInvocableWorkflows({ enabled: native && !!config });
   const workflow = workflows?.find((w) => w.workflow_type === config?.workflow);
   const status = (escalationContext?.escalation as { status?: string } | null | undefined)?.status;
   const terminal = status !== undefined && status !== ESCALATION_STATUS.PENDING;
 
-  if (!config || terminal) return null;
+  if (!native || !config || terminal) return null;
   if (isPending) {
     return <div className="h-4 w-32 rounded bg-surface-hover animate-pulse" data-testid={`invoke-widget-${fieldKey}-loading`} />;
   }
