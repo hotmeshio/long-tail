@@ -126,6 +126,7 @@ export async function getWorkflowResult(input: {
   appId?: string;
 }): Promise<LTApiResult> {
   try {
+    if (!durableProviderRegistry.isNative) return resultOnProvider(input.workflowId);
     const resolved = await resolveWorkflowHandle(input.workflowId, input.appId);
 
     const client = createClient();
@@ -164,6 +165,22 @@ export async function getWorkflowResult(input: {
     if (isResolveError(err)) return { status: 404, error: err.message };
     return { status: 500, error: err.message };
   }
+}
+
+/** A provider workflow's result, read from its execution once it has closed. */
+async function resultOnProvider(workflowId: string): Promise<LTApiResult> {
+  const provider = durableProviderRegistry.current;
+  const status = await provider.describe(workflowId);
+  if (status.state === JOB_STATE.UNKNOWN) return { status: 404, error: `Workflow ${workflowId} not found` };
+  if (status.state === JOB_STATE.RUNNING) return { status: 202, data: { workflowId, status: 'running' } };
+  if (status.state !== JOB_STATE.COMPLETED) {
+    return {
+      status: 200,
+      data: { workflowId, state: WORKFLOW_STATES.FAILED, terminated: status.state === JOB_STATE.TERMINATED, result: null },
+    };
+  }
+  const execution = provider.export ? await provider.export(workflowId, { excludeSystem: true }) : null;
+  return { status: 200, data: { workflowId, state: WORKFLOW_STATES.COMPLETED, result: execution?.result ?? null } };
 }
 
 /**

@@ -4,6 +4,7 @@ import { parseExpression } from 'cron-parser';
 import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
+import { durableProviderRegistry, startProviderWorkflow } from '../durable-provider';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig, LTAgent, AgentSchedule } from '../../types';
@@ -132,10 +133,14 @@ class LTCronRegistry {
       connection,
       callback: async () => {
         try {
-          const client = new Durable.Client({ connection });
           const { guid } = Virtual.getContext();
           const workflowId = `${workflowType}-cron-${guid}`;
           loggerRegistry.info(`[lt-cron] invoking ${workflowType} (${workflowId})`);
+          if (!durableProviderRegistry.isNative) {
+            await startProviderWorkflow({ workflowType, workflowId, taskQueue, envelope: defaultEnvelope });
+            return;
+          }
+          const client = new Durable.Client({ connection });
           await client.workflow.start({
             args: [defaultEnvelope],
             taskQueue,

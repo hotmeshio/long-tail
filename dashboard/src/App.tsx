@@ -331,7 +331,7 @@ const router = createBrowserRouter([
 
       // Invoke: open to anyone the server lists an invokable workflow for
       {
-        element: <RequireNativeEngine />,
+        element: <RequireEngineCapability capability="start" />,
         children: [
           {
             element: <RequireInvocable />,
@@ -357,6 +357,14 @@ const router = createBrowserRouter([
             ],
           },
           {
+            element: <RequireEngineCapability capability="start" />,
+            children: [
+              { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
+              { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+              { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
+            ],
+          },
+          {
             element: <RequireNativeEngine />,
             children: [
               { path: 'workflows', element: <Lazy><WorkflowsOverview /></Lazy> },
@@ -365,9 +373,6 @@ const router = createBrowserRouter([
               { path: 'workflows/tasks/detail/:id', element: <Lazy><TaskDetailPage /></Lazy> },
               { path: 'workflows/cron', element: <Navigate to="/workflows/start?mode=schedule" replace /> },
               { path: 'workflows/workers', element: <Lazy><WorkersPage /></Lazy> },
-              { path: 'workflows/registry', element: <Lazy><WorkflowConfigsPage /></Lazy> },
-              { path: 'workflows/registry/new', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
-              { path: 'workflows/registry/:workflowType', element: <Lazy><WorkflowConfigDetailPage /></Lazy> },
             ],
           },
         ],

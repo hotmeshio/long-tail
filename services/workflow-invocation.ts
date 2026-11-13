@@ -18,6 +18,7 @@ import * as userService from './user';
 import { JOB_EXPIRE_SECS } from '../modules/defaults';
 import { getRegisteredWorkers } from './workers/registry';
 import { resolvePrincipal } from './iam/principal';
+import { durableProviderRegistry, engineCanStart, startProviderWorkflow } from './durable-provider';
 import type { LTEnvelope } from '../types';
 
 // ── Public types ────────────────────────────────────────────────────────────
@@ -121,9 +122,15 @@ export async function invokeWorkflow(
   );
 
   // 5. Start workflow — caller options pass through to Durable client
-  const client = createClient();
   const callerOpts = input.options ?? {};
   const workflowId = callerOpts.workflowId || `${workflowType}-${Durable.guid()}`;
+
+  if (!durableProviderRegistry.isNative) {
+    await startProviderWorkflow({ workflowType, workflowId, taskQueue, envelope });
+    return { workflowId };
+  }
+
+  const client = createClient();
 
   await client.workflow.start({
     ...callerOpts,
@@ -146,6 +153,9 @@ export async function invokeWorkflow(
  * first (with invocable/role guards), then falls back to active workers.
  */
 async function resolveTaskQueue(workflowType: string): Promise<string> {
+  if (!engineCanStart()) {
+    throw new InvocationError(`The ${durableProviderRegistry.name} provider does not start workflows`, 501);
+  }
   const wfConfig = await configService.getWorkflowConfig(workflowType);
 
   if (wfConfig) {
@@ -159,6 +169,9 @@ async function resolveTaskQueue(workflowType: string): Promise<string> {
   }
 
   // No config — fall back to active worker registry
+  if (!durableProviderRegistry.isNative) {
+    throw new InvocationError(`Workflow not found: register a config for ${workflowType} with its task_queue`, 404);
+  }
   const worker = getRegisteredWorkers().get(workflowType);
   if (!worker) {
     throw new InvocationError(

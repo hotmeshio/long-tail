@@ -5,7 +5,7 @@ import { ToolsSidebar } from './ToolsSidebar';
 import { DesignSidebar } from './DesignSidebar';
 import { StorageSidebar } from './StorageSidebar';
 import { AdminSidebar } from './AdminSidebar';
-import { useEngine } from '../../hooks/useEngine';
+import { useEngine, engineStartsWorkflows } from '../../hooks/useEngine';
 import type { ViewAsRole } from '../../lib/view-as';
 
 export interface ShellNavSectionsProps {
@@ -24,12 +24,12 @@ export interface ShellNavSectionsProps {
  */
 export function ShellNavSections({ aiEnabled, isBuilder, isOps, viewAs, canSeePaceBoard, showLines }: ShellNavSectionsProps) {
   // Invoke drives HotMesh workflows; other engines start their own.
-  const { native } = useEngine();
+  const engine = useEngine();
   return (
     <>
       <ChoreographySidebar aiEnabled={aiEnabled} isBuilder={isBuilder} isOps={isOps} viewAs={viewAs} canSeePaceBoard={canSeePaceBoard} showLines={showLines} />
       <PinnedViewsSidebar />
-      {native && !isBuilder && <ToolsSidebar />}
+      {engineStartsWorkflows(engine) && !isBuilder && <ToolsSidebar />}
       {isBuilder && <OrchestrationSidebar />}
       {isBuilder && aiEnabled && <DesignSidebar />}
       {isBuilder && <StorageSidebar />}

@@ -30,7 +30,7 @@ import { isEffectivelyClaimed } from '../../../lib/escalation';
 import { seedFormJson } from '../../../lib/seed-form-json';
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useSettings } from '../../../api/settings';
-import { useEngine } from '../../../hooks/useEngine';
+import { useEngine, engineStartsWorkflows } from '../../../hooks/useEngine';
 import { getAiOverride } from '../../../lib/view-as';
 import { useEscalationDetailEvents } from '../../../hooks/useEventHooks';
 import { PanelRightClose, PanelRightOpen, RotateCcw, X } from 'lucide-react';
@@ -160,9 +160,10 @@ function EscalationDetailView({ id }: { id: string }) {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const { data: settings } = useSettings();
-  // Triage and workflow configs are HotMesh's; other engines never offer them.
-  const { native } = useEngine();
-  const { data: workflowConfigs } = useWorkflowConfigs({ enabled: native });
+  // Triage is HotMesh's; workflow configs exist wherever the engine starts workflows.
+  const engine = useEngine();
+  const { native } = engine;
+  const { data: workflowConfigs } = useWorkflowConfigs({ enabled: engineStartsWorkflows(engine) });
 
   const { isBuilder } = useAccess();
 

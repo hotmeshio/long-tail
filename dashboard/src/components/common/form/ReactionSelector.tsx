@@ -1,7 +1,7 @@
 import { useWorkflowConfigs } from '../../../api/workflows';
 import { useYamlWorkflows } from '../../../api/yaml-workflows';
 import { CapabilityCombobox } from './CapabilityCombobox';
-import { useEngine } from '../../../hooks/useEngine';
+import { useEngine, engineStartsWorkflows } from '../../../hooks/useEngine';
 
 const LABELS: Record<string, string> = {
   durable: 'Workflow',
@@ -13,7 +13,8 @@ const LABELS: Record<string, string> = {
 const ALL_TYPES = ['durable', 'pipeline', 'capability', 'mcp_query'] as const;
 
 /** Reactions that start HotMesh workflows: a durable workflow, a pipeline, an MCP query. */
-const NATIVE_ONLY_TYPES: readonly string[] = ['durable', 'pipeline', 'mcp_query'];
+const NATIVE_ONLY_TYPES: readonly string[] = ['pipeline', 'mcp_query'];
+const START_TYPES: readonly string[] = ['durable'];
 
 export interface ReactionSelectorProps {
   reactionType: string;
@@ -44,9 +45,13 @@ export function ReactionSelector({
   onMcpPromptChange,
   availableTypes = [...ALL_TYPES],
 }: ReactionSelectorProps) {
-  const { native } = useEngine();
-  const types = native ? availableTypes : availableTypes.filter((rt) => !NATIVE_ONLY_TYPES.includes(rt));
-  const { data: configs } = useWorkflowConfigs({ enabled: native });
+  const engine = useEngine();
+  const { native } = engine;
+  const starts = engineStartsWorkflows(engine);
+  const types = availableTypes
+    .filter((rt) => native || !NATIVE_ONLY_TYPES.includes(rt))
+    .filter((rt) => starts || !START_TYPES.includes(rt));
+  const { data: configs } = useWorkflowConfigs({ enabled: starts });
   const invocableWorkflows = (configs ?? []).filter((c: any) => c.invocable).map((c: any) => c.workflow_type as string);
   const { data: pipelineData } = useYamlWorkflows({ status: 'active' }, { enabled: native });
   const pipelines = (pipelineData?.workflows ?? []).map((w: any) => ({ id: w.id as string, name: (w.graph_topic || w.id) as string }));

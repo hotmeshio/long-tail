@@ -1,7 +1,7 @@
 import { Router } from '../lib/http';
 
 import { requireAuth } from '../modules/auth';
-import { requireNativeEngine } from './native-engine';
+import { requireNativeEngine, WORKFLOW_NEUTRAL_ROUTES, WORKFLOW_STATE_NEUTRAL_ROUTES } from './native-engine';
 import authRouter from './auth';
 import authSSORouter from './auth-sso';
 import oauthRouter from './oauth';
@@ -40,16 +40,6 @@ import identifiersRouter from './identifiers';
 import domainRouter from './domain';
 import announcementsRouter from './announcements';
 import machinesRouter from './machines';
-
-// Routes that work on every durable engine; the rest of their routers are HotMesh-only.
-const WORKFLOW_NEUTRAL_ROUTES = [
-  { method: 'POST', path: /^\/[^/]+\/terminate$/ },
-  { method: 'GET', path: /^\/[^/]+\/describe$/ },
-];
-const WORKFLOW_STATE_NEUTRAL_ROUTES = [
-  { method: 'GET', path: /^\/jobs$/ },
-  { method: 'GET', path: /^\/[^/]+\/execution$/ },
-];
 
 const router = Router();
 

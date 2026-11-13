@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../services/escalation/crud', () => ({ cancelEscalationsByWorkflowId: vi.fn().mockResolvedValue(1) }));
 
 import { exportWorkflowExecution } from '../../api/exports';
-import { terminateWorkflow, describeWorkflow } from '../../api/workflows';
+import { terminateWorkflow, describeWorkflow, getWorkflowResult } from '../../api/workflows';
 import { getSettings } from '../../api/settings';
 import { durableProviderRegistry } from '../../services/durable-provider';
 import { cancelEscalationsByWorkflowId } from '../../services/escalation/crud';
@@ -46,13 +46,31 @@ describe('engine-neutral workflow endpoints', () => {
     expect(result.data).toMatchObject({ workflowId: 'wf-3', state: 'running' });
   });
 
+  it('answers 202 for a result while the provider workflow runs', async () => {
+    const result = await getWorkflowResult({ workflowId: 'wf-4' });
+    expect(result).toEqual({ status: 202, data: { workflowId: 'wf-4', status: 'running' } });
+  });
+
+  it('reads a completed result from the provider execution', async () => {
+    provider.setState('wf-5', 'completed');
+    provider.result = { status: 'shipped' };
+    const result = await getWorkflowResult({ workflowId: 'wf-5' });
+    expect(result).toEqual({ status: 200, data: { workflowId: 'wf-5', state: 'completed', result: { status: 'shipped' } } });
+  });
+
+  it('reports a terminated provider workflow as failed', async () => {
+    provider.setState('wf-6', 'terminated');
+    const result = await getWorkflowResult({ workflowId: 'wf-6' });
+    expect(result.data).toMatchObject({ state: 'failed', terminated: true, result: null });
+  });
+
   it('reports the engine in settings and turns AI surfaces off', async () => {
     const result = await getSettings();
     const data = result.data as any;
     expect(data.engine).toEqual({
       provider: 'temporal',
       native: false,
-      capabilities: { execution: true, terminate: true, list: true },
+      capabilities: { execution: true, terminate: true, list: true, start: true },
       consoleUrl: 'https://temporal.example/namespaces/{namespace}/workflows/{workflowId}',
     });
     expect(data.ai.enabled).toBe(false);

@@ -5,6 +5,7 @@ import { registerLT } from '../services/interceptor';
 import { ensureEscalationCompatView } from '../services/escalation';
 import { systemEventsConfig } from '../lib/events/system-events';
 import { registerWorker } from '../services/workers/registry';
+import { durableProviderRegistry } from '../services/durable-provider';
 import { loggerRegistry } from '../lib/logger';
 import { telemetryRegistry } from '../lib/telemetry';
 import { eventRegistry } from '../lib/events';
@@ -70,9 +71,15 @@ export async function collectWorkers(startConfig: LTStartConfig): Promise<{
   builtinMcpServerFactories: Record<string, any>;
 }> {
   const { getSystemWorkers, builtinMcpServerFactories } = await import('../system');
-  // Normalize user workers: string workflows become named no-ops (readonly only)
+  // Normalize user workers: string workflows become named no-ops (readonly only).
+  // Under another provider, a string names that engine's workflow: its config
+  // registers here and the engine runs it.
+  const native = durableProviderRegistry.isNative;
   const userWorkers: WorkerEntry[] = (startConfig.workers ?? []).map((w) => {
     if (typeof w.workflow === 'string') {
+      if (!native) {
+        return { ...w, workflow: createNoOpWorkflow(w.workflow), connection: { ...w.connection, readonly: true } };
+      }
       if (!w.connection?.readonly) {
         throw new Error(
           `Worker "${w.workflow}" on queue "${w.taskQueue}": ` +

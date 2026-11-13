@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react';
 let settings: { data: unknown } = { data: undefined };
 vi.mock('../../api/settings', () => ({ useSettings: () => settings }));
 
-import { useEngine, engineConsoleUrl, engineListsExecutions } from '../useEngine';
+import { useEngine, engineConsoleUrl, engineListsExecutions, engineStartsWorkflows } from '../useEngine';
 
 const TEMPORAL = {
   provider: 'temporal',
@@ -56,5 +56,17 @@ describe('engineListsExecutions', () => {
   it('is false on a provider without list, including servers that predate the flag', () => {
     expect(engineListsExecutions(TEMPORAL)).toBe(false);
     expect(engineListsExecutions({ ...TEMPORAL, capabilities: { ...TEMPORAL.capabilities, list: false } })).toBe(false);
+  });
+});
+
+describe('engineStartsWorkflows', () => {
+  it('is true on HotMesh and on a provider that starts workflows', () => {
+    expect(engineStartsWorkflows({ ...TEMPORAL, native: true })).toBe(true);
+    expect(engineStartsWorkflows({ ...TEMPORAL, capabilities: { ...TEMPORAL.capabilities, start: true } })).toBe(true);
+  });
+
+  it('is false on a provider without start, including servers that predate the flag', () => {
+    expect(engineStartsWorkflows(TEMPORAL)).toBe(false);
+    expect(engineStartsWorkflows({ ...TEMPORAL, capabilities: { ...TEMPORAL.capabilities, start: false } })).toBe(false);
   });
 });

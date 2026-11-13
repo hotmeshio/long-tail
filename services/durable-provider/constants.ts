@@ -9,6 +9,7 @@ export const DURABLE_LOG = {
   WAITS_EXPIRED: 'durable_provider.waits.expired',
   WAITS_RECONCILED: 'durable_provider.waits.reconciled',
   FOLLOW_SKIPPED: 'durable_provider.follow.skipped',
+  STARTED: 'durable_provider.workflow.started',
   FOLLOW_FAILED: 'durable_provider.follow.failed',
 } as const;
 

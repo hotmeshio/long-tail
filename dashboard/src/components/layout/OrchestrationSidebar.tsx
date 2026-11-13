@@ -1,7 +1,7 @@
 import { SlidersHorizontal, Play, ListChecks, Code2, Workflow } from 'lucide-react';
 import { SidebarNav, type NavEntry } from './SidebarNav';
 import { useSettings } from '../../api/settings';
-import { useEngine } from '../../hooks/useEngine';
+import { useEngine, engineListsExecutions, engineStartsWorkflows } from '../../hooks/useEngine';
 import { getGraphEnabled } from '../../lib/view-as';
 
 /**
@@ -15,15 +15,25 @@ import { getGraphEnabled } from '../../lib/view-as';
  * the three items sit directly under "Orchestrate" with no sub-heading.
  * When Graph is enabled both sections are labelled so users can tell them apart.
  *
- * With another durable engine only Executions applies, when the engine lists.
+ * With another durable engine, Registry and Invoke Tool appear when the engine
+ * starts workflows, and Executions when it lists them.
  */
 export function OrchestrationSidebar() {
   const { data: settings } = useSettings();
   const engine = useEngine();
 
   if (!engine.native) {
-    if (!engine.capabilities.list) return null;
-    return <SidebarNav heading="Workflows" entries={[{ to: '/workflows/executions', label: 'Executions', icon: ListChecks }]} />;
+    const entries: NavEntry[] = [
+      ...(engineStartsWorkflows(engine)
+        ? [
+            { to: '/workflows/registry', label: 'Registry', icon: SlidersHorizontal },
+            { to: '/workflows/durable/invoke', label: 'Invoke Tool', icon: Play },
+          ]
+        : []),
+      ...(engineListsExecutions(engine) ? [{ to: '/workflows/executions', label: 'Executions', icon: ListChecks }] : []),
+    ];
+    if (!entries.length) return null;
+    return <SidebarNav heading="Workflows" entries={entries} />;
   }
 
   // Graph section visibility:

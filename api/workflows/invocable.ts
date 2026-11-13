@@ -1,6 +1,7 @@
 import * as configService from '../../services/config';
 import * as userService from '../../services/user';
 import { canInvokeWorkflow, hasGlobalInvocationAccess } from '../../services/invocation-access';
+import { durableProviderRegistry } from '../../services/durable-provider';
 import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/registry';
 import type { LTWorkflowConfig } from '../../types/config';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
@@ -63,7 +64,7 @@ export async function listInvocableWorkflows(auth: LTApiAuth): Promise<LTApiResu
       .filter((c) => canInvokeWorkflow(c, roles))
       .map((c) => ({ ...c, tier: tierOf(c) }));
 
-    if (hasGlobalInvocationAccess(roles)) {
+    if (durableProviderRegistry.isNative && hasGlobalInvocationAccess(roles)) {
       const registered = new Set(configs.map((c) => c.workflow_type));
       for (const [name, { taskQueue }] of getRegisteredWorkers()) {
         if (registered.has(name) || SYSTEM_WORKFLOWS.has(name)) continue;
