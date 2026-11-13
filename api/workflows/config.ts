@@ -154,6 +154,7 @@ export async function deleteWorkflowConfig(input: {
       return { status: 404, error: 'Workflow config not found' };
     }
     ltConfig.invalidate();
+    await cronRegistry.restartCron({ workflow_type: input.type });
     return { status: 200, data: { deleted: true, workflow_type: input.type } };
   } catch (err: any) {
     return { status: 500, error: err.message };

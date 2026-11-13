@@ -254,7 +254,7 @@ const result = await lt.workflows.getConfig({ type: 'reviewContent' });
 
 Create or replace a workflow configuration.
 
-Invalidates the config cache and restarts the cron schedule if one is defined. Idempotent.
+Invalidates the config cache and applies the config to its cron schedule: a new or edited schedule is armed under a new job, a removed one is stopped, and an unchanged one keeps running. Idempotent.
 
 ```typescript
 const result = await lt.workflows.upsertConfig({

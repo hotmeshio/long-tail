@@ -165,6 +165,7 @@ export function registerWorkflowConfigTools(server: McpServer): void {
       const deleted = await configService.deleteWorkflowConfig(args.workflow_type);
       if (!deleted) return errorResult('Workflow config not found');
       ltConfig.invalidate();
+      await cronRegistry.restartCron({ workflow_type: args.workflow_type });
       return {
         content: [{
           type: 'text' as const,
