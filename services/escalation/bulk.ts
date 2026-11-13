@@ -5,6 +5,7 @@ import { getPool } from '../../lib/db';
 import { escalations, ensureEscalationCompatView } from './client';
 import { toEscalationRecords } from './map';
 import { BULK_REASSIGN, BULK_UNASSIGN } from './sql';
+import { withoutProviderWaits } from './provider-waits';
 
 /** One row touched by a reassign/unassign, with its pre-update assignee. */
 export interface AssignmentChange {
@@ -154,13 +155,14 @@ export async function bulkCancelEscalations(
  * Returns full records so the caller can start triage workflows. No signal is
  * delivered — the triage workflow takes over handling. Rows backing a live
  * `condition()` waiter (`signal_key` set) are skipped by the store and stay
- * `pending`; only the returned rows enter triage.
+ * `pending`; only the returned rows enter triage. Rows a Temporal or DBOS
+ * workflow waits on are skipped the same way.
  */
 export async function bulkResolveForTriage(
   ids: string[],
   hint?: string,
 ): Promise<LTEscalationRecord[]> {
-  ids = onlyUuids(ids);
+  ids = await withoutProviderWaits(onlyUuids(ids));
   if (ids.length === 0) return [];
   const client = await escalations();
   const resolved = await client.resolveMany({

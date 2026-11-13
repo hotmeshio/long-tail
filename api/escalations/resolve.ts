@@ -193,6 +193,9 @@ export async function resolveBySignalKey(
     // resolved_by in the row metadata.
     const resolvedBy = await resolverIdentity(auth);
     const outcome = { ...metadata, ...facets, resolved_by: auth.userId };
+    if (!durableProviderRegistry.isNative && await getWaitByEscalationId(escalation.id)) {
+      return resolveProviderWait(escalation.id, resolverPayload, outcome, auth.userId);
+    }
     return resolveViaSignalKey(escalation, resolverPayload, outcome, undefined, resolvedBy);
   } catch (err: any) {
     return { status: 500, error: err.message };

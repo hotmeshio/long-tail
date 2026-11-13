@@ -5,6 +5,7 @@ import { isUuid } from '../../lib/uuid';
 import { escalations } from './client';
 import { publishEscalationChange } from './crud';
 import { toEscalationRecord } from './map';
+import { providerEscalationIdFor } from './provider-waits';
 
 /** Names the second row of a reciprocal add or removal. Exactly one selector. */
 export interface AccumulateReciprocal {
@@ -66,6 +67,15 @@ export interface RemoveItemServiceOutcome {
 const NOT_FOUND: AccumulateItemServiceOutcome = { outcome: 'not-found', count: -1, remaining: null, escalation: null };
 const RECIPROCAL_NOT_FOUND: AccumulateItemServiceOutcome = { ...NOT_FOUND, outcome: 'reciprocal-not-found' };
 
+/** Renames a reciprocal given by a provider wait's signal key to its escalation id. */
+async function withProviderReciprocal<T extends { reciprocal?: { signalKey?: string; id?: string } }>(input: T): Promise<T> {
+  const signalKey = input.reciprocal?.signalKey;
+  const id = signalKey ? await providerEscalationIdFor(signalKey) : null;
+  if (!id) return input;
+  const { signalKey: _named, ...reciprocal } = input.reciprocal!;
+  return { ...input, reciprocal: { ...reciprocal, id } };
+}
+
 function reciprocalIdValid(reciprocal?: { id?: string }): boolean {
   return !reciprocal?.id || isUuid(reciprocal.id);
 }
@@ -82,6 +92,7 @@ export async function accumulateItem(
   id: string,
   input: AccumulateItemInput,
 ): Promise<AccumulateItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
   if (!isUuid(id)) return NOT_FOUND;
   if (!reciprocalIdValid(input.reciprocal)) return RECIPROCAL_NOT_FOUND;
   const client = await escalations();
@@ -94,6 +105,9 @@ export async function accumulateItemBySignalKey(
   signalKey: string,
   input: Omit<AccumulateItemInput, 'assertClaim'>,
 ): Promise<AccumulateItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
+  const providerId = await providerEscalationIdFor(signalKey);
+  if (providerId) return accumulateItem(providerId, input);
   if (!reciprocalIdValid(input.reciprocal)) return RECIPROCAL_NOT_FOUND;
   const client = await escalations();
   const result = await client.accumulateItem({ signalKey, ...input });
@@ -106,6 +120,7 @@ export async function accumulateItemByMetadata(
   value: unknown,
   input: Omit<AccumulateItemInput, 'assertClaim'> & { roles?: string[] },
 ): Promise<AccumulateItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
   if (!reciprocalIdValid(input.reciprocal)) return RECIPROCAL_NOT_FOUND;
   const client = await escalations();
   const result = await client.accumulateItemByMetadata({ key, value, ...input });
@@ -121,6 +136,7 @@ export async function removeAccumulatedItem(
   id: string,
   input: RemoveItemInput,
 ): Promise<RemoveItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
   if (!isUuid(id)) return { outcome: 'not-found', count: -1, escalation: null };
   if (!reciprocalIdValid(input.reciprocal)) return { outcome: 'reciprocal-not-found', count: -1, escalation: null };
   const client = await escalations();
@@ -132,6 +148,9 @@ export async function removeAccumulatedItemBySignalKey(
   signalKey: string,
   input: RemoveItemInput,
 ): Promise<RemoveItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
+  const providerId = await providerEscalationIdFor(signalKey);
+  if (providerId) return removeAccumulatedItem(providerId, input);
   if (!reciprocalIdValid(input.reciprocal)) return { outcome: 'reciprocal-not-found', count: -1, escalation: null };
   const client = await escalations();
   const result = await client.removeAccumulatedItem({ signalKey, ...input });
@@ -143,6 +162,7 @@ export async function removeAccumulatedItemByMetadata(
   value: unknown,
   input: RemoveItemInput & { roles?: string[] },
 ): Promise<RemoveItemServiceOutcome> {
+  input = await withProviderReciprocal(input);
   if (!reciprocalIdValid(input.reciprocal)) return { outcome: 'reciprocal-not-found', count: -1, escalation: null };
   const client = await escalations();
   const result = await client.removeAccumulatedItemByMetadata({ key, value, ...input });

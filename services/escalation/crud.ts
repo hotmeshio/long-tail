@@ -16,6 +16,7 @@ import {
 } from './map';
 import type { CreateEscalationInput, ClaimResult } from './types';
 import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
+import { providerEscalationIdFor } from './provider-waits';
 import type { FacetValue } from '../../types/facets';
 
 /**
@@ -303,16 +304,25 @@ export async function getEscalationsByIds(
 }
 
 /**
- * Look up an efficient (atomic) escalation by its `signal_key` — the signal id
- * passed to `conditional(signalId, config)` / `condition(signalId, config)`.
- * Returns null when no row carries that key.
+ * Look up an efficient (atomic) escalation by its `signal_key`, the signal id
+ * passed to `conditional(signalId, config)` / `condition(signalId, config)`,
+ * or the escalation a Temporal or DBOS wait opened under that key.
+ * Returns null when nothing carries that key.
  */
 export async function getEscalationBySignalKey(
   signalKey: string,
 ): Promise<LTEscalationRecord | null> {
   const client = await escalations();
   const entry = await client.getBySignalKey(signalKey);
-  return entry ? toEscalationRecord(entry) : null;
+  if (entry) return toEscalationRecord(entry);
+  const providerId = await providerEscalationIdFor(signalKey);
+  return providerId ? getEscalation(providerId) : null;
+}
+
+/** Whether a HotMesh escalation holds `signalKey`. */
+export async function hotMeshHoldsSignalKey(signalKey: string): Promise<boolean> {
+  const client = await escalations();
+  return (await client.getBySignalKey(signalKey)) != null;
 }
 
 /**

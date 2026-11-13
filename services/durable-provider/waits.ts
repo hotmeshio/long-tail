@@ -8,7 +8,9 @@ import { announceCreated } from '../escalation/crud';
 import { toEscalationRecord } from '../escalation/map';
 import { DURABLE_LOG, ESCALATION_STORE_NAMESPACE } from './constants';
 import { foldWaitDeclaration } from './declaration';
-import { GET_WAIT_BY_ESCALATION, OPEN_WAIT } from './sql';
+import { GET_WAIT_BY_ESCALATION, OPEN_WAIT, SIGNAL_KEY_INDEX } from './sql';
+
+const UNIQUE_VIOLATION = '23505';
 
 export interface DurableWaitRow {
   escalation_id: string;
@@ -56,9 +58,14 @@ export async function openWait(provider: string, input: LTOpenWaitInput, created
     createdBy,
     input.expiresAt ?? null,
     JSON.stringify(envelope),
+    input.assignee ?? null,
+    input.durationMinutes ?? null,
+    input.originId ?? null,
+    input.parentId ?? null,
+    input.signalKey ?? null,
   ];
   for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
-    const { rows } = await getPool().query(OPEN_WAIT, params);
+    const { rows } = await queryOpenWait(params, input.signalKey);
     if (!rows.length) continue;
     const { created, reopened, ...entry } = rows[0];
     const escalation = toEscalationRecord(entry);
@@ -71,6 +78,23 @@ export async function openWait(provider: string, input: LTOpenWaitInput, created
     return { escalation, created: Boolean(created), reopened: Boolean(reopened) };
   }
   throw new Error(`could not open wait ${input.waitKey} for workflow ${input.workflowId}`);
+}
+
+/** A signal key another wait already holds. */
+export class SignalKeyTakenError extends Error {
+  constructor(signalKey: string) {
+    super(`signal key ${signalKey} is held by another wait`);
+    this.name = 'SignalKeyTakenError';
+  }
+}
+
+async function queryOpenWait(params: unknown[], signalKey: string | undefined) {
+  try {
+    return await getPool().query(OPEN_WAIT, params);
+  } catch (err: any) {
+    if (signalKey && err?.code === UNIQUE_VIOLATION && err?.constraint === SIGNAL_KEY_INDEX) throw new SignalKeyTakenError(signalKey);
+    throw err;
+  }
 }
 
 /** The wait behind an escalation, or null when the row is not a provider wait. */
