@@ -90,7 +90,7 @@ An invoke (`POST /api/workflows/:type/invoke`, the Invoke Tool, the `invoke_work
 
 Long Tail's own workflows, such as `capabilityInvoke`, which agent capability reactions start, run on HotMesh inside Long Tail and start there under any provider. `GET /api/workflows/:id/result` finds their runs too.
 
-A config with `cronSchedule` starts the workflow on that schedule with its `envelopeSchema` as the envelope. A workflow that returns `{ data }` shows that payload in the Invoke Tool when it completes; `GET /api/workflows/:id/result` returns whatever the workflow returned.
+A config with `cronSchedule` starts the workflow on that schedule, on every engine. Each tick reads the config as stored at that moment, so every container starts the run with the same `envelopeSchema`, `executeAs` and task queue. Saving a config leaves its schedule running unless the schedule itself changes; a changed, removed or re-enabled schedule moves to a new cron job (`lt_workflow_crons`), and deleting the config stops it. A workflow that returns `{ data }` shows that payload in the Invoke Tool when it completes; `GET /api/workflows/:id/result` returns whatever the workflow returned.
 
 ## Opening a wait
 
@@ -120,9 +120,32 @@ Each provider package's `conditional()` calls this endpoint through an activity 
 | 200 | The wait already exists. The existing row is returned with `created: false` |
 | 400 | The body is invalid, or `metadata` does not match the role's `metadata_schema` |
 | 403 | The caller lacks write access to the role |
+| 404 | `originId` or `parentId` names no escalation the caller can read |
+| 409 | `signalKey` is held by another wait or escalation |
 | 501 | No provider is configured; HotMesh workflows call `conditional()` directly |
 
 `metadata` holds the queryable facets and is validated against the role. `data` is shown to the resolver. `expiresAt` is the SLA.
+
+The other fields match what HotMesh's `conditional()` writes:
+
+| Field | Effect |
+|---|---|
+| `envelope` | Render-only data for the form: `formDefaults` prefills it, `confidence` drives `x-lt-confidence`, and any key is readable as `envelope.*`. Keys starting `batch_` or `accumulate_` are reserved |
+| `lookups` | Knowledge entries the form reads, stored as `envelope.lookups`. Pass it here or in `envelope`, not both |
+| `files` | Stored files the form shows, stored as `envelope.files` |
+| `schemaVersion` | The role form version the resolve UI renders, stored as `metadata.schema_version` |
+| `assignee` | Assigns the escalation when it is created; others can still claim it |
+| `durationMinutes` | With `assignee`, claims the escalation for that many minutes, timed by the database clock |
+| `originId`, `parentId` | Lineage for claim groups and `x-lt-transition`. Each must name an escalation the caller can read (`404` otherwise); with both, `originId` must be the parent's origin |
+| `signalKey` | Addresses the wait on the signal-key surfaces (below) |
+
+Opening the same wait again returns the first escalation unchanged.
+
+### Signal keys
+
+A wait opened with `signalKey` is addressed by key, as a HotMesh escalation is: `POST /api/escalations/resolve-by-signal-key`, `accumulate-by-signal-key`, `remove-item-by-signal-key`, `resolve-batch-item-by-signal-key`, `GET /api/escalations/items-by-signal-key`, a reciprocal named by `signalKey`, and the matching MCP tools. Long Tail looks the key up in `lt_durable_waits` and acts on the escalation by id, and the relay delivers the outcome.
+
+A key is unique across waits and HotMesh escalations for the life of the row; a key already held answers `409`. The escalation row itself carries no `signal_key`, so the escalation store never tries to wake HotMesh for it.
 
 ### Batch and accumulate waits
 
@@ -175,7 +198,13 @@ These routes answer `501` with the provider's name, because they read or start H
 - the other `/workflows` and `/workflow-states` routes
 - `/escalations/bulk-triage`
 
-The matching MCP tools are not registered.
+The matching MCP tools are not registered. Triage never resolves an escalation a provider workflow waits on: bulk triage skips those rows, as it skips HotMesh escalations that have a signal key.
+
+A Temporal activity or DBOS step calls an MCP tool with `POST /api/mcp/servers/:id/tools/:toolName/call`, where `:id` is the server's id or its name.
+
+### Machine lines
+
+Line workflows on Temporal or DBOS import the contracts from `@hotmeshio/long-tail/machines/contracts`: row types, facets, decisions, form schemas, `commandRow`, `commandTarget` and the line roles. Nothing behind that path loads Node built-ins, the database or HotMesh, so it fits a Temporal workflow bundle. The machine gateway resolves command rows and adds hop items by escalation id, so it works on the rows these workflows wait on.
 
 `GET /api/settings` reports the engine, and the dashboard uses it to show or hide its pages:
 
