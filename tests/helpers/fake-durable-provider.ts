@@ -10,6 +10,7 @@ import {
   type LTWorkflowExecution,
   type LTWorkflowListQuery,
   type LTWorkflowPage,
+  type LTWorkflowStartInput,
 } from '../../types/durable-provider';
 
 export interface FakeDelivery {
@@ -23,10 +24,12 @@ export interface FakeDelivery {
  */
 export class FakeDurableProvider implements LTDurableProvider {
   readonly name: string;
-  readonly capabilities = { native: false, execution: true, terminate: true, list: true };
+  readonly capabilities = { native: false, execution: true, terminate: true, list: true, start: true };
   readonly deliveries: FakeDelivery[] = [];
   readonly terminated: string[] = [];
   readonly listQueries: LTWorkflowListQuery[] = [];
+  readonly started: LTWorkflowStartInput[] = [];
+  result: unknown = undefined;
   listed: LTJobStatus[] = [];
   private states = new Map<string, LTJobState>();
   private failures = new Map<string, number>();
@@ -74,6 +77,7 @@ export class FakeDurableProvider implements LTDurableProvider {
       workflow_type: 'fakeWorkflow',
       task_queue: '',
       status: 'running',
+      result: this.result,
       start_time: null,
       close_time: null,
       duration_ms: null,
@@ -97,5 +101,10 @@ export class FakeDurableProvider implements LTDurableProvider {
   async terminate(workflowId: string): Promise<void> {
     this.terminated.push(workflowId);
     this.states.set(workflowId, JOB_STATE.TERMINATED);
+  }
+
+  async start(input: LTWorkflowStartInput): Promise<void> {
+    this.started.push(input);
+    this.states.set(input.workflowId, JOB_STATE.RUNNING);
   }
 }

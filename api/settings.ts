@@ -17,7 +17,7 @@ import { isSSOEnabled, getSSOConfig } from '../modules/sso';
 import { CLAIM_DURATION_OPTIONS } from '../modules/defaults';
 import { hasLLMApiKey } from '../services/llm';
 import type { LTApiResult } from '../types/sdk';
-import { durableProviderRegistry } from '../services/durable-provider';
+import { durableProviderRegistry, engineCanStart } from '../services/durable-provider';
 
 /**
  * Resolve the NATS WebSocket URL for the browser.
@@ -129,6 +129,7 @@ function engineSettings() {
       execution: provider ? provider.capabilities.execution : true,
       terminate: provider ? provider.capabilities.terminate : true,
       list: provider ? provider.capabilities.list : true,
+      start: provider ? engineCanStart() : true,
     },
     consoleUrl: durableProviderRegistry.settings.consoleUrl ?? null,
   };

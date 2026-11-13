@@ -54,7 +54,41 @@ await start({
 | `relay.batch` | Waits claimed per pass. Default 50. |
 | `relay.reconcileMs` | Interval for closing escalations whose workflow has ended. Default 15 min; `0` turns it off. |
 
-With a non-HotMesh provider, `start()` refuses configuration that needs HotMesh workflows: `workers`, `examples` and `escalation.strategy: 'mcp'`.
+With a non-HotMesh provider, `start()` refuses configuration that needs HotMesh workflows: workflow functions in `workers`, `examples` and `escalation.strategy: 'mcp'`.
+
+## Registering and invoking workflows
+
+A provider that starts workflows (`capabilities.start` and `provider.start`) gets the same registry, Invoke Tool and schedules HotMesh has. Register each workflow by name in `workers`; the engine runs its own workers, so Long Tail only stores the config:
+
+```ts
+await start({
+  durable: { provider: temporalProvider({ address: 'temporal:7233', namespace: 'default' }) },
+  workers: [{
+    taskQueue: 'orders',
+    workflow: 'reviewOrder',
+    config: {
+      invocable: true,
+      description: 'Review an order',
+      invocationRoles: ['reviewer'],
+      inputSchema: { type: 'object', properties: { orderId: { type: 'string' } }, required: ['orderId'] },
+    },
+  }],
+});
+```
+
+`taskQueue` is the engine's queue: the Temporal task queue, or the DBOS queue name. Configs can also be registered from the dashboard's Registry page, `PUT /api/workflows/:type/config` or the `upsert_workflow_config` MCP tool.
+
+An invoke (`POST /api/workflows/:type/invoke`, the Invoke Tool, the `invoke_workflow` MCP tool, an `x-lt-invoke` form widget or an agent reaction) runs the same checks as on HotMesh: `invocable`, invocation roles, bot scopes, the input schema and `execute_as`. Long Tail then calls `provider.start` with one argument, the envelope:
+
+```json
+{
+  "data": { "orderId": "42" },
+  "metadata": { "source": "dashboard" },
+  "lt": { "userId": "<who invoked>", "principal": { "id": "...", "roles": [] }, "scopes": ["workflow:invoke"] }
+}
+```
+
+A config with `cronSchedule` starts the workflow on that schedule with its `envelopeSchema` as the envelope. A workflow that returns `{ data }` shows that payload in the Invoke Tool when it completes; `GET /api/workflows/:id/result` returns whatever the workflow returned.
 
 ## Opening a wait
 
@@ -113,6 +147,9 @@ The escalation, role, identity and admin surfaces work the same on every engine.
 | `GET /api/workflow-states/:id/execution` | The execution timeline from `provider.export`, in the same shape HotMesh returns |
 | `POST /api/workflows/:id/terminate` | `provider.terminate`, then the workflow's pending escalations are cancelled |
 | `GET /api/workflows/:id/describe` | `provider.describe`: the workflow's state, type and times |
+| `GET /api/workflows/:id/result` | `202` while running; once closed, the result from `provider.export` |
+| `GET`, `PUT`, `DELETE /api/workflows/:type/config`, `GET /api/workflows/config`, `/discovered`, `/invocable`, `/:type/input-lookups`, `/cron/status` | The workflow registry. `/discovered` lists the registered configs |
+| `POST /api/workflows/:type/invoke` | `provider.start` with the envelope; `501` when the provider does not start workflows |
 
 These routes answer `501` with the provider's name, because they read or start HotMesh workflows:
 - `/tasks`, `/controlplane`, `/dba`, `/pipelines`, `/yaml-workflows`, `/insight`, `/workflow-sets`, `/namespaces`, `/diagnostics` and `/config/maintenance`
@@ -127,12 +164,12 @@ The matching MCP tools are not registered.
 "engine": {
   "provider": "temporal",
   "native": false,
-  "capabilities": { "execution": true, "terminate": true, "list": true },
+  "capabilities": { "execution": true, "terminate": true, "list": true, "start": true },
   "consoleUrl": "https://temporal.example.com/namespaces/default/workflows/{workflowId}"
 }
 ```
 
-With `list`, the sidebar shows Workflows, Executions, and the executions page lists the engine's workflows. Without it, the page and the entry are hidden.
+With `start`, the sidebar shows Registry and Invoke Tool. With `list`, it shows Executions, and the executions page lists the engine's workflows.
 
 ## Writing a provider
 
@@ -141,12 +178,13 @@ import type { LTDurableProvider } from '@hotmeshio/long-tail';
 
 export const myProvider: LTDurableProvider = {
   name: 'my-engine',
-  capabilities: { native: false, execution: true, terminate: true, list: true },
+  capabilities: { native: false, execution: true, terminate: true, list: true, start: true },
   async deliver(ref, outcome) { /* signal ref.workflowId with outcome; return 'delivered' or 'gone' */ },
   async describe(workflowId) { /* return { workflowId, state, providerState } */ },
   async export(workflowId) { /* return an LTWorkflowExecution; summarizeExecution(events) fills summary */ },
   async terminate(workflowId, reason) { /* stop the workflow */ },
   async list(query) { /* return { workflows, total }: one page, newest first, and the count of every match */ },
+  async start({ workflowType, workflowId, taskQueue, args }) { /* start the workflow; args is [envelope] */ },
 };
 ```
 

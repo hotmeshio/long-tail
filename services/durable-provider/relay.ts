@@ -94,6 +94,11 @@ export class DurableRelay {
     await this.running?.catch(() => undefined);
   }
 
+  /** Publish the workflow's completion when the engine reports it closed. */
+  follow(workflowId: string, workflowType: string): void {
+    this.follower.follow(workflowId, workflowType);
+  }
+
   /** Schedule a pass soon; bursts of events collapse into one pass. */
   kick(): void {
     if (this.kickTimer) return;

@@ -27,9 +27,14 @@ describe('durable provider start config', () => {
     expect(() => assertDurableConfig(withProvider({ escalation: { strategy: 'mcp' } }))).toThrow(/triage/);
   });
 
-  it('throws on HotMesh workers with a provider', () => {
-    const config = withProvider({ workers: [{ taskQueue: 'q', workflow: 'w', connection: { readonly: true } }] as any });
-    expect(() => assertDurableConfig(config)).toThrow(/workers/);
+  it('throws on HotMesh workflow functions with a provider', () => {
+    const config = withProvider({ workers: [{ taskQueue: 'q', workflow: async function reviewOrder() {} }] });
+    expect(() => assertDurableConfig(config)).toThrow(/as strings/);
+  });
+
+  it('accepts provider workflows named as strings', () => {
+    const config = withProvider({ workers: [{ taskQueue: 'orders', workflow: 'reviewOrder', config: { invocable: true } }] });
+    expect(() => assertDurableConfig(config)).not.toThrow();
   });
 
   it('throws on examples with a provider', () => {

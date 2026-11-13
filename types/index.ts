@@ -380,6 +380,7 @@ export type {
   LTWorkflowListState,
   LTWorkflowListQuery,
   LTWorkflowPage,
+  LTWorkflowStartInput,
 } from './durable-provider';
 
 export {

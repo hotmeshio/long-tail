@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-import { requireNativeEngine, nativeEngineError } from '../../routes/native-engine';
+import { requireNativeEngine, nativeEngineError, WORKFLOW_NEUTRAL_ROUTES } from '../../routes/native-engine';
 import { durableProviderRegistry } from '../../services/durable-provider';
 import { FakeDurableProvider } from '../helpers/fake-durable-provider';
 
@@ -35,5 +35,23 @@ describe('requireNativeEngine', () => {
     expect(invoke(gate, 'GET', '/wf-1/execution').next).toHaveBeenCalled();
     expect(invoke(gate, 'POST', '/wf-1/execution').next).not.toHaveBeenCalled();
     expect(invoke(gate, 'GET', '/wf-1/state').next).not.toHaveBeenCalled();
+  });
+
+  it('serves workflow configs, invoke and schedules on every engine', () => {
+    durableProviderRegistry.register(new FakeDurableProvider('dbos'));
+    const gate = requireNativeEngine(WORKFLOW_NEUTRAL_ROUTES);
+    for (const [method, path] of [
+      ['GET', '/config'],
+      ['PUT', '/reviewOrder/config'],
+      ['DELETE', '/reviewOrder/config'],
+      ['GET', '/invocable'],
+      ['GET', '/discovered'],
+      ['POST', '/reviewOrder/invoke'],
+      ['GET', '/wf-1/result'],
+      ['GET', '/cron/status'],
+    ]) {
+      expect(invoke(gate, method, path).next, `${method} ${path}`).toHaveBeenCalled();
+    }
+    expect(invoke(gate, 'GET', '/workers').next).not.toHaveBeenCalled();
   });
 });

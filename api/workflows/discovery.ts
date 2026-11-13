@@ -5,6 +5,7 @@ import { getRegisteredWorkers, SYSTEM_WORKFLOWS } from '../../services/workers/r
 import { DISTINCT_ENTITIES } from '../../services/pipelines/sql';
 import { sanitizeAppId, quoteSchema } from '../../services/hotmesh-utils';
 import type { LTApiResult } from '../../types/sdk';
+import { durableProviderRegistry } from '../../services/durable-provider';
 
 /**
  * List active workflow workers with their registration status.
@@ -50,15 +51,21 @@ export async function listDiscoveredWorkflows(input: {
   include_system?: boolean;
 }): Promise<LTApiResult> {
   try {
+    // Another engine runs its own workers, so its workflows are the registered configs.
+    const native = durableProviderRegistry.isNative;
+
     // 1. Active workers from in-memory registry
-    const activeWorkers = getRegisteredWorkers();
+    const activeWorkers = native ? getRegisteredWorkers() : new Map();
 
     // 2. Historical entities from jobs table
-    const pool = getPool();
-    // TODO: accept app_id parameter to avoid hardcoded schema
-    const schema = quoteSchema(sanitizeAppId('durable'));
-    const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES(schema));
-    const historicalEntities = new Set(entityRows.map((r) => r.entity));
+    const historicalEntities = new Set<string>();
+    if (native) {
+      const pool = getPool();
+      // TODO: accept app_id parameter to avoid hardcoded schema
+      const schema = quoteSchema(sanitizeAppId('durable'));
+      const { rows: entityRows } = await pool.query<{ entity: string }>(DISTINCT_ENTITIES(schema));
+      for (const r of entityRows) historicalEntities.add(r.entity);
+    }
 
     // 3. Registered configs
     const configs = await configService.listWorkflowConfigs();

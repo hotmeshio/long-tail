@@ -36,7 +36,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loggerRegistry } from '../../../lib/logger';
 import { registeredToolCount, removeTools } from '../../../services/mcp/registered-tools';
-import { durableProviderRegistry } from '../../../services/durable-provider';
+import { durableProviderRegistry, engineCanStart } from '../../../services/durable-provider';
 
 import { registerTaskTools } from './tasks';
 import { registerEscalationTools } from './escalations';
@@ -70,11 +70,12 @@ const HOTMESH_ONLY_TOOLS = [
   'get_workflow_envelopes',
   'get_export_status',
   'list_discovered_workflows',
-  'invoke_workflow',
-  'invoke_workflow_read_safe',
   'get_workflow_status',
   'bulk_triage',
 ];
+
+/** Tools that start workflows, kept when the provider can start them. */
+const START_TOOLS = ['invoke_workflow', 'invoke_workflow_read_safe'];
 
 let server: McpServer | null = null;
 
@@ -92,9 +93,10 @@ export async function createAdminServer(options?: {
   }
 
   const native = durableProviderRegistry.isNative;
+  const starts = engineCanStart();
   if (native) registerTaskTools(instance);
   registerEscalationTools(instance);
-  if (native) registerWorkflowConfigTools(instance);
+  if (starts) registerWorkflowConfigTools(instance);
   registerWorkflowTools(instance);
   registerMcpServerTools(instance);
   if (native) registerYamlWorkflowTools(instance);
@@ -117,6 +119,7 @@ export async function createAdminServer(options?: {
   registerDomainContextTools(instance);
   registerAnnouncementTools(instance);
   if (!native) removeTools(instance, HOTMESH_ONLY_TOOLS);
+  if (!starts) removeTools(instance, START_TOOLS);
 
   loggerRegistry.info(`[lt-mcp:admin] ${name} ready (${registeredToolCount(instance)} tools registered)`);
   return instance;

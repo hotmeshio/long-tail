@@ -61,6 +61,8 @@ export interface LTDurableCapabilities {
   terminate: boolean;
   /** `list()` is available. */
   list: boolean;
+  /** `start()` is available: Long Tail can invoke and schedule workflows. */
+  start?: boolean;
 }
 
 export const JOB_STATE = {
@@ -159,6 +161,18 @@ export interface LTExecutionExportOptions {
   maxDepth?: number;
 }
 
+// ── Start a workflow ─────────────────────────────────────────────────────────
+
+/** A workflow Long Tail asks the engine to start, from an invoke or a schedule. */
+export interface LTWorkflowStartInput {
+  workflowType: string;
+  workflowId: string;
+  /** The workflow config's `task_queue`: the engine's task queue or queue name. */
+  taskQueue: string;
+  /** One argument, the envelope `{ data, metadata, lt }`, as on HotMesh. */
+  args: unknown[];
+}
+
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export interface LTDurableProvider {
@@ -170,6 +184,8 @@ export interface LTDurableProvider {
   export?(workflowId: string, options?: LTExecutionExportOptions): Promise<LTWorkflowExecution>;
   terminate?(workflowId: string, reason: string): Promise<void>;
   list?(query: LTWorkflowListQuery): Promise<LTWorkflowPage>;
+  /** Start a workflow. Throws when the engine refuses it, such as a duplicate id. */
+  start?(input: LTWorkflowStartInput): Promise<void>;
 }
 
 export interface LTDurableRelayConfig {
