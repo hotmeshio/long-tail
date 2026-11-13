@@ -16,7 +16,7 @@ import { DURABLE_LOG, RELAY_DEFAULTS } from './constants';
 import { WorkflowFollower } from './follow';
 import {
   CLAIM_DELIVERIES,
-  EXPIRE_DUE,
+  expireDueSql,
   MARK_DELIVERED,
   MARK_RETRY,
   PENDING_WORKFLOWS,
@@ -169,7 +169,7 @@ export class DurableRelay {
   }
 
   private async expireDue(): Promise<number> {
-    const { rows } = await getPool().query(EXPIRE_DUE);
+    const { rows } = await getPool().query(expireDueSql());
     for (const entry of rows) {
       const escalation = toEscalationRecord(entry);
       void publishEscalationChange({

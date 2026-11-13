@@ -4,7 +4,7 @@
  * store's resolve never composes a HotMesh wake for it.
  */
 
-import { timeoutPayloadSql } from '@hotmeshio/hotmesh/build/services/store/providers/postgres/escalation-accumulate';
+type TimeoutPayloadSql = typeof import('@hotmeshio/hotmesh/build/services/store/providers/postgres/escalation-accumulate').timeoutPayloadSql;
 
 const WAIT_MATCH = 'x.provider = $1 AND x.workflow_id = $2 AND x.run_scope = $3 AND x.wait_key = $4';
 
@@ -81,15 +81,23 @@ export const MARK_RETRY = `
 /**
  * Expire pending provider escalations whose SLA has passed. An accumulator,
  * or a batch with `partialOnTimeout`, stores its collection as the resolver
- * payload, as HotMesh's expiry does, and the relay delivers it.
+ * payload, as HotMesh's expiry does, and the relay delivers it. Built on
+ * first use, so only a provider deployment depends on the SDK module path.
  */
-export const EXPIRE_DUE = `
+let expireDue: string | null = null;
+export function expireDueSql(): string {
+  if (!expireDue) {
+    const { timeoutPayloadSql } = require('@hotmeshio/hotmesh/build/services/store/providers/postgres/escalation-accumulate') as { timeoutPayloadSql: TimeoutPayloadSql };
+    expireDue = `
   UPDATE public.hmsh_escalations e
   SET status = 'expired', updated_at = NOW(), resolver_payload = ${timeoutPayloadSql('e')}
   FROM lt_durable_waits w
   WHERE w.escalation_id = e.id AND e.status = 'pending'
     AND e.expires_at IS NOT NULL AND e.expires_at <= NOW()
   RETURNING e.*`;
+  }
+  return expireDue;
+}
 
 /** Workflows with a pending provider escalation, after a keyset cursor. */
 export const PENDING_WORKFLOWS = `

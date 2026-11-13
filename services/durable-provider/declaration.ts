@@ -1,6 +1,6 @@
-import { foldEscalationConfig } from '@hotmeshio/hotmesh/build/services/escalations';
-
 import type { LTOpenWaitInput } from '../../types/durable-provider';
+
+type FoldEscalationConfig = typeof import('@hotmeshio/hotmesh/build/services/escalations').foldEscalationConfig;
 
 /** A batch or accumulate declaration the escalation store refuses. */
 export class WaitDeclarationError extends Error {
@@ -23,6 +23,8 @@ export function foldWaitDeclaration(input: LTOpenWaitInput): {
   envelope: Record<string, unknown>;
 } {
   const { batch, partialOnTimeout, wakeOnFlag, wakeOnFill, filled, accumulate } = input;
+  // Resolved on first use, so only a provider deployment depends on the SDK module path.
+  const { foldEscalationConfig } = require('@hotmeshio/hotmesh/build/services/escalations') as { foldEscalationConfig: FoldEscalationConfig };
   try {
     const folded = foldEscalationConfig({
       batch, partialOnTimeout, wakeOnFlag, wakeOnFill, filled, accumulate,
