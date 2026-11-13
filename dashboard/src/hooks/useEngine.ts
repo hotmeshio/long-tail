@@ -3,7 +3,7 @@ import { useSettings, type EngineSettings } from '../api/settings';
 const NATIVE_ENGINE: EngineSettings = {
   provider: 'hotmesh',
   native: true,
-  capabilities: { execution: true, terminate: true, list: true },
+  capabilities: { execution: true, terminate: true, list: true, start: true },
   consoleUrl: null,
 };
 
@@ -16,6 +16,11 @@ export function useEngine(): EngineSettings {
 /** True when the deployment can list workflow executions: HotMesh, or a provider that lists. */
 export function engineListsExecutions(engine: EngineSettings): boolean {
   return engine.native || !!engine.capabilities.list;
+}
+
+/** True when the deployment can invoke and schedule workflows: HotMesh, or a provider that starts them. */
+export function engineStartsWorkflows(engine: EngineSettings): boolean {
+  return engine.native || !!engine.capabilities.start;
 }
 
 /** The engine console link for a workflow, or null when no template is configured. */
