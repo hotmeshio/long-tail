@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Execution, terminate and describe answer from the configured provider when
 // HotMesh does not run the workflows.
 vi.mock('../../services/escalation/crud', () => ({ cancelEscalationsByWorkflowId: vi.fn().mockResolvedValue(1) }));
+const resolveWorkflowHandle = vi.hoisted(() => vi.fn());
+vi.mock('../../services/task', async (actual) => ({ ...(await actual<object>()), resolveWorkflowHandle }));
 
 import { exportWorkflowExecution } from '../../api/exports';
 import { terminateWorkflow, describeWorkflow, getWorkflowResult } from '../../api/workflows';
@@ -56,6 +58,14 @@ describe('engine-neutral workflow endpoints', () => {
     provider.result = { status: 'shipped' };
     const result = await getWorkflowResult({ workflowId: 'wf-5' });
     expect(result).toEqual({ status: 200, data: { workflowId: 'wf-5', state: 'completed', result: { status: 'shipped' } } });
+  });
+
+  it('looks up a workflow id the provider does not know on HotMesh, where Long Tail runs its own', async () => {
+    provider.setState('wf-system', 'unknown');
+    resolveWorkflowHandle.mockRejectedValueOnce(new Error('Cannot resolve workflow wf-system'));
+    const result = await getWorkflowResult({ workflowId: 'wf-system' });
+    expect(resolveWorkflowHandle).toHaveBeenCalledWith('wf-system', undefined);
+    expect(result.status).toBe(404);
   });
 
   it('reports a terminated provider workflow as failed', async () => {

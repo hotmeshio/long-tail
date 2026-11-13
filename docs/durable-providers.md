@@ -88,6 +88,8 @@ An invoke (`POST /api/workflows/:type/invoke`, the Invoke Tool, the `invoke_work
 }
 ```
 
+Long Tail's own workflows, such as `capabilityInvoke`, which agent capability reactions start, run on HotMesh inside Long Tail and start there under any provider. `GET /api/workflows/:id/result` finds their runs too.
+
 A config with `cronSchedule` starts the workflow on that schedule with its `envelopeSchema` as the envelope. A workflow that returns `{ data }` shows that payload in the Invoke Tool when it completes; `GET /api/workflows/:id/result` returns whatever the workflow returned.
 
 ## Opening a wait

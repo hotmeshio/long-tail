@@ -126,7 +126,11 @@ export async function getWorkflowResult(input: {
   appId?: string;
 }): Promise<LTApiResult> {
   try {
-    if (!durableProviderRegistry.isNative) return resultOnProvider(input.workflowId);
+    if (!durableProviderRegistry.isNative) {
+      // Long Tail's own workflows run on HotMesh; an id the provider does not know may be one.
+      const onProvider = await resultOnProvider(input.workflowId);
+      if (onProvider.status !== 404) return onProvider;
+    }
     const resolved = await resolveWorkflowHandle(input.workflowId, input.appId);
 
     const client = createClient();
