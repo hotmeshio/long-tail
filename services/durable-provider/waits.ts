@@ -7,6 +7,7 @@ import { ensureEscalationCompatView } from '../escalation/client';
 import { announceCreated } from '../escalation/crud';
 import { toEscalationRecord } from '../escalation/map';
 import { DURABLE_LOG, ESCALATION_STORE_NAMESPACE } from './constants';
+import { foldWaitDeclaration } from './declaration';
 import { GET_WAIT_BY_ESCALATION, OPEN_WAIT } from './sql';
 
 export interface DurableWaitRow {
@@ -36,6 +37,7 @@ const OPEN_ATTEMPTS = 3;
  * (provider, workflowId, runScope, waitKey): a repeat returns the same row.
  */
 export async function openWait(provider: string, input: LTOpenWaitInput, createdBy: string): Promise<OpenedWait> {
+  const { metadata, envelope } = foldWaitDeclaration(input);
   await ensureEscalationCompatView();
   const params = [
     provider,
@@ -49,10 +51,11 @@ export async function openWait(provider: string, input: LTOpenWaitInput, created
     input.description ?? null,
     input.role,
     input.priority ?? 2,
-    input.metadata ? JSON.stringify(input.metadata) : null,
+    metadata ? JSON.stringify(metadata) : null,
     input.data ? JSON.stringify(input.data) : null,
     createdBy,
     input.expiresAt ?? null,
+    JSON.stringify(envelope),
   ];
   for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
     const { rows } = await getPool().query(OPEN_WAIT, params);

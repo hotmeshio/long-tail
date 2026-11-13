@@ -62,4 +62,27 @@ describe('POST /api/escalations/waits', () => {
     expect(assertCreatable).toHaveBeenCalledWith('reviewer', {}, AUTH);
     expect(openWait).not.toHaveBeenCalled();
   });
+
+  it('refuses an invalid batch or accumulate declaration with 400', async () => {
+    for (const body of [
+      { ...BODY, batch: [] },
+      { ...BODY, batch: ['a', 'a'] },
+      { ...BODY, partialOnTimeout: true },
+      { ...BODY, batch: ['a'], accumulate: {} },
+      { ...BODY, accumulate: { max: 0 } },
+      { ...BODY, batch: ['a'], metadata: { batch_pending: [] } },
+    ]) {
+      const result = await openDurableWait(body as any, AUTH as any);
+      expect(result.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(openWait).not.toHaveBeenCalled();
+  });
+
+  it('passes a valid batch declaration to the wait', async () => {
+    (assertCreatable as any).mockResolvedValue(null);
+    const body = { ...BODY, batch: ['cut', 'weld'], wakeOnFill: ['cut'], partialOnTimeout: true };
+    expect((await openDurableWait(body, AUTH as any)).status).toBe(201);
+    expect(openWait).toHaveBeenCalledWith('temporal', expect.objectContaining({ batch: ['cut', 'weld'], wakeOnFill: ['cut'] }), AUTH.userId);
+  });
 });
+

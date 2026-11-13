@@ -207,14 +207,15 @@ export class DurableRelay {
   }
 }
 
+/** Resolved rows carry the resolver payload; expired rows carry a collection when the timeout stored one. */
 function toOutcome(row: ClaimedDelivery): LTWaitOutcome {
-  const resolved = row.status === WAIT_OUTCOME_STATUS.RESOLVED;
+  const carriesData = row.status === WAIT_OUTCOME_STATUS.RESOLVED || row.status === WAIT_OUTCOME_STATUS.EXPIRED;
   const at = row.resolved_at ?? row.updated_at;
   return {
     waitKey: row.wait_key,
     escalationId: row.escalation_id,
     status: row.status,
-    ...(resolved && row.resolver_payload ? { data: row.resolver_payload } : {}),
+    ...(carriesData && row.resolver_payload ? { data: row.resolver_payload } : {}),
     ...(row.resolved_by ? { resolvedBy: row.resolved_by } : {}),
     ...(at ? { resolvedAt: new Date(at).toISOString() } : {}),
   };
