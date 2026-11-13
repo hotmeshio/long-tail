@@ -1,4 +1,5 @@
 import { getPool } from '../../lib/db';
+import { isUuid } from '../../lib/uuid';
 import type { LTMcpServerRecord, LTMcpServerStatus, LTMcpToolManifest } from '../../types';
 import { loggerRegistry } from '../../lib/logger';
 import {
@@ -38,6 +39,7 @@ export async function createMcpServer(
 }
 
 export async function getMcpServer(id: string): Promise<LTMcpServerRecord | null> {
+  if (!isUuid(id)) return null;
   const pool = getPool();
   const { rows } = await pool.query(GET_MCP_SERVER, [id]);
   return rows[0] || null;
