@@ -14,6 +14,7 @@ vi.mock('../../workers', () => ({ createClient: mocks.createClient }));
 
 import { invokeWorkflow } from '../../services/workflow-invocation';
 import { durableProviderRegistry } from '../../services/durable-provider';
+import { getRegisteredWorkers, registerWorker } from '../../services/workers/registry';
 import { FakeDurableProvider } from '../helpers/fake-durable-provider';
 
 const ME = '11111111-1111-4111-8111-111111111111';
@@ -70,4 +71,31 @@ describe('invokeWorkflow on a provider', () => {
     await expect(invoke()).rejects.toMatchObject({ statusCode: 501, message: expect.stringMatching(/dbos provider/) });
     expect(provider.started).toHaveLength(0);
   });
+
+  it('starts Long Tail\'s own HotMesh workflows on HotMesh', async () => {
+    const start = vi.fn();
+    mocks.createClient.mockReturnValue({ workflow: { start } });
+    mocks.getWorkflowConfig.mockResolvedValue({ ...CONFIG, workflow_type: 'capabilityInvoke', task_queue: 'long-tail-system' });
+    registerWorker('capabilityInvoke', 'long-tail-system');
+    try {
+      const { workflowId } = await invokeWorkflow({ workflowType: 'capabilityInvoke', data: { toolName: 't' }, auth: { userId: ME } });
+      expect(start).toHaveBeenCalledWith(expect.objectContaining({ workflowName: 'capabilityInvoke', taskQueue: 'long-tail-system', workflowId }));
+      expect(provider.started).toHaveLength(0);
+    } finally {
+      getRegisteredWorkers().delete('capabilityInvoke');
+    }
+  });
+
+  it('starts it on HotMesh even when the provider does not start workflows', async () => {
+    (provider.capabilities as { start?: boolean }).start = false;
+    mocks.createClient.mockReturnValue({ workflow: { start: vi.fn() } });
+    mocks.getWorkflowConfig.mockResolvedValue(null);
+    registerWorker('capabilityInvoke', 'long-tail-system');
+    try {
+      await expect(invokeWorkflow({ workflowType: 'capabilityInvoke', data: {}, auth: { userId: ME } })).resolves.toMatchObject({ workflowId: expect.any(String) });
+    } finally {
+      getRegisteredWorkers().delete('capabilityInvoke');
+    }
+  });
 });
+

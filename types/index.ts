@@ -381,6 +381,8 @@ export type {
   LTWorkflowListQuery,
   LTWorkflowPage,
   LTWorkflowStartInput,
+  LTWaitFilledEntry,
+  LTWaitAccumulateConfig,
 } from './durable-provider';
 
 export {

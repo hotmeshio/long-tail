@@ -13,6 +13,7 @@ export { createHotMeshProvider } from './hotmesh';
 export { DurableRelay, backoffMs, type RelayPassResult } from './relay';
 export { WorkflowFollower } from './follow';
 export { openWait, getWaitByEscalationId, type DurableWaitRow, type OpenedWait } from './waits';
+export { foldWaitDeclaration, WaitDeclarationError } from './declaration';
 export { summarizeExecution } from './summary';
 export { DURABLE_LOG, RELAY_DEFAULTS, WAIT_LIMITS } from './constants';
 export { engineCanStart } from './start';

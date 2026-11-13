@@ -21,6 +21,7 @@ vi.mock('../../../services/iam/principal', () => ({ resolvePrincipal: vi.fn().mo
 import { cronRegistry } from '../../../services/cron';
 import { durableProviderRegistry } from '../../../services/durable-provider';
 import { FakeDurableProvider } from '../../helpers/fake-durable-provider';
+import { getRegisteredWorkers, registerWorker } from '../../../services/workers/registry';
 import type { LTWorkflowConfig } from '../../../types';
 
 const CONFIG = {
@@ -63,4 +64,18 @@ describe('cron on a provider', () => {
       taskQueue: 'orders',
     }));
   });
+
+  it('starts Long Tail\'s own HotMesh workflow on HotMesh under a provider', async () => {
+    const provider = new FakeDurableProvider('dbos');
+    durableProviderRegistry.register(provider);
+    registerWorker('reviewOrderRequest', 'orders');
+    try {
+      await tick();
+      expect(mocks.durableStart).toHaveBeenCalled();
+      expect(provider.started).toHaveLength(0);
+    } finally {
+      getRegisteredWorkers().delete('reviewOrderRequest');
+    }
+  });
 });
+

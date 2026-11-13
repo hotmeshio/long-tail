@@ -4,7 +4,8 @@ import { parseExpression } from 'cron-parser';
 import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
-import { durableProviderRegistry, startProviderWorkflow } from '../durable-provider';
+import { startProviderWorkflow } from '../durable-provider';
+import { runsOnHotMesh } from '../workflow-invocation';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig, LTAgent, AgentSchedule } from '../../types';
@@ -136,7 +137,7 @@ class LTCronRegistry {
           const { guid } = Virtual.getContext();
           const workflowId = `${workflowType}-cron-${guid}`;
           loggerRegistry.info(`[lt-cron] invoking ${workflowType} (${workflowId})`);
-          if (!durableProviderRegistry.isNative) {
+          if (!runsOnHotMesh(workflowType)) {
             await startProviderWorkflow({ workflowType, workflowId, taskQueue, envelope: defaultEnvelope });
             return;
           }

@@ -46,7 +46,7 @@ export interface LTWaitOutcome {
   waitKey: string;
   escalationId: string;
   status: LTWaitOutcomeStatus;
-  /** The resolver payload when resolved. */
+  /** The resolver payload when resolved; on expiry, the collection an accumulator or `partialOnTimeout` batch kept. */
   data?: Record<string, unknown>;
   resolvedBy?: string;
   resolvedAt?: string;
@@ -225,6 +225,35 @@ export interface LTOpenWaitInput {
   data?: Record<string, unknown>;
   /** ISO time when Long Tail expires the escalation. */
   expiresAt?: string;
+  /** Item keys the wait collects, one fill each. The last fill resolves it with every item. */
+  batch?: string[];
+  /** Batch only: on expiry, deliver the items filled so far. */
+  partialOnTimeout?: boolean;
+  /** Batch only: a flagged item ends the wait. */
+  wakeOnFlag?: boolean;
+  /** Batch only: a fill ends the wait with the items so far, for every key (`true`) or the listed keys. */
+  wakeOnFill?: boolean | string[];
+  /** Batch only: items already satisfied when the wait opens. */
+  filled?: Record<string, LTWaitFilledEntry>;
+  /** Collect items until `max`, the deadline or a resolve; the outcome carries `$accumulated` and `$trigger`. */
+  accumulate?: LTWaitAccumulateConfig;
+}
+
+/** A batch item satisfied before the wait opens. */
+export interface LTWaitFilledEntry {
+  payload: Record<string, unknown>;
+  /** ISO time the item was satisfied, from the source of record. */
+  at: string;
+  actor?: string;
+}
+
+export interface LTWaitAccumulateConfig {
+  /** Count that ends the wait. Absent: only the deadline or a resolve ends it. */
+  max?: number;
+  /** Default true. False makes `max` a cap: further adds answer `full`. */
+  resolveAtMax?: boolean;
+  /** Default true. False replaces a repeated item key in place. */
+  unique?: boolean;
 }
 
 export interface LTOpenWaitResult {

@@ -9,7 +9,8 @@ export function registerWaitRoutes(router: Router): void {
    * Idempotent on (workflowId, runScope, waitKey). RBAC as POST /api/escalations.
    *
    * Body: { workflowId, runScope?, workflowType?, waitKey, role, type, subtype?,
-   *         description?, priority?, metadata?, data?, expiresAt? }
+   *         description?, priority?, metadata?, data?, expiresAt?,
+   *         batch?, filled?, wakeOnFill?, wakeOnFlag?, partialOnTimeout?, accumulate? }
    */
   router.post('/waits', async (req, res) => {
     const body = req.body ?? {};
@@ -27,6 +28,12 @@ export function registerWaitRoutes(router: Router): void {
         metadata: body.metadata,
         data: body.data,
         expiresAt: body.expiresAt,
+        batch: body.batch,
+        filled: body.filled,
+        wakeOnFill: body.wakeOnFill,
+        wakeOnFlag: body.wakeOnFlag,
+        partialOnTimeout: body.partialOnTimeout,
+        accumulate: body.accumulate,
       },
       req.auth!,
     );

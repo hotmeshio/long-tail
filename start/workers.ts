@@ -207,6 +207,9 @@ export async function startWorkers(
       if (w.connection?.readonly) {
         // Readonly workers register for discovery only — they must not
         // consume messages from the stream (that is the real worker's job).
+        // Another provider's workflows stay out of the registry: it lists
+        // what HotMesh runs here.
+        if (!durableProviderRegistry.isNative) continue;
         registerWorker(w.workflow.name, w.taskQueue);
         loggerRegistry.info(
           `[long-tail] readonly worker registered: ${w.taskQueue}::${w.workflow.name}`,

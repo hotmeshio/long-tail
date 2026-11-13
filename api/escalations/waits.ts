@@ -1,4 +1,4 @@
-import { durableProviderRegistry, openWait, WAIT_LIMITS } from '../../services/durable-provider';
+import { durableProviderRegistry, foldWaitDeclaration, openWait, WaitDeclarationError, WAIT_LIMITS } from '../../services/durable-provider';
 import type { LTOpenWaitInput } from '../../types/durable-provider';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import { assertCreatable } from './create';
@@ -21,6 +21,8 @@ export async function openDurableWait(input: Partial<LTOpenWaitInput>, auth: LTA
     const invalid = invalidWaitInput(input);
     if (invalid) return { status: 400, error: invalid };
     const valid = input as LTOpenWaitInput;
+    const undeclarable = refuseDeclaration(valid);
+    if (undeclarable) return { status: 400, error: undeclarable };
 
     const refused = await assertCreatable(valid.role, valid.metadata ?? {}, auth);
     if (refused) return refused;
@@ -47,6 +49,17 @@ function invalidWaitInput(input: Partial<LTOpenWaitInput>): string | null {
   if (input.data !== undefined && !isPlainObject(input.data)) return 'data must be an object';
   if (input.expiresAt !== undefined && Number.isNaN(Date.parse(String(input.expiresAt)))) return 'expiresAt must be an ISO date';
   return null;
+}
+
+/** Why the batch or accumulate declaration is invalid, or null. */
+function refuseDeclaration(input: LTOpenWaitInput): string | null {
+  try {
+    foldWaitDeclaration(input);
+    return null;
+  } catch (err) {
+    if (err instanceof WaitDeclarationError) return err.message;
+    throw err;
+  }
 }
 
 function nonEmpty(value: unknown, max = Number.MAX_SAFE_INTEGER): value is string {

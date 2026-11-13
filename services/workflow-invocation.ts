@@ -125,7 +125,7 @@ export async function invokeWorkflow(
   const callerOpts = input.options ?? {};
   const workflowId = callerOpts.workflowId || `${workflowType}-${Durable.guid()}`;
 
-  if (!durableProviderRegistry.isNative) {
+  if (!runsOnHotMesh(workflowType)) {
     await startProviderWorkflow({ workflowType, workflowId, taskQueue, envelope });
     return { workflowId };
   }
@@ -153,7 +153,8 @@ export async function invokeWorkflow(
  * first (with invocable/role guards), then falls back to active workers.
  */
 async function resolveTaskQueue(workflowType: string): Promise<string> {
-  if (!engineCanStart()) {
+  const onHotMesh = runsOnHotMesh(workflowType);
+  if (!onHotMesh && !engineCanStart()) {
     throw new InvocationError(`The ${durableProviderRegistry.name} provider does not start workflows`, 501);
   }
   const wfConfig = await configService.getWorkflowConfig(workflowType);
@@ -169,7 +170,7 @@ async function resolveTaskQueue(workflowType: string): Promise<string> {
   }
 
   // No config — fall back to active worker registry
-  if (!durableProviderRegistry.isNative) {
+  if (!onHotMesh) {
     throw new InvocationError(`Workflow not found: register a config for ${workflowType} with its task_queue`, 404);
   }
   const worker = getRegisteredWorkers().get(workflowType);
@@ -180,6 +181,15 @@ async function resolveTaskQueue(workflowType: string): Promise<string> {
     );
   }
   return worker.taskQueue;
+}
+
+/**
+ * True when HotMesh starts this workflow: always without a provider, and for
+ * Long Tail's own workers (such as capabilityInvoke) under one. The provider
+ * starts every other workflow.
+ */
+export function runsOnHotMesh(workflowType: string): boolean {
+  return durableProviderRegistry.isNative || getRegisteredWorkers().has(workflowType);
 }
 
 /** A principal's grants by uuid or external_id, or null when no such user exists. */

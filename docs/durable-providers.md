@@ -19,13 +19,13 @@ interface LTWaitOutcome {
   waitKey: string;
   escalationId: string;
   status: 'resolved' | 'expired' | 'cancelled';
-  data?: Record<string, unknown>;   // the resolver payload when resolved
+  data?: Record<string, unknown>;   // the resolver payload; on expiry, a collection when one was kept
   resolvedBy?: string;
   resolvedAt?: string;
 }
 ```
 
-`conditional()` returns `data` when the escalation is resolved, and `null` when it expired or was cancelled.
+`conditional()` returns `data` when the escalation is resolved, the collection when an accumulator or `partialOnTimeout` batch expires, and `null` otherwise.
 
 A wait is identified by `(provider, workflowId, runScope, waitKey)`, so opening the same wait twice returns the same escalation. Keys are unique per wait within one workflow run, so a loop adds its round to the key.
 
@@ -88,6 +88,8 @@ An invoke (`POST /api/workflows/:type/invoke`, the Invoke Tool, the `invoke_work
 }
 ```
 
+Long Tail's own workflows, such as `capabilityInvoke`, which agent capability reactions start, run on HotMesh inside Long Tail and start there under any provider. `GET /api/workflows/:id/result` finds their runs too.
+
 A config with `cronSchedule` starts the workflow on that schedule with its `envelopeSchema` as the envelope. A workflow that returns `{ data }` shows that payload in the Invoke Tool when it completes; `GET /api/workflows/:id/result` returns whatever the workflow returned.
 
 ## Opening a wait
@@ -122,6 +124,23 @@ Each provider package's `conditional()` calls this endpoint through an activity 
 
 `metadata` holds the queryable facets and is validated against the role. `data` is shown to the resolver. `expiresAt` is the SLA.
 
+### Batch and accumulate waits
+
+A wait can collect many items into one escalation, with the same declarations HotMesh's `conditional()` takes. Long Tail stores the row in the shape HotMesh writes, so every item surface works on it: `resolve_batch_item`, `accumulate_item`, flags, resolve by metadata, and the dashboard.
+
+| Field | Meaning |
+|---|---|
+| `batch` | Item keys, filled once each. The last fill resolves the wait with every item: `{ [itemKey]: payload }` |
+| `filled` | Batch items already satisfied, keyed by item: `{ payload, at, actor? }` |
+| `wakeOnFill` | A fill ends the wait with the items so far, plus `$filled`, `$filledAt`, `$filledBy` and `$trigger: 'fill'`. `true` for every key, or a list |
+| `wakeOnFlag` | A flagged item ends the wait |
+| `partialOnTimeout` | On expiry the outcome carries the items filled so far and `$trigger: 'timeout'` |
+| `accumulate` | `{ max?, resolveAtMax?, unique? }`. Collects any item keys. The outcome carries `$accumulated` (items in arrival order) and `$trigger`: `count` at `max`, `timeout` on expiry, `resolve` when a person resolves it |
+
+`batch` and `accumulate` are exclusive, and the `batch_*` and `accumulate_*` metadata keys are reserved. An invalid declaration answers `400` before anything is written.
+
+An expired accumulator, or an expired batch with `partialOnTimeout`, delivers its collection in `data` with `status: 'expired'`. Every other expiry delivers no `data`.
+
 ## Delivery
 
 The relay runs in every Long Tail container:
@@ -130,7 +149,7 @@ The relay runs in every Long Tail container:
 - It leases each undelivered terminal wait, so concurrent containers deliver it once.
 - `provider.deliver` returns `delivered`, or `gone` when the workflow no longer exists. A thrown error is retried with capped exponential backoff, and the error is kept on the wait.
 - Every resolve surface delivers the same way: the dashboard, the HTTP API, the MCP tools, bulk resolve, resolve-by-metadata and scan rules.
-- The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`.
+- The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch.
 - Reconcile asks the provider for each workflow with a pending escalation. When the workflow is no longer running, Long Tail cancels the escalation.
 - Opening a wait again after its outcome was delivered clears the delivery, so the outcome is sent again. This covers an engine that re-runs the wait without its checkpoint.
 - After a delivery, the relay checks the workflow with `provider.describe` at growing intervals for about 25 seconds. When the engine reports it closed, Long Tail publishes `workflow.completed` or `workflow.failed`, the events HotMesh publishes, so the dashboard's workflow pages refresh. A workflow still running after that refreshes on its next escalation event.
