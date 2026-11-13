@@ -7,7 +7,8 @@
  * machine's reply (CommandResolution), so the step reads the outcome as data.
  */
 
-import { machineById, machineRole, type LineDef } from '../../lib/machines/line';
+import { machineById, machineRole } from '../../lib/machines/line-roles';
+import type { LineDef } from '../../types/machines';
 import { ROW_TYPE, type CommandFacets } from './contracts';
 
 /** Where a command goes: the machine and the role its rows land on. */

@@ -6,7 +6,7 @@
  * so neither the workflow nor its rows change to be resolved by a machine.
  */
 
-import type { LineDef } from '../../lib/machines/line';
+import type { LineDef } from '../../types/machines';
 import { ROW_TYPE, type ArtifactRef, type HandoffFacets, type HandoffUnit } from './contracts';
 
 /** The parts of an escalation row the adapter reads. */

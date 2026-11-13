@@ -19,6 +19,7 @@
     "!docs/donotcommit/",
     "!docs/donotpublish/",
     "dashboard/dist/",
+    "machines/",
     "LICENSE",
     "README.md"
   ],

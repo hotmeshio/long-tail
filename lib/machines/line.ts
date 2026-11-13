@@ -10,6 +10,20 @@ import type { LineDef, MachineDef, MachineIdent, MaterialDef, MeasurementDef } f
 import { assertTopicLevel, clientIdOf } from './protocol';
 
 export type { LineDef, MachineDef, MaterialDef, MeasurementDef };
+export {
+  DEFAULT_EXIT_ROLE,
+  DEFAULT_OPERATOR_ROLE,
+  DEFAULT_QUALITY_ROLE,
+  controllerId,
+  exitRole,
+  machineById,
+  machineRole,
+  operatorRole,
+  qualityRole,
+  receiverRoles,
+  stationRole,
+  stationRoles,
+} from './line-roles';
 
 /** How a line knows its machines' addresses (`LineDef.addressing`). */
 export const ADDRESSING = { DECLARED: 'declared', LEARNED: 'learned' } as const;
@@ -79,57 +93,7 @@ export function identOf(line: LineDef, machineId: string): MachineIdent {
   return { siteId: line.siteId, lineId: line.lineId, machineId, ...(address ? { address } : {}) };
 }
 
-export function machineById(line: LineDef, machineId: string): MachineDef {
-  const def = line.machines.find((m) => m.machineId === machineId);
-  if (!def) throw new Error(`machine "${machineId}" is not on ${line.siteId}/${line.lineId}`);
-  return def;
-}
-
 /** The broker identity of each machine whose address the line declares, {site}-{line}-{address}. */
 export function clientIds(line: LineDef): string[] {
   return line.machines.filter((m) => !learnsAddress(line, m.machineId)).map((m) => clientIdOf(identOf(line, m.machineId)));
-}
-
-/** The broker and Long Tail identity of the line's gateway. */
-export function controllerId(line: LineDef): string {
-  return `line-controller-${line.siteId}-${line.lineId}`;
-}
-
-/** The default role name for a process. */
-export function stationRole(process: string): string {
-  return `line-${process.replace(/_/g, '-')}`;
-}
-
-export const DEFAULT_EXIT_ROLE = 'line-exit';
-export const DEFAULT_OPERATOR_ROLE = 'line-operator';
-export const DEFAULT_QUALITY_ROLE = 'line-quality';
-
-/** The Long Tail role a machine resolves handoffs under. */
-export function machineRole(def: Pick<MachineDef, 'role' | 'process'>): string {
-  return def.role ?? stationRole(def.process);
-}
-
-/** Every station role on the line, once each, in route order. */
-export function stationRoles(line: LineDef): string[] {
-  return [...new Set(line.machines.map(machineRole))];
-}
-
-/** The role of the person who receives units at line exit. */
-export function exitRole(line: LineDef): string {
-  return line.roles?.exit ?? DEFAULT_EXIT_ROLE;
-}
-
-/** Roles of people who take units straight from a machine: the exit role and any receivers. */
-export function receiverRoles(line: LineDef): string[] {
-  return [...new Set([exitRole(line), ...(line.roles?.receivers ?? [])])];
-}
-
-/** The role of the person who decides failed handoffs and closes alarm and machine rows. */
-export function operatorRole(line: LineDef): string {
-  return line.roles?.operator ?? DEFAULT_OPERATOR_ROLE;
-}
-
-/** The role of the people who decide units a machine finished on hold: release, rework or scrap. */
-export function qualityRole(line: LineDef): string {
-  return line.roles?.quality ?? DEFAULT_QUALITY_ROLE;
 }
