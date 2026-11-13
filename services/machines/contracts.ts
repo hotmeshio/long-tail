@@ -5,8 +5,8 @@
  * protocol that resolves it differs.
  */
 
-import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE, DEFAULT_QUALITY_ROLE } from '../../lib/machines/line';
-import { REPLY_STATUS, TRANSFER_FAILURE } from '../../lib/machines/protocol';
+import { DEFAULT_EXIT_ROLE, DEFAULT_OPERATOR_ROLE, DEFAULT_QUALITY_ROLE } from '../../lib/machines/line-roles';
+import { REPLY_STATUS, TRANSFER_FAILURE } from '../../lib/machines/protocol/constants';
 
 export const ROW_TYPE = {
   HANDOFF: 'handoff',

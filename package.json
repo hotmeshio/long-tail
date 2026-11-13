@@ -1,6 +1,6 @@
 {
   "name": "@hotmeshio/long-tail",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "description": "Long Tail Workflows — Durable AI workflows with human-in-the-loop escalation. Powered by PostgreSQL.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -19,6 +19,7 @@
     "!docs/donotcommit/",
     "!docs/donotpublish/",
     "dashboard/dist/",
+    "machines/",
     "LICENSE",
     "README.md"
   ],

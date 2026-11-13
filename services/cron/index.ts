@@ -4,13 +4,20 @@ import { parseExpression } from 'cron-parser';
 import { getConnection } from '../../lib/db';
 import { JOB_EXPIRE_SECS } from '../../modules/defaults';
 import { loggerRegistry } from '../../lib/logger';
-import { startProviderWorkflow } from '../durable-provider';
-import { runsOnHotMesh } from '../workflow-invocation';
 import * as configService from '../config';
 import { resolvePrincipal } from '../iam/principal';
 import type { LTWorkflowConfig, LTAgent, AgentSchedule } from '../../types';
 import type { LTYamlWorkflowRecord } from '../../types/yaml-workflow';
 import type { LTEnvelopePrincipal } from '../../types/envelope';
+import {
+  legacyCronId,
+  listWorkflowCrons,
+  reconcileWorkflowCron,
+  scheduledConfigFor,
+  scheduleOf,
+  type CronJobOps,
+} from './workflow-schedule';
+import { startScheduledRun } from './workflow-run';
 
 const MIN_CRON_INTERVAL_MS = 60_000; // 1 minute minimum
 
@@ -36,7 +43,6 @@ export function validateCronSchedule(expr: string): void {
 }
 
 const CRON_TOPIC_PREFIX = 'lt.cron';
-const CRON_ID_PREFIX = 'lt-cron';
 const YAML_CRON_TOPIC_PREFIX = 'lt.cron.yaml';
 const CRON_SOURCE = 'cron';
 const YAML_CRON_ID_PREFIX = 'lt-cron-yaml';
@@ -44,19 +50,29 @@ const YAML_CRON_ID_PREFIX = 'lt-cron-yaml';
 /**
  * Singleton registry for workflow cron schedules.
  *
- * Follows the same pattern as maintenanceRegistry:
- * - connect()   — load configs with cron_schedule, start Virtual.cron for each
- * - disconnect() — interrupt all crons
- * - restartCron() — stop + start a single cron after config change
- * - clear()     — reset for tests
+ * - connect(): arm every scheduled workflow at startup
+ * - restartCron(): apply a saved or deleted config to its schedule
+ * - disconnect(): stop consuming on shutdown; schedules keep running
+ * - clear(): reset for tests
+ *
+ * Each workflow schedule runs as one HotMesh cron job, recorded in
+ * lt_workflow_crons (see workflow-schedule.ts). Each tick reads the config as
+ * stored now, so every container starts runs with the same settings.
  */
 class LTCronRegistry {
   private activeCrons = new Map<string, string>(); // workflowType -> cronId
+  private workerTopics = new Set<string>();
   private connected = false;
   private systemPrincipal: LTEnvelopePrincipal | null = null;
 
+  private readonly jobOps: CronJobOps = {
+    arm: (workflowType, jobId, schedule) => this.armJob(workflowType, jobId, schedule),
+    interrupt: (workflowType, jobId) => this.interruptJob(workflowType, jobId),
+  };
+
   /**
-   * Load all workflow configs with a cron_schedule and start Virtual.cron for each.
+   * Arm every scheduled workflow. A workflow without a lt_workflow_crons row
+   * runs under its original id, as before; arming a running job is a no-op.
    * Call after workers and migrations are ready.
    */
   async connect(): Promise<void> {
@@ -66,141 +82,96 @@ class LTCronRegistry {
     this.systemPrincipal = await resolvePrincipal('lt-system');
 
     const configs = await configService.listWorkflowConfigs();
-    const cronConfigs = configs.filter(
-      (c) => c.cron_schedule && c.invocable && c.task_queue,
-    );
+    const crons = new Map((await listWorkflowCrons()).map((row) => [row.workflow_type, row]));
+    const scheduled = configs.filter((c) => scheduleOf(c));
 
-    for (const config of cronConfigs) {
-      await this.startCron(config);
+    for (const config of scheduled) {
+      const type = config.workflow_type;
+      if (!crons.has(type)) {
+        await this.armJob(type, legacyCronId(type), config.cron_schedule!);
+        continue;
+      }
+      const result = await reconcileWorkflowCron(type, this.jobOps, false);
+      if (result.action === 'unchanged' && result.jobId) {
+        await this.armJob(type, result.jobId, config.cron_schedule!);
+      }
+    }
+
+    // Recorded schedules whose config no longer asks for one
+    const scheduledTypes = new Set(scheduled.map((c) => c.workflow_type));
+    for (const row of crons.values()) {
+      if (row.schedule && !scheduledTypes.has(row.workflow_type)) {
+        await reconcileWorkflowCron(row.workflow_type, this.jobOps, false);
+      }
     }
 
     // Connect YAML workflow crons
     await this.connectYamlCrons();
 
     this.connected = true;
-    if (cronConfigs.length > 0) {
+    if (scheduled.length > 0) {
       loggerRegistry.info(
-        `[lt-cron] started ${cronConfigs.length} cron(s): ${cronConfigs.map((c) => c.workflow_type).join(', ')}`,
+        `[lt-cron] started ${scheduled.length} cron(s): ${scheduled.map((c) => c.workflow_type).join(', ')}`,
       );
     }
   }
 
   /**
-   * Start a single Virtual.cron for a workflow config.
+   * Apply a workflow's stored config to its schedule after a save or delete.
+   * An unchanged schedule keeps running; a changed one moves to a new job.
    */
-  async startCron(config: LTWorkflowConfig): Promise<void> {
-    if (!config.cron_schedule || !config.task_queue) return;
-
-    validateCronSchedule(config.cron_schedule);
-
-    const connection = getConnection();
-    const topic = `${CRON_TOPIC_PREFIX}.${config.workflow_type}`;
-    const cronId = `${CRON_ID_PREFIX}-${config.workflow_type}`;
-
-    const defaultEnvelope: Record<string, any> = config.envelope_schema
-      ? { ...config.envelope_schema as Record<string, any> }
-      : { data: {}, metadata: {} };
-
-    // Ensure metadata.source identifies the cron
-    if (!defaultEnvelope.metadata) defaultEnvelope.metadata = {};
-    defaultEnvelope.metadata.source = 'cron';
-
-    // Auto-certify if the workflow config has roles or consumes
-    const isCertified = (config.roles?.length ?? 0) > 0 || (config.consumes?.length ?? 0) > 0;
-    if (isCertified) {
-      defaultEnvelope.metadata.certified = true;
+  async restartCron(config: Pick<LTWorkflowConfig, 'workflow_type'>): Promise<void> {
+    const type = config.workflow_type;
+    const result = await reconcileWorkflowCron(type, this.jobOps, this.activeCrons.get(type) === legacyCronId(type));
+    if (result.action === 'armed') {
+      loggerRegistry.info(`[lt-cron] armed ${type} (${result.jobId})`);
+    } else if (result.action === 'stopped') {
+      this.activeCrons.delete(type);
+      loggerRegistry.info(`[lt-cron] stopped ${type} (${result.jobId})`);
     }
+  }
 
-    // Resolve executing principal: per-config execute_as, or system bot fallback
-    if (!defaultEnvelope.lt) defaultEnvelope.lt = {};
-    if (!defaultEnvelope.lt.principal) {
-      let cronPrincipal = this.systemPrincipal;
-      if (config.execute_as) {
-        const botPrincipal = await resolvePrincipal(config.execute_as);
-        if (botPrincipal) cronPrincipal = botPrincipal;
-      }
-      if (cronPrincipal) {
-        defaultEnvelope.lt.userId = cronPrincipal.id;
-        defaultEnvelope.lt.principal = cronPrincipal;
-      }
-      defaultEnvelope.lt.scopes = ['workflow:cron'];
-    }
-
-    const workflowType = config.workflow_type;
-    const taskQueue = config.task_queue;
-
+  /** Arm a cron job. The first job on a topic in this process also registers its worker. */
+  private async armJob(workflowType: string, jobId: string, schedule: string): Promise<void> {
+    validateCronSchedule(schedule);
+    const topic = `${CRON_TOPIC_PREFIX}.${workflowType}`;
+    const register = !this.workerTopics.has(topic);
     await Virtual.cron({
       topic,
-      connection,
-      callback: async () => {
-        try {
-          const { guid } = Virtual.getContext();
-          const workflowId = `${workflowType}-cron-${guid}`;
-          loggerRegistry.info(`[lt-cron] invoking ${workflowType} (${workflowId})`);
-          if (!runsOnHotMesh(workflowType)) {
-            await startProviderWorkflow({ workflowType, workflowId, taskQueue, envelope: defaultEnvelope });
-            return;
-          }
-          const client = new Durable.Client({ connection });
-          await client.workflow.start({
-            args: [defaultEnvelope],
-            taskQueue,
-            workflowName: workflowType,
-            workflowId,
-            expire: JOB_EXPIRE_SECS,
-            entity: workflowType,
-            signalIn: false,
-          } as any);
-        } catch (err: any) {
-          loggerRegistry.error(`[lt-cron] ${workflowType} failed: ${err?.message}`);
-        }
-      },
+      connection: getConnection(),
+      ...(register ? { callback: () => this.runTick(workflowType) } : {}),
       args: [],
-      options: {
-        id: cronId,
-        interval: config.cron_schedule,
-      },
+      options: { id: jobId, interval: schedule },
     });
-
-    this.activeCrons.set(config.workflow_type, cronId);
+    if (register) this.workerTopics.add(topic);
+    this.activeCrons.set(workflowType, jobId);
   }
 
-  /**
-   * Stop a single cron for a workflow type.
-   */
-  async stopCron(workflowType: string): Promise<void> {
-    const cronId = this.activeCrons.get(workflowType);
-    if (!cronId) return;
-
-    const connection = getConnection();
-    const topic = `${CRON_TOPIC_PREFIX}.${workflowType}`;
-
+  private async interruptJob(workflowType: string, jobId: string): Promise<void> {
     try {
       await Virtual.interrupt({
-        topic,
-        connection,
-        options: { id: cronId },
+        topic: `${CRON_TOPIC_PREFIX}.${workflowType}`,
+        connection: getConnection(),
+        options: { id: jobId },
       });
     } catch (err: any) {
-      loggerRegistry.warn(
-        `[lt-cron] interrupt failed for ${workflowType}: ${err?.message}`,
-      );
+      loggerRegistry.warn(`[lt-cron] interrupt failed for ${workflowType} (${jobId}): ${err?.message}`);
     }
-
-    this.activeCrons.delete(workflowType);
   }
 
-  /**
-   * Restart a cron after a config change.
-   * Stops the old cron (if any) and starts a new one if cron_schedule is set.
-   */
-  async restartCron(config: LTWorkflowConfig): Promise<void> {
-    await this.stopCron(config.workflow_type);
-    if (config.cron_schedule && config.invocable && config.task_queue) {
-      await this.startCron(config);
-      loggerRegistry.info(
-        `[lt-cron] restarted ${config.workflow_type} (${config.cron_schedule})`,
-      );
+  /** One tick: start a run only when this job is the one the schedule runs under now. */
+  private async runTick(workflowType: string): Promise<void> {
+    const { workflowId: jobId, guid } = Virtual.getContext();
+    try {
+      const config = await scheduledConfigFor(workflowType, jobId);
+      if (!config) {
+        loggerRegistry.debug(`[lt-cron] ${workflowType} skipped tick of ${jobId}; not its current job`);
+        return;
+      }
+      this.systemPrincipal ??= await resolvePrincipal('lt-system');
+      await startScheduledRun(config, guid, this.systemPrincipal);
+    } catch (err: any) {
+      loggerRegistry.error(`[lt-cron] ${workflowType} failed: ${err?.message}`);
     }
   }
 

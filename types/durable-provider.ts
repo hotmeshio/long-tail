@@ -8,6 +8,8 @@
  * status and, when it can, exports the execution timeline.
  */
 
+import type { EscalationFileRef, EscalationLookupRef } from './escalation';
+
 /** Built-in provider names. Third-party providers choose their own. */
 export const DURABLE_PROVIDER = {
   HOTMESH: 'hotmesh',
@@ -237,6 +239,24 @@ export interface LTOpenWaitInput {
   filled?: Record<string, LTWaitFilledEntry>;
   /** Collect items until `max`, the deadline or a resolve; the outcome carries `$accumulated` and `$trigger`. */
   accumulate?: LTWaitAccumulateConfig;
+  /** Render-only data for the form (`formDefaults`, `confidence`, any `envelope.*` key). */
+  envelope?: Record<string, unknown>;
+  /** Knowledge entries the form reads; stored as `envelope.lookups`. */
+  lookups?: EscalationLookupRef[];
+  /** Stored files the form shows; stored as `envelope.files`. */
+  files?: EscalationFileRef[];
+  /** The role form version the resolve UI renders; stored as `metadata.schema_version`. */
+  schemaVersion?: number;
+  /** Assigns the escalation when it is created. Alone, others can still claim it. */
+  assignee?: string;
+  /** With `assignee`: claims the escalation for this many minutes when it is created. */
+  durationMinutes?: number;
+  /** The first escalation of the chain or group this one belongs to. */
+  originId?: string;
+  /** The escalation this one follows from. */
+  parentId?: string;
+  /** Addresses the wait on the signal-key surfaces. Unique across waits and HotMesh escalations. */
+  signalKey?: string;
 }
 
 /** A batch item satisfied before the wait opens. */

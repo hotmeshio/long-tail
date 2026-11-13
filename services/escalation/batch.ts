@@ -6,6 +6,7 @@ import { isUuid } from '../../lib/uuid';
 import { escalations } from './client';
 import { publishEscalationChange } from './crud';
 import { toEscalationRecord } from './map';
+import { providerEscalationIdFor } from './provider-waits';
 
 export interface ResolveBatchItemOutcome {
   outcome: BatchItemOutcome;
@@ -60,6 +61,8 @@ export async function resolveBatchItemBySignalKey(
   resolvedBy?: { id: string; email?: string },
   actor?: string,
 ): Promise<ResolveBatchItemOutcome> {
+  const providerId = await providerEscalationIdFor(signalKey);
+  if (providerId) return resolveBatchItem(providerId, itemKey, payload, metadata, undefined, resolvedBy, actor);
   const client = await escalations();
   const result = await client.resolveBatchItem({
     signalKey,

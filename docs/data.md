@@ -282,6 +282,17 @@ Workflow registration. Every workflow that uses the LT interceptor must have a r
 |-------|---------|---------|
 | `idx_config_workflows_tool_tags` | `(tool_tags)` GIN | Tag-based workflow discovery |
 
+### lt_workflow_crons
+
+The cron job behind each workflow schedule. Each time a schedule is armed it gets a new job id, so a schedule turned off and on again, or edited, never reuses one. A workflow with no row runs its schedule under `lt-cron-<workflow_type>`.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `workflow_type` | `TEXT` | — | Primary key |
+| `job_id` | `TEXT NOT NULL` | — | The HotMesh cron job id, `lt-cron-<workflow_type>-<uuid>` |
+| `schedule` | `TEXT` | — | The cron expression the job was armed with; `NULL` when the schedule is stopped |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last change |
+
 ### lt_config_roles
 
 Allowed roles per workflow type. A workflow can have multiple roles; any user holding one of these roles can claim its escalations.

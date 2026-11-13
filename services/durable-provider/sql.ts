@@ -12,20 +12,31 @@ const WAIT_MATCH = 'x.provider = $1 AND x.workflow_id = $2 AND x.run_scope = $3 
  * Open a wait and its escalation in one statement. A repeat returns the
  * existing row; when that row is terminal and was delivered, delivery is
  * cleared so the relay sends it again (the engine re-ran the wait).
+ * `assignee` ($17) and `durationMinutes` ($18) write the claim columns as
+ * HotMesh's insert does: an assignee alone pre-assigns; with a duration the
+ * claim window is armed. A `signal_key` ($21) held by another wait raises a
+ * unique violation on idx_lt_durable_waits_signal_key.
  * Zero rows means a concurrent open won the key under this snapshot: retry.
  */
 export const OPEN_WAIT = `
   WITH w AS (
-    INSERT INTO lt_durable_waits (escalation_id, provider, workflow_id, run_scope, wait_key, workflow_type)
-    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+    INSERT INTO lt_durable_waits (escalation_id, provider, workflow_id, run_scope, wait_key, workflow_type, signal_key)
+    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $21)
     ON CONFLICT (provider, workflow_id, run_scope, wait_key) DO NOTHING
     RETURNING escalation_id
   ), e AS (
     INSERT INTO public.hmsh_escalations
       (id, namespace, app_id, workflow_id, workflow_type, type, subtype, description, role,
-       priority, metadata, escalation_payload, envelope, created_by, initiated_by, expires_at)
+       priority, metadata, escalation_payload, envelope, created_by, initiated_by, expires_at,
+       origin_id, parent_id, assigned_to, assigned_until, claimed_at, claim_expires_at)
     SELECT w.escalation_id, $6, $6, $2, $5, $7, $8, $9, $10,
-           $11, $12::jsonb, $13::jsonb, $16::jsonb, $14, $14, $15::timestamptz
+           $11, $12::jsonb, $13::jsonb, $16::jsonb, $14, $14, $15::timestamptz,
+           $19, $20, $17::text,
+           CASE WHEN $17::text IS NOT NULL AND $18::numeric IS NOT NULL
+                THEN NOW() + ($18::numeric * INTERVAL '1 minute') END,
+           CASE WHEN $17::text IS NOT NULL THEN NOW() END,
+           CASE WHEN $17::text IS NOT NULL AND $18::numeric IS NOT NULL
+                THEN NOW() + ($18::numeric * INTERVAL '1 minute') END
     FROM w
     RETURNING *
   ), reopened AS (
@@ -112,3 +123,8 @@ export const PRUNE_ORPHANED_WAITS = `
   DELETE FROM lt_durable_waits w
   WHERE w.delivered_at IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM public.hmsh_escalations e WHERE e.id = w.escalation_id)`;
+
+export const SIGNAL_KEY_INDEX = 'idx_lt_durable_waits_signal_key';
+
+export const WAIT_BY_SIGNAL_KEY = `
+  SELECT escalation_id FROM lt_durable_waits WHERE signal_key = $1`;

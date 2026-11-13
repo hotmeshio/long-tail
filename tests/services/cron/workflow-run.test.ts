@@ -1,24 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// A workflow schedule under another provider starts the workflow on that
-// engine, with the config's envelope, instead of on HotMesh.
+// A scheduled run starts on the provider, or on HotMesh, with the config's
+// envelope and an id derived from the tick.
 const mocks = vi.hoisted(() => ({
-  cron: vi.fn(),
-  getContext: vi.fn(() => ({ guid: 'tick-1' })),
   durableStart: vi.fn(),
+  resolvePrincipal: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('@hotmeshio/hotmesh', async (actual) => {
   const real = await actual<typeof import('@hotmeshio/hotmesh')>();
   return {
     ...real,
-    Virtual: { ...real.Virtual, cron: mocks.cron, getContext: mocks.getContext },
     Durable: { ...real.Durable, Client: vi.fn(() => ({ workflow: { start: mocks.durableStart } })) },
   };
 });
 vi.mock('../../../lib/db', () => ({ getConnection: () => ({}) }));
-vi.mock('../../../services/iam/principal', () => ({ resolvePrincipal: vi.fn().mockResolvedValue(null) }));
+vi.mock('../../../services/iam/principal', () => ({ resolvePrincipal: mocks.resolvePrincipal }));
 
-import { cronRegistry } from '../../../services/cron';
+import { buildCronEnvelope, startScheduledRun } from '../../../services/cron/workflow-run';
 import { durableProviderRegistry } from '../../../services/durable-provider';
 import { FakeDurableProvider } from '../../helpers/fake-durable-provider';
 import { getRegisteredWorkers, registerWorker } from '../../../services/workers/registry';
@@ -33,13 +31,10 @@ const CONFIG = {
   consumes: [],
 } as unknown as LTWorkflowConfig;
 
-async function tick(): Promise<void> {
-  await cronRegistry.startCron(CONFIG);
-  const { callback } = mocks.cron.mock.calls[0][0];
-  await callback();
-}
+const SYSTEM = { id: 'sys-1', type: 'bot' } as any;
+const tick = () => startScheduledRun(CONFIG, 'tick-1', null);
 
-describe('cron on a provider', () => {
+describe('starting a scheduled run', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => durableProviderRegistry.clear());
 
@@ -77,5 +72,23 @@ describe('cron on a provider', () => {
       getRegisteredWorkers().delete('reviewOrderRequest');
     }
   });
-});
 
+  it('marks the source and runs as the system principal by default', async () => {
+    const envelope = await buildCronEnvelope(CONFIG, SYSTEM);
+    expect(envelope.metadata).toEqual({ source: 'cron' });
+    expect(envelope.lt).toEqual({ userId: 'sys-1', principal: SYSTEM, scopes: ['workflow:cron'] });
+  });
+
+  it('runs as the configured principal when execute_as resolves', async () => {
+    const bot = { id: 'bot-9', type: 'bot' };
+    mocks.resolvePrincipal.mockResolvedValueOnce(bot);
+    const envelope = await buildCronEnvelope({ ...CONFIG, execute_as: 'nightly-bot' } as LTWorkflowConfig, SYSTEM);
+    expect(mocks.resolvePrincipal).toHaveBeenCalledWith('nightly-bot');
+    expect(envelope.lt.principal).toBe(bot);
+  });
+
+  it('leaves the stored envelope schema unchanged', async () => {
+    await buildCronEnvelope(CONFIG, SYSTEM);
+    expect(CONFIG.envelope_schema).toEqual({ data: { orderId: 'nightly' }, metadata: {} });
+  });
+});

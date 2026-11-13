@@ -10,7 +10,9 @@ export function registerWaitRoutes(router: Router): void {
    *
    * Body: { workflowId, runScope?, workflowType?, waitKey, role, type, subtype?,
    *         description?, priority?, metadata?, data?, expiresAt?,
-   *         batch?, filled?, wakeOnFill?, wakeOnFlag?, partialOnTimeout?, accumulate? }
+   *         batch?, filled?, wakeOnFill?, wakeOnFlag?, partialOnTimeout?, accumulate?,
+   *         envelope?, lookups?, files?, schemaVersion?, assignee?, durationMinutes?,
+   *         originId?, parentId?, signalKey? }
    */
   router.post('/waits', async (req, res) => {
     const body = req.body ?? {};
@@ -34,6 +36,15 @@ export function registerWaitRoutes(router: Router): void {
         wakeOnFlag: body.wakeOnFlag,
         partialOnTimeout: body.partialOnTimeout,
         accumulate: body.accumulate,
+        envelope: body.envelope,
+        lookups: body.lookups,
+        files: body.files,
+        schemaVersion: body.schemaVersion,
+        assignee: body.assignee,
+        durationMinutes: body.durationMinutes,
+        originId: body.originId,
+        parentId: body.parentId,
+        signalKey: body.signalKey,
       },
       req.auth!,
     );
