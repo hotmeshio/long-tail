@@ -25,7 +25,7 @@ interface LTWaitOutcome {
 }
 ```
 
-`conditional()` returns `data` when the escalation is resolved, the collection when an accumulator or `partialOnTimeout` batch expires, and `null` otherwise.
+`conditional()` returns the payload when resolved; the collection when an accumulator or `partialOnTimeout` batch expires; `false` on any other expiry; `null` when cancelled, the same as HotMesh.
 
 A wait is identified by `(provider, workflowId, runScope, waitKey)`, so opening the same wait twice returns the same escalation. Keys are unique per wait within one workflow run, so a loop adds its round to the key.
 
