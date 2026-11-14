@@ -56,6 +56,19 @@ await start({
 
 With a non-HotMesh provider, `start()` refuses configuration that needs HotMesh workflows: workflow functions in `workers`, `examples` and `escalation.strategy: 'mcp'`.
 
+## Deployment
+
+Two choices, made independently.
+
+**Where the workflow code reaches Long Tail.** When the engine's workers run in the same process as Long Tail, the provider package takes Long Tail's SDK client, created as the account the workflows act as: `configureLongTail({ client: createClient({ auth: { userId } }) })` on DBOS, `longTailActivities({ client })` on Temporal. Its calls go through the same API functions as the HTTP routes, with the same validation and role checks, and no request or key. When Long Tail runs as its own service, the package takes its URL and a bot API key for that account. Either way, the account needs write access to the roles the workflows wait on.
+
+**Where the tables live.** Long Tail keeps its tables in `database`. Temporal keeps its state in the Temporal service. DBOS keeps its system tables in the `dbos` schema of the database it is given, which can be Long Tail's database or its own, on the same server or another. Long Tail connects to the DBOS system database as well: it delivers outcomes and lists workflows there.
+
+| Provider | Long Tail and the engine in one process | Long Tail as its own service |
+|---|---|---|
+| DBOS | SDK client; one database or two | URL and bot key; one database or two |
+| Temporal | SDK client | URL and bot key |
+
 ## Registering and invoking workflows
 
 A provider that starts workflows (`capabilities.start` and `provider.start`) gets the same registry, Invoke Tool and schedules HotMesh has. Register each workflow by name in `workers`; the engine runs its own workers, so Long Tail only stores the config:
@@ -94,9 +107,7 @@ A config with `cronSchedule` starts the workflow on that schedule, on every engi
 
 ## Opening a wait
 
-Each provider package's `conditional()` calls this endpoint through an activity or a step. It authenticates as a service account (bot API key) that has write access to the target role.
-
-The SDK client exposes the same operation as `lt.escalations.openWait`, with `lt.escalations.get` and `lt.escalations.cancel` for reading and cancelling the row. Each runs the same validation and role checks as its route, in process, under the client's `auth`.
+Each provider package's `conditional()` opens its wait through an activity or a step, as an account with write access to the target role: in process with the SDK client's `lt.escalations.openWait`, or over HTTP with a bot API key at this endpoint. `lt.escalations.get` and `lt.escalations.cancel` read and cancel the row the same way. Each runs the same validation and role checks as its route.
 
 `POST /api/escalations/waits`
 
