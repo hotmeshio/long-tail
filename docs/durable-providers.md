@@ -96,6 +96,8 @@ A config with `cronSchedule` starts the workflow on that schedule, on every engi
 
 Each provider package's `conditional()` calls this endpoint through an activity or a step. It authenticates as a service account (bot API key) that has write access to the target role.
 
+The SDK client exposes the same operation as `lt.escalations.openWait`, with `lt.escalations.get` and `lt.escalations.cancel` for reading and cancelling the row. Each runs the same validation and role checks as its route, in process, under the client's `auth`.
+
 `POST /api/escalations/waits`
 
 ```json

@@ -201,6 +201,31 @@ const result = await lt.escalations.get({ id: 'esc_123' });
 
 ---
 
+## openWait
+
+Open the escalation a workflow on a durable provider (Temporal, DBOS) waits on. The same operation as `POST /api/escalations/waits`, with the same validation and role checks. A provider worker running in the same process as Long Tail calls this instead of the HTTP route.
+
+```typescript
+const lt = createClient({ auth: { userId: workflowBotId } });
+
+const result = await lt.escalations.openWait({
+  workflowId: 'order-123',
+  waitKey: 'review',
+  role: 'reviewer',
+  type: 'order-review',
+  metadata: { orderId: 'order-123' },
+});
+// { status: 201, data: { escalationId, status: 'pending', created: true } }
+```
+
+**Parameters:** the body of `POST /api/escalations/waits`; see [Durable providers](../../durable-providers.md#opening-a-wait). `workflowId`, `waitKey`, `role` and `type` are required.
+
+**Returns:** `LTApiResult<{ escalationId: string; status: string; created: boolean }>` -- 201 when created, 200 for a repeat of the same `(workflowId, runScope, waitKey)`, 400 for an invalid body, 403 without write access to the role, 404 when `originId` or `parentId` names no escalation the caller can read, 409 when the signal key is held, 501 when HotMesh runs workflows.
+
+**Auth:** Required
+
+---
+
 ## getFiles
 
 Sign the stored files an escalation names (`envelope.files`). Enforces the same read scope as `get`; the refs on the row grant links to exactly the files they name. See [files](../../hitl/files.md).
@@ -738,7 +763,7 @@ const result = await lt.escalations.cancel({ id: 'esc_123' });
 
 **Returns:** `LTApiResult<{ escalation }>` — 404 if not found, 409 if already terminal.
 
-**Auth:** Required (admin or superadmin for the escalation's role)
+**Auth:** Required. Write access to the escalation's role; a member with self-only write access may cancel only an escalation assigned to them.
 
 ---
 

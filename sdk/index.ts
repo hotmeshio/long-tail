@@ -110,6 +110,8 @@ export function createClient(options: LTClientOptions = {}) {
       getStats: bindAuth(escalationsApi.getEscalationStats, auth),
       getStationMetrics: bindAuth(escalationsApi.getStationMetrics, auth),
       get: bindAuth(escalationsApi.getEscalation, auth),
+      // The escalation a workflow on a durable provider (Temporal, DBOS) waits on.
+      openWait: bindAuth(escalationsApi.openDurableWait, auth),
       getLookups: bindAuth(escalationsApi.getEscalationLookups, auth),
       getFiles: bindAuth(escalationsApi.getEscalationFiles, auth),
       getByWorkflowId: escalationsApi.getEscalationsByWorkflowId,
@@ -127,6 +129,8 @@ export function createClient(options: LTClientOptions = {}) {
       bulkUnassign: bindAuth(escalationsApi.bulkUnassign, auth),
       bulkEscalate: bindAuth(escalationsApi.bulkEscalate, auth),
       bulkTriage: bindAuth(escalationsApi.bulkTriage, auth),
+      cancel: bindAuth(escalationsApi.cancelSingleEscalation, auth),
+      bulkCancel: bindAuth(escalationsApi.bulkCancel, auth),
       findByMetadata: bindAuth(escalationsApi.findByMetadata, auth),
       claimByMetadata: bindAuth(escalationsApi.claimByMetadata, auth),
       resolveByMetadata: bindAuth(escalationsApi.resolveByMetadata, auth),
