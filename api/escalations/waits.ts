@@ -1,5 +1,5 @@
 import { isUuid } from '../../lib/uuid';
-import { durableProviderRegistry, foldWaitDeclaration, openWait, SignalKeyTakenError, WaitDeclarationError, WaitRoleError, WAIT_LIMITS } from '../../services/durable-provider';
+import { durableProviderRegistry, foldWaitDeclaration, kickDurableRelay, openWait, SignalKeyTakenError, WaitDeclarationError, WaitRoleError, WAIT_LIMITS } from '../../services/durable-provider';
 import * as escalationService from '../../services/escalation';
 import type { LTOpenWaitInput } from '../../types/durable-provider';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
@@ -34,6 +34,7 @@ export async function openDurableWait(input: Partial<LTOpenWaitInput>, auth: LTA
     if (unlinked) return unlinked;
 
     const { escalation, created } = await openWait(durableProviderRegistry.name, valid, auth.userId);
+    if (created && valid.expiresAt) kickDurableRelay();
     return {
       status: created ? 201 : 200,
       data: { escalationId: escalation.id, status: escalation.status, created },

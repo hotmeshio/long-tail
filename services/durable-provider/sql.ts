@@ -85,6 +85,17 @@ export const CLAIM_DELIVERIES = `
             e.status, e.resolver_payload, e.resolved_at, e.updated_at,
             COALESCE(e.metadata->>'resolved_by', e.assigned_to) AS resolved_by`;
 
+/**
+ * Extend the lease on a claimed wait before delivering it. `attempts` ($3)
+ * is the claim's own count, so a wait claimed again elsewhere matches
+ * nothing. Zero rows: skip the wait.
+ */
+export const RENEW_LEASE = `
+  UPDATE lt_durable_waits
+  SET lease_until = NOW() + ($2 * INTERVAL '1 millisecond')
+  WHERE escalation_id = $1 AND attempts = $3 AND delivered_at IS NULL AND lease_until >= NOW()
+  RETURNING escalation_id`;
+
 export const MARK_DELIVERED = `
   UPDATE lt_durable_waits
   SET delivered_at = NOW(), delivery = $2, lease_until = NULL, last_error = NULL
@@ -93,7 +104,7 @@ export const MARK_DELIVERED = `
 export const MARK_RETRY = `
   UPDATE lt_durable_waits
   SET lease_until = NULL, last_error = $2, next_attempt_at = NOW() + ($3 * INTERVAL '1 millisecond')
-  WHERE escalation_id = $1`;
+  WHERE escalation_id = $1 AND attempts = $4 AND delivered_at IS NULL`;
 
 /**
  * Expire pending provider escalations whose SLA has passed. An accumulator,
@@ -115,6 +126,12 @@ export function expireDueSql(): string {
   }
   return expireDue;
 }
+
+/** Milliseconds until the earliest pending provider wait expires; null when none carries an expiry. */
+export const NEXT_EXPIRY = `
+  SELECT EXTRACT(EPOCH FROM (MIN(e.expires_at) - NOW())) * 1000 AS due_in_ms
+  FROM lt_durable_waits w JOIN public.hmsh_escalations e ON e.id = w.escalation_id
+  WHERE w.provider = $1 AND e.status = 'pending' AND e.expires_at IS NOT NULL`;
 
 /** Runs with a pending provider escalation, after a keyset cursor. */
 export const PENDING_RUNS = `

@@ -19,8 +19,10 @@ import {
   expireDueSql,
   MARK_DELIVERED,
   MARK_RETRY,
+  NEXT_EXPIRY,
   PENDING_RUNS,
   PRUNE_ORPHANED_WAITS,
+  RENEW_LEASE,
 } from './sql';
 
 export interface RelayPassResult {
@@ -28,6 +30,8 @@ export interface RelayPassResult {
   delivered: number;
   gone: number;
   retried: number;
+  /** Claimed waits another relay took over before this one reached them. */
+  skipped: number;
 }
 
 interface ClaimedDelivery {
@@ -51,7 +55,8 @@ const RECONCILE_PAGE = 200;
  * Delivers each terminal escalation outcome to its waiting workflow once.
  * Runs on escalation events, with a slow sweep as the recovery net. The
  * sweep also expires overdue waits; reconcile closes escalations whose
- * workflow ended without them. After a delivery, the follower publishes the
+ * workflow ended without them. Once started, it also wakes at the earliest
+ * pending expiry. After a delivery, the follower publishes the
  * workflow's completion once the engine reports it.
  */
 export class DurableRelay {
@@ -61,6 +66,8 @@ export class DurableRelay {
   private readonly reconcileMs: number;
   private timers: NodeJS.Timeout[] = [];
   private kickTimer: NodeJS.Timeout | null = null;
+  private expiryTimer: NodeJS.Timeout | null = null;
+  private started = false;
   private running: Promise<RelayPassResult> | null = null;
   private rerun = false;
   private readonly follower: WorkflowFollower;
@@ -77,6 +84,7 @@ export class DurableRelay {
   }
 
   start(): void {
+    this.started = true;
     this.kick();
     this.timers.push(setInterval(() => this.kick(), this.sweepMs).unref());
     if (this.reconcileMs > 0) {
@@ -85,10 +93,13 @@ export class DurableRelay {
   }
 
   async stop(): Promise<void> {
+    this.started = false;
     for (const timer of this.timers) clearInterval(timer);
     this.timers = [];
     if (this.kickTimer) clearTimeout(this.kickTimer);
     this.kickTimer = null;
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
     this.follower.stop();
     await this.running?.catch(() => undefined);
   }
@@ -153,16 +164,39 @@ export class DurableRelay {
   }
 
   private async pass(): Promise<RelayPassResult> {
-    const result: RelayPassResult = { expired: await this.expireDue(), delivered: 0, gone: 0, retried: 0 };
+    const result: RelayPassResult = { expired: await this.expireDue(), delivered: 0, gone: 0, retried: 0, skipped: 0 };
     for (;;) {
       const { rows } = await getPool().query<ClaimedDelivery>(CLAIM_DELIVERIES, [this.leaseMs, this.batch]);
       for (const row of rows) {
-        const outcome = await this.deliverOne(row);
+        const outcome = await this.holdsLease(row) ? await this.deliverOne(row) : 'skipped';
         result[outcome]++;
       }
       if (rows.length < this.batch) break;
     }
+    await this.wakeAtNextExpiry();
     return result;
+  }
+
+  /** Each delivery starts with a full lease, however long the batch before it took. */
+  private async holdsLease(row: ClaimedDelivery): Promise<boolean> {
+    const { rowCount } = await getPool().query(RENEW_LEASE, [row.escalation_id, this.leaseMs, row.attempts]);
+    return rowCount === 1;
+  }
+
+  /** Schedule a pass for the earliest pending expiry that falls before the next sweep. */
+  private async wakeAtNextExpiry(): Promise<void> {
+    if (!this.started) return;
+    const { rows } = await getPool().query<{ due_in_ms: string | null }>(NEXT_EXPIRY, [this.provider.name]);
+    if (!this.started) return;
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    const dueInMs = rows[0]?.due_in_ms == null ? null : Number(rows[0].due_in_ms);
+    if (dueInMs === null || dueInMs >= this.sweepMs) return;
+    this.expiryTimer = setTimeout(() => {
+      this.expiryTimer = null;
+      this.kick();
+    }, Math.max(dueInMs, 0));
+    this.expiryTimer.unref?.();
   }
 
   private async expireDue(): Promise<number> {
@@ -197,7 +231,7 @@ export class DurableRelay {
       return 'delivered';
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await getPool().query(MARK_RETRY, [row.escalation_id, message, backoffMs(row.attempts)]);
+      await getPool().query(MARK_RETRY, [row.escalation_id, message, backoffMs(row.attempts), row.attempts]);
       loggerRegistry.warn(DURABLE_LOG.RELAY_RETRY, { ...ref, escalationId: row.escalation_id, attempts: row.attempts, error: message });
       return 'retried';
     }

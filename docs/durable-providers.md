@@ -182,10 +182,10 @@ An expired accumulator, or an expired batch with `partialOnTimeout`, delivers it
 The relay runs in every Long Tail container:
 
 - It runs when an escalation is resolved or cancelled, and on a sweep (`relay.sweepMs`) that also runs at startup.
-- It leases each undelivered terminal wait, so concurrent containers deliver it once.
+- It leases each undelivered terminal wait, so concurrent containers deliver it once. The relay renews a wait's lease (`relay.leaseMs`) as it reaches that wait in a batch, and skips a wait another container has claimed since. Set `relay.leaseMs` above the longest time one `provider.deliver` call can take.
 - `provider.deliver` returns `delivered`, or `gone` when the workflow no longer exists. A thrown error is retried with capped exponential backoff, and the error is kept on the wait.
 - Every resolve surface delivers the same way: the dashboard, the HTTP API, the MCP tools, bulk resolve, resolve-by-metadata and scan rules.
-- The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch.
+- Each pass expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch. After a pass the relay schedules its next one for the earliest pending `expiresAt`, and opening a wait with `expiresAt` starts a pass, so a wait expires at its time; the sweep is the upper bound.
 - Reconcile asks the provider about each run with a pending escalation, passing the wait's `runScope` to `provider.describe`. When the provider reports the run closed (completed, failed, cancelled or terminated), Long Tail cancels the escalations that run opened; a later run under the same workflow id keeps its own. A run the provider reports as unknown keeps its escalations pending. Reconcile also removes a wait whose escalation row has been pruned.
 - A resolve (by id or by signal key) makes the same check on the wait's run first. When the run has closed, the escalation is cancelled and the resolve answers `409`, so the resolver sees that the workflow has ended.
 - Opening a wait again after its outcome was delivered clears the delivery, so the outcome is sent again. This covers an engine that re-runs the wait without its checkpoint.
