@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   durableStart: vi.fn(),
   resolvePrincipal: vi.fn().mockResolvedValue(null),
+  recordFollow: vi.fn().mockResolvedValue(true),
 }));
 vi.mock('@hotmeshio/hotmesh', async (actual) => {
   const real = await actual<typeof import('@hotmeshio/hotmesh')>();
@@ -14,6 +15,11 @@ vi.mock('@hotmeshio/hotmesh', async (actual) => {
   };
 });
 vi.mock('../../../lib/db', () => ({ getConnection: () => ({}) }));
+vi.mock('../../../services/durable-provider/follow-store', () => ({
+  recordFollow: mocks.recordFollow,
+  removeFollow: vi.fn(),
+  claimDueFollows: vi.fn(),
+}));
 vi.mock('../../../services/iam/principal', () => ({ resolvePrincipal: mocks.resolvePrincipal }));
 
 import { buildCronEnvelope, startScheduledRun } from '../../../services/cron/workflow-run';
@@ -48,6 +54,7 @@ describe('starting a scheduled run', () => {
       taskQueue: 'orders',
       args: [expect.objectContaining({ data: { orderId: 'nightly' }, metadata: { source: 'cron' }, lt: { scopes: ['workflow:cron'] } })],
     }]);
+    expect(mocks.recordFollow).toHaveBeenCalledWith('dbos', 'reviewOrderRequest-cron-tick-1', 'reviewOrderRequest');
     expect(mocks.durableStart).not.toHaveBeenCalled();
   });
 

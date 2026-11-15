@@ -96,10 +96,51 @@ export const RENEW_LEASE = `
   WHERE escalation_id = $1 AND attempts = $3 AND delivered_at IS NULL AND lease_until >= NOW()
   RETURNING escalation_id`;
 
+const FOLLOW_UPSERT = `
+  ON CONFLICT (provider, workflow_id) DO UPDATE
+  SET next_check_at = EXCLUDED.next_check_at, checks = 0,
+      workflow_type = COALESCE(EXCLUDED.workflow_type, lt_durable_follows.workflow_type)`;
+
+/**
+ * Record the delivery. With a first check delay ($3, milliseconds) the
+ * workflow is followed in the same statement; null records the delivery alone.
+ */
 export const MARK_DELIVERED = `
-  UPDATE lt_durable_waits
-  SET delivered_at = NOW(), delivery = $2, lease_until = NULL, last_error = NULL
-  WHERE escalation_id = $1`;
+  WITH d AS (
+    UPDATE lt_durable_waits
+    SET delivered_at = NOW(), delivery = $2, lease_until = NULL, last_error = NULL
+    WHERE escalation_id = $1
+    RETURNING provider, workflow_id, workflow_type)
+  INSERT INTO lt_durable_follows (provider, workflow_id, workflow_type, next_check_at)
+  SELECT d.provider, d.workflow_id, d.workflow_type, NOW() + ($3::bigint * INTERVAL '1 millisecond')
+  FROM d WHERE $3::bigint IS NOT NULL${FOLLOW_UPSERT}`;
+
+/** Follow a workflow, first checked after $4 milliseconds. A repeat restarts its checks. */
+export const RECORD_FOLLOW = `
+  INSERT INTO lt_durable_follows (provider, workflow_id, workflow_type, next_check_at)
+  VALUES ($1, $2, NULLIF($3, ''), NOW() + ($4::bigint * INTERVAL '1 millisecond'))${FOLLOW_UPSERT}
+  RETURNING (xmax = 0) AS created`;
+
+/**
+ * Take up to $2 due follows, moving each one's next check out by a doubling
+ * delay ($3 base, $4 cap, milliseconds) so concurrent relays take different rows.
+ */
+export const CLAIM_DUE_FOLLOWS = `
+  UPDATE lt_durable_follows f
+  SET checks = f.checks + 1,
+      next_check_at = NOW() + LEAST($3::float8 * POWER(2, LEAST(f.checks, 30)), $4::float8) * INTERVAL '1 millisecond'
+  WHERE f.provider = $1 AND f.workflow_id IN (
+    SELECT x.workflow_id FROM lt_durable_follows x
+    WHERE x.provider = $1 AND x.next_check_at <= NOW()
+    ORDER BY x.next_check_at
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED)
+  RETURNING f.workflow_id, f.workflow_type`;
+
+/** Remove a follow. The caller that gets the row publishes the completion. */
+export const REMOVE_FOLLOW = `
+  DELETE FROM lt_durable_follows WHERE provider = $1 AND workflow_id = $2
+  RETURNING workflow_type`;
 
 export const MARK_RETRY = `
   UPDATE lt_durable_waits

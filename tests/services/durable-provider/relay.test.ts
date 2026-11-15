@@ -48,6 +48,7 @@ describe('durable relay', () => {
     const pool = getPool();
     await pool.query(`DELETE FROM public.hmsh_escalations WHERE id IN (SELECT escalation_id FROM lt_durable_waits WHERE provider = $1)`, [PROVIDER]);
     await pool.query('DELETE FROM lt_durable_waits WHERE provider = $1', [PROVIDER]);
+    await pool.query('DELETE FROM lt_durable_follows WHERE provider = $1', [PROVIDER]);
     await Durable.shutdown();
   });
 
@@ -75,6 +76,25 @@ describe('durable relay', () => {
       type: 'workflow.completed', workflowId, workflowName: 'reviewOrder', source: 'durable-relay',
     }));
     await relay.stop();
+  });
+
+  it('stores a follow with the delivery; a later sweep publishes the completion once', async () => {
+    const workflowId = `${runId}-stored`;
+    const id = await open(workflowId, { workflowType: 'reviewOrder' });
+    await escalationService.resolveEscalation(id, { approved: true });
+    expect((await relay.run()).delivered).toBe(1);
+    await relay.stop();
+    const stored = () => getPool().query('SELECT workflow_type FROM lt_durable_follows WHERE provider = $1 AND workflow_id = $2', [PROVIDER, workflowId]);
+    expect((await stored()).rows).toEqual([{ workflow_type: 'reviewOrder' }]);
+
+    publishWorkflowEvent.mockClear();
+    provider.setState(workflowId, JOB_STATE.COMPLETED);
+    await getPool().query('UPDATE lt_durable_follows SET next_check_at = NOW() WHERE provider = $1 AND workflow_id = $2', [PROVIDER, workflowId]);
+    const [one, two] = [new DurableRelay(provider, { reconcileMs: 0 }), new DurableRelay(provider, { reconcileMs: 0 })];
+    const published = await Promise.all([one.sweepFollows(), two.sweepFollows()]);
+    expect(published[0] + published[1]).toBe(1);
+    expect(publishWorkflowEvent).toHaveBeenCalledTimes(1);
+    expect((await stored()).rowCount).toBe(0);
   });
 
   it('leaves a pending wait alone', async () => {
@@ -107,6 +127,8 @@ describe('durable relay', () => {
     const result = await relay.run();
     expect(result.gone).toBe(1);
     expect((await getWaitByEscalationId(id))?.delivery).toBe('gone');
+    const follows = await getPool().query('SELECT 1 FROM lt_durable_follows WHERE provider = $1 AND workflow_id = $2', [PROVIDER, `${runId}-e`]);
+    expect(follows.rowCount).toBe(0);
     expect((await relay.run()).gone).toBe(0);
   });
 

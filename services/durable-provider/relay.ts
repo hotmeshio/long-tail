@@ -12,7 +12,7 @@ import { publishEscalationChange } from '../escalation/crud';
 import { toEscalationRecord } from '../escalation/map';
 import { escalationEventData } from '../../lib/events/escalation-wire';
 import { cancelWaitsOfClosedRun } from './closure';
-import { DURABLE_LOG, RELAY_DEFAULTS } from './constants';
+import { DURABLE_LOG, FOLLOW_DEFAULTS, RELAY_DEFAULTS } from './constants';
 import { WorkflowFollower } from './follow';
 import {
   CLAIM_DELIVERIES,
@@ -56,8 +56,8 @@ const RECONCILE_PAGE = 200;
  * Runs on escalation events, with a slow sweep as the recovery net. The
  * sweep also expires overdue waits; reconcile closes escalations whose
  * workflow ended without them. Once started, it also wakes at the earliest
- * pending expiry. After a delivery, the follower publishes the
- * workflow's completion once the engine reports it.
+ * pending expiry. A workflow that was started or delivered to is followed
+ * until the engine reports it closed, and its completion is published.
  */
 export class DurableRelay {
   private readonly sweepMs: number;
@@ -86,7 +86,9 @@ export class DurableRelay {
   start(): void {
     this.started = true;
     this.kick();
+    void this.sweepFollows();
     this.timers.push(setInterval(() => this.kick(), this.sweepMs).unref());
+    this.timers.push(setInterval(() => void this.sweepFollows(), this.sweepMs).unref());
     if (this.reconcileMs > 0) {
       this.timers.push(setInterval(() => { void this.reconcile(); }, this.reconcileMs).unref());
     }
@@ -100,13 +102,23 @@ export class DurableRelay {
     this.kickTimer = null;
     if (this.expiryTimer) clearTimeout(this.expiryTimer);
     this.expiryTimer = null;
-    this.follower.stop();
+    await this.follower.stop();
     await this.running?.catch(() => undefined);
   }
 
-  /** Publish the workflow's completion when the engine reports it closed. */
-  follow(workflowId: string, workflowType: string): void {
-    this.follower.follow(workflowId, workflowType);
+  /** Watch a workflow whose follow is already stored. */
+  watch(workflowId: string): void {
+    this.follower.watch(workflowId);
+  }
+
+  /** Check the due follows, apart from the delivery pass. Returns the completions published. */
+  async sweepFollows(): Promise<number> {
+    try {
+      return await this.follower.sweep();
+    } catch (err) {
+      loggerRegistry.warn(DURABLE_LOG.FOLLOW_FAILED, { error: err instanceof Error ? err.message : String(err) });
+      return 0;
+    }
   }
 
   /** Schedule a pass soon; bursts of events collapse into one pass. */
@@ -223,11 +235,12 @@ export class DurableRelay {
     const ref = { provider: row.provider, workflowId: row.workflow_id, runScope: row.run_scope, waitKey: row.wait_key };
     try {
       const result = await this.provider.deliver(ref, toOutcome(row));
-      await getPool().query(MARK_DELIVERED, [row.escalation_id, result]);
-      const event = result === DELIVERY_RESULT.GONE ? DURABLE_LOG.RELAY_GONE : DURABLE_LOG.RELAY_DELIVERED;
+      const delivered = result === DELIVERY_RESULT.DELIVERED;
+      await getPool().query(MARK_DELIVERED, [row.escalation_id, result, delivered ? FOLLOW_DEFAULTS.SWEEP_AFTER_MS : null]);
+      const event = delivered ? DURABLE_LOG.RELAY_DELIVERED : DURABLE_LOG.RELAY_GONE;
       loggerRegistry.info(event, { ...ref, escalationId: row.escalation_id, status: row.status });
-      if (result === DELIVERY_RESULT.GONE) return 'gone';
-      this.follower.follow(row.workflow_id, row.workflow_type ?? '');
+      if (!delivered) return 'gone';
+      this.follower.watch(row.workflow_id);
       return 'delivered';
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

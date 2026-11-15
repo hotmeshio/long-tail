@@ -24,10 +24,17 @@ export const RELAY_DEFAULTS = {
   KICK_DEBOUNCE_MS: 50,
 } as const;
 
-/** After a delivery, describe checks at these delays (about 25 s in all), until the workflow closes. */
+/**
+ * A followed workflow is checked in memory at DELAYS_MS (about 25 s in all),
+ * then from its stored row: first after SWEEP_AFTER_MS, doubling to
+ * SWEEP_BACKOFF_MAX_MS, until the engine reports it closed.
+ */
 export const FOLLOW_DEFAULTS = {
   DELAYS_MS: [100, 200, 400, 800, 1_600, 3_200, 6_400, 12_800],
   MAX_FOLLOWED: 1_000,
+  SWEEP_AFTER_MS: 30_000,
+  SWEEP_BACKOFF_MAX_MS: 15 * 60_000,
+  SWEEP_BATCH: 100,
 } as const;
 
 /** Namespace and app id the escalation store uses for rows Long Tail creates. */
