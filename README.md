@@ -1,106 +1,60 @@
 # Long Tail
 
-**The queue durable systems forgot.**
+## Durable workflow solves reliability. Long Tail solves uncertainty.
 
-Durable platforms queue deterministic work well — retries, timeouts, exactly-once — and give you `await condition()` to park a workflow until a signal arrives. But the wait itself is invisible: nothing to find, claim, or measure while it sits there.
-
-Long Tail's `conditional` is that same wait made visible. Waiting mints a row that is searchable, claimable, deadlined, and role-gated on a shared metadata surface. A person or a machine answers it; the workflow resumes exactly where it paused.
+Sooner or later, your workflow waits on something outside its control: a reviewer's approval, an agent's answer, a machine's finished cycle. Call `conditional()` there. The workflow pauses, the work lands in a role's queue, and whoever resolves it sends the answer back as a typed value.
 
 ```bash
 npm install @hotmeshio/long-tail
 ```
 
-## How it works
-
-One workflow, both queues: `proxyActivities` for the deterministic one, `conditional` for non-determinism.
-
-```typescript
-import { Durable } from '@hotmeshio/hotmesh';
+```ts
 import { conditional, type LTEnvelope } from '@hotmeshio/long-tail';
-import * as activities from './activities';
 
-const { analyzeContent } = Durable.workflow.proxyActivities<typeof activities>({ activities });
-
-export async function reviewContent(envelope: LTEnvelope) {
-  // activity calls are checkpointed and crash-safe
-  const analysis = await analyzeContent(envelope.data.content);
-
-  if (analysis.confidence >= 0.85) {
-    return { data: { approved: true, analysis } };
-  }
-
-  // low confidence: pause as a claimable, role-gated escalation
-  const { workflowId } = Durable.workflow.workflowInfo();
-  const decision = await conditional<{ approved: boolean; notes?: string }>(
-    `review-${workflowId}`,
-    {
-      role: 'reviewer',
-      type: 'content-review',
-      priority: 2,
-      description: `Confidence ${analysis.confidence} — needs a human`,
-      metadata: { contentId: envelope.data.contentId },
-      envelope: { data: envelope.data, analysis },
-      schemaVersion: 1,   // the reviewer form edition this code is written for
-    },
-  );
-
-  return { data: { approved: decision && decision.approved, analysis } };
+export async function reviewOrder(envelope: LTEnvelope) {
+  const { orderId } = envelope.data;
+  const decision = await conditional<{ approved: boolean }>(`review-${orderId}`, {
+    role: 'reviewer',
+    type: 'order-review',
+    metadata: { orderId },
+    timeout: '48h',
+  });
+  if (!decision) return 'expired or cancelled';
+  return decision.approved ? 'shipped' : 'rejected';
 }
 ```
 
-The `reviewer` role owns a versioned form schema. The platform renders it as the resolver's UI, validates every submission against it, and `schemaVersion` pins the edition this code expects — evolve the form and the payload type together, and rows in flight keep the form they were minted for:
+A reviewer claims the review in the dashboard, fills in the role's form and submits. The workflow resumes with their answer, `false` when the wait expired, or `null` when it was cancelled.
 
-```json
-{
-  "title": "Content Review",
-  "required": ["approved"],
-  "properties": {
-    "approved": { "type": "boolean", "description": "Approve this content?" },
-    "notes":    { "type": "string", "format": "textarea", "description": "What you saw" }
-  }
-}
-```
+## What you get
 
-Two surfaces, one model. A `proxyActivity` targets a machine: call it, get a result. `conditional` targets the external world — a reviewer, an operator, a factory cell. It suspends the workflow and writes a single escalation row carrying everything needed to route the work: the `role` that should act, its `type` and `priority`, and any `metadata` to display or filter on. People work that row through an RBAC-scoped surface — find it, claim it, resolve it — from the dashboard, the API, or MCP, and resolving it resumes the workflow exactly where it paused.
+- **Queues by role.** Each wait lands in a role's queue, filtered and counted by its `metadata` facets.
+- **Forms.** The role's versioned schema renders the form and validates every answer before it reaches the workflow.
+- **Claims.** One person works an item at a time, under a time-boxed claim.
+- **Deadlines.** `timeout` becomes the escalation's expiry.
+- **A dashboard.** Queues, escalation detail, your workflows and each one's timeline.
+- **Every surface.** A person resolves on the [dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md), a service over [HTTP](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md), an operator from the [CLI](https://github.com/hotmeshio/long-tail/blob/main/docs/cli.md), an agent over [MCP](https://github.com/hotmeshio/long-tail/blob/main/docs/mcp.md), a machine over [MQTT](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md). The escalation, the validation, the permissions and the audit are the same on each.
+- **Invoke and schedules.** Register a workflow, and people, services and agents start it from the dashboard, HTTP or MCP, or Long Tail starts it on a cron schedule.
 
-Three kinds of resolver answer the same row:
+A wait can also prefill its form (`envelope`), attach `files` and `lookups`, pin a form `schemaVersion`, go straight to an `assignee`, collect many items (`batch`, `accumulate`), and be addressed by a `signalKey`. See [Workflows](https://github.com/hotmeshio/long-tail/blob/main/docs/workflows.md).
 
-- **People**, on the [dashboard](https://github.com/hotmeshio/long-tail/blob/main/docs/dashboard.md): the role's versioned form is their UI.
-- **Systems and agents**, over the [API](https://github.com/hotmeshio/long-tail/blob/main/docs/api/http/escalations.md) and MCP: the same find, claim and resolve verbs, as a service account.
-- **Machines**, over [MQTT](https://github.com/hotmeshio/long-tail/blob/main/docs/machines.md): a line's gateway claims and resolves as each machine, and the protocol lands on the row as data; the dashboard's Lines view watches the wire, and lines are declared in code or through the API.
+## Your durable engine
 
-Activities are plain functions:
+Long Tail runs workflows on [HotMesh](https://github.com/hotmeshio/sdk-typescript), with Postgres as the only dependency. Workflows on Temporal and DBOS make the same `conditional()` call and get the same queues, forms and dashboard:
 
-```typescript
-export async function analyzeContent(content: string) {
-  const result = await llm.classify(content);
-  return { confidence: result.confidence, flags: result.flags };
-}
-```
-
-## What the primitive buys
-
-The non-deterministic queue has qualities the deterministic one never needed:
-
-- **RBAC is intrinsic.** The queue is a role; permission lives in the queue itself. Any member answers — a person in the dashboard, a service account through the API, a machine over MQTT — and the workflow is indifferent to which.
-- **The form is data.** A versioned JSON Schema on the role renders the resolver's UI — fields, validation, conditionals, layout — with zero frontend code. Assign an escalation to one named user with self scope and you have a just-in-time form: one person, one item, one auditable edition.
-- **Claims are locks.** A claim is a TTL window with an extend prompt before it lapses and a resolve guard behind it — the platform rejects a submission against an expired claim atomically, in the same statement that settles the row. Stale work cannot land.
-- **Cancel is home.** Cancellation is a first-class settlement, not an exception. When the pressure no longer applies, the waiting flow sees `null` and reconciles to a modeled resting state. Handled is broader than resolved — timeout, cancel, and hop-onward are all endings the loop was built to reach.
-- **One shared surface.** Every actor that touches an item writes to the same metadata-keyed row. The contact point is shared by construction, so there is one place to search, one place to claim, one place to audit.
-- **History accretes.** The surface only ever adds: intent at creation, outcome at settlement, every crossing in between. The object's whole history sits there to replay — frames the queue kept for you.
-- **Objects get lifecycles.** Give an object this queue and a `while` loop and it lives — a digital twin: it advertises when free, asks when it needs service, waits for reality's answer, reconciles when reality gives one. An order, a document only compliance may edit, a machine on a line — all the same shape, an object looping at a role.
-- **What repeats, stops needing people.** Every settled row is a worked example. Recurring patterns become deterministic tools — problems that once required a person, then required AI reasoning, eventually require neither.
+- [Long Tail for Temporal](https://github.com/hotmeshio/long-tail-temporal)
+- [Long Tail for DBOS](https://github.com/hotmeshio/long-tail-dbos)
 
 ## Start
 
-Point at Postgres. Everything else is optional.
+Point at Postgres and register your workflows. Everything else is optional.
 
 ```typescript
 import { start } from '@hotmeshio/long-tail';
 
 const lt = await start({
   database: { host: 'localhost', port: 5432, user: 'postgres', password: 'password', database: 'mydb' },
-  workers: [{ taskQueue: 'default', workflow: reviewContent }],
+  workers: [{ taskQueue: 'default', workflow: reviewOrder }],
 });
 ```
 
@@ -167,7 +121,7 @@ All three paths produce the same outcome: tools callable as durable activities. 
 ```typescript
 const lt = await start({
   database: { connectionString: process.env.DATABASE_URL },
-  workers: [{ taskQueue: 'default', workflow: reviewContent }],
+  workers: [{ taskQueue: 'default', workflow: reviewOrder }],
 
   // Everything below is optional
   seed: { admin: { externalId: 'admin', password: process.env.ADMIN_PASSWORD } },
@@ -191,7 +145,7 @@ const lt = await start({
   database: { connectionString: process.env.DATABASE_URL },
   server: { enabled: false },
   seed: { admin: { externalId: 'system' } },
-  workers: [{ taskQueue: 'default', workflow: reviewContent }],
+  workers: [{ taskQueue: 'default', workflow: reviewOrder }],
 });
 
 const client = createClient({ auth: { userId: lt.adminUserId } });
