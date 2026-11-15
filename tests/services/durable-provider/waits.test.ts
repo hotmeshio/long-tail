@@ -5,7 +5,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options } from '../../setup';
 import { migrate } from '../../../lib/db/migrate';
 import { getPool } from '../../../lib/db';
-import { openWait, getWaitByEscalationId } from '../../../services/durable-provider';
+import { openWait, getWaitByEscalationId, WaitRoleError } from '../../../services/durable-provider';
 import * as escalationService from '../../../services/escalation';
 
 const { Connection } = Durable;
@@ -86,6 +86,15 @@ describe('durable provider waits', () => {
     expect(again.escalation.status).toBe('resolved');
     const wait = await getWaitByEscalationId(escalation.id);
     expect(wait?.delivered_at).toBeNull();
+  });
+
+  it('refuses a repeat naming another role and keeps the delivery record', async () => {
+    const { escalation } = await openWait(PROVIDER, waitInput(`${runId}-f`), CREATOR);
+    await escalationService.resolveEscalation(escalation.id, { approved: true });
+    await getPool().query(`UPDATE lt_durable_waits SET delivered_at = NOW(), delivery = 'delivered' WHERE escalation_id = $1`, [escalation.id]);
+    await expect(openWait(PROVIDER, { ...waitInput(`${runId}-f`), role: 'engineer' }, CREATOR)).rejects.toBeInstanceOf(WaitRoleError);
+    const wait = await getWaitByEscalationId(escalation.id);
+    expect(wait?.delivered_at).not.toBeNull();
   });
 
   it('returns null for an escalation that is not a wait, and for a malformed id', async () => {

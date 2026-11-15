@@ -130,11 +130,11 @@ Each provider package's `conditional()` opens its wait through an activity or a 
 | Status | Meaning |
 |---|---|
 | 201 | Created. `{ escalationId, status: 'pending', created: true }` |
-| 200 | The wait already exists. The existing row is returned with `created: false` |
+| 200 | The wait already exists under this role. The existing row is returned with `created: false` |
 | 400 | The body is invalid, or `metadata` does not match the role's `metadata_schema` |
 | 403 | The caller lacks write access to the role |
 | 404 | `originId` or `parentId` names no escalation the caller can read |
-| 409 | `signalKey` is held by another wait or escalation |
+| 409 | `signalKey` is held by another wait or escalation, or the wait is open under another role |
 | 501 | No provider is configured; HotMesh workflows call `conditional()` directly |
 
 `metadata` holds the queryable facets and is validated against the role. `data` is shown to the resolver. `expiresAt` is the SLA.
@@ -158,7 +158,7 @@ Opening the same wait again returns the first escalation unchanged.
 
 A wait opened with `signalKey` is addressed by key, as a HotMesh escalation is: `POST /api/escalations/resolve-by-signal-key`, `accumulate-by-signal-key`, `remove-item-by-signal-key`, `resolve-batch-item-by-signal-key`, `GET /api/escalations/items-by-signal-key`, a reciprocal named by `signalKey`, and the matching MCP tools. Long Tail looks the key up in `lt_durable_waits` and acts on the escalation by id, and the relay delivers the outcome.
 
-A key is unique across waits and HotMesh escalations for the life of the row; a key already held answers `409`. The escalation row itself carries no `signal_key`, so the escalation store never tries to wake HotMesh for it.
+A key is unique across waits and HotMesh escalations for the life of the row; a key already held answers `409`. `POST /api/escalations/waits` and `POST /api/escalations` claim a key under one lock per key, so the two agree on a single holder: a create that names a key a wait holds returns the wait's escalation (`200`), or `409` for another role. Keep the keys of provider waits distinct from the signal ids that HotMesh system workflows pass to `conditional()`, which write to the escalation store directly. The escalation row itself carries no `signal_key`, so the escalation store never tries to wake HotMesh for it.
 
 ### Batch and accumulate waits
 
@@ -182,13 +182,14 @@ An expired accumulator, or an expired batch with `partialOnTimeout`, delivers it
 The relay runs in every Long Tail container:
 
 - It runs when an escalation is resolved or cancelled, and on a sweep (`relay.sweepMs`) that also runs at startup.
-- It leases each undelivered terminal wait, so concurrent containers deliver it once.
+- It leases each undelivered terminal wait, so concurrent containers deliver it once. The relay renews a wait's lease (`relay.leaseMs`) as it reaches that wait in a batch, and skips a wait another container has claimed since. Set `relay.leaseMs` above the longest time one `provider.deliver` call can take.
 - `provider.deliver` returns `delivered`, or `gone` when the workflow no longer exists. A thrown error is retried with capped exponential backoff, and the error is kept on the wait.
 - Every resolve surface delivers the same way: the dashboard, the HTTP API, the MCP tools, bulk resolve, resolve-by-metadata and scan rules.
-- The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch.
-- Reconcile asks the provider for each workflow with a pending escalation. When the workflow is no longer running, Long Tail cancels the escalation.
+- Each pass expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch. After a pass the relay schedules its next one for the earliest pending `expiresAt`, and opening a wait with `expiresAt` starts a pass, so a wait expires at its time; the sweep is the upper bound.
+- Reconcile asks the provider about each run with a pending escalation, passing the wait's `runScope` to `provider.describe`. When the provider reports the run closed (completed, failed, cancelled or terminated), Long Tail cancels the escalations that run opened; a later run under the same workflow id keeps its own. A run the provider reports as unknown keeps its escalations pending. Reconcile also removes a wait whose escalation row has been pruned.
+- A resolve (by id or by signal key) makes the same check on the wait's run first. When the run has closed, the escalation is cancelled and the resolve answers `409`, so the resolver sees that the workflow has ended.
 - Opening a wait again after its outcome was delivered clears the delivery, so the outcome is sent again. This covers an engine that re-runs the wait without its checkpoint.
-- After a delivery, the relay checks the workflow with `provider.describe` at growing intervals for about 25 seconds. When the engine reports it closed, Long Tail publishes `workflow.completed` or `workflow.failed`, the events HotMesh publishes, so the dashboard's workflow pages refresh. A workflow still running after that refreshes on its next escalation event.
+- Long Tail follows every workflow it starts on the provider and every workflow it delivers an outcome to. Each follow is a row in `lt_durable_follows`, written before the engine is asked to start the workflow and in the same statement that records a delivery. The relay checks a followed workflow with `provider.describe`: in memory at growing intervals for about 25 seconds, then from the stored row, first after 30 seconds and doubling to one check every 15 minutes, for as long as the workflow runs. When the engine reports it closed, the container that removes the row publishes `workflow.completed` or `workflow.failed`, the events HotMesh publishes, so the dashboard's workflow pages refresh. Any container's relay picks up a stored follow, so a restart or deploy carries on from the table.
 
 Waits are stored in `lt_durable_waits`, one row per wait, keyed by the escalation id.
 
@@ -241,7 +242,7 @@ export const myProvider: LTDurableProvider = {
   name: 'my-engine',
   capabilities: { native: false, execution: true, terminate: true, list: true, start: true },
   async deliver(ref, outcome) { /* signal ref.workflowId with outcome; return 'delivered' or 'gone' */ },
-  async describe(workflowId) { /* return { workflowId, state, providerState } */ },
+  async describe(workflowId, runScope) { /* return { workflowId, state, providerState }; with runScope, the state of that run as its waits see it */ },
   async export(workflowId) { /* return an LTWorkflowExecution; summarizeExecution(events) fills summary */ },
   async terminate(workflowId, reason) { /* stop the workflow */ },
   async list(query) { /* return { workflows, total }: one page, newest first, and the count of every match */ },

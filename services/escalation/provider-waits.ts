@@ -1,3 +1,5 @@
+import type { PoolClient } from 'pg';
+
 import { getPool } from '../../lib/db';
 import { durableProviderRegistry } from '../durable-provider/registry';
 import { WAIT_BY_SIGNAL_KEY } from '../durable-provider/sql';
@@ -12,6 +14,29 @@ export async function providerEscalationIdFor(signalKey: string): Promise<string
   if (durableProviderRegistry.isNative || !signalKey) return null;
   const { rows } = await getPool().query(WAIT_BY_SIGNAL_KEY, [signalKey]);
   return rows[0]?.escalation_id ?? null;
+}
+
+const LOCK_SIGNAL_KEY = `SELECT pg_advisory_xact_lock(hashtextextended('lt:signal-key:' || $1, 0))`;
+
+/**
+ * Run `claim` while holding the lock for `signalKey`, inside a transaction on
+ * `client`. Every Long Tail path that gives a key to a row claims under this
+ * lock, so a wait and an escalation never both take the same key.
+ */
+export async function withSignalKeyLock<T>(signalKey: string, claim: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(LOCK_SIGNAL_KEY, [signalKey]);
+    const claimed = await claim(client);
+    await client.query('COMMIT');
+    return claimed;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 const PROVIDER_WAITS_AMONG = `

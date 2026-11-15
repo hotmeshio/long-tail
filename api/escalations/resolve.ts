@@ -2,7 +2,7 @@ import * as escalationService from '../../services/escalation';
 import * as userService from '../../services/user';
 import * as taskService from '../../services/task';
 import { escalationStrategyRegistry } from '../../services/escalation-strategy';
-import { durableProviderRegistry, getWaitByEscalationId, kickDurableRelay } from '../../services/durable-provider';
+import { cancelWaitsIfRunClosed, durableProviderRegistry, getWaitByEscalationId, kickDurableRelay, type DurableWaitRow } from '../../services/durable-provider';
 import { storeEphemeral, formatEphemeralToken } from '../../services/iam/ephemeral';
 import { getEngine as getYamlEngine } from '../../services/yaml-workflow/deployer';
 import { createClient } from '../../workers';
@@ -94,9 +94,8 @@ export async function resolveEscalation(
 
     // Provider wait: a workflow on Temporal/DBOS waits on this row. Resolve it;
     // the relay delivers the outcome. Triage and re-run never apply.
-    if (!durableProviderRegistry.isNative && await getWaitByEscalationId(escalation.id)) {
-      return resolveProviderWait(escalation.id, resolverPayload, outcome, auth.userId);
-    }
+    const wait = durableProviderRegistry.isNative ? null : await getWaitByEscalationId(escalation.id);
+    if (wait) return resolveProviderWait(wait, resolverPayload, outcome, auth.userId);
 
     // Path A: conditional signal
     const metadataSignalId = (escalation.metadata as any)?.signal_id;
@@ -146,13 +145,21 @@ export async function resolveEscalation(
   }
 }
 
-/** Resolve a provider wait's row; the relay delivers the outcome to the workflow. */
+/**
+ * Resolve a provider wait's row; the relay delivers the outcome to the
+ * workflow. A wait whose run has closed is cancelled and answers 409.
+ */
 async function resolveProviderWait(
-  id: string,
+  wait: DurableWaitRow,
   resolverPayload: Record<string, any>,
   outcome: Record<string, any>,
   userId: string,
 ): Promise<LTApiResult> {
+  const id = wait.escalation_id;
+  if (await cancelWaitsIfRunClosed(wait)) {
+    kickDurableRelay();
+    return { status: 409, error: 'The workflow has ended; the escalation was cancelled' };
+  }
   const resolved = await escalationService.resolveEscalation(id, resolverPayload, outcome, userId);
   if (!resolved) return { status: 409, error: 'Escalation not available for resolution' };
   kickDurableRelay();
@@ -193,9 +200,8 @@ export async function resolveBySignalKey(
     // resolved_by in the row metadata.
     const resolvedBy = await resolverIdentity(auth);
     const outcome = { ...metadata, ...facets, resolved_by: auth.userId };
-    if (!durableProviderRegistry.isNative && await getWaitByEscalationId(escalation.id)) {
-      return resolveProviderWait(escalation.id, resolverPayload, outcome, auth.userId);
-    }
+    const wait = durableProviderRegistry.isNative ? null : await getWaitByEscalationId(escalation.id);
+    if (wait) return resolveProviderWait(wait, resolverPayload, outcome, auth.userId);
     return resolveViaSignalKey(escalation, resolverPayload, outcome, undefined, resolvedBy);
   } catch (err: any) {
     return { status: 500, error: err.message };

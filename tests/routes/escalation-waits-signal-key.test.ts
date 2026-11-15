@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 
 import { setupRouteTest, authHeaders } from './setup';
 import { getPool } from '../../lib/db';
-import { createEscalationOnce } from '../../services/escalation/crud';
+import { escalations } from '../../services/escalation/client';
 import { FakeDurableProvider } from '../helpers/fake-durable-provider';
 
 // A provider wait opened with a signal key is addressed by every signal-key
@@ -17,6 +17,11 @@ async function post(path: string, body: Record<string, unknown>) {
     method: 'POST', headers: authHeaders(ctx.builderToken), body: JSON.stringify(body),
   });
   return { status: res.status, data: await res.json() };
+}
+
+/** A HotMesh escalation holding `signalKey`, as a workflow's conditional() writes it. */
+async function holdOnHotMesh(signalKey: string) {
+  return (await escalations()).create({ type: 'review', role: 'reviewer', signalKey } as any);
 }
 
 const openWait = (workflowId: string, signalKey: string, body: Record<string, unknown> = {}) =>
@@ -63,14 +68,44 @@ describe('signal keys on provider waits', () => {
     const taken = await openWait(`${RUN}-held-b`, `${RUN}-held-key`);
     expect(taken.status).toBe(409);
 
-    await createEscalationOnce({ type: 'review', role: 'reviewer' } as any, `${RUN}-hotmesh-key`);
+    await holdOnHotMesh(`${RUN}-hotmesh-key`);
     const hotmesh = await openWait(`${RUN}-held-c`, `${RUN}-hotmesh-key`);
     expect(hotmesh.status).toBe(409);
+    const { rows } = await getPool().query('SELECT 1 FROM lt_durable_waits WHERE workflow_id = $1', [`${RUN}-held-c`]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('answers a create naming a key a wait holds with the wait, or 409 for another role', async () => {
+    const wait = await openWait(`${RUN}-create`, `${RUN}-create-key`);
+    const same = await post('', { type: 'review', role: 'reviewer', signal_key: `${RUN}-create-key` });
+    expect(same).toMatchObject({ status: 200, data: { id: wait.data.escalationId } });
+    const other = await post('', { type: 'review', role: 'engineer', signal_key: `${RUN}-create-key` });
+    expect(other.status).toBe(409);
+    const { rows } = await getPool().query('SELECT 1 FROM public.hmsh_escalations WHERE signal_key = $1', [`${RUN}-create-key`]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('gives a key to one row when a wait and a create ask for it together', async () => {
+    const key = `${RUN}-together-key`;
+    const [wait, created] = await Promise.all([
+      openWait(`${RUN}-together`, key),
+      post('', { type: 'review', role: 'reviewer', signal_key: key }),
+    ]);
+    const pool = getPool();
+    const waits = await pool.query('SELECT escalation_id FROM lt_durable_waits WHERE signal_key = $1', [key]);
+    const keyed = await pool.query('SELECT id FROM public.hmsh_escalations WHERE signal_key = $1', [key]);
+    expect(waits.rows.length + keyed.rows.length).toBe(1);
+    if (waits.rows.length) {
+      expect(wait.status).toBe(201);
+      expect(created).toMatchObject({ status: 200, data: { id: wait.data.escalationId } });
+    } else {
+      expect([wait.status, created.status]).toEqual([409, 201]);
+    }
   });
 
   it('reopens its own wait even after a HotMesh escalation took the same key', async () => {
     const first = await openWait(`${RUN}-late`, `${RUN}-late-key`);
-    await createEscalationOnce({ type: 'review', role: 'reviewer' } as any, `${RUN}-late-key`);
+    await holdOnHotMesh(`${RUN}-late-key`);
     const again = await openWait(`${RUN}-late`, `${RUN}-late-key`);
     expect(again).toMatchObject({ status: 200, data: { escalationId: first.data.escalationId } });
   });
@@ -84,6 +119,17 @@ describe('signal keys on provider waits', () => {
     const deliveries = await settled(`${RUN}-resolve`);
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0].outcome).toMatchObject({ status: 'resolved', data: { approved: true } });
+  });
+
+  it('answers 409 and cancels the escalation when the workflow has ended', async () => {
+    const opened = await openWait(`${RUN}-ended`, `${RUN}-ended-key`);
+    provider.setState(`${RUN}-ended`, 'completed');
+    const byKey = await post('resolve-by-signal-key', { signalKey: `${RUN}-ended-key`, resolverPayload: { approved: true } });
+    expect(byKey.status).toBe(409);
+    const { rows } = await getPool().query('SELECT status, resolver_payload FROM public.hmsh_escalations WHERE id = $1', [opened.data.escalationId]);
+    expect(rows[0]).toEqual({ status: 'cancelled', resolver_payload: null });
+    const byId = await post(`${opened.data.escalationId}/resolve`, { resolverPayload: { approved: true } });
+    expect(byId.status).toBe(409);
   });
 
   it('settles one outcome when resolves by id and by key race', async () => {

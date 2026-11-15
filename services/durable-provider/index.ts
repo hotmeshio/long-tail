@@ -3,6 +3,7 @@ import { eventRegistry } from '../../lib/events';
 import { loggerRegistry } from '../../lib/logger';
 import type { LTStartConfig } from '../../types/startup';
 import { DURABLE_LOG } from './constants';
+import { recordFollow, removeFollow } from './follow-store';
 import { createHotMeshProvider } from './hotmesh';
 import { durableProviderRegistry } from './registry';
 import { DurableRelay } from './relay';
@@ -12,10 +13,12 @@ export { durableProviderRegistry } from './registry';
 export { createHotMeshProvider } from './hotmesh';
 export { DurableRelay, backoffMs, type RelayPassResult } from './relay';
 export { WorkflowFollower } from './follow';
-export { openWait, getWaitByEscalationId, SignalKeyTakenError, type DurableWaitRow, type OpenedWait } from './waits';
+export { claimDueFollows, recordFollow, removeFollow } from './follow-store';
+export { openWait, getWaitByEscalationId, SignalKeyTakenError, WaitRoleError, type DurableWaitRow, type OpenedWait } from './waits';
+export { cancelRunWaits, cancelWaitsIfRunClosed, cancelWaitsOfClosedRun } from './closure';
 export { foldWaitDeclaration, WaitDeclarationError } from './declaration';
 export { summarizeExecution } from './summary';
-export { DURABLE_LOG, RELAY_DEFAULTS, WAIT_LIMITS } from './constants';
+export { DURABLE_LOG, FOLLOW_DEFAULTS, RELAY_DEFAULTS, WAIT_LIMITS } from './constants';
 export { engineCanStart } from './start';
 
 const KICK_PATTERNS = ['system.escalation.*.*.resolved', 'system.escalation.*.*.cancelled'];
@@ -66,12 +69,20 @@ export function startDurableRelay(): void {
 }
 
 /**
- * Start a workflow on the provider, then follow it so a run that ends
- * before any wait still publishes its completion.
+ * Start a workflow on the provider and follow it, so a run that ends before
+ * any wait still publishes its completion. The follow is stored first, so it
+ * holds whatever happens to this process after the engine accepts the start.
  */
 export async function startProviderWorkflow(input: Parameters<typeof startOnProvider>[0]): Promise<void> {
-  await startOnProvider(input);
-  relay?.follow(input.workflowId, input.workflowType);
+  const provider = durableProviderRegistry.name;
+  const followed = await recordFollow(provider, input.workflowId, input.workflowType);
+  try {
+    await startOnProvider(input);
+  } catch (err) {
+    if (followed) await removeFollow(provider, input.workflowId).catch(() => undefined);
+    throw err;
+  }
+  relay?.watch(input.workflowId);
 }
 
 /** Ask the relay for a pass now (after an in-process resolve). */

@@ -2,25 +2,27 @@ import { getPool } from '../../lib/db';
 import { loggerRegistry } from '../../lib/logger';
 import {
   DELIVERY_RESULT,
-  JOB_STATE,
   WAIT_OUTCOME_STATUS,
   type LTDurableProvider,
   type LTDurableRelayConfig,
   type LTWaitOutcome,
   type LTWaitOutcomeStatus,
 } from '../../types/durable-provider';
-import { cancelEscalationsByWorkflowId, publishEscalationChange } from '../escalation/crud';
+import { publishEscalationChange } from '../escalation/crud';
 import { toEscalationRecord } from '../escalation/map';
 import { escalationEventData } from '../../lib/events/escalation-wire';
-import { DURABLE_LOG, RELAY_DEFAULTS } from './constants';
+import { cancelWaitsOfClosedRun } from './closure';
+import { DURABLE_LOG, FOLLOW_DEFAULTS, RELAY_DEFAULTS } from './constants';
 import { WorkflowFollower } from './follow';
 import {
   CLAIM_DELIVERIES,
   expireDueSql,
   MARK_DELIVERED,
   MARK_RETRY,
-  PENDING_WORKFLOWS,
+  NEXT_EXPIRY,
+  PENDING_RUNS,
   PRUNE_ORPHANED_WAITS,
+  RENEW_LEASE,
 } from './sql';
 
 export interface RelayPassResult {
@@ -28,6 +30,8 @@ export interface RelayPassResult {
   delivered: number;
   gone: number;
   retried: number;
+  /** Claimed waits another relay took over before this one reached them. */
+  skipped: number;
 }
 
 interface ClaimedDelivery {
@@ -46,14 +50,14 @@ interface ClaimedDelivery {
 }
 
 const RECONCILE_PAGE = 200;
-const OPEN_JOB_STATES: string[] = [JOB_STATE.RUNNING];
 
 /**
  * Delivers each terminal escalation outcome to its waiting workflow once.
  * Runs on escalation events, with a slow sweep as the recovery net. The
  * sweep also expires overdue waits; reconcile closes escalations whose
- * workflow ended without them. After a delivery, the follower publishes the
- * workflow's completion once the engine reports it.
+ * workflow ended without them. Once started, it also wakes at the earliest
+ * pending expiry. A workflow that was started or delivered to is followed
+ * until the engine reports it closed, and its completion is published.
  */
 export class DurableRelay {
   private readonly sweepMs: number;
@@ -62,6 +66,8 @@ export class DurableRelay {
   private readonly reconcileMs: number;
   private timers: NodeJS.Timeout[] = [];
   private kickTimer: NodeJS.Timeout | null = null;
+  private expiryTimer: NodeJS.Timeout | null = null;
+  private started = false;
   private running: Promise<RelayPassResult> | null = null;
   private rerun = false;
   private readonly follower: WorkflowFollower;
@@ -78,25 +84,41 @@ export class DurableRelay {
   }
 
   start(): void {
+    this.started = true;
     this.kick();
+    void this.sweepFollows();
     this.timers.push(setInterval(() => this.kick(), this.sweepMs).unref());
+    this.timers.push(setInterval(() => void this.sweepFollows(), this.sweepMs).unref());
     if (this.reconcileMs > 0) {
       this.timers.push(setInterval(() => { void this.reconcile(); }, this.reconcileMs).unref());
     }
   }
 
   async stop(): Promise<void> {
+    this.started = false;
     for (const timer of this.timers) clearInterval(timer);
     this.timers = [];
     if (this.kickTimer) clearTimeout(this.kickTimer);
     this.kickTimer = null;
-    this.follower.stop();
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    await this.follower.stop();
     await this.running?.catch(() => undefined);
   }
 
-  /** Publish the workflow's completion when the engine reports it closed. */
-  follow(workflowId: string, workflowType: string): void {
-    this.follower.follow(workflowId, workflowType);
+  /** Watch a workflow whose follow is already stored. */
+  watch(workflowId: string): void {
+    this.follower.watch(workflowId);
+  }
+
+  /** Check the due follows, apart from the delivery pass. Returns the completions published. */
+  async sweepFollows(): Promise<number> {
+    try {
+      return await this.follower.sweep();
+    } catch (err) {
+      loggerRegistry.warn(DURABLE_LOG.FOLLOW_FAILED, { error: err instanceof Error ? err.message : String(err) });
+      return 0;
+    }
   }
 
   /** Schedule a pass soon; bursts of events collapse into one pass. */
@@ -129,18 +151,16 @@ export class DurableRelay {
     }
   }
 
-  /** Cancel pending escalations whose workflow is no longer running. Returns the count cancelled. */
+  /** Cancel pending escalations whose run the engine reports closed. Returns the count cancelled. */
   async reconcile(): Promise<number> {
-    let cursor = '';
+    let cursor = { workflowId: '', runScope: '' };
     let cancelled = 0;
     for (;;) {
-      const { rows } = await getPool().query(PENDING_WORKFLOWS, [this.provider.name, cursor, RECONCILE_PAGE]);
-      for (const { workflow_id: workflowId } of rows) {
-        cursor = workflowId;
+      const { rows } = await getPool().query(PENDING_RUNS, [this.provider.name, cursor.workflowId, cursor.runScope, RECONCILE_PAGE]);
+      for (const { workflow_id: workflowId, run_scope: runScope } of rows) {
+        cursor = { workflowId, runScope };
         try {
-          const status = await this.provider.describe(workflowId);
-          if (OPEN_JOB_STATES.includes(status.state)) continue;
-          cancelled += await cancelEscalationsByWorkflowId(workflowId);
+          cancelled += await cancelWaitsOfClosedRun(this.provider, workflowId, runScope);
         } catch (err) {
           loggerRegistry.warn(DURABLE_LOG.RELAY_FAILED, { workflowId, error: err instanceof Error ? err.message : String(err) });
         }
@@ -156,16 +176,39 @@ export class DurableRelay {
   }
 
   private async pass(): Promise<RelayPassResult> {
-    const result: RelayPassResult = { expired: await this.expireDue(), delivered: 0, gone: 0, retried: 0 };
+    const result: RelayPassResult = { expired: await this.expireDue(), delivered: 0, gone: 0, retried: 0, skipped: 0 };
     for (;;) {
       const { rows } = await getPool().query<ClaimedDelivery>(CLAIM_DELIVERIES, [this.leaseMs, this.batch]);
       for (const row of rows) {
-        const outcome = await this.deliverOne(row);
+        const outcome = await this.holdsLease(row) ? await this.deliverOne(row) : 'skipped';
         result[outcome]++;
       }
       if (rows.length < this.batch) break;
     }
+    await this.wakeAtNextExpiry();
     return result;
+  }
+
+  /** Each delivery starts with a full lease, however long the batch before it took. */
+  private async holdsLease(row: ClaimedDelivery): Promise<boolean> {
+    const { rowCount } = await getPool().query(RENEW_LEASE, [row.escalation_id, this.leaseMs, row.attempts]);
+    return rowCount === 1;
+  }
+
+  /** Schedule a pass for the earliest pending expiry that falls before the next sweep. */
+  private async wakeAtNextExpiry(): Promise<void> {
+    if (!this.started) return;
+    const { rows } = await getPool().query<{ due_in_ms: string | null }>(NEXT_EXPIRY, [this.provider.name]);
+    if (!this.started) return;
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    const dueInMs = rows[0]?.due_in_ms == null ? null : Number(rows[0].due_in_ms);
+    if (dueInMs === null || dueInMs >= this.sweepMs) return;
+    this.expiryTimer = setTimeout(() => {
+      this.expiryTimer = null;
+      this.kick();
+    }, Math.max(dueInMs, 0));
+    this.expiryTimer.unref?.();
   }
 
   private async expireDue(): Promise<number> {
@@ -192,15 +235,16 @@ export class DurableRelay {
     const ref = { provider: row.provider, workflowId: row.workflow_id, runScope: row.run_scope, waitKey: row.wait_key };
     try {
       const result = await this.provider.deliver(ref, toOutcome(row));
-      await getPool().query(MARK_DELIVERED, [row.escalation_id, result]);
-      const event = result === DELIVERY_RESULT.GONE ? DURABLE_LOG.RELAY_GONE : DURABLE_LOG.RELAY_DELIVERED;
+      const delivered = result === DELIVERY_RESULT.DELIVERED;
+      await getPool().query(MARK_DELIVERED, [row.escalation_id, result, delivered ? FOLLOW_DEFAULTS.SWEEP_AFTER_MS : null]);
+      const event = delivered ? DURABLE_LOG.RELAY_DELIVERED : DURABLE_LOG.RELAY_GONE;
       loggerRegistry.info(event, { ...ref, escalationId: row.escalation_id, status: row.status });
-      if (result === DELIVERY_RESULT.GONE) return 'gone';
-      this.follower.follow(row.workflow_id, row.workflow_type ?? '');
+      if (!delivered) return 'gone';
+      this.follower.watch(row.workflow_id);
       return 'delivered';
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await getPool().query(MARK_RETRY, [row.escalation_id, message, backoffMs(row.attempts)]);
+      await getPool().query(MARK_RETRY, [row.escalation_id, message, backoffMs(row.attempts), row.attempts]);
       loggerRegistry.warn(DURABLE_LOG.RELAY_RETRY, { ...ref, escalationId: row.escalation_id, attempts: row.attempts, error: message });
       return 'retried';
     }

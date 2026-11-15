@@ -15,13 +15,19 @@ const WAIT_MATCH = 'x.provider = $1 AND x.workflow_id = $2 AND x.run_scope = $3 
  * `assignee` ($17) and `durationMinutes` ($18) write the claim columns as
  * HotMesh's insert does: an assignee alone pre-assigns; with a duration the
  * claim window is armed. A `signal_key` ($21) held by another wait raises a
- * unique violation on idx_lt_durable_waits_signal_key.
- * Zero rows means a concurrent open won the key under this snapshot: retry.
+ * unique violation on idx_lt_durable_waits_signal_key; one a HotMesh
+ * escalation holds opens nothing. Delivery is cleared only for a caller
+ * naming the row's role ($10).
+ * Zero rows means the key is held by HotMesh, or a concurrent open won the
+ * wait under this snapshot: retry.
  */
 export const OPEN_WAIT = `
   WITH w AS (
     INSERT INTO lt_durable_waits (escalation_id, provider, workflow_id, run_scope, wait_key, workflow_type, signal_key)
-    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $21)
+    SELECT gen_random_uuid(), $1, $2, $3, $4, $5, $21
+    WHERE $21::text IS NULL OR NOT EXISTS (
+      SELECT 1 FROM public.hmsh_escalations k
+      WHERE k.namespace = $6 AND k.app_id = $6 AND k.signal_key = $21::text)
     ON CONFLICT (provider, workflow_id, run_scope, wait_key) DO NOTHING
     RETURNING escalation_id
   ), e AS (
@@ -44,7 +50,7 @@ export const OPEN_WAIT = `
     SET delivered_at = NULL, delivery = NULL, next_attempt_at = NULL, last_error = NULL
     FROM public.hmsh_escalations h
     WHERE NOT EXISTS (SELECT 1 FROM w) AND ${WAIT_MATCH}
-      AND h.id = x.escalation_id AND h.status <> 'pending' AND x.delivered_at IS NOT NULL
+      AND h.id = x.escalation_id AND h.role = $10 AND h.status <> 'pending' AND x.delivered_at IS NOT NULL
     RETURNING x.escalation_id
   )
   SELECT e.*, true AS created, false AS reopened FROM e
@@ -79,15 +85,67 @@ export const CLAIM_DELIVERIES = `
             e.status, e.resolver_payload, e.resolved_at, e.updated_at,
             COALESCE(e.metadata->>'resolved_by', e.assigned_to) AS resolved_by`;
 
-export const MARK_DELIVERED = `
+/**
+ * Extend the lease on a claimed wait before delivering it. `attempts` ($3)
+ * is the claim's own count, so a wait claimed again elsewhere matches
+ * nothing. Zero rows: skip the wait.
+ */
+export const RENEW_LEASE = `
   UPDATE lt_durable_waits
-  SET delivered_at = NOW(), delivery = $2, lease_until = NULL, last_error = NULL
-  WHERE escalation_id = $1`;
+  SET lease_until = NOW() + ($2 * INTERVAL '1 millisecond')
+  WHERE escalation_id = $1 AND attempts = $3 AND delivered_at IS NULL AND lease_until >= NOW()
+  RETURNING escalation_id`;
+
+const FOLLOW_UPSERT = `
+  ON CONFLICT (provider, workflow_id) DO UPDATE
+  SET next_check_at = EXCLUDED.next_check_at, checks = 0,
+      workflow_type = COALESCE(EXCLUDED.workflow_type, lt_durable_follows.workflow_type)`;
+
+/**
+ * Record the delivery. With a first check delay ($3, milliseconds) the
+ * workflow is followed in the same statement; null records the delivery alone.
+ */
+export const MARK_DELIVERED = `
+  WITH d AS (
+    UPDATE lt_durable_waits
+    SET delivered_at = NOW(), delivery = $2, lease_until = NULL, last_error = NULL
+    WHERE escalation_id = $1
+    RETURNING provider, workflow_id, workflow_type)
+  INSERT INTO lt_durable_follows (provider, workflow_id, workflow_type, next_check_at)
+  SELECT d.provider, d.workflow_id, d.workflow_type, NOW() + ($3::bigint * INTERVAL '1 millisecond')
+  FROM d WHERE $3::bigint IS NOT NULL${FOLLOW_UPSERT}`;
+
+/** Follow a workflow, first checked after $4 milliseconds. A repeat restarts its checks. */
+export const RECORD_FOLLOW = `
+  INSERT INTO lt_durable_follows (provider, workflow_id, workflow_type, next_check_at)
+  VALUES ($1, $2, NULLIF($3, ''), NOW() + ($4::bigint * INTERVAL '1 millisecond'))${FOLLOW_UPSERT}
+  RETURNING (xmax = 0) AS created`;
+
+/**
+ * Take up to $2 due follows, moving each one's next check out by a doubling
+ * delay ($3 base, $4 cap, milliseconds) so concurrent relays take different rows.
+ */
+export const CLAIM_DUE_FOLLOWS = `
+  UPDATE lt_durable_follows f
+  SET checks = f.checks + 1,
+      next_check_at = NOW() + LEAST($3::float8 * POWER(2, LEAST(f.checks, 30)), $4::float8) * INTERVAL '1 millisecond'
+  WHERE f.provider = $1 AND f.workflow_id IN (
+    SELECT x.workflow_id FROM lt_durable_follows x
+    WHERE x.provider = $1 AND x.next_check_at <= NOW()
+    ORDER BY x.next_check_at
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED)
+  RETURNING f.workflow_id, f.workflow_type`;
+
+/** Remove a follow. The caller that gets the row publishes the completion. */
+export const REMOVE_FOLLOW = `
+  DELETE FROM lt_durable_follows WHERE provider = $1 AND workflow_id = $2
+  RETURNING workflow_type`;
 
 export const MARK_RETRY = `
   UPDATE lt_durable_waits
   SET lease_until = NULL, last_error = $2, next_attempt_at = NOW() + ($3 * INTERVAL '1 millisecond')
-  WHERE escalation_id = $1`;
+  WHERE escalation_id = $1 AND attempts = $4 AND delivered_at IS NULL`;
 
 /**
  * Expire pending provider escalations whose SLA has passed. An accumulator,
@@ -110,19 +168,33 @@ export function expireDueSql(): string {
   return expireDue;
 }
 
-/** Workflows with a pending provider escalation, after a keyset cursor. */
-export const PENDING_WORKFLOWS = `
-  SELECT DISTINCT w.workflow_id
+/** Milliseconds until the earliest pending provider wait expires; null when none carries an expiry. */
+export const NEXT_EXPIRY = `
+  SELECT EXTRACT(EPOCH FROM (MIN(e.expires_at) - NOW())) * 1000 AS due_in_ms
   FROM lt_durable_waits w JOIN public.hmsh_escalations e ON e.id = w.escalation_id
-  WHERE w.provider = $1 AND e.status = 'pending' AND w.workflow_id > $2
-  ORDER BY w.workflow_id
-  LIMIT $3`;
+  WHERE w.provider = $1 AND e.status = 'pending' AND e.expires_at IS NOT NULL`;
 
-/** Delivered waits whose escalation row has been pruned. */
+/** Runs with a pending provider escalation, after a keyset cursor. */
+export const PENDING_RUNS = `
+  SELECT DISTINCT w.workflow_id, w.run_scope
+  FROM lt_durable_waits w JOIN public.hmsh_escalations e ON e.id = w.escalation_id
+  WHERE w.provider = $1 AND e.status = 'pending' AND (w.workflow_id, w.run_scope) > ($2, $3)
+  ORDER BY w.workflow_id, w.run_scope
+  LIMIT $4`;
+
+/** Cancel the pending escalations of one run's waits. */
+export const CANCEL_RUN_WAITS = `
+  UPDATE public.hmsh_escalations e
+  SET status = 'cancelled', updated_at = NOW()
+  FROM lt_durable_waits w
+  WHERE w.escalation_id = e.id AND w.provider = $1 AND w.workflow_id = $2 AND w.run_scope = $3
+    AND e.status = 'pending'
+  RETURNING e.*`;
+
+/** Waits whose escalation row has been pruned. */
 export const PRUNE_ORPHANED_WAITS = `
   DELETE FROM lt_durable_waits w
-  WHERE w.delivered_at IS NOT NULL
-    AND NOT EXISTS (SELECT 1 FROM public.hmsh_escalations e WHERE e.id = w.escalation_id)`;
+  WHERE NOT EXISTS (SELECT 1 FROM public.hmsh_escalations e WHERE e.id = w.escalation_id)`;
 
 export const SIGNAL_KEY_INDEX = 'idx_lt_durable_waits_signal_key';
 

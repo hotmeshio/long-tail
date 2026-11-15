@@ -47,6 +47,15 @@ describe('POST /escalations/waits', () => {
     expect(row.envelope).toMatchObject({ accumulate_items: {} });
   });
 
+  it('answers 409 for a repeat naming another role', async () => {
+    const opened = await openWait(`${RUN}-role`, {});
+    const again = await openWait(`${RUN}-role`, {});
+    expect(again).toMatchObject({ status: 200, data: { escalationId: opened.data.escalationId } });
+    const other = await openWait(`${RUN}-role`, { role: 'engineer' });
+    expect(other.status).toBe(409);
+    expect(other.data.escalationId).toBeUndefined();
+  });
+
   it('answers 400 for an invalid declaration', async () => {
     const opened = await openWait(`${RUN}-bad`, { batch: ['a'], accumulate: {} });
     expect(opened.status).toBe(400);

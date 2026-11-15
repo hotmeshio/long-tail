@@ -182,7 +182,12 @@ export interface LTDurableProvider {
   readonly capabilities: LTDurableCapabilities;
   /** Deliver the terminal outcome. Returns `gone` when the waiter no longer exists; throws on transient failure. */
   deliver(ref: LTWaitRef, outcome: LTWaitOutcome): Promise<LTDeliveryResult>;
-  describe(workflowId: string): Promise<LTJobStatus>;
+  /**
+   * The workflow's status. With `runScope`, the status of that run as its
+   * waits see it: closed once a wait opened under it can no longer receive
+   * an outcome.
+   */
+  describe(workflowId: string, runScope?: string): Promise<LTJobStatus>;
   export?(workflowId: string, options?: LTExecutionExportOptions): Promise<LTWorkflowExecution>;
   terminate?(workflowId: string, reason: string): Promise<void>;
   list?(query: LTWorkflowListQuery): Promise<LTWorkflowPage>;
