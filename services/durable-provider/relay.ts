@@ -46,7 +46,7 @@ interface ClaimedDelivery {
 }
 
 const RECONCILE_PAGE = 200;
-const OPEN_JOB_STATES: string[] = [JOB_STATE.RUNNING];
+const CLOSED_JOB_STATES: string[] = [JOB_STATE.COMPLETED, JOB_STATE.FAILED, JOB_STATE.CANCELLED, JOB_STATE.TERMINATED];
 
 /**
  * Delivers each terminal escalation outcome to its waiting workflow once.
@@ -129,7 +129,7 @@ export class DurableRelay {
     }
   }
 
-  /** Cancel pending escalations whose workflow is no longer running. Returns the count cancelled. */
+  /** Cancel pending escalations whose workflow the engine reports closed. Returns the count cancelled. */
   async reconcile(): Promise<number> {
     let cursor = '';
     let cancelled = 0;
@@ -139,7 +139,7 @@ export class DurableRelay {
         cursor = workflowId;
         try {
           const status = await this.provider.describe(workflowId);
-          if (OPEN_JOB_STATES.includes(status.state)) continue;
+          if (!CLOSED_JOB_STATES.includes(status.state)) continue;
           cancelled += await cancelEscalationsByWorkflowId(workflowId);
         } catch (err) {
           loggerRegistry.warn(DURABLE_LOG.RELAY_FAILED, { workflowId, error: err instanceof Error ? err.message : String(err) });

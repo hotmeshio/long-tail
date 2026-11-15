@@ -142,6 +142,21 @@ describe('durable relay', () => {
     expect(provider.deliveries.some((d) => d.outcome.escalationId === id && d.outcome.status === 'cancelled')).toBe(true);
   });
 
+  it.each([JOB_STATE.FAILED, JOB_STATE.CANCELLED, JOB_STATE.TERMINATED])('reconcile cancels escalations of a %s workflow', async (state) => {
+    const id = await open(`${runId}-closed-${state}`);
+    provider.setState(`${runId}-closed-${state}`, state);
+    await relay.reconcile();
+    expect((await escalationService.getEscalation(id))?.status).toBe('cancelled');
+  });
+
+  it.each([JOB_STATE.RUNNING, JOB_STATE.UNKNOWN])('reconcile keeps escalations of a %s workflow pending', async (state) => {
+    const id = await open(`${runId}-open-${state}`);
+    provider.setState(`${runId}-open-${state}`, state);
+    await relay.reconcile();
+    expect((await escalationService.getEscalation(id))?.status).toBe('pending');
+    await escalationService.cancelEscalation(id);
+  });
+
   it('caps backoff and rejects invalid config', () => {
     expect(backoffMs(1)).toBe(RELAY_DEFAULTS.BACKOFF_BASE_MS);
     expect(backoffMs(2)).toBe(RELAY_DEFAULTS.BACKOFF_BASE_MS * 2);
