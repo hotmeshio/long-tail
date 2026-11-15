@@ -39,8 +39,9 @@ export class FakeDurableProvider implements LTDurableProvider {
     this.name = name;
   }
 
-  setState(workflowId: string, state: LTJobState): void {
-    this.states.set(workflowId, state);
+  /** With `runScope`, the state of that run alone. */
+  setState(workflowId: string, state: LTJobState, runScope?: string): void {
+    this.states.set(stateKey(workflowId, runScope), state);
   }
 
   /** The next `times` deliveries to `workflowId` throw. */
@@ -63,10 +64,10 @@ export class FakeDurableProvider implements LTDurableProvider {
     return DELIVERY_RESULT.DELIVERED;
   }
 
-  async describe(workflowId: string) {
+  async describe(workflowId: string, runScope?: string) {
     return {
       workflowId,
-      state: this.states.get(workflowId) ?? JOB_STATE.RUNNING,
+      state: this.states.get(stateKey(workflowId, runScope)) ?? this.states.get(workflowId) ?? JOB_STATE.RUNNING,
       providerState: 'FAKE',
     };
   }
@@ -107,4 +108,8 @@ export class FakeDurableProvider implements LTDurableProvider {
     this.started.push(input);
     this.states.set(input.workflowId, JOB_STATE.RUNNING);
   }
+}
+
+function stateKey(workflowId: string, runScope?: string): string {
+  return runScope ? `${workflowId}\u0000${runScope}` : workflowId;
 }

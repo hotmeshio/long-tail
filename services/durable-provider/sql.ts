@@ -110,19 +110,27 @@ export function expireDueSql(): string {
   return expireDue;
 }
 
-/** Workflows with a pending provider escalation, after a keyset cursor. */
-export const PENDING_WORKFLOWS = `
-  SELECT DISTINCT w.workflow_id
+/** Runs with a pending provider escalation, after a keyset cursor. */
+export const PENDING_RUNS = `
+  SELECT DISTINCT w.workflow_id, w.run_scope
   FROM lt_durable_waits w JOIN public.hmsh_escalations e ON e.id = w.escalation_id
-  WHERE w.provider = $1 AND e.status = 'pending' AND w.workflow_id > $2
-  ORDER BY w.workflow_id
-  LIMIT $3`;
+  WHERE w.provider = $1 AND e.status = 'pending' AND (w.workflow_id, w.run_scope) > ($2, $3)
+  ORDER BY w.workflow_id, w.run_scope
+  LIMIT $4`;
 
-/** Delivered waits whose escalation row has been pruned. */
+/** Cancel the pending escalations of one run's waits. */
+export const CANCEL_RUN_WAITS = `
+  UPDATE public.hmsh_escalations e
+  SET status = 'cancelled', updated_at = NOW()
+  FROM lt_durable_waits w
+  WHERE w.escalation_id = e.id AND w.provider = $1 AND w.workflow_id = $2 AND w.run_scope = $3
+    AND e.status = 'pending'
+  RETURNING e.*`;
+
+/** Waits whose escalation row has been pruned. */
 export const PRUNE_ORPHANED_WAITS = `
   DELETE FROM lt_durable_waits w
-  WHERE w.delivered_at IS NOT NULL
-    AND NOT EXISTS (SELECT 1 FROM public.hmsh_escalations e WHERE e.id = w.escalation_id)`;
+  WHERE NOT EXISTS (SELECT 1 FROM public.hmsh_escalations e WHERE e.id = w.escalation_id)`;
 
 export const SIGNAL_KEY_INDEX = 'idx_lt_durable_waits_signal_key';
 

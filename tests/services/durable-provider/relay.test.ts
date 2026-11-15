@@ -142,19 +142,25 @@ describe('durable relay', () => {
     expect(provider.deliveries.some((d) => d.outcome.escalationId === id && d.outcome.status === 'cancelled')).toBe(true);
   });
 
-  it.each([JOB_STATE.FAILED, JOB_STATE.CANCELLED, JOB_STATE.TERMINATED])('reconcile cancels escalations of a %s workflow', async (state) => {
-    const id = await open(`${runId}-closed-${state}`);
-    provider.setState(`${runId}-closed-${state}`, state);
+  it('reconcile cancels the closed run and keeps the running run of one workflow id', async () => {
+    const workflowId = `${runId}-runs`;
+    const old = await open(workflowId, { runScope: 'run-1' });
+    const current = await open(workflowId, { runScope: 'run-2' });
+    provider.setState(workflowId, JOB_STATE.COMPLETED, 'run-1');
     await relay.reconcile();
-    expect((await escalationService.getEscalation(id))?.status).toBe('cancelled');
+    expect((await escalationService.getEscalation(old))?.status).toBe('cancelled');
+    expect((await escalationService.getEscalation(current))?.status).toBe('pending');
+    await escalationService.cancelEscalation(current);
   });
 
-  it.each([JOB_STATE.RUNNING, JOB_STATE.UNKNOWN])('reconcile keeps escalations of a %s workflow pending', async (state) => {
-    const id = await open(`${runId}-open-${state}`);
-    provider.setState(`${runId}-open-${state}`, state);
+  it('reconcile removes a wait whose escalation was pruned, delivered or not', async () => {
+    const undelivered = await open(`${runId}-pruned-a`);
+    const delivered = await open(`${runId}-pruned-b`);
+    await getPool().query('UPDATE lt_durable_waits SET delivered_at = NOW() WHERE escalation_id = $1', [delivered]);
+    await getPool().query('DELETE FROM public.hmsh_escalations WHERE id = ANY($1::uuid[])', [[undelivered, delivered]]);
     await relay.reconcile();
-    expect((await escalationService.getEscalation(id))?.status).toBe('pending');
-    await escalationService.cancelEscalation(id);
+    expect(await getWaitByEscalationId(undelivered)).toBeNull();
+    expect(await getWaitByEscalationId(delivered)).toBeNull();
   });
 
   it('caps backoff and rejects invalid config', () => {

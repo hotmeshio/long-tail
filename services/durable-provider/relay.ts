@@ -2,16 +2,16 @@ import { getPool } from '../../lib/db';
 import { loggerRegistry } from '../../lib/logger';
 import {
   DELIVERY_RESULT,
-  JOB_STATE,
   WAIT_OUTCOME_STATUS,
   type LTDurableProvider,
   type LTDurableRelayConfig,
   type LTWaitOutcome,
   type LTWaitOutcomeStatus,
 } from '../../types/durable-provider';
-import { cancelEscalationsByWorkflowId, publishEscalationChange } from '../escalation/crud';
+import { publishEscalationChange } from '../escalation/crud';
 import { toEscalationRecord } from '../escalation/map';
 import { escalationEventData } from '../../lib/events/escalation-wire';
+import { cancelWaitsOfClosedRun } from './closure';
 import { DURABLE_LOG, RELAY_DEFAULTS } from './constants';
 import { WorkflowFollower } from './follow';
 import {
@@ -19,7 +19,7 @@ import {
   expireDueSql,
   MARK_DELIVERED,
   MARK_RETRY,
-  PENDING_WORKFLOWS,
+  PENDING_RUNS,
   PRUNE_ORPHANED_WAITS,
 } from './sql';
 
@@ -46,7 +46,6 @@ interface ClaimedDelivery {
 }
 
 const RECONCILE_PAGE = 200;
-const CLOSED_JOB_STATES: string[] = [JOB_STATE.COMPLETED, JOB_STATE.FAILED, JOB_STATE.CANCELLED, JOB_STATE.TERMINATED];
 
 /**
  * Delivers each terminal escalation outcome to its waiting workflow once.
@@ -129,18 +128,16 @@ export class DurableRelay {
     }
   }
 
-  /** Cancel pending escalations whose workflow the engine reports closed. Returns the count cancelled. */
+  /** Cancel pending escalations whose run the engine reports closed. Returns the count cancelled. */
   async reconcile(): Promise<number> {
-    let cursor = '';
+    let cursor = { workflowId: '', runScope: '' };
     let cancelled = 0;
     for (;;) {
-      const { rows } = await getPool().query(PENDING_WORKFLOWS, [this.provider.name, cursor, RECONCILE_PAGE]);
-      for (const { workflow_id: workflowId } of rows) {
-        cursor = workflowId;
+      const { rows } = await getPool().query(PENDING_RUNS, [this.provider.name, cursor.workflowId, cursor.runScope, RECONCILE_PAGE]);
+      for (const { workflow_id: workflowId, run_scope: runScope } of rows) {
+        cursor = { workflowId, runScope };
         try {
-          const status = await this.provider.describe(workflowId);
-          if (!CLOSED_JOB_STATES.includes(status.state)) continue;
-          cancelled += await cancelEscalationsByWorkflowId(workflowId);
+          cancelled += await cancelWaitsOfClosedRun(this.provider, workflowId, runScope);
         } catch (err) {
           loggerRegistry.warn(DURABLE_LOG.RELAY_FAILED, { workflowId, error: err instanceof Error ? err.message : String(err) });
         }
