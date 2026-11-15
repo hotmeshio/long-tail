@@ -11,6 +11,7 @@ export const DURABLE_LOG = {
   FOLLOW_SKIPPED: 'durable_provider.follow.skipped',
   STARTED: 'durable_provider.workflow.started',
   FOLLOW_FAILED: 'durable_provider.follow.failed',
+  DESCRIBE_FAILED: 'durable_provider.describe.failed',
 } as const;
 
 export const RELAY_DEFAULTS = {

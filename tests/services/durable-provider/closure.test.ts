@@ -5,7 +5,7 @@ import { Durable } from '@hotmeshio/hotmesh';
 import { postgres_options } from '../../setup';
 import { migrate } from '../../../lib/db/migrate';
 import { getPool } from '../../../lib/db';
-import { cancelRunWaits, cancelWaitsOfClosedRun, openWait } from '../../../services/durable-provider';
+import { cancelRunWaits, cancelWaitsIfRunClosed, cancelWaitsOfClosedRun, durableProviderRegistry, openWait } from '../../../services/durable-provider';
 import * as escalationService from '../../../services/escalation';
 import { FakeDurableProvider } from '../../helpers/fake-durable-provider';
 import { JOB_STATE } from '../../../types/durable-provider';
@@ -94,5 +94,33 @@ describe('closing the waits of an ended run', () => {
       describe: async () => { throw new Error('engine unavailable'); },
     });
     await expect(cancelWaitsOfClosedRun(failing, `${runId}-err`, '')).rejects.toThrow('engine unavailable');
+  });
+
+  it('reports a closed run through the registered provider and cancels its waits', async () => {
+    const workflowId = `${runId}-registered`;
+    const id = await open(workflowId, 'run-1');
+    durableProviderRegistry.register(provider);
+    try {
+      expect(await cancelWaitsIfRunClosed({ workflow_id: workflowId, run_scope: 'run-1' })).toBe(false);
+      provider.setState(workflowId, JOB_STATE.COMPLETED);
+      expect(await cancelWaitsIfRunClosed({ workflow_id: workflowId, run_scope: 'run-1' })).toBe(true);
+      expect(await statusOf(id)).toBe('cancelled');
+    } finally {
+      durableProviderRegistry.clear();
+    }
+  });
+
+  it('counts a run as open when the engine cannot answer', async () => {
+    const workflowId = `${runId}-unanswered`;
+    const id = await open(workflowId);
+    durableProviderRegistry.register(Object.assign(new FakeDurableProvider(PROVIDER), {
+      describe: async () => { throw new Error('engine unavailable'); },
+    }));
+    try {
+      expect(await cancelWaitsIfRunClosed({ workflow_id: workflowId, run_scope: '' })).toBe(false);
+      expect(await statusOf(id)).toBe('pending');
+    } finally {
+      durableProviderRegistry.clear();
+    }
   });
 });

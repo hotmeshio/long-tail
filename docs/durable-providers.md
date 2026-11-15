@@ -187,6 +187,7 @@ The relay runs in every Long Tail container:
 - Every resolve surface delivers the same way: the dashboard, the HTTP API, the MCP tools, bulk resolve, resolve-by-metadata and scan rules.
 - The sweep expires pending waits whose `expiresAt` has passed and delivers `expired`, with the collection for an accumulator or a `partialOnTimeout` batch.
 - Reconcile asks the provider about each run with a pending escalation, passing the wait's `runScope` to `provider.describe`. When the provider reports the run closed (completed, failed, cancelled or terminated), Long Tail cancels the escalations that run opened; a later run under the same workflow id keeps its own. A run the provider reports as unknown keeps its escalations pending. Reconcile also removes a wait whose escalation row has been pruned.
+- A resolve (by id or by signal key) makes the same check on the wait's run first. When the run has closed, the escalation is cancelled and the resolve answers `409`, so the resolver sees that the workflow has ended.
 - Opening a wait again after its outcome was delivered clears the delivery, so the outcome is sent again. This covers an engine that re-runs the wait without its checkpoint.
 - After a delivery, the relay checks the workflow with `provider.describe` at growing intervals for about 25 seconds. When the engine reports it closed, Long Tail publishes `workflow.completed` or `workflow.failed`, the events HotMesh publishes, so the dashboard's workflow pages refresh. A workflow still running after that refreshes on its next escalation event.
 

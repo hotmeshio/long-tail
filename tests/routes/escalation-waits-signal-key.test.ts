@@ -121,6 +121,17 @@ describe('signal keys on provider waits', () => {
     expect(deliveries[0].outcome).toMatchObject({ status: 'resolved', data: { approved: true } });
   });
 
+  it('answers 409 and cancels the escalation when the workflow has ended', async () => {
+    const opened = await openWait(`${RUN}-ended`, `${RUN}-ended-key`);
+    provider.setState(`${RUN}-ended`, 'completed');
+    const byKey = await post('resolve-by-signal-key', { signalKey: `${RUN}-ended-key`, resolverPayload: { approved: true } });
+    expect(byKey.status).toBe(409);
+    const { rows } = await getPool().query('SELECT status, resolver_payload FROM public.hmsh_escalations WHERE id = $1', [opened.data.escalationId]);
+    expect(rows[0]).toEqual({ status: 'cancelled', resolver_payload: null });
+    const byId = await post(`${opened.data.escalationId}/resolve`, { resolverPayload: { approved: true } });
+    expect(byId.status).toBe(409);
+  });
+
   it('settles one outcome when resolves by id and by key race', async () => {
     const opened = await openWait(`${RUN}-race`, `${RUN}-race-key`);
     const results = await Promise.all([
