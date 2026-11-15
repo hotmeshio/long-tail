@@ -130,11 +130,11 @@ Each provider package's `conditional()` opens its wait through an activity or a 
 | Status | Meaning |
 |---|---|
 | 201 | Created. `{ escalationId, status: 'pending', created: true }` |
-| 200 | The wait already exists. The existing row is returned with `created: false` |
+| 200 | The wait already exists under this role. The existing row is returned with `created: false` |
 | 400 | The body is invalid, or `metadata` does not match the role's `metadata_schema` |
 | 403 | The caller lacks write access to the role |
 | 404 | `originId` or `parentId` names no escalation the caller can read |
-| 409 | `signalKey` is held by another wait or escalation |
+| 409 | `signalKey` is held by another wait or escalation, or the wait is open under another role |
 | 501 | No provider is configured; HotMesh workflows call `conditional()` directly |
 
 `metadata` holds the queryable facets and is validated against the role. `data` is shown to the resolver. `expiresAt` is the SLA.
@@ -158,7 +158,7 @@ Opening the same wait again returns the first escalation unchanged.
 
 A wait opened with `signalKey` is addressed by key, as a HotMesh escalation is: `POST /api/escalations/resolve-by-signal-key`, `accumulate-by-signal-key`, `remove-item-by-signal-key`, `resolve-batch-item-by-signal-key`, `GET /api/escalations/items-by-signal-key`, a reciprocal named by `signalKey`, and the matching MCP tools. Long Tail looks the key up in `lt_durable_waits` and acts on the escalation by id, and the relay delivers the outcome.
 
-A key is unique across waits and HotMesh escalations for the life of the row; a key already held answers `409`. The escalation row itself carries no `signal_key`, so the escalation store never tries to wake HotMesh for it.
+A key is unique across waits and HotMesh escalations for the life of the row; a key already held answers `409`. `POST /api/escalations/waits` and `POST /api/escalations` claim a key under one lock per key, so the two agree on a single holder: a create that names a key a wait holds returns the wait's escalation (`200`), or `409` for another role. Keep the keys of provider waits distinct from the signal ids that HotMesh system workflows pass to `conditional()`, which write to the escalation store directly. The escalation row itself carries no `signal_key`, so the escalation store never tries to wake HotMesh for it.
 
 ### Batch and accumulate waits
 

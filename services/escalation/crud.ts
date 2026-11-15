@@ -16,7 +16,8 @@ import {
 } from './map';
 import type { CreateEscalationInput, ClaimResult } from './types';
 import { RESOLVE_BY_METADATA_ATOMIC, RELEASE_EXPIRED_CLAIMS } from './sql';
-import { providerEscalationIdFor } from './provider-waits';
+import { durableProviderRegistry } from '../durable-provider/registry';
+import { providerEscalationIdFor, withSignalKeyLock } from './provider-waits';
 import type { FacetValue } from '../../types/facets';
 
 /**
@@ -50,13 +51,23 @@ export async function createEscalation(
 /**
  * Create a row once per `signalKey`: the first call creates it; a later call
  * with the same key returns the row that holds the key, created by nobody.
- * The store's unique signal key decides, so concurrent callers agree.
+ * The store's unique signal key decides, so concurrent callers agree. On a
+ * provider deployment a key a Temporal or DBOS wait holds returns that wait's row.
  */
 export async function createEscalationOnce(
   input: CreateEscalationInput,
   signalKey: string,
 ): Promise<{ escalation: LTEscalationRecord; created: boolean }> {
-  const entry = await insertEscalation(input, signalKey);
+  if (durableProviderRegistry.isNative) return insertEscalationOnce(input, signalKey);
+  return withSignalKeyLock(signalKey, () => insertEscalationOnce(input, signalKey));
+}
+
+async function insertEscalationOnce(
+  input: CreateEscalationInput,
+  signalKey: string,
+): Promise<{ escalation: LTEscalationRecord; created: boolean }> {
+  const held = await providerEscalationIdFor(signalKey);
+  const entry = held ? undefined : await insertEscalation(input, signalKey);
   if (entry) return { escalation: announceCreated(toEscalationRecord(entry)), created: true };
   const existing = await getEscalationBySignalKey(signalKey);
   if (!existing) throw new Error(`no escalation holds signal key ${signalKey}`);
@@ -312,11 +323,11 @@ export async function getEscalationsByIds(
 export async function getEscalationBySignalKey(
   signalKey: string,
 ): Promise<LTEscalationRecord | null> {
+  const providerId = await providerEscalationIdFor(signalKey);
+  if (providerId) return getEscalation(providerId);
   const client = await escalations();
   const entry = await client.getBySignalKey(signalKey);
-  if (entry) return toEscalationRecord(entry);
-  const providerId = await providerEscalationIdFor(signalKey);
-  return providerId ? getEscalation(providerId) : null;
+  return entry ? toEscalationRecord(entry) : null;
 }
 
 /** Whether a HotMesh escalation holds `signalKey`. */

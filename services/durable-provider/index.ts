@@ -12,7 +12,7 @@ export { durableProviderRegistry } from './registry';
 export { createHotMeshProvider } from './hotmesh';
 export { DurableRelay, backoffMs, type RelayPassResult } from './relay';
 export { WorkflowFollower } from './follow';
-export { openWait, getWaitByEscalationId, SignalKeyTakenError, type DurableWaitRow, type OpenedWait } from './waits';
+export { openWait, getWaitByEscalationId, SignalKeyTakenError, WaitRoleError, type DurableWaitRow, type OpenedWait } from './waits';
 export { cancelRunWaits, cancelWaitsOfClosedRun } from './closure';
 export { foldWaitDeclaration, WaitDeclarationError } from './declaration';
 export { summarizeExecution } from './summary';

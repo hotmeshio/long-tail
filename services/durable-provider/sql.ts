@@ -15,13 +15,19 @@ const WAIT_MATCH = 'x.provider = $1 AND x.workflow_id = $2 AND x.run_scope = $3 
  * `assignee` ($17) and `durationMinutes` ($18) write the claim columns as
  * HotMesh's insert does: an assignee alone pre-assigns; with a duration the
  * claim window is armed. A `signal_key` ($21) held by another wait raises a
- * unique violation on idx_lt_durable_waits_signal_key.
- * Zero rows means a concurrent open won the key under this snapshot: retry.
+ * unique violation on idx_lt_durable_waits_signal_key; one a HotMesh
+ * escalation holds opens nothing. Delivery is cleared only for a caller
+ * naming the row's role ($10).
+ * Zero rows means the key is held by HotMesh, or a concurrent open won the
+ * wait under this snapshot: retry.
  */
 export const OPEN_WAIT = `
   WITH w AS (
     INSERT INTO lt_durable_waits (escalation_id, provider, workflow_id, run_scope, wait_key, workflow_type, signal_key)
-    VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $21)
+    SELECT gen_random_uuid(), $1, $2, $3, $4, $5, $21
+    WHERE $21::text IS NULL OR NOT EXISTS (
+      SELECT 1 FROM public.hmsh_escalations k
+      WHERE k.namespace = $6 AND k.app_id = $6 AND k.signal_key = $21::text)
     ON CONFLICT (provider, workflow_id, run_scope, wait_key) DO NOTHING
     RETURNING escalation_id
   ), e AS (
@@ -44,7 +50,7 @@ export const OPEN_WAIT = `
     SET delivered_at = NULL, delivery = NULL, next_attempt_at = NULL, last_error = NULL
     FROM public.hmsh_escalations h
     WHERE NOT EXISTS (SELECT 1 FROM w) AND ${WAIT_MATCH}
-      AND h.id = x.escalation_id AND h.status <> 'pending' AND x.delivered_at IS NOT NULL
+      AND h.id = x.escalation_id AND h.role = $10 AND h.status <> 'pending' AND x.delivered_at IS NOT NULL
     RETURNING x.escalation_id
   )
   SELECT e.*, true AS created, false AS reopened FROM e

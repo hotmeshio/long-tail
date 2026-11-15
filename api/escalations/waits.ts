@@ -1,7 +1,6 @@
 import { isUuid } from '../../lib/uuid';
-import { durableProviderRegistry, foldWaitDeclaration, openWait, SignalKeyTakenError, WaitDeclarationError, WAIT_LIMITS } from '../../services/durable-provider';
+import { durableProviderRegistry, foldWaitDeclaration, openWait, SignalKeyTakenError, WaitDeclarationError, WaitRoleError, WAIT_LIMITS } from '../../services/durable-provider';
 import * as escalationService from '../../services/escalation';
-import { providerEscalationIdFor } from '../../services/escalation/provider-waits';
 import type { LTOpenWaitInput } from '../../types/durable-provider';
 import type { LTApiResult, LTApiAuth } from '../../types/sdk';
 import { assertCreatable } from './create';
@@ -12,7 +11,8 @@ const PRIORITIES = [1, 2, 3, 4];
 /**
  * Open a wait for a workflow running on the configured durable provider
  * (Temporal, DBOS). Creates the escalation the workflow waits on, once per
- * (workflowId, runScope, waitKey); a repeat returns the same escalation.
+ * (workflowId, runScope, waitKey); a repeat naming the same role returns the
+ * same escalation, and one naming another role answers 409.
  * The terminal outcome is delivered to the workflow by the relay.
  *
  * @returns 201 with `{ escalationId, status, created: true }`; 200 for a repeat
@@ -32,9 +32,6 @@ export async function openDurableWait(input: Partial<LTOpenWaitInput>, auth: LTA
     if (refused) return refused;
     const unlinked = await refuseLineage(valid, auth);
     if (unlinked) return unlinked;
-    if (valid.signalKey && await signalKeyHeldByHotMesh(valid.signalKey)) {
-      return { status: 409, error: `signal key ${valid.signalKey} is held by another escalation` };
-    }
 
     const { escalation, created } = await openWait(durableProviderRegistry.name, valid, auth.userId);
     return {
@@ -42,7 +39,7 @@ export async function openDurableWait(input: Partial<LTOpenWaitInput>, auth: LTA
       data: { escalationId: escalation.id, status: escalation.status, created },
     };
   } catch (err: any) {
-    if (err instanceof SignalKeyTakenError) return { status: 409, error: err.message };
+    if (err instanceof SignalKeyTakenError || err instanceof WaitRoleError) return { status: 409, error: err.message };
     return { status: 500, error: err.message };
   }
 }
@@ -71,16 +68,6 @@ function invalidWaitInput(input: Partial<LTOpenWaitInput>): string | null {
   if (input.parentId !== undefined && !isUuid(input.parentId)) return 'parentId must be an escalation id';
   if (input.signalKey !== undefined && !nonEmpty(input.signalKey, WAIT_LIMITS.KEY_MAX)) return `signalKey must be a non-empty string of at most ${WAIT_LIMITS.KEY_MAX} characters`;
   return null;
-}
-
-/**
- * Whether a HotMesh escalation holds `signalKey` while no wait does. Once a
- * wait holds the key, opening it again returns that wait, and another wait
- * asking for the key gets the unique violation.
- */
-async function signalKeyHeldByHotMesh(signalKey: string): Promise<boolean> {
-  if (await providerEscalationIdFor(signalKey)) return false;
-  return escalationService.hotMeshHoldsSignalKey(signalKey);
 }
 
 /**
