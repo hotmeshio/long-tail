@@ -114,7 +114,7 @@ Any durable workflow can be promoted through the Workflow Registry in the dashbo
 
 A service account is a non-human principal — a row in `lt_users` with `account_type = 'bot'`. Service accounts have their own roles, scopes, and stored credentials, identical to human users in every functional respect. The `account_type` field exists for audit segmentation, not authorization.
 
-Service accounts authenticate with API keys prefixed `lt_bot_`. The keys are bcrypt-hashed at rest and validated by the same auth adapter that handles human JWTs. Once authenticated, the request is indistinguishable from a human request.
+Service accounts authenticate with API keys prefixed `lt_bot_`. The keys are stored as SHA-256 digests and validated by the same auth adapter that handles human JWTs, with one indexed read per request that also confirms the account is `active` and returns its current roles. Once authenticated, the request is indistinguishable from a human request.
 
 ### When to use a service account
 

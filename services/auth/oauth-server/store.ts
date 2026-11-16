@@ -4,6 +4,7 @@ import { getPool } from '../../../lib/db';
 import { loggerRegistry } from '../../../lib/logger';
 import { config } from '../../../modules/config';
 import { isUuid } from '../../../lib/uuid';
+import { digestKey } from '../key-digest';
 import type { LTGrantPolicy, LTGrantSnapshot, LTGrantSummary, LTOAuthClient } from '../../../types/oauth-server';
 import {
   INSERT_CLIENT,
@@ -37,9 +38,7 @@ export function createSecret(): string {
 }
 
 /** SHA-256 of a secret. Codes and refresh tokens are stored only as hashes. */
-export function hashSecret(secret: string): string {
-  return crypto.createHash('sha256').update(secret).digest('hex');
-}
+export const hashSecret = digestKey;
 
 /** The PKCE S256 challenge for a code verifier (RFC 7636). */
 export function pkceChallenge(verifier: string): string {

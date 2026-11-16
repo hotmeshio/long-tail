@@ -7,7 +7,7 @@ import { loggerRegistry } from '../lib/logger';
 import { mayAdminister, mayBuild, mayIssueCredentials, mayManageRoles, mayReadWorkflowRun, type CapabilityPrincipal } from './capabilities';
 import { ssoProvision } from '../services/user/sso-provision';
 import { validateBotApiKey } from '../services/auth/bot-api-key';
-import { resolvePrincipal } from '../services/iam/principal';
+import { highestRoleType } from '../services/auth/oauth-server/access-token';
 import type { AuthPayload, LTAuthAdapter } from '../types';
 
 // Re-export types for convenience
@@ -60,17 +60,13 @@ export class JwtAuthAdapter implements LTAuthAdapter {
 
   private async authenticateBotApiKey(rawKey: string): Promise<AuthPayload | null> {
     try {
-      const keyRecord = await validateBotApiKey(rawKey);
-      if (!keyRecord) return null;
-
-      // Resolve bot's actual roles (single JOIN query) instead of hardcoding 'member'
-      const principal = await resolvePrincipal(keyRecord.user_id);
-      const role = principal?.roleType ?? 'member';
+      const key = await validateBotApiKey(rawKey);
+      if (!key) return null;
 
       return {
-        userId: keyRecord.user_id,
-        role,
-        scopes: keyRecord.scopes ?? [],
+        userId: key.user_id,
+        role: highestRoleType(key.roles ?? []),
+        scopes: key.scopes ?? [],
         principalType: 'bot',
       };
     } catch {

@@ -205,6 +205,18 @@ describe('Bot account routes', () => {
       expect(res.status).toBe(200);
     });
 
+    it('an inactive bot\'s key stops authenticating, and works again once active', async () => {
+      const setStatus = (status: string) => fetch(`${ctx.BASE}/bot-accounts/${botId}`, {
+        method: 'PUT',
+        headers: authHeaders(ctx.builderToken),
+        body: JSON.stringify({ status }),
+      });
+      expect((await setStatus('inactive')).status).toBe(200);
+      expect((await fetch(`${ctx.BASE}/tasks`, { headers: authHeaders(rawKey) })).status).toBe(401);
+      expect((await setStatus('active')).status).toBe(200);
+      expect((await fetch(`${ctx.BASE}/tasks`, { headers: authHeaders(rawKey) })).status).toBe(200);
+    });
+
     it('DELETE /api/bot-accounts/:id/api-keys/:keyId revokes key', async () => {
       const res = await fetch(`${ctx.BASE}/bot-accounts/${botId}/api-keys/${keyId}`, {
         method: 'DELETE',

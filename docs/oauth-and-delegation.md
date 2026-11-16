@@ -264,7 +264,7 @@ const { id, rawToken } = await generateServiceToken(
 );
 ```
 
-Returns the raw token **once**. The system stores only a bcrypt hash. `listServiceTokens(serverId)` lists a server's tokens without hashes, and `revokeServiceToken(id)` deletes one.
+Returns the raw token **once**. The system stores only hashes of it, and validates each use with one read by its SHA-256 digest. `listServiceTokens(serverId)` lists a server's tokens without hashes, and `revokeServiceToken(id)` deletes one.
 
 ### Using a Service Token
 
@@ -430,7 +430,7 @@ cd dashboard && npx vitest run
 │  - User JWTs signed with JWT_SECRET          │
 │  - Delegation tokens signed with JWT_SECRET  │
 │  - OAuth tokens encrypted with AES-256-GCM   │
-│  - Service token hashes stored with bcrypt   │
+│  - Service tokens stored as hashes           │
 └────────────────────────┬─────────────────────┘
                          │
             Delegation API (scoped access)
