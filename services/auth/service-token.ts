@@ -2,16 +2,31 @@ import * as crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { getPool } from '../../lib/db';
+import { loggerRegistry } from '../../lib/logger';
+import { KEY_LAST_USED_STAMP_SECONDS } from '../../modules/defaults';
 import type { ServiceTokenRecord } from '../../types/delegation';
+import { createDigestAdopter } from './digest-adoption';
+import { digestKey } from './key-digest';
 import {
   INSERT_SERVICE_TOKEN,
-  GET_ALL_ACTIVE_SERVICE_TOKENS,
-  UPDATE_SERVICE_TOKEN_LAST_USED,
+  GET_LIVE_SERVICE_TOKEN,
+  GET_SERVICE_TOKENS_WITHOUT_DIGEST,
+  SET_SERVICE_TOKEN_DIGEST,
+  STAMP_SERVICE_TOKEN_LAST_USED,
   DELETE_SERVICE_TOKEN,
   LIST_SERVICE_TOKENS_BY_SERVER,
 } from './sql';
 
 const TOKEN_PREFIX = 'lt_svc_';
+
+const adoptDigest = createDigestAdopter({
+  async listWithoutDigest() {
+    return (await (await getPool()).query(GET_SERVICE_TOKENS_WITHOUT_DIGEST)).rows;
+  },
+  async setDigest(id, digest) {
+    await (await getPool()).query(SET_SERVICE_TOKEN_DIGEST, [id, digest]);
+  },
+});
 
 /**
  * Generate a new service token for an external MCP server.
@@ -27,28 +42,42 @@ export async function generateServiceToken(
   const tokenHash = await bcrypt.hash(rawToken, 10);
   const pool = await getPool();
   const { rows } = await pool.query(INSERT_SERVICE_TOKEN, [
-    name, tokenHash, serverId, scopes, expiresAt || null,
+    name, tokenHash, digestKey(rawToken), serverId, scopes, expiresAt || null,
   ]);
   return { id: rows[0].id, rawToken };
 }
 
 /**
- * Validate a raw service token. Returns the record if valid, null otherwise.
+ * Validate a raw service token: one indexed read by its digest. Returns the
+ * record if the token is unexpired, null otherwise.
  */
 export async function validateServiceToken(
   rawToken: string,
-): Promise<(ServiceTokenRecord & { token_hash?: undefined }) | null> {
+): Promise<ServiceTokenRecord | null> {
   if (!rawToken.startsWith(TOKEN_PREFIX)) return null;
   const pool = await getPool();
-  const { rows } = await pool.query(GET_ALL_ACTIVE_SERVICE_TOKENS);
-  for (const row of rows) {
-    if (await bcrypt.compare(rawToken, row.token_hash)) {
-      await pool.query(UPDATE_SERVICE_TOKEN_LAST_USED, [row.id]);
-      const { token_hash, ...record } = row;
-      return record;
-    }
+  const digest = digestKey(rawToken);
+
+  let row = await readLiveServiceToken(digest);
+  if (!row && (await adoptDigest(rawToken, digest))) {
+    row = await readLiveServiceToken(digest);
   }
-  return null;
+  if (!row) return null;
+
+  const { stamp_due, ...record } = row;
+  if (stamp_due) {
+    pool.query(STAMP_SERVICE_TOKEN_LAST_USED, [record.id, KEY_LAST_USED_STAMP_SECONDS])
+      .catch((err) => loggerRegistry.warn(`[lt-auth] service token last-used stamp failed: ${err?.message}`));
+  }
+  return record;
+}
+
+async function readLiveServiceToken(
+  digest: string,
+): Promise<(ServiceTokenRecord & { stamp_due: boolean }) | null> {
+  const pool = await getPool();
+  const { rows } = await pool.query(GET_LIVE_SERVICE_TOKEN, [digest, KEY_LAST_USED_STAMP_SECONDS]);
+  return rows[0] ?? null;
 }
 
 /**

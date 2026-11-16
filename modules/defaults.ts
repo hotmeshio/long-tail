@@ -126,6 +126,17 @@ export const STOP_WORDS = new Set([
 /** YAML dump line width. */
 export const YAML_LINE_WIDTH = envInt('LT_YAML_LINE_WIDTH', 120);
 
+// ── API keys and service tokens ──────────────────────────────────────
+
+/** A key's `last_used_at` is stamped at most once per this many seconds. */
+export const KEY_LAST_USED_STAMP_SECONDS = envInt('LT_KEY_LAST_USED_STAMP_SECONDS', 60);
+
+/** How long a process remembers that a presented secret matched no digest-less row. */
+export const KEY_DIGEST_MISS_MEMO_SECONDS = envInt('LT_KEY_DIGEST_MISS_MEMO_SECONDS', 300);
+
+/** The most unmatched secrets a process remembers at once. */
+export const KEY_DIGEST_MISS_MEMO_MAX = envInt('LT_KEY_DIGEST_MISS_MEMO_MAX', 1000);
+
 // ── OAuth authorization server ───────────────────────────────────────
 
 /** Access-token lifetime. Bounds how stale a token's roles can be when no revocation event arrives. */

@@ -276,7 +276,7 @@ Service accounts are named identities that authenticate with API keys instead of
 
 ### How It Works
 
-Service account API keys are prefixed with `lt_bot_` and validated via bcrypt comparison, following the same pattern as service tokens. The built-in `JwtAuthAdapter` detects the prefix automatically:
+Service account API keys are prefixed with `lt_bot_` and stored as a SHA-256 digest. Each request is validated by one indexed read that returns the key, its scopes and the account's current roles, and requires the account to be `active`. A revoked key, a deactivated account or a role change takes effect on the next request in every container. Service tokens follow the same pattern. The built-in `JwtAuthAdapter` detects the prefix automatically:
 
 ```
 Authorization: Bearer lt_bot_a1b2c3d4e5f6...

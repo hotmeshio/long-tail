@@ -78,7 +78,8 @@ export function verifyAccessToken(token: string, target: AccessTokenTarget): LTA
   }
 }
 
-function highestRoleType(roles: LTGrantRole[]): LTRoleType {
+/** The highest role type among a principal's memberships; member when there are none. */
+export function highestRoleType(roles: { type: LTRoleType }[]): LTRoleType {
   if (roles.some((r) => r.type === 'superadmin')) return 'superadmin';
   if (roles.some((r) => r.type === 'admin')) return 'admin';
   return 'member';

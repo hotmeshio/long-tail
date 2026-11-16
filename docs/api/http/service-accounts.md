@@ -87,7 +87,7 @@ PUT /api/bot-accounts/:id
 |-------|------|-------------|
 | `display_name` | `string` | New display name |
 | `description` | `string` | New description |
-| `status` | `string` | `active`, `inactive`, or `suspended` |
+| `status` | `string` | `active`, `inactive`, or `suspended`. The account's API keys authenticate while it is `active` |
 
 **Response 200:** The updated service account object.
 

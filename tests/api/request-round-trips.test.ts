@@ -16,6 +16,7 @@ import routes from '../../routes';
 import mcpRouter from '../../routes/mcp-endpoint';
 import * as userService from '../../services/user';
 import * as escalationService from '../../services/escalation';
+import { generateBotApiKey } from '../../services/auth/bot-api-key';
 
 const STAMP = Date.now();
 const ROLE = `rt-queue-${STAMP}`;
@@ -84,7 +85,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   (Client.prototype as any).query = function (this: Client, ...args: any[]) {
     const text = typeof args[0] === 'string' ? args[0] : args[0]?.text;
-    if (text) statements.push(String(text).replace(/\s+/g, ' ').trim().slice(0, 120));
+    if (text) statements.push(String(text).replace(/\s+/g, ' ').trim().slice(0, 600));
     return (originalQuery as any).apply(this, args);
   };
   // Warm caches (domain index, schema enforcement) so steady state is measured.
@@ -145,5 +146,21 @@ describe('round trips per request (member, dashboard login)', () => {
   it('authentication adds no statement for a dashboard login', async () => {
     const statements = await measure(() => mcp('find_escalations', { role: ROLE, limit: 1 }));
     expect(statements.filter((q) => /lt_bot_api_keys|FROM lt_users WHERE/.test(q))).toEqual([]);
+  });
+
+  it('a bot key is validated by one read of its table per request', async () => {
+    const { rawKey } = await generateBotApiKey(`rt-key-${STAMP}`, userId);
+    const dashboardToken = token;
+    token = rawKey;
+    try {
+      await get(`/escalations?role=${ROLE}&limit=1`);
+      const statements = await measure(() => get(`/escalations?role=${ROLE}&limit=1`));
+      const keyStatements = statements.filter((q) => /lt_bot_api_keys/.test(q));
+      expect(keyStatements).toHaveLength(1);
+      expect(keyStatements[0]).toMatch(/^SELECT/);
+      expect(statements.filter((q) => /FROM lt_users WHERE/.test(q))).toEqual([]);
+    } finally {
+      token = dashboardToken;
+    }
   });
 });

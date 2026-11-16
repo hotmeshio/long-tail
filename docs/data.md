@@ -239,7 +239,7 @@ Type is enforced by a CHECK constraint: `type IN ('superadmin', 'admin', 'member
 
 ### lt_bot_api_keys
 
-API keys for bot accounts. Each key is bcrypt-hashed — the raw key is returned once at creation and never stored.
+API keys for bot accounts. The raw key is returned once at creation and never stored. A request is validated by one read on `key_digest`, joined to the owning account and its roles.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -247,9 +247,10 @@ API keys for bot accounts. Each key is bcrypt-hashed — the raw key is returned
 | `name` | `TEXT NOT NULL` | — | Human-readable key name |
 | `user_id` | `UUID NOT NULL` | — | FK to `lt_users(id)`, CASCADE on delete |
 | `key_hash` | `TEXT NOT NULL` | — | bcrypt hash of the raw API key |
+| `key_digest` | `TEXT` | — | Hex SHA-256 of the raw API key, the lookup column. Unique where set. A key minted before this column gains it on first use |
 | `scopes` | `TEXT[] NOT NULL` | `'{}'` | Allowed scopes (e.g., `mcp:tool:call`) |
 | `expires_at` | `TIMESTAMPTZ` | — | Optional expiry (null = no expiry) |
-| `last_used_at` | `TIMESTAMPTZ` | — | Updated on each successful validation |
+| `last_used_at` | `TIMESTAMPTZ` | — | Last use, stamped at most once per `LT_KEY_LAST_USED_STAMP_SECONDS` (default 60) |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 
@@ -454,17 +455,18 @@ Unique constraint: `(user_id, provider, label)`.
 
 ### lt_service_tokens
 
-Service tokens for external MCP servers. Each token is hashed — the raw token is returned once at creation.
+Service tokens for external MCP servers. The raw token is returned once at creation. A request is validated by one read on `token_digest`.
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
 | `id` | `UUID` | `gen_random_uuid()` | Primary key |
 | `name` | `TEXT UNIQUE NOT NULL` | — | Human-readable token name |
-| `token_hash` | `TEXT NOT NULL` | — | Hashed token value |
+| `token_hash` | `TEXT NOT NULL` | — | bcrypt hash of the raw token |
+| `token_digest` | `TEXT` | — | Hex SHA-256 of the raw token, the lookup column. Unique where set. A token minted before this column gains it on first use |
 | `server_id` | `UUID` | — | FK to `lt_mcp_servers(id)`, CASCADE on delete |
 | `scopes` | `TEXT[] NOT NULL` | `'{}'` | Allowed scopes |
 | `expires_at` | `TIMESTAMPTZ` | — | Optional expiry |
-| `last_used_at` | `TIMESTAMPTZ` | — | Updated on each use |
+| `last_used_at` | `TIMESTAMPTZ` | — | Last use, stamped at most once per `LT_KEY_LAST_USED_STAMP_SECONDS` (default 60) |
 | `created_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Row creation time |
 | `updated_at` | `TIMESTAMPTZ NOT NULL` | `NOW()` | Last modification |
 

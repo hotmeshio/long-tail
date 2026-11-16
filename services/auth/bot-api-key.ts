@@ -3,16 +3,33 @@ import { isUuid } from '../../lib/uuid';
 import bcrypt from 'bcryptjs';
 
 import { getPool } from '../../lib/db';
+import { loggerRegistry } from '../../lib/logger';
+import { KEY_LAST_USED_STAMP_SECONDS } from '../../modules/defaults';
+import type { LTRoleType } from '../../types';
+import { createDigestAdopter } from './digest-adoption';
+import { digestKey } from './key-digest';
 import {
   INSERT_BOT_KEY,
-  GET_ALL_ACTIVE_BOT_KEYS,
-  UPDATE_BOT_KEY_LAST_USED,
+  GET_LIVE_BOT_KEY,
+  GET_BOT_KEYS_WITHOUT_DIGEST,
+  SET_BOT_KEY_DIGEST,
+  STAMP_BOT_KEY_LAST_USED,
   DELETE_BOT_KEY,
   LIST_BOT_KEYS_BY_USER,
   GET_BOT_KEY_OWNER,
 } from './sql';
 
 const TOKEN_PREFIX = 'lt_bot_';
+const KEY_SHAPE = /^lt_bot_[0-9a-f]{64}$/;
+
+const adoptDigest = createDigestAdopter({
+  async listWithoutDigest() {
+    return (await (await getPool()).query(GET_BOT_KEYS_WITHOUT_DIGEST)).rows;
+  },
+  async setDigest(id, digest) {
+    await (await getPool()).query(SET_BOT_KEY_DIGEST, [id, digest]);
+  },
+});
 
 /** Record returned from bot API key queries (never includes key_hash). */
 export interface BotApiKeyRecord {
@@ -24,6 +41,15 @@ export interface BotApiKeyRecord {
   last_used_at: Date | null;
   created_at: Date;
   updated_at: Date;
+}
+
+/** A presented key that is valid now, with its bot's current memberships. */
+export interface LiveBotApiKey {
+  id: string;
+  name: string;
+  user_id: string;
+  scopes: string[];
+  roles: { role: string; type: LTRoleType }[];
 }
 
 /**
@@ -40,29 +66,42 @@ export async function generateBotApiKey(
   const keyHash = await bcrypt.hash(rawKey, 10);
   const pool = await getPool();
   const { rows } = await pool.query(INSERT_BOT_KEY, [
-    name, userId, keyHash, scopes, expiresAt || null,
+    name, userId, keyHash, digestKey(rawKey), scopes, expiresAt || null,
   ]);
   return { id: rows[0].id, rawKey };
 }
 
 /**
- * Validate a raw bot API key.
- * Returns the key record (with user_id) if valid, null otherwise.
+ * Validate a raw bot API key: one indexed read by its digest. The key must be
+ * unexpired and its bot active. Returns null otherwise.
  */
 export async function validateBotApiKey(
   rawKey: string,
-): Promise<BotApiKeyRecord | null> {
-  if (!rawKey.startsWith(TOKEN_PREFIX)) return null;
+): Promise<LiveBotApiKey | null> {
+  if (!KEY_SHAPE.test(rawKey)) return null;
   const pool = await getPool();
-  const { rows } = await pool.query(GET_ALL_ACTIVE_BOT_KEYS);
-  for (const row of rows) {
-    if (await bcrypt.compare(rawKey, row.key_hash)) {
-      await pool.query(UPDATE_BOT_KEY_LAST_USED, [row.id]);
-      const { key_hash, ...record } = row;
-      return record;
-    }
+  const digest = digestKey(rawKey);
+
+  let row = await readLiveBotKey(digest);
+  if (!row && (await adoptDigest(rawKey, digest))) {
+    row = await readLiveBotKey(digest);
   }
-  return null;
+  if (!row) return null;
+
+  const { stamp_due, ...key } = row;
+  if (stamp_due) {
+    pool.query(STAMP_BOT_KEY_LAST_USED, [key.id, KEY_LAST_USED_STAMP_SECONDS])
+      .catch((err) => loggerRegistry.warn(`[lt-auth] bot key last-used stamp failed: ${err?.message}`));
+  }
+  return key;
+}
+
+async function readLiveBotKey(
+  digest: string,
+): Promise<(LiveBotApiKey & { stamp_due: boolean }) | null> {
+  const pool = await getPool();
+  const { rows } = await pool.query(GET_LIVE_BOT_KEY, [digest, KEY_LAST_USED_STAMP_SECONDS]);
+  return rows[0] ?? null;
 }
 
 /**

@@ -109,19 +109,20 @@ describe('requireAuth: JWT bearer', () => {
 });
 
 describe('requireAuth: bot API key', () => {
-  it('resolves the key and the principal once each, and builds a bot payload', async () => {
-    mocks.validateBotApiKey.mockResolvedValue({ user_id: USER, scopes: ['mcp:read'] });
-    mocks.resolvePrincipal.mockResolvedValue({ roleType: 'admin' });
+  it('builds a bot payload from the one key read, with the highest role type', async () => {
+    mocks.validateBotApiKey.mockResolvedValue({
+      user_id: USER, scopes: ['mcp:read'],
+      roles: [{ role: 'reviewer', type: 'member' }, { role: 'ops', type: 'admin' }],
+    });
     const { outcome, auth } = await authenticate(bearer('lt_bot_abc'));
     expect(outcome).toBe('next');
     expect(auth).toEqual({ userId: USER, role: 'admin', scopes: ['mcp:read'], principalType: 'bot' });
     expect(mocks.validateBotApiKey).toHaveBeenCalledTimes(1);
-    expect(mocks.resolvePrincipal).toHaveBeenCalledTimes(1);
+    expect(mocks.resolvePrincipal).not.toHaveBeenCalled();
   });
 
   it('defaults the role to member and the scopes to none', async () => {
-    mocks.validateBotApiKey.mockResolvedValue({ user_id: USER, scopes: null });
-    mocks.resolvePrincipal.mockResolvedValue(null);
+    mocks.validateBotApiKey.mockResolvedValue({ user_id: USER, scopes: null, roles: [] });
     expect((await authenticate(bearer('lt_bot_abc'))).auth).toEqual({ userId: USER, role: 'member', scopes: [], principalType: 'bot' });
   });
 
