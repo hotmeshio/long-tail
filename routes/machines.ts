@@ -4,6 +4,7 @@ import * as escalationsApi from '../api/escalations';
 import { requireAdmin, requireRoleManager } from '../modules/auth';
 import { getMachineSurface } from '../modules/machines';
 import { commandRow, commandTarget } from '../services/machines/commands';
+import { argsRefusal } from '../services/machines/command-args';
 import { LineVersionConflict, getLineWithHealth, listLines, listSites, type LineListQuery } from '../services/machines/registry';
 import { declareLine, retireLine } from '../services/machines/registry-sync';
 import { emptyLineHealth, lineSummaryOf, toLineIndexRow, wirePayloadOf } from '../services/machines/line-index';
@@ -225,6 +226,11 @@ router.post('/lines/:siteId/:lineId/machines/:machineId/commands', async (req, r
   const args = req.body?.args;
   if (args !== undefined && (!args || typeof args !== 'object' || Array.isArray(args))) {
     res.status(400).json({ error: 'args must be an object' });
+    return;
+  }
+  const refusal = argsRefusal(op, surface.commandArgs(siteId, lineId)[op], args ?? {});
+  if (refusal) {
+    res.status(422).json({ error: refusal });
     return;
   }
   const result = await escalationsApi.createEscalation(commandRow(commandTarget(line, machineId), op, args ?? {}), req.auth!);

@@ -14,6 +14,7 @@ function surface(opts: { runs: boolean; leads: boolean }): LineSurface {
     inspect: () => null,
     findLine: (s, l) => (opts.runs && s === siteId && l === lineId ? DEFAULT_LINE : undefined),
     commandOps: () => [],
+    commandArgs: () => ({}),
   };
 }
 

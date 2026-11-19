@@ -15,6 +15,10 @@ export interface LineSummaryMachine {
   addressing: MachineAddressing;
   /** Command ops the line's codec declares beyond the generic control set. */
   rowOps?: readonly string[];
+  /** Every op a command row may ask of the machine, as its codec declares them; absent before the line is described. */
+  commandOps?: readonly string[];
+  /** The JSON Schema each op's `args` must satisfy, for the ops that declare one. */
+  opArgs?: Record<string, Record<string, unknown>>;
 }
 
 export interface LineSummary {
@@ -149,14 +153,11 @@ export interface CommandReceipt {
 
 // ── Command vocabulary ───────────────────────────────────────────────────────
 
-export const CONTROL_OPS = ['start', 'stop', 'pause', 'resume', 'changeover', 'cancel'] as const;
-export type ControlOp = (typeof CONTROL_OPS)[number];
 export const SNAPSHOT_OP = 'snapshot';
 
-/** The ops a machine's command select offers: control, snapshot, then the codec's declared ops. */
-export function commandOpsFor(machine: Pick<LineSummaryMachine, 'rowOps'> | null | undefined): string[] {
-  const declared = machine?.rowOps ?? [];
-  return [...new Set<string>([...CONTROL_OPS, SNAPSHOT_OP, ...declared])];
+/** The ops a machine's command select offers, as the line's codec declares them. */
+export function commandOpsFor(machine: Pick<LineSummaryMachine, 'commandOps'> | null | undefined): string[] {
+  return [...(machine?.commandOps ?? [])];
 }
 
 /** Facets an escalation row carries for the machine it addresses. */

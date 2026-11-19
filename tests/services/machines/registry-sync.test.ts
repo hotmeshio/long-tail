@@ -24,6 +24,7 @@ function fakeSurface(calls: string[]): LineSurface {
     inspect: () => null,
     findLine: (s, l) => running.get(`${s}/${l}`),
     commandOps: () => [],
+    commandArgs: () => ({}),
     declare: async (def) => {
       const key = `${def.siteId}/${def.lineId}`;
       const outcome = !running.has(key) ? 'started' : running.get(key)!.machines.length === def.machines.length ? 'unchanged' : 'replaced';

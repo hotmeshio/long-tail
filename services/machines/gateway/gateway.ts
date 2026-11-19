@@ -13,7 +13,7 @@ import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, 
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, OP, alarmIdsOf, declaredRowOps, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, OP, alarmIdsOf, declaredControlOps, declaredRowOps, rowOpArgs, rowOpSettleMs, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { publishMachineWireEvent } from '../../../lib/events/publish';
 import type { InspectResult } from '../../../types/machines-view';
@@ -92,7 +92,10 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
+    this.state.controlOps = declaredControlOps(this.codec);
     this.state.rowOps = declaredRowOps(this.codec);
+    this.state.opArgs = rowOpArgs(this.codec);
+    this.state.settleMs = rowOpSettleMs(this.codec);
     this.state.oneWayOps = oneWayOps(this.codec);
     this.state.lifecycle = deps.settings.lifecycle === true;
     this.state.retainedAlarms = this.codec.retainedAlarms === true;

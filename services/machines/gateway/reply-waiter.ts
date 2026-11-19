@@ -3,6 +3,8 @@
  * before the command is published and resolves with the reply, or null at the
  * deadline. Several waits on one key are all settled by the next answer, so
  * two dispatches asking one machine what it holds share its next snapshot.
+ * A reply nobody waits for is kept a while, so a final reply that comes just
+ * before its command row starts waiting for it is still read.
  */
 
 export interface CommandReply {
@@ -11,8 +13,10 @@ export interface CommandReply {
   reason: string;
   /** The machine's structured code for the outcome, when its reply carried one. */
   code?: string;
-  /** An acceptance the machine will follow with `completed` or `failed` once the job is prepared. */
+  /** An acceptance the machine will follow with `completed` or `failed` under the same cmdId. */
   preparing?: boolean;
+  /** What the machine returned with the reply, such as a value it read. */
+  data?: Record<string, unknown>;
 }
 
 /** The jobs a machine reports holding, queued or in work. */
@@ -74,17 +78,33 @@ class Waits<T> {
   }
 }
 
+/** Replies nobody waited for, kept for a final-reply wait; the oldest are forgotten first. */
+const UNCLAIMED_KEPT = 1_000;
+
 export class ReplyWaiter {
   private replies = new Waits<CommandReply>();
   private snapshots = new Waits<HeldJobs>();
+  private unclaimed = new Map<string, CommandReply>();
 
   wait(cmdId: string, timeoutMs: number): Promise<CommandReply | null> {
     return this.replies.wait(cmdId, timeoutMs);
   }
 
+  /** The reply that settles a `preparing` one: kept already when it came first, else the next under `cmdId`. */
+  waitFinal(cmdId: string, timeoutMs: number): Promise<CommandReply | null> {
+    const kept = this.unclaimed.get(cmdId);
+    this.unclaimed.delete(cmdId);
+    if (kept && !kept.preparing) return Promise.resolve(kept);
+    return this.replies.wait(cmdId, timeoutMs);
+  }
+
   /** True when a waiter took the reply. */
   settle(reply: CommandReply): boolean {
-    return this.replies.settle(reply.cmdId, reply);
+    if (this.replies.settle(reply.cmdId, reply)) return true;
+    this.unclaimed.delete(reply.cmdId);
+    this.unclaimed.set(reply.cmdId, reply);
+    if (this.unclaimed.size > UNCLAIMED_KEPT) this.unclaimed.delete(this.unclaimed.keys().next().value!);
+    return false;
   }
 
   /** The next snapshot from `machineId`, or null at the deadline; every wait in flight for the machine gets it. */
@@ -100,5 +120,6 @@ export class ReplyWaiter {
   cancelAll(): void {
     this.replies.cancelAll();
     this.snapshots.cancelAll();
+    this.unclaimed.clear();
   }
 }

@@ -1,5 +1,5 @@
 import { cancelCommandId, type HandoffResolution } from '../contracts';
-import { CONTROL_OPS, OP } from '../../../lib/machines/protocol';
+import { OP } from '../../../lib/machines/protocol';
 import type { Action, Actor } from './actions';
 import { dispatchJobs, type DispatchJob } from './jobs';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
@@ -53,5 +53,5 @@ export function holdForResolver(row: HandoffRow, reporter: Actor): Action {
 
 /** The ops a machine-command row or a request's answer may name: the control ops, a snapshot, and the codec's own. */
 export function rowOpsOf(state: GatewayState): string[] {
-  return [...CONTROL_OPS, OP.SNAPSHOT, ...state.rowOps];
+  return [...new Set([...state.controlOps, OP.SNAPSHOT, ...state.rowOps])];
 }

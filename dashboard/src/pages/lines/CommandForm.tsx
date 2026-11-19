@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { commandOpsFor, sendCommand, SNAPSHOT_OP, type LineSummaryMachine } from '../../api/machines';
+import { ResolverForm } from '../../components/escalation/resolver-form/ResolverForm';
+import { buildResolverPayload } from '../../lib/resolver-payload';
+import { seedFormJson } from '../../lib/seed-form-json';
 import { rowPath } from './wire-display';
 
 export type CommandOutcome =
@@ -47,9 +50,18 @@ function parseArgs(text: string): Record<string, unknown> {
   return parsed;
 }
 
+/** The args an op's declared schema accepts, or why they fail it. */
+function schemaArgs(json: string): Record<string, unknown> {
+  const result = buildResolverPayload(json);
+  if (result.parseError) throw new Error(result.parseError);
+  if (result.errors.length) throw new Error(result.errors.map((e) => `${e.field}: ${e.message}`).join('; '));
+  return result.payload ?? {};
+}
+
 /**
- * Send one command to a machine: an op from the line's vocabulary and a
- * small JSON args object. The server creates the row; the role decides.
+ * Send one command to a machine: an op from the line's vocabulary and its
+ * args, as the fields the op declares or a small JSON object. The server
+ * creates the row; the role decides.
  */
 export function CommandForm({
   siteId,
@@ -65,14 +77,22 @@ export function CommandForm({
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<CommandOutcome | null>(null);
   const ops = commandOpsFor(machine);
+  const schema = op ? machine.opArgs?.[op] : undefined;
+  const [fields, setFields] = useState('');
+
+  const chooseOp = (next: string) => {
+    setOp(next);
+    const declared = machine.opArgs?.[next];
+    setFields(declared ? seedFormJson(declared) : '');
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!op) return;
-    const request = `${op} ${args.trim() || '{}'}`;
+    const request = schema ? op : `${op} ${args.trim() || '{}'}`;
     setBusy(true);
     try {
-      const parsed = parseArgs(args);
+      const parsed = schema ? schemaArgs(fields) : parseArgs(args);
       const receipt = await sendCommand(siteId, lineId, machine.machineId, { op, args: parsed });
       setOutcome({ request, ok: true, rowId: receipt.rowId });
     } catch (err) {
@@ -94,35 +114,39 @@ export function CommandForm({
           className="select text-xs font-mono"
           value={op}
           required
-          onChange={(e) => setOp(e.target.value)}
+          onChange={(e) => chooseOp(e.target.value)}
         >
           <option value="" disabled>Choose…</option>
           {ops.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </div>
-      <div>
-        <label htmlFor="command-args" className="block text-2xs font-medium text-text-secondary">Args</label>
-        <p className="text-2xs text-text-tertiary mb-1">Write a JSON object, or add a key from the helpers.</p>
-        <textarea
-          id="command-args"
-          className="textarea text-2xs font-mono min-h-[4.5rem]"
-          value={args}
-          placeholder="{}"
-          onChange={(e) => setArgs(e.target.value)}
-        />
-        <div className="flex items-center gap-2 mt-1">
-          {ARG_HELPERS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setArgs((t) => mergeArgKey(t, key))}
-              className="text-2xs font-mono icon-link"
-            >
-              + {key}
-            </button>
-          ))}
+      {schema ? (
+        <ResolverForm value={fields} onChange={setFields} />
+      ) : (
+        <div>
+          <label htmlFor="command-args" className="block text-2xs font-medium text-text-secondary">Args</label>
+          <p className="text-2xs text-text-tertiary mb-1">Write a JSON object, or add a key from the helpers.</p>
+          <textarea
+            id="command-args"
+            className="textarea text-2xs font-mono min-h-[4.5rem]"
+            value={args}
+            placeholder="{}"
+            onChange={(e) => setArgs(e.target.value)}
+          />
+          <div className="flex items-center gap-2 mt-1">
+            {ARG_HELPERS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setArgs((t) => mergeArgKey(t, key))}
+                className="text-2xs font-mono icon-link"
+              >
+                + {key}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <button type="submit" disabled={busy || !op} className="btn-primary text-xs py-1.5 px-4">
         Send
       </button>

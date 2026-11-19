@@ -275,6 +275,8 @@ export interface CommandResolution {
   reason?: string;
   /** The machine's structured code for the outcome, when its reply carried one. */
   code?: string;
+  /** What the machine returned with its reply, such as a value it read. */
+  data?: Record<string, unknown>;
 }
 
 /** A row's dispatch command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */

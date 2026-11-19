@@ -44,6 +44,7 @@ function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: En
       return ack([{
         kind: 'settleReply', cmdId: b.cmdId, status: b.status, reason: b.reason,
         ...(typeof b.code === 'string' ? { code: b.code } : {}), ...(b.preparing === true ? { preparing: true } : {}),
+        ...(b.data && typeof b.data === 'object' && !Array.isArray(b.data) ? { data: b.data } : {}),
       }]);
     case MESSAGE_KIND.JOB:
       return planJob(state, m, b, env?.at, ttl);

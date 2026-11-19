@@ -10,6 +10,7 @@
 
 import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
+import { argsRefusal } from '../command-args';
 import { OP } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
@@ -101,6 +102,8 @@ function commandRefusal(state: GatewayState, line: LineDef, c: CommandFacets, ro
   const allowed = rowOpsOf(state);
   if (!allowed.includes(c.op)) return `${c.op} is not a command a row may ask for; one of ${allowed.join(', ')}`;
   if (c.op === OP.CANCEL && typeof c.args.jobId !== 'string') return `${OP.CANCEL} needs args.jobId, the job to withdraw or stop`;
+  const badArgs = argsRefusal(c.op, state.opArgs[c.op], c.args);
+  if (badArgs) return badArgs;
   if (!reachable(state, line, c.machineId)) return `${c.machineId} has not registered an address yet`;
   return null;
 }

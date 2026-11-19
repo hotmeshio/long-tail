@@ -14,6 +14,7 @@ function surface(): LineSurface {
     inspect: () => null,
     findLine: () => DEFAULT_LINE,
     commandOps: () => [],
+    commandArgs: () => ({}),
   };
 }
 

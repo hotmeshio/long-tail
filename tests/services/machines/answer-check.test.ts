@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { answerRefusal, type AnswerLine } from '../../../services/machines/answer-check';
-import { commandOpsOf } from '../../../services/machines/surface';
+import { commandOpsOf } from '../../../lib/machines/protocol';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import { ACK_OP, requestCodec } from '../../helpers/machine-request-codec';
 

@@ -12,7 +12,7 @@ import type { CallbackEventAdapter } from '../../lib/events/callback';
 import { isDeepStrictEqual } from 'node:util';
 
 import { learnsAddress, machineRole, type LineDef } from '../../lib/machines/line';
-import { CONTROL_OPS, OP, declaredRowOps, type LineCodec } from '../../lib/machines/protocol';
+import { commandOpsOf, declaredRowOps, rowOpArgs, type LineCodec } from '../../lib/machines/protocol';
 import type { InboundMessage } from '../../lib/machines/transport';
 import type { InspectResult, LineSummary, LineView, WireEvent, WireWindowQuery } from '../../types/machines-view';
 import { ESCALATION_FEED, MACHINE_TRANSPORT, loadMachineLineConfig, type MachineLineConfig } from './config';
@@ -66,6 +66,8 @@ export interface LineSurface {
   findLine(siteId: string, lineId: string): LineDef | undefined;
   /** The ops a machine-command row on this line may ask for. */
   commandOps(siteId: string, lineId: string): string[];
+  /** The JSON Schema each op's `args` must satisfy, for the ops that declare one. */
+  commandArgs(siteId: string, lineId: string): Record<string, Record<string, unknown>>;
   /** Run a line on this replica: started, replaced when its definition changed, or unchanged. */
   declare(line: LineDef): Promise<DeclareOutcome>;
   /** Stop running a line on this replica; false when it was not running. */
@@ -84,8 +86,10 @@ export function surfaceConfig(env: Env): MachineLineConfig {
 }
 
 /** The line as every replica can describe it: its machines, roles, declared addresses and the codec's own ops. */
-export function summarizeLine(line: LineDef, codec: Pick<LineCodec, 'rowOps'>): LineSummary {
+export function summarizeLine(line: LineDef, codec: Pick<LineCodec, 'rowOps' | 'controlOps'>): LineSummary {
   const rowOps = declaredRowOps(codec);
+  const commandOps = commandOpsOf(codec);
+  const opArgs = rowOpArgs(codec);
   return {
     siteId: line.siteId, lineId: line.lineId,
     machines: line.machines.map((m) => {
@@ -93,15 +97,10 @@ export function summarizeLine(line: LineDef, codec: Pick<LineCodec, 'rowOps'>): 
       return {
         machineId: m.machineId, process: m.process, role: machineRole(m),
         address: learned ? null : m.address ?? m.machineId, addressing: learned ? 'learned' : 'declared',
-        ...(rowOps.length ? { rowOps } : {}),
+        ...(rowOps.length ? { rowOps } : {}), commandOps, ...(Object.keys(opArgs).length ? { opArgs } : {}),
       };
     }),
   };
-}
-
-/** The ops a machine-command row may ask for: the control ops, a snapshot, and the codec's own. */
-export function commandOpsOf(codec: Pick<LineCodec, 'rowOps'>): string[] {
-  return [...new Set<string>([...CONTROL_OPS, OP.SNAPSHOT, ...declaredRowOps(codec)])];
 }
 
 class LineRun {
@@ -258,6 +257,11 @@ export class MachineSurface implements LineSurface {
   commandOps(siteId: string, lineId: string): string[] {
     const run = this.run(siteId, lineId);
     return run ? commandOpsOf(run.codec) : [];
+  }
+
+  commandArgs(siteId: string, lineId: string): Record<string, Record<string, unknown>> {
+    const run = this.run(siteId, lineId);
+    return run ? rowOpArgs(run.codec) : {};
   }
 
   /** The codecs every line on a site runs, so one site's streams keep all their subjects. */

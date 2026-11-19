@@ -7,7 +7,7 @@
 
 import type { HandoffFacets, TraceEntry } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
-import { ALARM_IDS, type AlarmIds } from '../../../lib/machines/protocol';
+import { ALARM_IDS, CONTROL_OPS, type AlarmIds } from '../../../lib/machines/protocol';
 import type { ContestedClaimView, LineView } from '../../../types/machines-view';
 import { dispatchJobs } from './jobs';
 import { projectLine } from './project';
@@ -117,8 +117,14 @@ export class GatewayState {
   unitsPerDispatch: number | null = null;
   /** Jobs go to a receiver once its units arrive there, from the codec. */
   dispatchOnArrival = false;
+  /** The line protocol's control ops the machines have, from the codec. */
+  controlOps: readonly string[] = CONTROL_OPS;
   /** Commands of the machines' own that a machine-command row may ask for, from the codec. */
   rowOps: readonly string[] = [];
+  /** The JSON Schema each row op's args must satisfy, from the codec. */
+  opArgs: Readonly<Record<string, Record<string, unknown>>> = {};
+  /** How long each row op waits after a `preparing` reply for the final one, from the codec. */
+  settleMs: Readonly<Record<string, number>> = {};
   /** Row ops the machines never reply to: sent once, done on publish. */
   oneWayOps: ReadonlySet<string> = new Set();
   /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
@@ -440,7 +446,7 @@ export class GatewayState {
   clone(): GatewayState {
     const copy = new GatewayState();
     Object.assign(copy, {
-      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
+      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, controlOps: this.controlOps, rowOps: this.rowOps, opArgs: this.opArgs, settleMs: this.settleMs, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
       retainedAlarms: this.retainedAlarms, alarmIds: this.alarmIds, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));

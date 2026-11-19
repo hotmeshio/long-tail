@@ -144,7 +144,10 @@ export class Executor {
         this.watchOffline(a.machineId);
         return [plannedAction(a)];
       case 'settleReply':
-        if (replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason, ...(a.code ? { code: a.code } : {}), ...(a.preparing ? { preparing: true } : {}) })) return [plannedAction(a)];
+        if (replies.settle({
+          cmdId: a.cmdId, status: a.status, reason: a.reason,
+          ...(a.code ? { code: a.code } : {}), ...(a.preparing ? { preparing: true } : {}), ...(a.data ? { data: a.data } : {}),
+        })) return [plannedAction(a)];
         return [{ verb: 'ack', detail: `late ${a.status} ${a.cmdId}` }, ...await this.lateReply(a)];
       case 'settleSnapshot':
         replies.settleSnapshot(a.machineId, new Set(a.jobIds));
