@@ -92,7 +92,7 @@ describe('Long Tail HTTP client', () => {
     const url = new URLSearchParams(server.seen[0].path.split('?')[1]);
     expect(Object.fromEntries(url)).toEqual({
       type: 'handoff', status: 'resolved', limit: '50', offset: '0',
-      facets: JSON.stringify({ siteId: 's1', lineId: 'l1' }), orderBy: JSON.stringify([{ field: 'resolved_at', direction: 'desc' }]),
+      facets: JSON.stringify({ siteId: 's1', lineId: 'l1' }), orderBy: JSON.stringify([{ field: 'created_at', direction: 'desc' }]),
     });
     expect(server.seen[0].auth).toBe('Bearer tok-controller');
   });

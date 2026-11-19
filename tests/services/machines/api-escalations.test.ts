@@ -34,7 +34,7 @@ describe('ApiLineEscalations', () => {
     list.mockResolvedValue({ status: 200, data: { escalations: [{ id: 'esc-3' }], total: 1 } } as any);
     expect(await lt.listEnded({ type: 'handoff', facets: { siteId: 's1' }, limit: 10 })).toEqual([{ id: 'esc-3' }]);
     expect(list).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'handoff', status: 'resolved', limit: 10, facets: { siteId: 's1' }, orderBy: [{ field: 'resolved_at', direction: 'desc' }],
+      type: 'handoff', status: 'resolved', limit: 10, facets: { siteId: 's1' }, orderBy: [{ field: 'created_at', direction: 'desc' }],
     }), { userId: 'controller-user' });
   });
 

@@ -54,16 +54,19 @@ export interface LineEscalations {
   get(id: string): Promise<Record<string, any> | null>;
   /** Every pending row matching each given field, oldest first, in the projection escalation events carry. */
   listOpen(query: OpenRowQuery): Promise<Record<string, any>[]>;
-  /** The most recently resolved rows matching the query, newest first, with their resolver payloads. */
+  /** The most recently created resolved rows matching the query, newest first, with their resolver payloads. */
   listEnded(query: EndedRowQuery): Promise<Record<string, any>[]>;
 }
 
-/** The list query for resolved rows, newest resolve first, as the escalation API takes it. */
+/**
+ * The list query for resolved rows, newest created first, as the escalation API takes it.
+ * Creation order reads the (status, created_at) index and stops at `limit`, however long the line's history.
+ */
 export function endedListQuery(query: EndedRowQuery): Record<string, unknown> {
   const { facets, limit, ...fields } = query;
   return {
     ...fields, status: 'resolved', limit, offset: 0,
-    facets: facets ?? {}, orderBy: [{ field: 'resolved_at', direction: 'desc' }],
+    facets: facets ?? {}, orderBy: [{ field: 'created_at', direction: 'desc' }],
   };
 }
 
