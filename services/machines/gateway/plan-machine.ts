@@ -12,7 +12,7 @@
  * row already closed is acked, so a replay never resolves anything twice.
  */
 
-import { DECISION, HANDOFF_ERROR, itemKeys } from '../contracts';
+import { DECISION, HANDOFF_ERROR, HANDOFF_EXIT, itemKeys } from '../contracts';
 import { JOB_EVENT, JOB_RESULT, MESSAGE_KIND, OP, type Envelope, type Inspection, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION } from '../../../lib/machines/transport';
 import { CONTROLLER, type Action, type Plan } from './actions';
@@ -145,9 +145,8 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
       return missing(state, unitId, fromHere);
     }
     state.takeFinish(m, unitId);
-    const released = releasedAction(row, m, b);
-    if (b.result === JOB_RESULT.OK) return ack([released]);
-    return ack([holdForResolver(row, m), released, ...failHandoff(state, row, m, {
+    if (b.result === JOB_RESULT.OK) return ack([releasedAction(row, m, b, true)]);
+    return ack([holdForResolver(row, m), releasedAction(row, m, b), ...failHandoff(state, row, m, {
       received: false, unitId, errorCode: HANDOFF_ERROR.SENDER_REJECTED, result: b.result, reason: b.reason ?? null,
       detail: `${m} finished ${unitId}: ${b.result}${b.reason ? ` (${b.reason})` : ''}`,
     })]);
@@ -163,7 +162,11 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
   const reported = typeof b.jobId === 'string' ? b.jobId : undefined;
   if (b.event === JOB_EVENT.RELEASED) {
     state.letGo(m, unitId, reported);
-    return ack();
+    if (b.processed !== false) return ack();
+    // A unit passed through unprocessed: its next hop records the release itself, as no finish will.
+    const row = state.openFor(unitId, fromHere);
+    if (!row) return missing(state, unitId, fromHere);
+    return ack([releasedAction(row, m, { ...b, unitId }, true)]);
   }
 
   if (b.event === JOB_EVENT.WITHDRAWN) {
@@ -178,16 +181,22 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
   return ack();
 }
 
-function releasedAction(row: HandoffRow, m: string, b: Record<string, any>): Action {
+/** The sender's release on the hop out of `m`; `done`: an exit the finish ends then resolves once every unit is released. */
+function releasedAction(row: HandoffRow, m: string, b: Record<string, any>, done = false): Action {
   row.trace = mergeTrace(row.trace, [traceEntry(m, b)]);
-  return { kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(b.unitId), payload: b, metadata: traceFacets(row.trace) };
+  const units = row.units.map((u) => u.unitId);
+  const ends = done && row.exit === HANDOFF_EXIT.FINISH && !row.toMachine;
+  return {
+    kind: 'accumulate', as: m, rowId: row.id, itemKey: itemKeys.released(b.unitId), payload: b, metadata: traceFacets(row.trace),
+    ...(ends ? { complete: { keys: units.map(itemKeys.released), payload: { received: true, units } } } : {}),
+  };
 }
 
 /** The sender's finished record that came before the row, written ahead of the arrival that may resolve it. */
 function releasedEarly(state: GatewayState, row: HandoffRow, unitId: string): Action[] {
   const b = state.takeFinish(row.fromMachine!, unitId);
   if (!b || b.result !== JOB_RESULT.OK || !ownsJob(row.senderJobId, b.jobId)) return [];
-  return [releasedAction(row, row.fromMachine!, b)];
+  return [releasedAction(row, row.fromMachine!, b, true)];
 }
 
 /** A machine able to take one job now holds a ready mark until a dispatch uses it; `ready: false` withdraws it. */

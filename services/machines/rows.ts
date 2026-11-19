@@ -7,7 +7,7 @@
  */
 
 import type { LineDef } from '../../types/machines';
-import { ROW_TYPE, type ArtifactRef, type HandoffFacets, type HandoffUnit } from './contracts';
+import { HANDOFF_EXIT, ROW_TYPE, type ArtifactRef, type HandoffFacets, type HandoffUnit } from './contracts';
 
 /** The parts of an escalation row the adapter reads. */
 export interface EscalationRowView {
@@ -100,6 +100,7 @@ export function readHandoffFacets(md: Record<string, any> = {}): HandoffFacets |
     attempt: Number(md.attempt ?? 1),
     ...(paramsOf(md.parameters) ? { parameters: paramsOf(md.parameters) } : {}),
     ...(refsOf(md.refs) ? { refs: refsOf(md.refs) } : {}),
+    ...(md.exit === HANDOFF_EXIT.FINISH && !str(md.toMachine) ? { exit: HANDOFF_EXIT.FINISH } : {}),
   };
 }
 

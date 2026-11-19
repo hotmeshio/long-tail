@@ -90,7 +90,16 @@ export interface HandoffFacets {
   parameters?: Record<string, unknown>;
   /** The host's references for the job, by name (an order, a batch, a ticket); sent to the machine as given and searchable on the row. */
   refs?: Record<string, string>;
+  /**
+   * `finish`: a hop with no receiving machine that the sender's finish ends. An ok finish (or a
+   * pass-through release) resolves it `received` once every unit is released; a not-ok one, `sender-rejected`.
+   */
+  exit?: HandoffExit;
 }
+
+/** How a hop with no receiving machine ends (`HandoffFacets.exit`). */
+export const HANDOFF_EXIT = { FINISH: 'finish' } as const;
+export type HandoffExit = typeof HANDOFF_EXIT[keyof typeof HANDOFF_EXIT];
 
 const RELEASED_PREFIX = 'released:';
 const ARRIVED_PREFIX = 'arrived:';
