@@ -33,6 +33,9 @@ export function learnsAddress(line: LineDef, machineId: string): boolean {
   return line.addressing === ADDRESSING.LEARNED && !line.machines.find((m) => m.machineId === machineId)?.address;
 }
 
+/** How a machine is paced beyond its queue depth (`MachineDef.paceBy`). */
+export const PACE_BY = { READY: 'ready' } as const;
+
 /** Which machine puts a unit on its carrier plate and which takes it off. */
 export const CARRIER_ROLE = { BIND: 'bind', RELEASE: 'release', NONE: 'none' } as const;
 export type CarrierRole = typeof CARRIER_ROLE[keyof typeof CARRIER_ROLE];
@@ -60,6 +63,9 @@ export function validateLine(line: LineDef): LineDef {
     if (!(m.cycleSec > 0)) throw new Error(`${m.machineId}: cycleSec must be positive`);
     if (m.queueDepth !== undefined && !(Number.isInteger(m.queueDepth) && m.queueDepth >= 1)) {
       throw new Error(`${m.machineId}: queueDepth must be a whole number of at least 1`);
+    }
+    if (m.paceBy !== undefined && !Object.values(PACE_BY).includes(m.paceBy)) {
+      throw new Error(`${m.machineId}: paceBy must be one of ${Object.values(PACE_BY).join(', ')}`);
     }
   }
   return line;

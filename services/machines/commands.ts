@@ -37,6 +37,17 @@ export function commandRow(target: CommandTarget, op: string, args: Record<strin
   };
 }
 
+/** The row that holds a machine: no dispatch goes to it while the row is open, and whoever ends the hold resolves it. */
+export function holdRow(target: CommandTarget, reason: string) {
+  return {
+    role: target.role,
+    type: ROW_TYPE.MACHINE_HOLD,
+    description: `${target.machineId} held: ${reason}`,
+    priority: 2,
+    metadata: { siteId: target.siteId, lineId: target.lineId, machineId: target.machineId, reason } as Record<string, unknown>,
+  };
+}
+
 /** A machine-command row's facets; null when the line, machine or op is missing. */
 export function readCommandFacets(md: Record<string, any> = {}): CommandFacets | null {
   if (!md.siteId || !md.lineId || !md.machineId || !md.op) return null;

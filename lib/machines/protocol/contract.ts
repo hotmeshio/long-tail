@@ -47,7 +47,8 @@ const BODY: Record<MessageKind, Schema> = {
     jobs: { type: 'array', items: shape({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
     alarms: { type: 'array', items: STR },
     cycles: INT0,
-  }, ['bootId', 'software', 'recipe', 'cycles']),
+    ready: BOOL,
+  }, ['bootId', 'software', 'recipe', 'cycles', 'ready']),
   [MESSAGE_KIND.JOB]: shape({
     event: oneOf(JOB_EVENT), jobId: STR, unitId: STR, orderRef: STR, recipe: RECIPE, carrierId: STR_N, peer: STR_N,
     result: oneOf(JOB_RESULT), reason: STR_N,
@@ -68,6 +69,7 @@ const BODY: Record<MessageKind, Schema> = {
   [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
   [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR, preparing: BOOL, data: { type: 'object' } }, ['code', 'preparing', 'data']),
   [MESSAGE_KIND.REPORT]: { type: 'object' },
+  [MESSAGE_KIND.READY]: shape({ ready: BOOL }, ['ready']),
 };
 
 const ajv = new Ajv({ allErrors: true, strict: false });

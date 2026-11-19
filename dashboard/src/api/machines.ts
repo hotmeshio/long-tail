@@ -86,7 +86,7 @@ export interface LineView {
 export type WireDirection = 'in' | 'out';
 
 export const WIRE_KINDS = [
-  'presence', 'snapshot', 'job', 'alarm', 'telemetry', 'report', 'cmd', 'reply', 'receipt', 'unknown',
+  'presence', 'snapshot', 'job', 'alarm', 'telemetry', 'report', 'ready', 'cmd', 'reply', 'receipt', 'unknown',
 ] as const;
 export type WireKind = (typeof WIRE_KINDS)[number];
 

@@ -17,6 +17,7 @@ export interface FakeRow {
   type: string;
   subtype?: string;
   role: string;
+  description?: string;
   status: 'pending' | 'resolved' | 'cancelled' | 'expired';
   assigned_to?: string;
   metadata: Record<string, any>;

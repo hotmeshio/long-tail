@@ -1,6 +1,7 @@
 /**
  * What a gateway restores when it starts leading a line, read back from Long
- * Tail: the alarm, offline and quiet rows it raised before, so a clear or a
+ * Tail: the alarm, offline and quiet rows it raised before, the hold rows that
+ * keep a machine from dispatch, so a clear or a
  * return that comes later still resolves them; the units each open handoff
  * saw arrive, so the receiver holds them again; and the jobs recent handoffs
  * sent, so a restarted machine gets them back.
@@ -24,6 +25,7 @@ export interface RestoredRows {
   offline: number;
   quiet: number;
   registrations: number;
+  holds: number;
 }
 
 export async function restoreLineRows(state: GatewayState, lt: LineEscalations, line: LineDef): Promise<RestoredRows> {
@@ -44,7 +46,10 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
   }
   for (const row of quiet) state.link(row.metadata.machineId).quietRowId = row.id;
   for (const row of registrations) state.raiseClaim(row.metadata.address, row.metadata.machineId, row.id);
-  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length };
+  const holds = (await lt.listOpen({ type: ROW_TYPE.MACHINE_HOLD }))
+    .filter((row) => mine(row) && line.machines.some((m) => m.machineId === row.metadata.machineId));
+  for (const row of holds) state.holdRows.set(row.id, row.metadata.machineId);
+  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length, holds: holds.length };
 }
 
 /** Ended handoffs read back on taking the line, newest first. */

@@ -141,6 +141,10 @@ export class GatewayState {
   progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
+  /** Machines that said they can take one job now (`paceBy: ready`); a dispatch uses the mark. */
+  readonly readyMarks = new Set<string>();
+  /** Open machine-hold rows → the machine each holds. */
+  readonly holdRows = new Map<string, string>();
   /** Units at each machine that arrived and have not left: machine → unit → job. */
   private held = new Map<string, Map<string, string>>();
   /** Jobs sent and taken, by machine: job → the row that sent it, kept while the machine holds the job's units. */
@@ -433,6 +437,11 @@ export class GatewayState {
     return link;
   }
 
+  /** Whether an open machine-hold row holds the machine. */
+  isHeld(machineId: string): boolean {
+    return [...this.holdRows.values()].includes(machineId);
+  }
+
   alarmKey(machineId: string, alarmId: string): string {
     return `${machineId}/${alarmId}`;
   }
@@ -460,6 +469,8 @@ export class GatewayState {
     copyInto(this.dispatches, copy.dispatches);
     copyInto(this.links, copy.links, (link) => ({ ...link }));
     copyInto(this.requests, copy.requests, (track) => ({ ...track }));
+    copyInto(this.holdRows, copy.holdRows);
+    for (const m of this.readyMarks) copy.readyMarks.add(m);
     copyInto(this.addressOfStation, copy.addressOfStation);
     copyInto(this.stationOfAddress, copy.stationOfAddress);
     copyInto(this.claims, copy.claims);

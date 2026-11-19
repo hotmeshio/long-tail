@@ -16,6 +16,7 @@ export const MESSAGE_KIND = {
   CMD: 'cmd',
   REPLY: 'reply',
   REPORT: 'report',
+  READY: 'ready',
 } as const;
 export type MessageKind = typeof MESSAGE_KIND[keyof typeof MESSAGE_KIND];
 
@@ -66,6 +67,7 @@ const CHANNEL_KIND: Record<string, MessageKind> = {
   [CHANNEL.TELEMETRY]: MESSAGE_KIND.TELEMETRY,
   [CHANNEL.CMD]: MESSAGE_KIND.CMD,
   [CHANNEL.REPLY]: MESSAGE_KIND.REPLY,
+  [CHANNEL.READY]: MESSAGE_KIND.READY,
 };
 
 /** Classify a topic under `root`; null when it is not a machine topic. */

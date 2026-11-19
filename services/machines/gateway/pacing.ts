@@ -1,5 +1,7 @@
 /**
  * Pacing: a machine with a queue depth is sent no more jobs than that at once.
+ * A machine paced by ready is sent one job per ready it says, and a machine an
+ * open machine-hold row holds is sent none.
  * A handoff beyond it waits in the machine's role queue, unclaimed, the way
  * work waits for a busy person, and the oldest waiting row goes out when the
  * machine has room. A machine's load is every job it has been sent or still
@@ -9,7 +11,7 @@
 
 import { HANDOFF_ERROR, dispatchCommandId } from '../contracts';
 import { isoTs } from '../../../lib/machines/protocol';
-import { machineById, type LineDef } from '../../../lib/machines/line';
+import { PACE_BY, machineById, type LineDef } from '../../../lib/machines/line';
 import { CONTROLLER, type Action } from './actions';
 import { dispatchJobs } from './jobs';
 import { DISPATCH_STATE, type DispatchState, type GatewayState, type HandoffRow } from './state';
@@ -91,9 +93,15 @@ export function machineLoad(state: GatewayState, machineId: string): Set<string>
   return jobs;
 }
 
-/** Whether a row's jobs fit at its receiver; an idle machine always takes the next row, however large. */
+/**
+ * Whether a row's jobs fit at its receiver; an idle machine always takes the next row, however large.
+ * A held machine takes none, and one paced by ready takes one per ready it has said.
+ */
 function fits(line: LineDef, row: HandoffRow, load: Set<string>, state: GatewayState): boolean {
-  const depth = machineById(line, row.toMachine!).queueDepth;
+  const def = machineById(line, row.toMachine!);
+  if (state.isHeld(def.machineId)) return false;
+  if (def.paceBy === PACE_BY.READY && !state.readyMarks.has(def.machineId)) return false;
+  const depth = def.queueDepth;
   return !depth || load.size === 0 || load.size + jobIdsOf(state, row.jobId, row).length <= depth;
 }
 
@@ -122,6 +130,7 @@ export function admit(state: GatewayState, line: LineDef, row: HandoffRow, dispa
   const refused = refuseUnfit(state, line, row);
   if (refused.length) return refused;
   row.dispatch = DISPATCH_STATE.PENDING;
+  if (machineById(line, row.toMachine!).paceBy === PACE_BY.READY) state.readyMarks.delete(row.toMachine!);
   return [dispatchAction(row, row.toMachine!, dispatchTtlMs)];
 }
 

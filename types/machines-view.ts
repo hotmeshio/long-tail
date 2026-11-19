@@ -93,7 +93,7 @@ export type LineViewResponse = (LineView | StandingByView) & { summary: LineSumm
 
 export type WireDirection = 'in' | 'out';
 
-export type WireKind = 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'cmd' | 'reply' | 'receipt' | 'unknown';
+export type WireKind = 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'ready' | 'cmd' | 'reply' | 'receipt' | 'unknown';
 
 export type WireVerb = 'claim' | 'accumulate' | 'resolve' | 'create-row' | 'refuse' | 'hold' | 'unmatched' | 'unreadable' | 'ack' | 'none';
 

@@ -11,7 +11,8 @@ describe('site streams', () => {
     const [events, telemetry] = streams;
     expect(events.name).toBe(LINE_STREAM.EVENTS);
     expect(events.subjects).toEqual([
-      'line.v1.*.*.*.alarm.*', 'line.v1.*.*.*.cmd.reply', 'line.v1.*.*.*.job', 'line.v1.*.*.*.presence', 'line.v1.*.*.*.report.>', 'line.v1.*.*.*.snapshot',
+      'line.v1.*.*.*.alarm.*', 'line.v1.*.*.*.cmd.reply', 'line.v1.*.*.*.job', 'line.v1.*.*.*.presence', 'line.v1.*.*.*.ready',
+      'line.v1.*.*.*.report.>', 'line.v1.*.*.*.snapshot',
     ]);
     expect(telemetry.subjects).toEqual(['line.v1.*.*.*.telemetry']);
     expect(events.subjects).not.toContain('line.v1.*.*.*.cmd');

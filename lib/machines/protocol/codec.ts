@@ -158,7 +158,7 @@ export interface GenericCodecOptions {
 }
 
 export const GENERIC_CHANNELS: CodecChannels = {
-  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`],
+  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`, CHANNEL.READY],
   telemetry: [CHANNEL.TELEMETRY],
   commands: [CHANNEL.CMD],
 };

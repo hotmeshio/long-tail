@@ -18,6 +18,7 @@ export const WIRE_DIRECTION = { IN: 'in', OUT: 'out' } as const;
 const RECEIPT_CHANNEL = 'receipt';
 const ALARM_EVENT = { RAISED: 'raised', ACKED: 'acked', CLEARED: 'cleared' } as const;
 const PRESENCE_EVENT = { ONLINE: 'online', OFFLINE: 'offline' } as const;
+const READY_EVENT = { READY: 'ready', WITHDRAWN: 'withdrawn' } as const;
 
 export interface WireOptions {
   /** Publish telemetry messages too. */
@@ -107,6 +108,7 @@ export function eventOf(seen: Inspection): string | null {
     case MESSAGE_KIND.PRESENCE: return b.online === true ? PRESENCE_EVENT.ONLINE : PRESENCE_EVENT.OFFLINE;
     case MESSAGE_KIND.SNAPSHOT: return typeof b.mode === 'string' ? b.mode : null;
     case MESSAGE_KIND.REPORT: return parsed.key ?? null;
+    case MESSAGE_KIND.READY: return b.ready === false ? READY_EVENT.WITHDRAWN : READY_EVENT.READY;
     default: return null;
   }
 }
@@ -136,6 +138,8 @@ export function summarize(seen: Inspection): string {
       return ['reply', event, b.cmdId, b.reason ? `: ${b.reason}` : null].filter(Boolean).join(' ');
     case MESSAGE_KIND.REPORT:
       return `report ${parsed.key ?? ''}`.trim();
+    case MESSAGE_KIND.READY:
+      return `ready ${event}`;
     default:
       return parsed.kind;
   }

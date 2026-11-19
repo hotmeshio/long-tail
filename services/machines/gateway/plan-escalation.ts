@@ -36,7 +36,7 @@ const ACCUMULATE_MAX = 'accumulate_max';
 
 const LINE_ROW_TYPES: string[] = [
   ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION,
-  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.MACHINE_NOTICE, ROW_TYPE.REQUEST_OVERDUE,
+  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.MACHINE_NOTICE, ROW_TYPE.REQUEST_OVERDUE, ROW_TYPE.MACHINE_HOLD,
 ];
 
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
@@ -91,6 +91,18 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.MACHINE_REGISTRATION) return event.role === operatorRole(line) ? planRegistrationRow(state, line, event) : [];
   if (type === ROW_TYPE.MACHINE_REQUEST || type === ROW_TYPE.MACHINE_NOTICE) return planRequestRow(state, event);
   if (type === ROW_TYPE.REQUEST_OVERDUE) return event.role === operatorRole(line) ? planOverdueRow(state, event) : [];
+  if (type === ROW_TYPE.MACHINE_HOLD) return planHoldRow(state, line, event);
+  return [];
+}
+
+/** An open hold row keeps its machine from any dispatch; the pacing that follows each event sends what waited once it ends. */
+function planHoldRow(state: GatewayState, line: LineDef, event: EscalationEvent): Action[] {
+  const machineId = event.data?.metadata?.machineId;
+  if (event.verb === VERB.CREATED || event.verb === VERB.CLAIMED) {
+    if (onLine(line, machineId)) state.holdRows.set(event.escalationId, machineId);
+  } else if (event.verb !== VERB.UPDATED) {
+    state.holdRows.delete(event.escalationId);
+  }
   return [];
 }
 

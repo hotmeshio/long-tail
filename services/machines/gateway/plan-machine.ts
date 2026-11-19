@@ -54,6 +54,9 @@ function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: En
       return planPresence(state, m, b);
     case MESSAGE_KIND.SNAPSHOT:
       return planSnapshot(state, m, b, ttl);
+    case MESSAGE_KIND.READY:
+      markReady(state, m, b.ready);
+      return ack();
     default:
       return ack();
   }
@@ -187,6 +190,12 @@ function releasedEarly(state: GatewayState, row: HandoffRow, unitId: string): Ac
   return [releasedAction(row, row.fromMachine!, b)];
 }
 
+/** A machine able to take one job now holds a ready mark until a dispatch uses it; `ready: false` withdraws it. */
+function markReady(state: GatewayState, m: string, ready: unknown): void {
+  if (ready === false) state.readyMarks.delete(m);
+  else state.readyMarks.add(m);
+}
+
 function planPresence(state: GatewayState, m: string, b: Record<string, any>): Plan {
   const link = state.link(m);
   const session = typeof b.sessionId === 'string' ? b.sessionId : undefined;
@@ -234,6 +243,7 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
     link.jobs = b.jobs;
   }
   if (typeof b.bootId === 'string') link.bootId = b.bootId;
+  if (typeof b.ready === 'boolean') markReady(state, m, b.ready);
   const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
   const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };

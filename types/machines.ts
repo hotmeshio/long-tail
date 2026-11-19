@@ -76,6 +76,11 @@ export interface MachineDef {
    * handoffs wait in its role queue until it has room. Unset: no limit.
    */
   queueDepth?: number;
+  /**
+   * `ready`: the machine takes a job only after it says it is ready for one (a `ready` message, or a
+   * snapshot with `ready: true`); each dispatch uses up one ready. Unset: paced by `queueDepth` alone.
+   */
+  paceBy?: 'ready';
   /** Refuse a handoff whose row has no artifact (url and sha256) before anything is sent. */
   requireArtifact?: boolean;
 }

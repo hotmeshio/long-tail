@@ -28,6 +28,8 @@ export const ROW_TYPE = {
   MACHINE_NOTICE: 'machine-notice',
   /** A machine request or notice still open past its window, shown to the line's operators. */
   REQUEST_OVERDUE: 'machine-request-overdue',
+  /** A machine takes no dispatch while a person or a workflow holds it, as for a plate swap. */
+  MACHINE_HOLD: 'machine-hold',
 } as const;
 
 export const LINE_ROLE = {
