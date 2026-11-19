@@ -76,4 +76,6 @@ export interface Completion {
 export interface Plan {
   actions: Action[];
   disposition: Disposition;
+  /** Why a nak'd message waits: the row it needs and does not find yet. */
+  waitingFor?: string;
 }

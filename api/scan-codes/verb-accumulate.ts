@@ -33,7 +33,8 @@ import { accumulateIntoSubject } from './verb-into-subject';
  *   item with no row, or no container facet, falls through. An item whose
  *   container has closed and whose successor has not parked yet answers
  *   `no_open_container` with the item row, so the station can say "scan
- *   again" instead of showing the item with no hint.
+ *   again" instead of showing the item with no hint. The item key is
+ *   `params.itemKey` (template) when given, else the scanned target.
  * - Container-locate (no `containerFacet`): the scan locates the container
  *   by the scheme facet and adds `params.itemKey` (template).
  *
@@ -61,7 +62,7 @@ export async function accumulateStep(
       ? scanCodeService.interpolateScanTemplate(step.params.resolverPayload, tpl)
       : undefined,
     metadata: { ...interpolatedMetadata(step, ctx, tpl), ...provenance(ctx) },
-    itemKey: options?.containerFacet
+    itemKey: options?.containerFacet && !step.params?.itemKey
       ? ctx.parsed.target
       : scanCodeService.interpolateScanTemplate(step.params!.itemKey!, tpl),
   }), item);

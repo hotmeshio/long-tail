@@ -4,6 +4,7 @@ import { migrate } from '../../../lib/db/migrate';
 import { getPool } from '../../../lib/db';
 import * as roleService from '../../../services/role';
 import { applyRoleConfig, STARTUP_CHANGE_SUMMARY } from '../../../services/role/seed';
+import { orderRolesByParent } from '../../../services/role/apply-order';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Startup role apply — code-owned declarations register through the versioned
@@ -109,5 +110,22 @@ describe('role service — startup apply of portals', () => {
     // Rows with different cell counts swap places: the order is the layout.
     expect(await applyRoleConfig({ role: PORTAL_ROLE, portals: declared([[cellC], [cellA, cellB]]) }, true)).toBe('applied');
     expect(await stored()).toEqual(declared([[cellC], [cellA, cellB]]));
+  });
+});
+
+describe('role service: startup apply order', () => {
+  const PARENT = `${ROLE}-parent`;
+  const CHILD = `${ROLE}-child`;
+
+  afterAll(async () => {
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [CHILD]);
+    await getPool().query('DELETE FROM lt_roles WHERE role = $1', [PARENT]);
+  });
+
+  it('applies a role declared before its parent once the list is ordered parents first', async () => {
+    const declared = [{ role: CHILD, title: 'Child', parent_role: PARENT }, { role: PARENT, title: 'Parent' }];
+    for (const cfg of orderRolesByParent(declared)) expect(await applyRoleConfig(cfg, true)).toBe('applied');
+    const child = (await roleService.listRolesWithDetails()).find((r) => r.role === CHILD);
+    expect(child?.parent_role).toBe(PARENT);
   });
 });

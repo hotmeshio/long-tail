@@ -13,7 +13,7 @@ let rig: LineRig;
 afterEach(async () => rig?.stop());
 
 const onArrival = { codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL }) };
-const strict = { codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL, strict: true }) };
+const strict = { codec: { ...genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL }), strict: true } };
 
 function scan(body: Record<string, unknown>): void {
   const ident = identOf(DEFAULT_LINE, 'press-01');
@@ -80,5 +80,20 @@ describe('an arrival that read no id at all', () => {
     rig.lt.personResolves(unmatchedRows()[0].id, { decision: 'rescan' });
     scan(unreadable);
     await until(() => unmatchedRows().length === 2);
+  });
+});
+
+describe('a message no row claims after every delivery', () => {
+  it('is logged with what it was and the row it waited for, and the wire says why on each delivery', async () => {
+    const log = new RecordingLog();
+    rig = await startRig({ autoArriveAtEntry: false }, {}, DEFAULT_LINE, { log });
+    scan({ event: JOB_EVENT.FINISHED, unitId: 'U9', jobId: 'U9-press-01', result: 'ok' });
+    await until(() => log.of(GATEWAY_LOG.UNMATCHED).length, 5_000);
+    expect(log.of(GATEWAY_LOG.UNMATCHED)[0]).toMatchObject({
+      kind: 'job', event: JOB_EVENT.FINISHED, machineId: 'press-01', unitId: 'U9', jobId: 'U9-press-01',
+      waitingFor: 'no open handoff out of press-01 carries U9',
+    });
+    const waits = rig.gateway.window.read({ machine: 'press-01' }).flatMap((e) => e.actions.map((a) => a.detail ?? ''));
+    expect(waits.some((d) => d.endsWith(': no open handoff out of press-01 carries U9'))).toBe(true);
   });
 });

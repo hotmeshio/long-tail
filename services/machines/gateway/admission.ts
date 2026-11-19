@@ -22,6 +22,8 @@ export interface Applied {
   disposition: Disposition;
   failed: boolean;
   actions: WireAction[];
+  /** Why a nak'd message waits, from its plan. */
+  waitingFor?: string;
   /** The address the message came from, when it was not admitted as a station's. */
   sender?: { machineId: string | null; address: string | null };
 }

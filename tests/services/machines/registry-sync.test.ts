@@ -22,6 +22,7 @@ function fakeSurface(calls: string[]): LineSurface {
     describeLines: () => [],
     describeLine: () => null,
     inspect: () => null,
+    wire: () => null,
     findLine: (s, l) => running.get(`${s}/${l}`),
     commandOps: () => [],
     commandArgs: () => ({}),

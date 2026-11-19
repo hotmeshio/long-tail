@@ -164,8 +164,9 @@ export function appliedActions(applied: Applied, deliveries: number, maxDeliveri
   if (applied.actions.length) return applied.actions;
   if (applied.disposition !== DISPOSITION.NAK) return [{ verb: 'ack' }];
   if (applied.failed) return [{ verb: 'none', detail: 'a verb failed; the message is delivered again' }];
-  if (deliveries >= maxDeliveries) return [{ verb: 'unmatched', detail: `no row after ${deliveries} deliveries` }];
-  return [{ verb: 'none', detail: `waiting for its row (delivery ${deliveries})` }];
+  const why = applied.waitingFor ? `: ${applied.waitingFor}` : '';
+  if (deliveries >= maxDeliveries) return [{ verb: 'unmatched', detail: `no row after ${deliveries} deliveries${why}` }];
+  return [{ verb: 'none', detail: `waiting for its row (delivery ${deliveries})${why}` }];
 }
 
 /** A message no row has claimed after this many deliveries is not racing its row. */

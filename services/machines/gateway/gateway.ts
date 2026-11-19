@@ -28,7 +28,7 @@ import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
-import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
+import { MAX_DELIVERIES, WireRecorder, eventOf, type WireSink } from './wire';
 import { WireWindow } from './wire-window';
 import { NO_WORKFLOWS, type LineWorkflows } from './workflows';
 
@@ -285,6 +285,7 @@ export class MachineGateway {
     const acted: Inspection[] = [];
     let outcome: Disposition = DISPOSITION.TERM;
     let failed = false;
+    let lastWait: { seen: Inspection; waitingFor?: string } | undefined;
     for (const raw of decoded) {
       if (!raw.parsed) continue;
       const admitted = await admitSender(this.admission, msg.topic, raw);
@@ -309,11 +310,12 @@ export class MachineGateway {
       }
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
+      if (applied.disposition === DISPOSITION.NAK && !applied.failed) lastWait = { seen, waitingFor: applied.waitingFor };
       this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, msg.deliveries);
     }
     // No row has claimed it after this many tries, so it is not racing its row: stop. A failed verb always retries.
     if (outcome === DISPOSITION.NAK && !failed && msg.deliveries >= MAX_DELIVERIES) {
-      this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries });
+      this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries, ...(lastWait ? unmatchedContext(lastWait.seen, lastWait.waitingFor) : {}) });
       outcome = DISPOSITION.TERM;
     }
     if (outcome !== DISPOSITION.NAK) this.confirm(acted);
@@ -355,7 +357,7 @@ export class MachineGateway {
     try {
       const actions = await this.executor.apply(plan.actions);
       await this.pace();
-      return { disposition: plan.disposition, failed: false, actions };
+      return { disposition: plan.disposition, failed: false, actions, ...(plan.waitingFor ? { waitingFor: plan.waitingFor } : {}) };
     } catch (err: any) {
       if (!(err instanceof GatewayStopped)) this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
       return { disposition: DISPOSITION.NAK, failed: true, actions: [] };
@@ -364,6 +366,15 @@ export class MachineGateway {
 }
 
 const DEFAULT_RECEIPT_DELAY_MS = 250;
+
+/** What an unmatched message was and the row it waited for, so the log reads it after the wire window has rolled. */
+function unmatchedContext(seen: Inspection, waitingFor?: string): Record<string, unknown> {
+  const b: Record<string, any> = seen.body?.body ?? {};
+  return {
+    kind: seen.parsed?.kind, event: eventOf(seen), machineId: seen.parsed?.ident.machineId,
+    unitId: b.unitId ?? null, jobId: b.jobId ?? null, carrierId: b.carrierId ?? null, ...(waitingFor ? { waitingFor } : {}),
+  };
+}
 
 const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };
 

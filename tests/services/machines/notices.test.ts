@@ -20,7 +20,7 @@ describe('notice rows', () => {
 
   it('a notice names its own ref first, like a request', () => {
     expect(requestRef({ notice: { ref: 'N' }, receiptId: 'C', body: { id: 'E' } as any })).toBe('N');
-    expect(requestRef({ notice: {}, receiptId: 'C' })).toBe('C');
+    expect(requestRef({ notice: {}, receiptId: 'C', body: null })).toBe('C');
   });
 
   it('reads a notice row\'s facets, and a parked row\'s by its type', () => {

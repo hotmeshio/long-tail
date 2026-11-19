@@ -96,7 +96,7 @@ describe('the wire record', () => {
       event: 'arrived', jobId: 'U7-press-01', unitId: 'U7', orderRef: 'ORD-1', recipe: null, carrierId: 'CR-U7', peer: null,
     })));
     const waiting = await until(() => events.find((e) => e.kind === 'job' && e.event === 'arrived' && e.summary.includes('U7')));
-    expect(waiting.actions).toEqual([{ verb: 'none', detail: 'waiting for its row (delivery 1)' }]);
+    expect(waiting.actions).toEqual([{ verb: 'none', detail: 'waiting for its row (delivery 1): no open handoff into press-01 carries U7' }]);
   });
 
   it('keeps the last events in the leader\'s window, newest first', async () => {

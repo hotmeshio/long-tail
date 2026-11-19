@@ -26,7 +26,7 @@ import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
 const ack = (actions: Action[] = []): Plan => ({ actions, disposition: DISPOSITION.ACK });
-const nak: Plan = { actions: [], disposition: DISPOSITION.NAK };
+const waits = (waitingFor: string): Plan => ({ actions: [], disposition: DISPOSITION.NAK, waitingFor });
 
 /** `seen`: the codec's inspection, when the message may ask the host for an answer (plan-request.ts). */
 export function planMachineMessage(
@@ -73,8 +73,8 @@ function heard(state: GatewayState, m: string): Action[] {
 }
 
 /** Ack when the matching row already closed (a replay or a cancel); otherwise wait for the row. */
-function missing(state: GatewayState, unitId: string, pred: (r: HandoffRow) => boolean): Plan {
-  return state.closedFor(unitId, pred) ? ack() : nak;
+function missing(state: GatewayState, unitId: string, pred: (r: HandoffRow) => boolean, row: string): Plan {
+  return state.closedFor(unitId, pred) ? ack() : waits(`no open ${row} carries ${unitId}`);
 }
 
 /** Whether a machine's job id belongs to `jobId`; a row for some of a job's units still owns it. */
@@ -104,14 +104,14 @@ function unitOnCarrier(state: GatewayState, m: string, carrierId: unknown): stri
 function planJob(state: GatewayState, m: string, b: Record<string, any>, at: string | undefined, ttl: number): Plan {
   const unitId = typeof b.unitId === 'string' ? b.unitId : unitOnCarrier(state, m, b.carrierId);
   // A carrier no open handoff here carries yet: its row may still be on the way.
-  if (unitId === undefined) return nak;
+  if (unitId === undefined) return waits(`no open handoff into ${m} carries carrier ${b.carrierId ?? '(none)'}`);
   // An event from an earlier attempt's job never touches a later attempt's row.
   const toHere = (r: HandoffRow) => r.toMachine === m && ownsJob(r.jobId, b.jobId);
   const fromHere = (r: HandoffRow) => r.fromMachine === m && ownsJob(r.senderJobId, b.jobId);
 
   if (b.event === JOB_EVENT.ARRIVED) {
     const row = state.openFor(unitId, toHere);
-    if (!row) return missing(state, unitId, toHere);
+    if (!row) return missing(state, unitId, toHere, `handoff into ${m}`);
     const expected = row.units.find((u) => u.unitId === unitId)?.carrierId;
     if (expected && b.carrierId && expected !== b.carrierId) {
       return ack(failHandoff(state, row, m, {
@@ -142,7 +142,7 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     const row = state.openFor(unitId, fromHere);
     if (!row) {
       if (!state.closedFor(unitId, fromHere)) state.rememberFinish(m, unitId, b);
-      return missing(state, unitId, fromHere);
+      return missing(state, unitId, fromHere, `handoff out of ${m}`);
     }
     state.takeFinish(m, unitId);
     if (b.result === JOB_RESULT.OK) return ack([releasedAction(row, m, b, true)]);
@@ -155,7 +155,7 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
   if (b.event === JOB_EVENT.TRANSFER_FAILED) {
     const either = (r: HandoffRow) => toHere(r) || fromHere(r);
     const row = state.openFor(unitId, either);
-    if (!row) return missing(state, unitId, either);
+    if (!row) return missing(state, unitId, either, `handoff at ${m}`);
     return ack(failHandoff(state, row, m, { received: false, unitId, errorCode: b.failure, detail: `${m} reported ${b.failure}` }));
   }
 
@@ -165,7 +165,7 @@ function planJob(state: GatewayState, m: string, b: Record<string, any>, at: str
     if (b.processed !== false) return ack();
     // A unit passed through unprocessed: its next hop records the release itself, as no finish will.
     const row = state.openFor(unitId, fromHere);
-    if (!row) return missing(state, unitId, fromHere);
+    if (!row) return missing(state, unitId, fromHere, `handoff out of ${m}`);
     return ack([releasedAction(row, m, { ...b, unitId }, true)]);
   }
 

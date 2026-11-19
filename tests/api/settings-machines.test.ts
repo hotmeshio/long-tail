@@ -12,9 +12,12 @@ function surface(): LineSurface {
     describeLines: () => [summarizeLine(DEFAULT_LINE, { rowOps: ['probe'] })],
     describeLine: () => null,
     inspect: () => null,
+    wire: () => null,
     findLine: () => DEFAULT_LINE,
     commandOps: () => [],
     commandArgs: () => ({}),
+    declare: async () => 'unchanged',
+    retire: async () => false,
   };
 }
 
