@@ -182,6 +182,7 @@ export function plannedAction(a: Action): WireAction {
     case 'accumulate': return { verb: 'accumulate', rowId: a.rowId, itemKey: a.itemKey };
     case 'resolve': return { verb: 'resolve', rowId: a.rowId };
     case 'createAlarmRow': return { verb: 'create-row', detail: `${a.row.type} for ${a.machineId}` };
+    case 'createReadyRow': return { verb: 'create-row', detail: `${a.row.type} for ${a.machineId}` };
     case 'createRow': return { verb: 'create-row', detail: a.row.type };
     case 'watchOffline': return { verb: 'none', detail: `watching ${a.machineId} for an offline row` };
     case 'settleReply': return { verb: 'ack', detail: `${a.status} ${a.cmdId}` };

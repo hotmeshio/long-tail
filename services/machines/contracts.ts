@@ -30,6 +30,8 @@ export const ROW_TYPE = {
   REQUEST_OVERDUE: 'machine-request-overdue',
   /** A machine takes no dispatch while a person or a workflow holds it, as for a plate swap. */
   MACHINE_HOLD: 'machine-hold',
+  /** A machine paced by ready may take one job; the dispatch the machine accepts resolves it. */
+  MACHINE_READY: 'machine-ready',
 } as const;
 
 export const LINE_ROLE = {
@@ -225,6 +227,10 @@ export const DECISION = {
   ANSWERED: 'answered',
   /** The machine notice an overdue row named has ended. */
   RECORDED: 'recorded',
+  /** A machine-ready row spent on the dispatch the machine accepted. */
+  DISPATCHED: 'dispatched',
+  /** A machine-ready row the machine took back (`ready: false`). */
+  WITHDRAWN: 'withdrawn',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
@@ -365,6 +371,9 @@ export const noticeSignalKey = (siteId: string, lineId: string, machineId: strin
 /** The key an alarm row is created under: once per alarm id, or per raise when `raisedAt` tells raises apart. */
 export const alarmSignalKey = (siteId: string, lineId: string, machineId: string, alarmId: string, raisedAt?: string) =>
   `machine-alarm:${siteId}:${lineId}:${machineId}:${alarmId}${raisedAt ? `:${raisedAt}` : ''}`;
+/** The key a machine-ready row is created under, once per ready message. */
+export const readySignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
+  `machine-ready:${siteId}:${lineId}:${machineId}:${ref}`;
 /** The id of the workflow started for a parked row, once per row. */
 export const rowWorkflowId = (rowType: string, rowId: string) => `${rowType}-${rowId}`;
 /** The key a request's overdue row is created under, once per request. */

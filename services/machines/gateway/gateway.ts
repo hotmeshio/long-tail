@@ -12,7 +12,7 @@ import { CONTROLLER, type Action } from './actions';
 import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests, restoreSentJobs } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
-import { PACE_BY, type LineDef } from '../../../lib/machines/line';
+import { PACE_BY, machineRole, type LineDef } from '../../../lib/machines/line';
 import { DISPATCH_ON, MESSAGE_KIND, OP, alarmIdsOf, declaredControlOps, declaredRowOps, rowOpArgs, rowOpSettleMs, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { publishMachineWireEvent } from '../../../lib/events/publish';
@@ -92,10 +92,7 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
-    const byReady = deps.line.machines.filter((m) => m.paceBy === PACE_BY.READY).map((m) => m.machineId);
-    if (this.state.dispatchOnArrival && byReady.length) {
-      throw new Error(`${byReady.join(', ')}: paceBy ready needs dispatch on creation; this line's codec dispatches on arrival`);
-    }
+    this.state.readyPaced = new Map(deps.line.machines.filter((m) => m.paceBy === PACE_BY.READY).map((m) => [m.machineId, machineRole(m)]));
     this.state.controlOps = declaredControlOps(this.codec);
     this.state.rowOps = declaredRowOps(this.codec);
     this.state.opArgs = rowOpArgs(this.codec);

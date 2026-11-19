@@ -23,6 +23,7 @@ import { dispatchJobs, type DispatchJob } from './jobs';
 import { dispatchWindow } from './pacing';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { CommandReply, HeldJobs, ReplyWaiter } from './reply-waiter';
+import { readyAccepted, readyUnspent } from './ready';
 import { DISPATCH_STATE, type GatewayState } from './state';
 import type { WireRecorder } from './wire';
 
@@ -233,6 +234,9 @@ export class Dispatcher {
       }
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
+      // The ready this dispatch spent ends before the claim, so a new leader never reads it as unspent beside a claimed row.
+      const spent = readyAccepted(state, a.rowId);
+      if (spent) this.check(spent.rowId, 'resolve', await lt.resolve(CONTROLLER, spent.rowId, spent.payload));
       const claiming = lt.claim(a.machineId, a.rowId);
       if (row) row.claiming = claiming;
       this.check(a.rowId, 'claim', await claiming);
@@ -248,6 +252,7 @@ export class Dispatcher {
       log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: [...live.awaitingReady] });
       return;
     }
+    readyUnspent(state, a.rowId);
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
     if (!row) return;
     row.dispatch = DISPATCH_STATE.REFUSED;

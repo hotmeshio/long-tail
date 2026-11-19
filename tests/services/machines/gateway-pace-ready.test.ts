@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 
 import { CHANNEL, DISPATCH_ON, OP, buildEnvelope, genericCodec, machineTopic } from '../../../lib/machines/protocol';
 import { PACE_BY, identOf, validateLine, type LineDef } from '../../../lib/machines/line';
-import { MachineGateway } from '../../../services/machines/gateway/gateway';
 import { startRig, type LineRig } from '../../helpers/machine-line-gateway-harness';
 import { ROOT, sleep, until } from '../../helpers/machine-line-fixtures';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
@@ -71,10 +70,16 @@ describe('paceBy in a line definition', () => {
     expect(() => validateLine(bad)).toThrow(/paceBy must be one of ready/);
   });
 
-  it('is refused on a line whose codec dispatches on arrival', () => {
-    expect(() => new MachineGateway({
-      bus: {} as any, feed: {} as any, lt: {} as any, line: byReady,
-      settings: { topicRoot: ROOT } as any, codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL }),
-    })).toThrow(/press-01: paceBy ready needs dispatch on creation/);
+  it('on a line that dispatches on arrival, sends that machine its job on creation while the others wait for their units', async () => {
+    rig = await startRig({ autoArriveAtEntry: false }, {}, byReady, { codec: genericCodec({ root: ROOT, dispatchOn: DISPATCH_ON.ARRIVAL }) });
+    const first = rig.park('U1', null, 'press-01');
+    rig.park('U2', null, 'cut-01');
+    publish(CHANNEL.READY, {});
+    await until(() => dispatchedTo('press-01').length === 1);
+    await sleep(80);
+    expect(dispatchedTo('cut-01')).toEqual([]);
+    await until(() => rig.lt.rows.get(first.id)!.assigned_to);
+    publish(CHANNEL.JOB, { event: 'arrived', unitId: 'U1', carrierId: 'CR-U1', jobId: 'U1-press-01' });
+    expect((await rig.lt.ended(first.id)).resolver_payload).toMatchObject({ received: true });
   });
 });

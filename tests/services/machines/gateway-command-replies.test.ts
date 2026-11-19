@@ -87,6 +87,26 @@ describe('a command reply', () => {
     expect(ended.resolver_payload).toMatchObject({ accepted: true, status: 'accepted' });
   });
 
+  it('marked preparing, then a takeover: the final reply read before the resend\'s reply still resolves the row with its data', async () => {
+    rig = await startRig({}, { replyTimeoutMs: 2_000, dispatchAttempts: 1 }, DEFAULT_LINE, declared);
+    rig.line.config('press-01', { replyMode: 'drop' });
+    const row = ask('setpoint', { name: 'platen-temp', value: 9 });
+    await until(() => rig.recorder.commands('press-01', 'setpoint').length);
+    const cmdId = controlCommandId(row.id);
+    reply(cmdId, REPLY_STATUS.ACCEPTED, { preparing: true });
+    await sleep(30);
+    await rig.gateway.stop();
+    // Published while no gateway leads: the next one reads it from the durable consumer.
+    reply(cmdId, REPLY_STATUS.COMPLETED, { data: { name: 'platen-temp', was: 7, now: 9 } });
+    rig.gateway = await rig.startGateway();
+    await until(() => rig.recorder.commands('press-01', 'setpoint').length === 2);
+    expect(rig.recorder.commands('press-01', 'setpoint')[1]).toMatchObject({ cmdId });
+    // The machine answers the resend, a duplicate, with its saved reply.
+    reply(cmdId, REPLY_STATUS.ACCEPTED, { preparing: true });
+    const ended = await rig.lt.ended(row.id);
+    expect(ended.resolver_payload).toMatchObject({ accepted: true, status: 'completed', data: { was: 7, now: 9 } });
+  });
+
   it('marked preparing ends failed when the final reply says so', async () => {
     await quietPress();
     const row = ask('calibrate');

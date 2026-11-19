@@ -11,6 +11,7 @@
 import { COMMAND_STATUS, ROW_TYPE, type CommandFacets, type HandoffFacets } from '../contracts';
 import { readCommandFacets } from '../commands';
 import { argsRefusal } from '../command-args';
+import { planReadyRow } from './ready';
 import { OP } from '../../../lib/machines/protocol';
 import { machineById, machineRole, operatorRole, receiverRoles, type LineDef } from '../../../lib/machines/line';
 import type { EscalationEvent } from '../../../lib/machines/transport';
@@ -36,7 +37,7 @@ const ACCUMULATE_MAX = 'accumulate_max';
 
 const LINE_ROW_TYPES: string[] = [
   ROW_TYPE.ALARM, ROW_TYPE.MACHINE_OFFLINE, ROW_TYPE.MACHINE_QUIET, ROW_TYPE.MACHINE_COMMAND, ROW_TYPE.MACHINE_REGISTRATION,
-  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.MACHINE_NOTICE, ROW_TYPE.REQUEST_OVERDUE, ROW_TYPE.MACHINE_HOLD,
+  ROW_TYPE.MACHINE_REQUEST, ROW_TYPE.MACHINE_NOTICE, ROW_TYPE.REQUEST_OVERDUE, ROW_TYPE.MACHINE_HOLD, ROW_TYPE.MACHINE_READY,
 ];
 
 function handoffRow(id: string, role: string, facets: HandoffFacets, data?: Record<string, any>): HandoffRow {
@@ -92,6 +93,7 @@ export function planEscalationEvent(
   if (type === ROW_TYPE.MACHINE_REQUEST || type === ROW_TYPE.MACHINE_NOTICE) return planRequestRow(state, event);
   if (type === ROW_TYPE.REQUEST_OVERDUE) return event.role === operatorRole(line) ? planOverdueRow(state, event) : [];
   if (type === ROW_TYPE.MACHINE_HOLD) return planHoldRow(state, line, event);
+  if (type === ROW_TYPE.MACHINE_READY) return planReadyRow(state, line, event);
   return [];
 }
 
@@ -177,7 +179,8 @@ function planHandoff(state: GatewayState, line: LineDef, event: EscalationEvent,
       row.dispatch = DISPATCH_STATE.ACCEPTED;
       return [];
     }
-    if (state.dispatchOnArrival) {
+    // A machine paced by ready asks for its job, so the job goes on creation, on any line.
+    if (state.dispatchOnArrival && !state.readyPaced.has(row.toMachine!)) {
       const refused = refuseUnfit(state, line, row);
       if (refused.length) return refused;
       row.dispatch = DISPATCH_STATE.ARRIVING;

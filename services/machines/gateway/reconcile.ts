@@ -1,7 +1,7 @@
 /**
  * What a gateway restores when it starts leading a line, read back from Long
  * Tail: the alarm, offline and quiet rows it raised before, the hold rows that
- * keep a machine from dispatch, so a clear or a
+ * keep a machine from dispatch and the readies that admit one, so a clear or a
  * return that comes later still resolves them; the units each open handoff
  * saw arrive, so the receiver holds them again; and the jobs recent handoffs
  * sent, so a restarted machine gets them back.
@@ -17,6 +17,7 @@ import { resolverPayloadOf, type LineEscalations } from './escalations';
 import { dispatchJobs } from './jobs';
 import { dispatchAction, latestArrival } from './pacing';
 import type { HandoffRowAdapter } from '../rows';
+import { restoreReady } from './ready';
 import { readTrace } from './trace';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 
@@ -26,6 +27,7 @@ export interface RestoredRows {
   quiet: number;
   registrations: number;
   holds: number;
+  ready: number;
 }
 
 export async function restoreLineRows(state: GatewayState, lt: LineEscalations, line: LineDef): Promise<RestoredRows> {
@@ -49,7 +51,8 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
   const holds = (await lt.listOpen({ type: ROW_TYPE.MACHINE_HOLD }))
     .filter((row) => mine(row) && line.machines.some((m) => m.machineId === row.metadata.machineId));
   for (const row of holds) state.holdRows.set(row.id, row.metadata.machineId);
-  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length, holds: holds.length };
+  const ready = await restoreReady(state, lt, line);
+  return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length, holds: holds.length, ready };
 }
 
 /** Ended handoffs read back on taking the line, newest first. */

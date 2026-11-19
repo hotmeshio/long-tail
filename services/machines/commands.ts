@@ -48,6 +48,17 @@ export function holdRow(target: CommandTarget, reason: string) {
   };
 }
 
+/** The row that marks a machine paced by ready as able to take one job; the dispatch it accepts resolves it. */
+export function readyRow(target: CommandTarget, reason: string) {
+  return {
+    role: target.role,
+    type: ROW_TYPE.MACHINE_READY,
+    description: `${target.machineId} ready: ${reason}`,
+    priority: 2,
+    metadata: { siteId: target.siteId, lineId: target.lineId, machineId: target.machineId, reason } as Record<string, unknown>,
+  };
+}
+
 /** A machine-command row's facets; null when the line, machine or op is missing. */
 export function readCommandFacets(md: Record<string, any> = {}): CommandFacets | null {
   if (!md.siteId || !md.lineId || !md.machineId || !md.op) return null;

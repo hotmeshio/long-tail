@@ -18,6 +18,7 @@ import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher, GatewayStopped } from './dispatcher';
 import { failHandoff } from './plan-shared';
+import { readyCreated } from './ready';
 import { RequestRunner } from './requests-runner';
 import type { LineWorkflows } from './workflows';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
@@ -134,6 +135,8 @@ export class Executor {
       }
       case 'createAlarmRow':
         return this.createAlarmRow(a);
+      case 'createReadyRow':
+        return this.createReadyRow(a);
       case 'createRow': {
         this.live();
         const { id } = await lt.create(CONTROLLER, a.row);
@@ -279,6 +282,19 @@ export class Executor {
     const note = track ? `${a.machineId} raised ${a.alarmId} again; this one ended` : `cleared at ${a.machineId}`;
     await this.d.lt.resolve(CONTROLLER, row.id, { decision: DECISION.CLEARED, note });
     return [created];
+  }
+
+  /** A keyed create that returns a row already ended is a ready replayed after it was spent: no ready. */
+  private async createReadyRow(a: Extract<Action, { kind: 'createReadyRow' }>): Promise<WireAction[]> {
+    try {
+      this.live();
+      const row = await this.d.lt.create(CONTROLLER, a.row);
+      readyCreated(this.d.state, a.machineId, row.id, row.status);
+      const ended = row.status && row.status !== PENDING ? ` (${row.status} already)` : '';
+      return [{ verb: 'create-row', rowId: row.id, detail: `${a.row.type} at ${a.machineId}${ended}` }];
+    } finally {
+      this.d.state.readyCreating.delete(a.machineId);
+    }
   }
 
   /** Raise a quiet row for each connected machine silent longer than `quietMs`. */

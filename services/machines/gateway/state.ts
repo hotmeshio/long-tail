@@ -141,8 +141,14 @@ export class GatewayState {
   progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
-  /** Machines that said they can take one job now (`paceBy: ready`); a dispatch uses the mark. */
-  readonly readyMarks = new Set<string>();
+  /** Machines paced by ready (`MachineDef.paceBy`) → the role their ready rows park on, from the line. */
+  readyPaced: ReadonlyMap<string, string> = new Map();
+  /** Open machine-ready rows no dispatch has spent → the machine each marks ready (ready.ts). */
+  readonly readyRows = new Map<string, string>();
+  /** Readies spent on a dispatch the machine has not accepted yet: handoff row → the ready row and its machine. */
+  readonly readySpent = new Map<string, { readyRowId: string; machineId: string }>();
+  /** Machines whose ready row is being raised. */
+  readonly readyCreating = new Set<string>();
   /** Open machine-hold rows → the machine each holds. */
   readonly holdRows = new Map<string, string>();
   /** Units at each machine that arrived and have not left: machine → unit → job. */
@@ -455,7 +461,7 @@ export class GatewayState {
   clone(): GatewayState {
     const copy = new GatewayState();
     Object.assign(copy, {
-      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, controlOps: this.controlOps, rowOps: this.rowOps, opArgs: this.opArgs, settleMs: this.settleMs, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
+      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, controlOps: this.controlOps, readyPaced: this.readyPaced, rowOps: this.rowOps, opArgs: this.opArgs, settleMs: this.settleMs, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
       retainedAlarms: this.retainedAlarms, alarmIds: this.alarmIds, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));
@@ -470,7 +476,9 @@ export class GatewayState {
     copyInto(this.links, copy.links, (link) => ({ ...link }));
     copyInto(this.requests, copy.requests, (track) => ({ ...track }));
     copyInto(this.holdRows, copy.holdRows);
-    for (const m of this.readyMarks) copy.readyMarks.add(m);
+    copyInto(this.readyRows, copy.readyRows);
+    copyInto(this.readySpent, copy.readySpent, (spent) => ({ ...spent }));
+    for (const m of this.readyCreating) copy.readyCreating.add(m);
     copyInto(this.addressOfStation, copy.addressOfStation);
     copyInto(this.stationOfAddress, copy.stationOfAddress);
     copyInto(this.claims, copy.claims);

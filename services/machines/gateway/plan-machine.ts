@@ -22,6 +22,7 @@ import { dispatchJobs, jobOwns } from './jobs';
 import { noteJobEvent } from './lifecycle';
 import { alarmsNoLongerListed, planAlarm } from './plan-alarm';
 import { planParked, type ParkedSeen } from './plan-request';
+import { planReady } from './ready';
 import { mergeTrace, traceEntry, traceFacets } from './trace';
 import { DISPATCH_STATE, type GatewayState, type HandoffRow } from './state';
 
@@ -53,10 +54,9 @@ function planByKind(state: GatewayState, m: string, parsed: ParsedTopic, env: En
     case MESSAGE_KIND.PRESENCE:
       return planPresence(state, m, b);
     case MESSAGE_KIND.SNAPSHOT:
-      return planSnapshot(state, m, b, ttl);
+      return planSnapshot(state, parsed, env, b, ttl);
     case MESSAGE_KIND.READY:
-      markReady(state, m, b.ready);
-      return ack();
+      return ack(planReady(state, parsed, env, b.ready));
     default:
       return ack();
   }
@@ -199,12 +199,6 @@ function releasedEarly(state: GatewayState, row: HandoffRow, unitId: string): Ac
   return [releasedAction(row, row.fromMachine!, b, true)];
 }
 
-/** A machine able to take one job now holds a ready mark until a dispatch uses it; `ready: false` withdraws it. */
-function markReady(state: GatewayState, m: string, ready: unknown): void {
-  if (ready === false) state.readyMarks.delete(m);
-  else state.readyMarks.add(m);
-}
-
 function planPresence(state: GatewayState, m: string, b: Record<string, any>): Plan {
   const link = state.link(m);
   const session = typeof b.sessionId === 'string' ? b.sessionId : undefined;
@@ -239,7 +233,8 @@ function planPresence(state: GatewayState, m: string, b: Record<string, any>): P
  * dispatches again, and the jobs it had ready for units it still holds, from
  * the rows that sent them. A lost job nothing is remembered for is logged.
  */
-function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, ttl: number): Plan {
+function planSnapshot(state: GatewayState, parsed: ParsedTopic, env: Envelope | null, b: Record<string, any>, ttl: number): Plan {
+  const m = parsed.ident.machineId;
   const link = state.link(m);
   if (b.software) link.software = b.software;
   const jobIds: string[] = Array.isArray(b.jobs) ? b.jobs.map((j: any) => j?.jobId).filter((id: unknown) => typeof id === 'string') : [];
@@ -252,15 +247,15 @@ function planSnapshot(state: GatewayState, m: string, b: Record<string, any>, tt
     link.jobs = b.jobs;
   }
   if (typeof b.bootId === 'string') link.bootId = b.bootId;
-  if (typeof b.ready === 'boolean') markReady(state, m, b.ready);
+  const ready = typeof b.ready === 'boolean' ? planReady(state, parsed, env, b.ready) : [];
   const fresh = !state.retainedAlarms && !state.readingRetained && Array.isArray(b.alarms);
   const cleared = fresh ? alarmsNoLongerListed(state, m, b.alarms) : [];
   const answer: Action = { kind: 'settleSnapshot', machineId: m, jobIds };
-  if (!rebooted) return ack([...cleared, answer]);
+  if (!rebooted) return ack([...ready, ...cleared, answer]);
   const missing = (r: HandoffRow) => dispatchJobs(r.jobId, r.units, state.unitsPerDispatch).some((j) => !held.has(j.jobId));
   const open = state.open().filter((r) => r.toMachine === m && r.dispatch === DISPATCH_STATE.ACCEPTED && missing(r));
   const rows = new Map(lost.resend.map((l) => [l.row.id, l.row]));
   const again = [...rows.values()].map((r): Action => ({ ...(dispatchAction(r, m, ttl) as Extract<Action, { kind: 'dispatch' }>), ended: true }));
   const unknown: Action[] = lost.unknown.length ? [{ kind: 'unrecoverable', machineId: m, jobs: lost.unknown }] : [];
-  return ack([...cleared, answer, ...open.map((r) => dispatchAction(r, m, ttl)), ...again, ...unknown]);
+  return ack([...ready, ...cleared, answer, ...open.map((r) => dispatchAction(r, m, ttl)), ...again, ...unknown]);
 }

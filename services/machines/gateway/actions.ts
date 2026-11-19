@@ -42,6 +42,8 @@ export type Action =
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
   /** `paused`: the notes on the rows the alarm pauses, written only when the row it raises is open. */
   | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput; paused: Action[] }
+  /** A machine's ready, raised as a keyed machine-ready row (ready.ts). */
+  | { kind: 'createReadyRow'; machineId: string; row: CreateRowInput }
   /** A row for a person, raised by the controller. */
   | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
