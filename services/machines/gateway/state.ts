@@ -7,6 +7,7 @@
 
 import type { HandoffFacets, TraceEntry } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
+import { ALARM_IDS, CONTROL_OPS, type AlarmIds } from '../../../lib/machines/protocol';
 import type { ContestedClaimView, LineView } from '../../../types/machines-view';
 import { dispatchJobs } from './jobs';
 import { projectLine } from './project';
@@ -116,14 +117,22 @@ export class GatewayState {
   unitsPerDispatch: number | null = null;
   /** Jobs go to a receiver once its units arrive there, from the codec. */
   dispatchOnArrival = false;
+  /** The line protocol's control ops the machines have, from the codec. */
+  controlOps: readonly string[] = CONTROL_OPS;
   /** Commands of the machines' own that a machine-command row may ask for, from the codec. */
   rowOps: readonly string[] = [];
+  /** The JSON Schema each row op's args must satisfy, from the codec. */
+  opArgs: Readonly<Record<string, Record<string, unknown>>> = {};
+  /** How long each row op waits after a `preparing` reply for the final one, from the codec. */
+  settleMs: Readonly<Record<string, number>> = {};
   /** Row ops the machines never reply to: sent once, done on publish. */
   oneWayOps: ReadonlySet<string> = new Set();
   /** Note each job's start, progress steps and pauses on the row that holds it (lifecycle.ts). */
   lifecycle = false;
   /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
   retainedAlarms = false;
+  /** What an alarm id names, from the codec (codec.ts alarmIds). */
+  alarmIds: AlarmIds = ALARM_IDS.RECURRING;
   /** Reading the broker's retained messages on taking the line; a snapshot read back may be older than its alarms. */
   readingRetained = false;
   /** When this gateway took the line (epoch ms); a command for an older row may have been sent by an earlier one. */
@@ -132,6 +141,16 @@ export class GatewayState {
   progressStep = 25;
   /** While reconciling, new handoffs wait so pacing sees the whole line before anything is sent. */
   holdDispatch = false;
+  /** Machines paced by ready (`MachineDef.paceBy`) → the role their ready rows park on, from the line. */
+  readyPaced: ReadonlyMap<string, string> = new Map();
+  /** Open machine-ready rows no dispatch has spent → the machine each marks ready (ready.ts). */
+  readonly readyRows = new Map<string, string>();
+  /** Readies spent on a dispatch the machine has not accepted yet: handoff row → the ready row and its machine. */
+  readonly readySpent = new Map<string, { readyRowId: string; machineId: string }>();
+  /** Machines whose ready row is being raised. */
+  readonly readyCreating = new Set<string>();
+  /** Open machine-hold rows → the machine each holds. */
+  readonly holdRows = new Map<string, string>();
   /** Units at each machine that arrived and have not left: machine → unit → job. */
   private held = new Map<string, Map<string, string>>();
   /** Jobs sent and taken, by machine: job → the row that sent it, kept while the machine holds the job's units. */
@@ -189,12 +208,22 @@ export class GatewayState {
     if (!row) return undefined;
     this.openRows.delete(id);
     row.ended = ended;
-    this.closedRows.set(id, row);
+    this.keepClosed(row);
+    return row;
+  }
+
+  /** A row that ended before this gateway led the line, read back from Long Tail; an open row is left alone. */
+  restoreClosed(row: HandoffRow): void {
+    if (this.openRows.has(row.id) || this.closedRows.has(row.id)) return;
+    this.keepClosed(row);
+  }
+
+  private keepClosed(row: HandoffRow): void {
+    this.closedRows.set(row.id, row);
     if (this.closedRows.size > CLOSED_LIMIT) {
       const oldest = this.closedRows.keys().next().value;
       if (oldest) this.closedRows.delete(oldest);
     }
-    return row;
   }
 
   isClosed(id: string): boolean {
@@ -219,11 +248,12 @@ export class GatewayState {
     this.held.get(machineId)!.set(unitId, jobId);
   }
 
-  letGo(machineId: string, unitId: string): void {
+  /** `reported`: the job the machine named, for a unit this gateway never saw arrive (one sent before it led the line). */
+  letGo(machineId: string, unitId: string, reported?: string): void {
     const units = this.held.get(machineId);
-    const jobId = units?.get(unitId);
+    const jobId = units?.get(unitId) ?? (this.sentJobs.get(machineId)?.has(reported ?? '') ? reported : undefined);
     units?.delete(unitId);
-    if (jobId === undefined || [...units!.values()].includes(jobId)) return;
+    if (jobId === undefined || [...(units?.values() ?? [])].includes(jobId)) return;
     this.sentJobs.get(machineId)?.delete(jobId);
     if (!this.endedJobs.has(machineId)) this.endedJobs.set(machineId, new Set());
     this.endedJobs.get(machineId)!.add(jobId);
@@ -413,6 +443,11 @@ export class GatewayState {
     return link;
   }
 
+  /** Whether an open machine-hold row holds the machine. */
+  isHeld(machineId: string): boolean {
+    return [...this.holdRows.values()].includes(machineId);
+  }
+
   alarmKey(machineId: string, alarmId: string): string {
     return `${machineId}/${alarmId}`;
   }
@@ -426,8 +461,8 @@ export class GatewayState {
   clone(): GatewayState {
     const copy = new GatewayState();
     Object.assign(copy, {
-      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
-      retainedAlarms: this.retainedAlarms, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
+      unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, controlOps: this.controlOps, readyPaced: this.readyPaced, rowOps: this.rowOps, opArgs: this.opArgs, settleMs: this.settleMs, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
+      retainedAlarms: this.retainedAlarms, alarmIds: this.alarmIds, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));
     copyInto(this.sentJobs, copy.sentJobs, (jobs) => new Map(jobs));
@@ -440,6 +475,10 @@ export class GatewayState {
     copyInto(this.dispatches, copy.dispatches);
     copyInto(this.links, copy.links, (link) => ({ ...link }));
     copyInto(this.requests, copy.requests, (track) => ({ ...track }));
+    copyInto(this.holdRows, copy.holdRows);
+    copyInto(this.readyRows, copy.readyRows);
+    copyInto(this.readySpent, copy.readySpent, (spent) => ({ ...spent }));
+    for (const m of this.readyCreating) copy.readyCreating.add(m);
     copyInto(this.addressOfStation, copy.addressOfStation);
     copyInto(this.stationOfAddress, copy.stationOfAddress);
     copyInto(this.claims, copy.claims);

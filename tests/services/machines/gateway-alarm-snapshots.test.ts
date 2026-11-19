@@ -22,9 +22,9 @@ function raise(alarmId: string): void {
   })), false);
 }
 
-function snapshot(alarms: string[]): void {
+function snapshot(alarms?: string[]): void {
   rig.broker.publish(machineTopic(ROOT, ident, CHANNEL.SNAPSHOT), JSON.stringify(buildEnvelope(ident, {
-    bootId: 'boot-1', software: '1.0', mode: 'idle', enabled: true, recipe: null, jobs: [], alarms, cycles: 0,
+    bootId: 'boot-1', software: '1.0', mode: 'idle', enabled: true, recipe: null, jobs: [], cycles: 0, ...(alarms ? { alarms } : {}),
   })), true);
 }
 
@@ -52,5 +52,21 @@ describe('alarms a machine does not retain', () => {
     const ended = await rig.lt.ended(row.id);
     expect(ended.resolver_payload).toMatchObject({ decision: 'cleared' });
     expect(ended.resolver_payload!.note).toMatch(/snapshot no longer lists it/);
+  });
+
+  it('stay open after a takeover through a snapshot with no alarms field, and clear on their own clear', async () => {
+    rig = await startRig({}, {}, DEFAULT_LINE, unretained);
+    raise('A-1');
+    const row = await until(() => alarmRows()[0]);
+    await rig.gateway.stop();
+    rig.gateway = await rig.startGateway();
+    snapshot();
+    await rig.gateway.idle();
+    await sleep(20);
+    expect(rig.lt.rows.get(row.id)!.status).toBe('pending');
+    rig.broker.publish(alarmTopic(ROOT, ident, 'A-1'), JSON.stringify(buildEnvelope(ident, {
+      alarmId: 'A-1', active: false, raisedAt: '2026-01-01T00:00:00.000Z', clearedBy: 'op-1',
+    })), false);
+    expect((await rig.lt.ended(row.id)).resolver_payload).toMatchObject({ decision: 'cleared', clearedBy: 'op-1' });
   });
 });

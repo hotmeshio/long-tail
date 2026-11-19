@@ -23,6 +23,7 @@ import { dispatchJobs, type DispatchJob } from './jobs';
 import { dispatchWindow } from './pacing';
 import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { CommandReply, HeldJobs, ReplyWaiter } from './reply-waiter';
+import { readyAccepted, readyUnspent } from './ready';
 import { DISPATCH_STATE, type GatewayState } from './state';
 import type { WireRecorder } from './wire';
 
@@ -150,24 +151,40 @@ export class Dispatcher {
    * machine that gave it. The command expires when the asking ends, so one that
    * reaches a machine after its row resolved no-reply is refused, never run.
    * Rounds of the asking count from the row's creation, so the command sent
-   * again by a new gateway is the same command with the same arguments.
+   * again by a new gateway is the same command with the same arguments. A
+   * `preparing` reply holds the row for the machine's final one (settled()).
    */
   async control(a: ControlAction): Promise<void> {
     if (this.d.state.oneWayOps.has(a.op)) return this.controlOneWay(a);
     const now = Date.now();
     const ttlMs = this.d.replyTimeoutMs * this.d.dispatchAttempts;
     const { round, expiresAt } = dispatchWindow(a.createdAt ?? now, now, ttlMs);
-    const reply = await this.ask(a.machineId, a.op, controlCommandId(a.rowId, round), { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt, expiresAt - ttlMs);
+    const cmdId = controlCommandId(a.rowId, round);
+    const first = await this.ask(a.machineId, a.op, cmdId, { ...a.args, expiresAt: isoTs(expiresAt) }, a.createdAt, expiresAt - ttlMs);
     // Timers may fire a little early; the command must have expired before the row says no-reply.
-    if (!reply && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1, undefined, { signal: this.stopping.signal }).catch(() => undefined);
+    if (!first && Date.now() <= expiresAt) await sleep(expiresAt - Date.now() + 1, undefined, { signal: this.stopping.signal }).catch(() => undefined);
     this.live();
+    const reply = first?.preparing && first.status === REPLY_STATUS.ACCEPTED ? await this.settled(a, cmdId, first, expiresAt) : first;
     const outcome: CommandResolution = reply
-      ? { accepted: reply.status === REPLY_STATUS.ACCEPTED, machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason, ...withCode(reply) }
+      ? {
+        accepted: took(reply), machineId: a.machineId, op: a.op, status: reply.status as CommandResolution['status'], reason: reply.reason,
+        ...withCode(reply), ...(reply.data ? { data: reply.data } : {}),
+      }
       : { accepted: false, machineId: a.machineId, op: a.op, status: COMMAND_STATUS.NO_REPLY, reason: `no reply after ${this.d.dispatchAttempts} attempts` };
     const context = { row: a.rowId, machine: a.machineId, op: a.op, status: outcome.status, reason: outcome.reason };
     if (outcome.accepted) this.d.log.info(GATEWAY_LOG.COMMANDED, context);
     else this.d.log.warn(!reply ? GATEWAY_LOG.COMMAND_UNANSWERED : fromMachine(reply) ? GATEWAY_LOG.COMMAND_REFUSED : GATEWAY_LOG.COMMAND_UNSUPPORTED, context);
     this.check(a.rowId, 'resolve', await this.d.lt.resolve(fromMachine(reply) ? a.machineId : CONTROLLER, a.rowId, outcome as unknown as Record<string, any>));
+  }
+
+  /** The final reply to a `preparing` one, within the op's settle window or the command's own; none leaves the held reply, its data kept. */
+  private async settled(a: ControlAction, cmdId: string, held: CommandReply, expiresAt: number): Promise<CommandReply> {
+    const waitMs = this.d.state.settleMs[a.op] ?? Math.max(expiresAt - Date.now(), 0);
+    this.d.log.info(GATEWAY_LOG.COMMAND_PREPARING, { row: a.rowId, machine: a.machineId, op: a.op, waitMs });
+    const final = await this.d.replies.waitFinal(cmdId, waitMs);
+    this.live();
+    const data = final?.data ?? held.data;
+    return final ? { ...final, ...(data ? { data } : {}) } : held;
   }
 
   /** A one-way command row: sent once, resolved `sent` by the controller; nothing is waited for or sent again. */
@@ -194,7 +211,7 @@ export class Dispatcher {
     const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
     // Known before any reply, so a failure that follows an acceptance finds its row.
     for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
-    const since = state.get(a.rowId)?.createdAt;
+    const since = (state.get(a.rowId) ?? state.closedRow(a.rowId))?.createdAt;
     const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units }, since, a.issuedAt)));
     const refused = replies.find((r) => r && !took(r));
     const silent = jobs.filter((_, i) => !replies[i]);
@@ -217,6 +234,9 @@ export class Dispatcher {
       }
       if (reconciled) log.info(GATEWAY_LOG.DISPATCH_RECONCILED, { row: a.rowId, machine: a.machineId, jobs: silent.map((j) => j.jobId) });
       log.info(GATEWAY_LOG.DISPATCHED, { row: a.rowId, machine: a.machineId, reason: replies.map((r) => r?.reason ?? 'held').join('; ') });
+      // The ready this dispatch spent ends before the claim, so a new leader never reads it as unspent beside a claimed row.
+      const spent = readyAccepted(state, a.rowId);
+      if (spent) this.check(spent.rowId, 'resolve', await lt.resolve(CONTROLLER, spent.rowId, spent.payload));
       const claiming = lt.claim(a.machineId, a.rowId);
       if (row) row.claiming = claiming;
       this.check(a.rowId, 'claim', await claiming);
@@ -232,6 +252,7 @@ export class Dispatcher {
       log.info(GATEWAY_LOG.DISPATCH_PREPARING, { row: a.rowId, machine: a.machineId, jobs: [...live.awaitingReady] });
       return;
     }
+    readyUnspent(state, a.rowId);
     // The handoff may have ended meanwhile: a machine that ran the job anyway reports the arrival.
     if (!row) return;
     row.dispatch = DISPATCH_STATE.REFUSED;

@@ -52,7 +52,7 @@ export function isWireDirection(v: unknown): v is WireDirection {
   return v === 'in' || v === 'out';
 }
 
-const KINDS: readonly string[] = ['presence', 'snapshot', 'job', 'alarm', 'telemetry', 'report', 'cmd', 'reply', 'receipt', 'unknown'];
+const KINDS: readonly string[] = ['presence', 'snapshot', 'job', 'alarm', 'telemetry', 'report', 'ready', 'cmd', 'reply', 'receipt', 'unknown'];
 
 export function isWireKind(v: unknown): v is WireKind {
   return typeof v === 'string' && KINDS.includes(v);

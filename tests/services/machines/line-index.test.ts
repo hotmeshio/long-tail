@@ -12,8 +12,12 @@ function surface(opts: { runs: boolean; leads: boolean }): LineSurface {
     describeLines: () => (opts.runs ? [summarizeLine(DEFAULT_LINE, { rowOps: ['probe'] })] : []),
     describeLine: () => (opts.leads ? ({ siteId, lineId, leading: true, takenAt: null, machines: [], contested: [] }) : null),
     inspect: () => null,
+    wire: () => null,
     findLine: (s, l) => (opts.runs && s === siteId && l === lineId ? DEFAULT_LINE : undefined),
     commandOps: () => [],
+    commandArgs: () => ({}),
+    declare: async () => 'unchanged',
+    retire: async () => false,
   };
 }
 

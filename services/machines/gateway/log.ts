@@ -30,6 +30,7 @@ export const GATEWAY_LOG = {
   COMMAND_REFUSED: 'machine_gateway.command.refused',
   COMMAND_UNANSWERED: 'machine_gateway.command.unanswered',
   COMMAND_UNSUPPORTED: 'machine_gateway.command.unsupported',
+  COMMAND_PREPARING: 'machine_gateway.command.preparing',
   REQUEST_PARKED: 'machine_gateway.request.parked',
   REQUEST_REFUSED: 'machine_gateway.request.refused',
   REQUEST_ANSWERED: 'machine_gateway.request.answered',

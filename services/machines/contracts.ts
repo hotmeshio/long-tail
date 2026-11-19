@@ -28,6 +28,10 @@ export const ROW_TYPE = {
   MACHINE_NOTICE: 'machine-notice',
   /** A machine request or notice still open past its window, shown to the line's operators. */
   REQUEST_OVERDUE: 'machine-request-overdue',
+  /** A machine takes no dispatch while a person or a workflow holds it, as for a plate swap. */
+  MACHINE_HOLD: 'machine-hold',
+  /** A machine paced by ready may take one job; the dispatch the machine accepts resolves it. */
+  MACHINE_READY: 'machine-ready',
 } as const;
 
 export const LINE_ROLE = {
@@ -88,7 +92,16 @@ export interface HandoffFacets {
   parameters?: Record<string, unknown>;
   /** The host's references for the job, by name (an order, a batch, a ticket); sent to the machine as given and searchable on the row. */
   refs?: Record<string, string>;
+  /**
+   * `finish`: a hop with no receiving machine that the sender's finish ends. An ok finish (or a
+   * pass-through release) resolves it `received` once every unit is released; a not-ok one, `sender-rejected`.
+   */
+  exit?: HandoffExit;
 }
+
+/** How a hop with no receiving machine ends (`HandoffFacets.exit`). */
+export const HANDOFF_EXIT = { FINISH: 'finish' } as const;
+export type HandoffExit = typeof HANDOFF_EXIT[keyof typeof HANDOFF_EXIT];
 
 const RELEASED_PREFIX = 'released:';
 const ARRIVED_PREFIX = 'arrived:';
@@ -214,6 +227,10 @@ export const DECISION = {
   ANSWERED: 'answered',
   /** The machine notice an overdue row named has ended. */
   RECORDED: 'recorded',
+  /** A machine-ready row spent on the dispatch the machine accepted. */
+  DISPATCHED: 'dispatched',
+  /** A machine-ready row the machine took back (`ready: false`). */
+  WITHDRAWN: 'withdrawn',
 } as const;
 export type Decision = typeof DECISION[keyof typeof DECISION];
 
@@ -275,6 +292,8 @@ export interface CommandResolution {
   reason?: string;
   /** The machine's structured code for the outcome, when its reply carried one. */
   code?: string;
+  /** What the machine returned with its reply, such as a value it read. */
+  data?: Record<string, unknown>;
 }
 
 /** A row's dispatch command in its validity round; a later round is a new command (gateway/pacing.ts dispatchWindow). */
@@ -349,6 +368,12 @@ export const requestSignalKey = (siteId: string, lineId: string, machineId: stri
 /** The key a machine notice is created under, once per machine message. */
 export const noticeSignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
   `machine-notice:${siteId}:${lineId}:${machineId}:${ref}`;
+/** The key an alarm row is created under: once per alarm id, or per raise when `raisedAt` tells raises apart. */
+export const alarmSignalKey = (siteId: string, lineId: string, machineId: string, alarmId: string, raisedAt?: string) =>
+  `machine-alarm:${siteId}:${lineId}:${machineId}:${alarmId}${raisedAt ? `:${raisedAt}` : ''}`;
+/** The key a machine-ready row is created under, once per ready message. */
+export const readySignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
+  `machine-ready:${siteId}:${lineId}:${machineId}:${ref}`;
 /** The id of the workflow started for a parked row, once per row. */
 export const rowWorkflowId = (rowType: string, rowId: string) => `${rowType}-${rowId}`;
 /** The key a request's overdue row is created under, once per request. */

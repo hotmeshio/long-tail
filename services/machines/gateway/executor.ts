@@ -18,6 +18,7 @@ import { GATEWAY_LOG, type GatewayLog } from './log';
 import type { ReplyWaiter } from './reply-waiter';
 import { Dispatcher, GatewayStopped } from './dispatcher';
 import { failHandoff } from './plan-shared';
+import { readyCreated } from './ready';
 import { RequestRunner } from './requests-runner';
 import type { LineWorkflows } from './workflows';
 import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
@@ -25,6 +26,7 @@ import { plannedAction, type WireRecorder } from './wire';
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
+const PENDING = 'pending';
 
 export interface ExecutorDeps {
   bus: MachineBus;
@@ -132,7 +134,9 @@ export class Executor {
         return [outcomeOf('resolve', a.rowId, result)];
       }
       case 'createAlarmRow':
-        return [{ verb: 'create-row', rowId: await this.createAlarmRow(a), detail: `${a.row.type} ${a.alarmId} at ${a.machineId}` }];
+        return this.createAlarmRow(a);
+      case 'createReadyRow':
+        return this.createReadyRow(a);
       case 'createRow': {
         this.live();
         const { id } = await lt.create(CONTROLLER, a.row);
@@ -143,7 +147,10 @@ export class Executor {
         this.watchOffline(a.machineId);
         return [plannedAction(a)];
       case 'settleReply':
-        if (replies.settle({ cmdId: a.cmdId, status: a.status, reason: a.reason, ...(a.code ? { code: a.code } : {}), ...(a.preparing ? { preparing: true } : {}) })) return [plannedAction(a)];
+        if (replies.settle({
+          cmdId: a.cmdId, status: a.status, reason: a.reason,
+          ...(a.code ? { code: a.code } : {}), ...(a.preparing ? { preparing: true } : {}), ...(a.data ? { data: a.data } : {}),
+        })) return [plannedAction(a)];
         return [{ verb: 'ack', detail: `late ${a.status} ${a.cmdId}` }, ...await this.lateReply(a)];
       case 'settleSnapshot':
         replies.settleSnapshot(a.machineId, new Set(a.jobIds));
@@ -249,20 +256,45 @@ export class Executor {
     }
   }
 
-  private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<string> {
+  /**
+   * A keyed create that returns a row already ended is a raise replayed after
+   * its row closed: the alarm is not tracked again and pauses nothing.
+   */
+  private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<WireAction[]> {
     this.live();
-    const { id } = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
-    this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: id, machine: a.machineId, alarm: a.alarmId });
-    const track = this.d.state.alarms.get(this.d.state.alarmKey(a.machineId, a.alarmId));
+    const { state } = this.d;
+    const row = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
+    const created: WireAction = { verb: 'create-row', rowId: row.id, detail: `${a.row.type} ${a.alarmId} at ${a.machineId}` };
+    const key = state.alarmKey(a.machineId, a.alarmId);
+    const track = state.alarms.get(key);
     const raisedAt = a.row.metadata?.raisedAt;
-    if (track && (!track.raisedAt || !raisedAt || track.raisedAt === raisedAt)) {
-      track.rowId = id;
-      return id;
+    const current = !!track && (!track.raisedAt || !raisedAt || track.raisedAt === raisedAt);
+    if (row.status && row.status !== PENDING) {
+      if (current) state.alarms.delete(key);
+      return [{ ...created, detail: `${created.detail} (${row.status} already)` }];
+    }
+    this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: row.id, machine: a.machineId, alarm: a.alarmId });
+    if (current) {
+      track!.rowId = row.id;
+      return [created, ...await this.apply(a.paused)];
     }
     // Cleared at the machine, or raised again, while the row was being created.
     const note = track ? `${a.machineId} raised ${a.alarmId} again; this one ended` : `cleared at ${a.machineId}`;
-    await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.CLEARED, note });
-    return id;
+    await this.d.lt.resolve(CONTROLLER, row.id, { decision: DECISION.CLEARED, note });
+    return [created];
+  }
+
+  /** A keyed create that returns a row already ended is a ready replayed after it was spent: no ready. */
+  private async createReadyRow(a: Extract<Action, { kind: 'createReadyRow' }>): Promise<WireAction[]> {
+    try {
+      this.live();
+      const row = await this.d.lt.create(CONTROLLER, a.row);
+      readyCreated(this.d.state, a.machineId, row.id, row.status);
+      const ended = row.status && row.status !== PENDING ? ` (${row.status} already)` : '';
+      return [{ verb: 'create-row', rowId: row.id, detail: `${a.row.type} at ${a.machineId}${ended}` }];
+    } finally {
+      this.d.state.readyCreating.delete(a.machineId);
+    }
   }
 
   /** Raise a quiet row for each connected machine silent longer than `quietMs`. */

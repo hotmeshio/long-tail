@@ -125,7 +125,7 @@ describe('requireMcpAuth with the OAuth server', () => {
 
 describe('requireMcpAuth never uses the SSO cookie fallback', () => {
   beforeEach(() => {
-    mocks.sso = { resolve: vi.fn(async () => ({ externalId: 'hike-user' })) };
+    mocks.sso = { resolve: vi.fn(async () => ({ externalId: 'sso-user' })) };
   });
 
   it('without the OAuth server, a cookie-only request is refused', async () => {

@@ -65,6 +65,11 @@ describe('accumulateStep — item-locate mode', () => {
     expect(request.metadata).toMatchObject({ scanScheme: 10, scanCategory: '3', scanActionName: 'Bin it' });
   });
 
+  it('keys the item by params.itemKey when given, templated from the located row', async () => {
+    await accumulateStep(itemLocate({ params: { accumulate: { containerFacet: 'binKey' }, itemKey: '{item.orderId}-in-{item.binKey}' } }), ctx);
+    expect(add.mock.calls[0][0]).toMatchObject({ key: 'binKey', value: 'B-7', itemKey: 'ORD-9-in-B-7' });
+  });
+
   it('skips the reciprocal when the step opts out', async () => {
     await accumulateStep(itemLocate({ params: { accumulate: { containerFacet: 'binKey', reciprocal: false } } }), ctx);
     expect(add.mock.calls[0][0].reciprocal).toBeUndefined();

@@ -71,16 +71,43 @@ describe('a machine that restarts after its job is ready, on arrival dispatch', 
     expect(log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE)).toHaveLength(0);
   });
 
-  it('logs a lost job as unrecoverable when a later gateway holds no memory of it', async () => {
+  it('is sent the job again by a later gateway, which reads the row that sent it back from Long Tail', async () => {
+    const log = new RecordingLog();
+    const { rowId, cmdId } = await readyJob(log);
+    await rig.gateway.stop();
+    rig.gateway = await rig.startGateway();
+    snapshot('boot-1', [{ jobId: 'U1-press-01' }]);
+    await sleep(30);
+    snapshot('boot-2', []);
+    await until(() => dispatches().length === 2);
+    expect(dispatches()[1]).toMatchObject({ cmdId, retry: true, args: { jobId: 'U1-press-01' } });
+    expect(rig.lt.rows.get(rowId)).toMatchObject({ status: 'resolved' });
+    expect(log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE)).toHaveLength(0);
+  });
+
+  it('sends nothing for a job whose units left before the restart, after a takeover', async () => {
     const log = new RecordingLog();
     await readyJob(log);
     await rig.gateway.stop();
     rig.gateway = await rig.startGateway();
     snapshot('boot-1', [{ jobId: 'U1-press-01' }]);
     await sleep(30);
+    publish(CHANNEL.JOB, { event: 'released', jobId: 'U1-press-01', unitId: 'U1', orderRef: 'ORD-1', recipe: null });
+    await sleep(30);
     snapshot('boot-2', []);
+    await sleep(80);
+    expect(dispatches()).toHaveLength(1);
+    expect(log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE)).toHaveLength(0);
+  });
+
+  it('logs a lost job as unrecoverable when no row sent it', async () => {
+    const log = new RecordingLog();
+    await readyJob(log);
+    snapshot('boot-1', [{ jobId: 'U1-press-01' }, { jobId: 'stray-job' }]);
+    await sleep(30);
+    snapshot('boot-2', [{ jobId: 'U1-press-01' }]);
     await until(() => log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE).length);
-    expect(log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE)[0]).toMatchObject({ machine: 'press-01', jobs: ['U1-press-01'] });
+    expect(log.of(GATEWAY_LOG.DISPATCH_UNRECOVERABLE)[0]).toMatchObject({ machine: 'press-01', jobs: ['stray-job'] });
     expect(dispatches()).toHaveLength(1);
   });
 });

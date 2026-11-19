@@ -7,9 +7,9 @@
  */
 
 import { isUuid } from '../../../lib/uuid';
-import type { OpenRowQuery } from '../rows';
+import type { EndedRowQuery, OpenRowQuery } from '../rows';
 import { CONTROLLER, type Actor, type CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, endedListQuery, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 
 export class LtHttpError extends Error {
   readonly cause?: unknown;
@@ -118,6 +118,13 @@ export class HttpLineEscalations implements LineEscalations {
       const page = await this.http.request<{ escalations: Record<string, any>[] }>('GET', `/escalations?${query}`, this.tokenFor(CONTROLLER));
       return page.escalations;
     });
+  }
+
+  async listEnded(filter: EndedRowQuery): Promise<Record<string, any>[]> {
+    const fields = Object.entries(endedListQuery(filter))
+      .map(([k, v]): [string, string] => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)]);
+    const page = await this.http.request<{ escalations: Record<string, any>[] }>('GET', `/escalations?${new URLSearchParams(fields)}`, this.tokenFor(CONTROLLER));
+    return page.escalations;
   }
 
   private async verb(as: Actor, method: string, path: string, body: unknown): Promise<VerbResult> {

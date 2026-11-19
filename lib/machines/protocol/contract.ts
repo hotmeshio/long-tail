@@ -47,7 +47,8 @@ const BODY: Record<MessageKind, Schema> = {
     jobs: { type: 'array', items: shape({ jobId: STR, units: { type: 'array', items: STR }, status: STR }) },
     alarms: { type: 'array', items: STR },
     cycles: INT0,
-  }, ['bootId', 'software', 'recipe', 'cycles']),
+    ready: BOOL,
+  }, ['bootId', 'software', 'recipe', 'cycles', 'ready']),
   [MESSAGE_KIND.JOB]: shape({
     event: oneOf(JOB_EVENT), jobId: STR, unitId: STR, orderRef: STR, recipe: RECIPE, carrierId: STR_N, peer: STR_N,
     result: oneOf(JOB_RESULT), reason: STR_N,
@@ -57,8 +58,8 @@ const BODY: Record<MessageKind, Schema> = {
     },
     materials: { type: 'array', items: shape({ material: STR, lot: STR }) },
     startedAt: TS, endedAt: TS, durationMs: INT0, failure: oneOf(TRANSFER_FAILURE),
-    percent: { type: 'number', minimum: 0, maximum: 100 }, remainingSec: INT0, stage: STR, detail: { type: 'object' },
-  }, ['jobId', 'unitId', 'orderRef', 'peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'stage', 'detail']),
+    percent: { type: 'number', minimum: 0, maximum: 100 }, remainingSec: INT0, stage: STR, detail: { type: 'object' }, processed: BOOL,
+  }, ['jobId', 'unitId', 'orderRef', 'peer', 'result', 'reason', 'measurements', 'materials', 'startedAt', 'endedAt', 'durationMs', 'failure', 'percent', 'remainingSec', 'stage', 'detail', 'processed']),
   [MESSAGE_KIND.ALARM]: shape({
     alarmId: STR, code: STR, level: oneOf(LEVEL), text: STR, active: BOOL,
     raisedAt: TS, clearedAt: TS_N, clearedBy: STR_N, ackedBy: STR_N, ackedAt: TS_N,
@@ -66,8 +67,9 @@ const BODY: Record<MessageKind, Schema> = {
   }, ['needsPerson']),
   [MESSAGE_KIND.TELEMETRY]: shape({ readings: { type: 'object', additionalProperties: NUM } }),
   [MESSAGE_KIND.CMD]: shape({ cmdId: STR, op: oneOf(OP), args: { type: 'object' } }),
-  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR, preparing: BOOL }, ['code', 'preparing']),
+  [MESSAGE_KIND.REPLY]: shape({ cmdId: STR, status: oneOf(REPLY_STATUS), reason: STR, code: STR, preparing: BOOL, data: { type: 'object' } }, ['code', 'preparing', 'data']),
   [MESSAGE_KIND.REPORT]: { type: 'object' },
+  [MESSAGE_KIND.READY]: shape({ ready: BOOL }, ['ready']),
 };
 
 const ajv = new Ajv({ allErrors: true, strict: false });

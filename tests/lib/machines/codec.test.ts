@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildEnvelope, declaredRowOps, genericCodec, oneWayOps, RECEIPT_FROM, topicOf } from '../../../lib/machines/protocol';
+import { ALARM_IDS, alarmIdsOf, buildEnvelope, declaredRowOps, genericCodec, oneWayOps, RECEIPT_FROM, topicOf } from '../../../lib/machines/protocol';
 
 const ident = { siteId: 'site-1', lineId: 'line-1', machineId: 'cut-01' };
 const topic = (channel: string) => `line/v1/site-1/line-1/cut-01/${channel}`;
@@ -95,5 +95,16 @@ describe('row ops', () => {
   it('the generic codec carries respondingTo in the command body', () => {
     const [wire] = genericCodec({ root: 'line/v1' }).encode(ident, { cmdId: 'c1', op: 'ack', args: {}, respondingTo: 'm-7' });
     expect(JSON.parse(wire.payload).body).toMatchObject({ cmdId: 'c1', respondingTo: 'm-7' });
+  });
+});
+
+describe('alarm ids', () => {
+  it('are recurring unless the codec says each names one occurrence', () => {
+    expect(alarmIdsOf({})).toBe(ALARM_IDS.RECURRING);
+    expect(alarmIdsOf({ alarmIds: ALARM_IDS.OCCURRENCE })).toBe(ALARM_IDS.OCCURRENCE);
+  });
+
+  it('refuse any other value', () => {
+    expect(() => alarmIdsOf({ alarmIds: 'unique' as any })).toThrow(/alarmIds/);
   });
 });

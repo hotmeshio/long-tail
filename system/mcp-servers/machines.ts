@@ -5,6 +5,7 @@ import { createEscalation } from '../../api/escalations';
 import { loggerRegistry } from '../../lib/logger';
 import { getMachineSurface } from '../../modules/machines';
 import { commandRow, commandTarget } from '../../services/machines/commands';
+import { argsRefusal } from '../../services/machines/command-args';
 import { registeredToolCount } from '../../services/mcp/registered-tools';
 import { emptyLineHealth, lineSummaryOf, toLineIndexRow, wirePayloadOf } from '../../services/machines/line-index';
 import { LineVersionConflict, getLineWithHealth, listLines, listSites, type LineListQuery } from '../../services/machines/registry';
@@ -108,6 +109,8 @@ function registerTools(srv: McpServer): void {
       if (!line.machines.some((m) => m.machineId === args.machineId)) return fail(`no machine ${args.machineId} on ${args.siteId}/${args.lineId}`);
       const ops = surface.commandOps(args.siteId, args.lineId);
       if (!ops.includes(args.op)) return fail(`op must be one of ${ops.join(', ')}`);
+      const refusal = argsRefusal(args.op, surface.commandArgs(args.siteId, args.lineId)[args.op], args.args ?? {});
+      if (refusal) return fail(refusal);
       const result = await createEscalation(commandRow(commandTarget(line, args.machineId), args.op, args.args ?? {}), await callerAuth(extra));
       if (result.status !== 201) return fail(result.error ?? `command refused (${result.status})`);
       return ok({ rowId: result.data.id });

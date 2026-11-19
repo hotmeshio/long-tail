@@ -10,13 +10,14 @@ import { VERB_OUTCOME, type CreatedRow, type LineEscalations, type RowItem, type
 import { REQUEST_ITEM, ROW_TYPE, type HandoffFacets } from '../contracts';
 import type { MemoryEscalationFeed } from '../../../lib/machines/transport';
 import { until } from './wait';
-import type { OpenRowQuery } from '../rows';
+import type { EndedRowQuery, OpenRowQuery } from '../rows';
 
 export interface FakeRow {
   id: string;
   type: string;
   subtype?: string;
   role: string;
+  description?: string;
   status: 'pending' | 'resolved' | 'cancelled' | 'expired';
   assigned_to?: string;
   metadata: Record<string, any>;
@@ -36,6 +37,7 @@ export class FakeLongTail implements LineEscalations {
   /** Rows by the key they were created under, as Long Tail's unique signal key keeps them. */
   private readonly keyed = new Map<string, string>();
   private seq = 0;
+  /** Resolved row ids, oldest resolve first. */
   private failing = new Map<string, number>();
 
   /** The next `times` calls of `verb` fail as a Long Tail outage would (5xx). */
@@ -184,6 +186,18 @@ export class FakeLongTail implements LineEscalations {
       .map((r) => ({
         id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, assigned_to: r.assigned_to ?? null, metadata: r.metadata,
         created_at: r.created_at ?? null,
+      }));
+  }
+
+  async listEnded(query: EndedRowQuery): Promise<Record<string, any>[]> {
+    const fits = (r: FakeRow) => (!query.type || r.type === query.type) && (!query.role || r.role === query.role)
+      && Object.entries(query.facets ?? {}).every(([k, v]) => r.metadata[k] === v);
+    return [...this.rows.values()].reverse()
+      .filter((r) => r.status === 'resolved' && fits(r))
+      .slice(0, query.limit)
+      .map((r) => ({
+        id: r.id, type: r.type, subtype: r.subtype, role: r.role, status: r.status, metadata: r.metadata, created_at: r.created_at ?? null,
+        resolver_payload: r.resolver_payload ? JSON.stringify(r.resolver_payload) : null,
       }));
   }
 

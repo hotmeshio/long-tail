@@ -10,7 +10,8 @@ import { eventRegistry } from '../../../lib/events';
 import { maintenanceRegistry } from '../../../services/maintenance';
 import { mcpRegistry } from '../../../services/mcp/index';
 import { registerMachineSurface } from '../../../modules/machines';
-import { commandOpsOf, summarizeLine, type LineSurface, type WireProbe } from '../../../services/machines/surface';
+import { summarizeLine, type LineSurface, type WireProbe } from '../../../services/machines/surface';
+import { commandOpsOf, rowOpArgs } from '../../../lib/machines/protocol';
 import { getLine } from '../../../services/machines/registry';
 import { DEFAULT_LINE } from '../../../examples/workflows/machine-line/line';
 import type { LineDef } from '../../../lib/machines/line';
@@ -38,6 +39,8 @@ const SITE = `mcp-${Date.now().toString(36)}`;
 const COMMAND_ROLE = 'line-bond';
 const running = new Map<string, LineDef>([[`${siteId}/${lineId}`, DEFAULT_LINE]]);
 
+const CODEC = { rowOps: ['probe', { op: 'setpoint', args: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } } }] };
+
 function fakeSurface(leading: boolean): LineSurface {
   const view: LineView = { siteId, lineId, leading: true, takenAt: '2026-03-01T08:00:00.000Z', machines: [], contested: [] };
   const planned = (probe: WireProbe): InspectResult => ({
@@ -48,7 +51,8 @@ function fakeSurface(leading: boolean): LineSurface {
     describeLine: (s, l) => (leading && s === siteId && l === lineId ? view : null),
     inspect: (s, l, probe) => (leading && s === siteId && l === lineId ? planned(probe) : null),
     findLine: (s, l) => running.get(`${s}/${l}`),
-    commandOps: () => commandOpsOf({ rowOps: ['probe'] }),
+    commandOps: () => commandOpsOf(CODEC),
+    commandArgs: () => rowOpArgs(CODEC),
     declare: async (def) => { running.set(`${def.siteId}/${def.lineId}`, def); return 'started'; },
     retire: async (s, l) => running.delete(`${s}/${l}`),
   };
@@ -130,6 +134,12 @@ describe('machines MCP server', () => {
     expect(rows[0].metadata).toMatchObject({ siteId, lineId, machineId: 'press-01', op: 'pause' });
     expect((await call(MACHINE_TOOL.COMMAND, { siteId, lineId, machineId: 'press-01', op: 'explode' })).isError).toBe(true);
     expect((await call(MACHINE_TOOL.COMMAND, { siteId, lineId, machineId: 'ghost', op: 'pause' })).isError).toBe(true);
+  });
+
+  it('refuses args that fail the op\'s declared schema, parking nothing', async () => {
+    const res = await call(MACHINE_TOOL.COMMAND, { siteId, lineId, machineId: 'press-01', op: 'setpoint', args: {} });
+    expect(res.isError).toBe(true);
+    expect(JSON.stringify(res.content)).toMatch(/setpoint args: name/);
   });
 
   it('declares a line into the registry, runs it, lists it, conflicts on a stale version, and retires it', async () => {

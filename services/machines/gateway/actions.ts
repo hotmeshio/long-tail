@@ -40,11 +40,14 @@ export type Action =
   /** `metadata` is merged into the row's metadata in the same statement. */
   | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; metadata?: Record<string, any>; complete?: Completion }
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
-  | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
+  /** `paused`: the notes on the rows the alarm pauses, written only when the row it raises is open. */
+  | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput; paused: Action[] }
+  /** A machine's ready, raised as a keyed machine-ready row (ready.ts). */
+  | { kind: 'createReadyRow'; machineId: string; row: CreateRowInput }
   /** A row for a person, raised by the controller. */
   | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }
-  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string; preparing?: boolean }
+  | { kind: 'settleReply'; cmdId: string; status: string; reason: string; code?: string; preparing?: boolean; data?: Record<string, unknown> }
   /** A machine reported the jobs it holds: answers a status query in flight. */
   | { kind: 'settleSnapshot'; machineId: string; jobIds: string[] }
   /** Bind a station to the address that claims it, and keep the binding in the address book. `by`: who approved it, when someone did. */
@@ -75,4 +78,6 @@ export interface Completion {
 export interface Plan {
   actions: Action[];
   disposition: Disposition;
+  /** Why a nak'd message waits: the row it needs and does not find yet. */
+  waitingFor?: string;
 }

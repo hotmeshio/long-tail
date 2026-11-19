@@ -142,9 +142,11 @@ export async function startWorkers(
   // Register declared roles (every container — roles are independent of workers).
   if (startConfig.roles?.length) {
     const { applyRoleConfig, listConfiguredRoles } = await import('../services/role/seed');
+    const { orderRolesByParent } = await import('../services/role/apply-order');
     const roleReport = newSurfaceReport();
+    const ordered = orderRolesByParent(startConfig.roles);
     await withConfigLock(async () => {
-      for (const roleCfg of startConfig.roles!) {
+      for (const roleCfg of ordered) {
         try {
           const outcome = await applyRoleConfig(roleCfg, ownedByCode(roleCfg.reset, configSource));
           recordOutcome(roleReport, roleCfg.role, outcome);

@@ -14,6 +14,10 @@ export interface LineSummaryMachine {
   addressing: MachineAddressing;
   /** Command ops the line's codec declares beyond the control ops and `snapshot`. */
   rowOps?: readonly string[];
+  /** Every op a command row may ask of the machine: the control ops its codec declares, `snapshot`, and the row ops. */
+  commandOps: readonly string[];
+  /** The JSON Schema each op's `args` must satisfy, for the ops that declare one. */
+  opArgs?: Record<string, Record<string, unknown>>;
 }
 
 export interface LineSummary {
@@ -89,7 +93,7 @@ export type LineViewResponse = (LineView | StandingByView) & { summary: LineSumm
 
 export type WireDirection = 'in' | 'out';
 
-export type WireKind = 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'cmd' | 'reply' | 'receipt' | 'unknown';
+export type WireKind = 'presence' | 'snapshot' | 'job' | 'alarm' | 'telemetry' | 'report' | 'ready' | 'cmd' | 'reply' | 'receipt' | 'unknown';
 
 export type WireVerb = 'claim' | 'accumulate' | 'resolve' | 'create-row' | 'refuse' | 'hold' | 'unmatched' | 'unreadable' | 'ack' | 'none';
 

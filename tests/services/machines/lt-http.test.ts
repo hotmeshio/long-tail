@@ -85,6 +85,18 @@ describe('Long Tail HTTP client', () => {
     expect(server.seen[1].body).toEqual({ itemKey: 'arrived:U1', payload: {} });
   });
 
+  it('lists the newest resolved rows on the line in one read, with facets and order on the URL', async () => {
+    server = await new FakeLtServer().on('GET', /^\/escalations\?/, () => ({ status: 200, body: { escalations: [{ id: 'e7' }] } })).start();
+    const rows = await client(server).listEnded({ type: 'handoff', facets: { siteId: 's1', lineId: 'l1' }, limit: 50 });
+    expect(rows).toEqual([{ id: 'e7' }]);
+    const url = new URLSearchParams(server.seen[0].path.split('?')[1]);
+    expect(Object.fromEntries(url)).toEqual({
+      type: 'handoff', status: 'resolved', limit: '50', offset: '0',
+      facets: JSON.stringify({ siteId: 's1', lineId: 'l1' }), orderBy: JSON.stringify([{ field: 'created_at', direction: 'desc' }]),
+    });
+    expect(server.seen[0].auth).toBe('Bearer tok-controller');
+  });
+
   it('reads every page of open rows, oldest first', async () => {
     const page = (offset: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${offset + i}` }));
     server = await new FakeLtServer()

@@ -7,7 +7,7 @@
  */
 
 import type { LineDef } from '../../../types/machines';
-import { CHANNEL, JOB_EVENT } from './constants';
+import { CHANNEL, JOB_EVENT, type Op } from './constants';
 import { inspectMessage, type Inspection } from './contract';
 import { buildEnvelope, type Envelope, type MachineIdent } from './envelope';
 import { MESSAGE_KIND, machineTopic } from './topics';
@@ -35,8 +35,17 @@ export interface MachineCommand {
   respondingTo?: string;
 }
 
-/** A codec's own row op: its name, or the name and whether the machine replies to it (it does unless `reply: false`). */
-export type RowOp = string | { op: string; reply?: boolean };
+/** A codec's own row op, declared by name or in full. */
+export interface RowOpEntry {
+  op: string;
+  /** The machine replies to it unless `reply: false`; a one-way op is sent once and its row resolves `sent`. */
+  reply?: boolean;
+  /** A JSON Schema for the op's `args`: a command row whose args fail it is refused, and the dashboard renders its fields. */
+  args?: Record<string, unknown>;
+  /** After a `preparing` reply, how long the row waits for the machine's final reply before it resolves with the held one. */
+  settleMs?: number;
+}
+export type RowOp = string | RowOpEntry;
 
 /** MQTT filters under each machine's topic, e.g. `job` or `alarm/+`. */
 export interface CodecChannels {
@@ -91,10 +100,21 @@ export interface LineCodec {
    */
   readonly retainedAlarms?: boolean;
   /**
+   * What an alarm id names. `recurring` (the default): the id comes back, and each raise is told apart
+   * by its `raisedAt`. `occurrence`: the id names one occurrence, so a raise for an id whose row
+   * exists, open or ended, raises nothing.
+   */
+  readonly alarmIds?: AlarmIds;
+  /**
+   * The line protocol's control ops the machines have (CONTROL_OPS by default). A command row, the
+   * commands route and the dashboard's control menu offer only these; any other is refused.
+   */
+  readonly controlOps?: readonly Op[];
+  /**
    * Commands of the machines' own, beyond the line protocol's control ops, that a machine-command row
    * may ask for. Each is sent through `encode` and the row resolves with the reply. An op declared with
    * `reply: false` is sent once and its row resolves `sent`, waiting for nothing. Every name is a
-   * non-empty string; the gateway refuses a codec whose entries are not.
+   * non-empty string; the gateway refuses a codec whose entries are not (ops.ts).
    */
   readonly rowOps?: readonly RowOp[];
   /** One wire message as zero or more line-protocol messages; empty when the topic is not a machine's. */
@@ -108,28 +128,20 @@ export interface LineCodec {
   receipt?(ident: MachineIdent, messageIds: string[]): WireMessage[];
 }
 
-const rowOpName = (entry: RowOp): unknown => (typeof entry === 'string' ? entry : entry?.op);
-
-/** The names of the codec's own row ops; an entry without a non-empty name is a misconfigured codec and throws. */
-export function declaredRowOps(codec: Pick<LineCodec, 'rowOps'>): readonly string[] {
-  const ops = codec.rowOps ?? [];
-  if (!Array.isArray(ops)) throw new Error('codec.rowOps must be a list of op names or { op, reply } entries');
-  const names = ops.map(rowOpName);
-  if (names.some((op) => typeof op !== 'string' || !op)) {
-    throw new Error('codec.rowOps entries must each name a non-empty op');
-  }
-  return names as string[];
-}
-
-/** The row ops the machines never reply to: sent once, done on publish. */
-export function oneWayOps(codec: Pick<LineCodec, 'rowOps'>): ReadonlySet<string> {
-  declaredRowOps(codec);
-  const ops = (codec.rowOps ?? []).filter((e): e is { op: string; reply?: boolean } => typeof e === 'object' && e.reply === false);
-  return new Set(ops.map((e) => e.op));
-}
-
 export const DISPATCH_ON = { CREATED: 'created', ARRIVAL: 'arrival' } as const;
 export type DispatchOn = typeof DISPATCH_ON[keyof typeof DISPATCH_ON];
+
+export const ALARM_IDS = { RECURRING: 'recurring', OCCURRENCE: 'occurrence' } as const;
+export type AlarmIds = typeof ALARM_IDS[keyof typeof ALARM_IDS];
+
+/** The codec's `alarmIds`, `recurring` when left out; any other value is a misconfigured codec and throws. */
+export function alarmIdsOf(codec: Pick<LineCodec, 'alarmIds'>): AlarmIds {
+  const value = codec.alarmIds ?? ALARM_IDS.RECURRING;
+  if (!Object.values(ALARM_IDS).includes(value)) {
+    throw new Error(`codec.alarmIds must be one of ${Object.values(ALARM_IDS).join(', ')}; got ${String(value)}`);
+  }
+  return value;
+}
 
 /** Which job event counts as the receiver's receipt. */
 export const RECEIPT_FROM = { ARRIVED: 'arrived', BOUND: 'bound', STARTED: 'started' } as const;
@@ -146,7 +158,7 @@ export interface GenericCodecOptions {
 }
 
 export const GENERIC_CHANNELS: CodecChannels = {
-  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`],
+  events: [CHANNEL.PRESENCE, CHANNEL.SNAPSHOT, CHANNEL.JOB, `${CHANNEL.ALARM}/+`, CHANNEL.REPLY, `${CHANNEL.REPORT}/#`, CHANNEL.READY],
   telemetry: [CHANNEL.TELEMETRY],
   commands: [CHANNEL.CMD],
 };

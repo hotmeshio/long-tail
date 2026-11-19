@@ -6,10 +6,10 @@
 import * as escalationApi from '../../../api/escalations';
 import { isUuid } from '../../../lib/uuid';
 import type { Actor, CreateRowInput } from './actions';
-import { OPEN_PAGE, VERB_OUTCOME, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
+import { OPEN_PAGE, VERB_OUTCOME, endedListQuery, readAllPages, verbOutcomeOf, type CreatedRow, type LineEscalations, type RowItem, type VerbResult } from './escalations';
 import { CONTROLLER } from './actions';
 import type { LTApiResult } from '../../../types/sdk';
-import type { OpenRowQuery } from '../rows';
+import type { EndedRowQuery, OpenRowQuery } from '../rows';
 
 /** A row that was never given items (one parked by hand) answers 400; it holds none. */
 const NO_ITEMS_STATUS = 400;
@@ -74,5 +74,11 @@ export class ApiLineEscalations implements LineEscalations {
       if (result.status >= 300) throw new Error(`list failed ${result.status}: ${result.error}`);
       return (result.data as any).escalations;
     });
+  }
+
+  async listEnded(query: EndedRowQuery): Promise<Record<string, any>[]> {
+    const result = await escalationApi.listEscalations(endedListQuery(query) as Parameters<typeof escalationApi.listEscalations>[0], this.auth(CONTROLLER));
+    if (result.status >= 300) throw new Error(`list failed ${result.status}: ${result.error}`);
+    return (result.data as any).escalations;
   }
 }

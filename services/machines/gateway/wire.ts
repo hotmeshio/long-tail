@@ -18,6 +18,7 @@ export const WIRE_DIRECTION = { IN: 'in', OUT: 'out' } as const;
 const RECEIPT_CHANNEL = 'receipt';
 const ALARM_EVENT = { RAISED: 'raised', ACKED: 'acked', CLEARED: 'cleared' } as const;
 const PRESENCE_EVENT = { ONLINE: 'online', OFFLINE: 'offline' } as const;
+const READY_EVENT = { READY: 'ready', WITHDRAWN: 'withdrawn' } as const;
 
 export interface WireOptions {
   /** Publish telemetry messages too. */
@@ -107,6 +108,7 @@ export function eventOf(seen: Inspection): string | null {
     case MESSAGE_KIND.PRESENCE: return b.online === true ? PRESENCE_EVENT.ONLINE : PRESENCE_EVENT.OFFLINE;
     case MESSAGE_KIND.SNAPSHOT: return typeof b.mode === 'string' ? b.mode : null;
     case MESSAGE_KIND.REPORT: return parsed.key ?? null;
+    case MESSAGE_KIND.READY: return b.ready === false ? READY_EVENT.WITHDRAWN : READY_EVENT.READY;
     default: return null;
   }
 }
@@ -136,6 +138,8 @@ export function summarize(seen: Inspection): string {
       return ['reply', event, b.cmdId, b.reason ? `: ${b.reason}` : null].filter(Boolean).join(' ');
     case MESSAGE_KIND.REPORT:
       return `report ${parsed.key ?? ''}`.trim();
+    case MESSAGE_KIND.READY:
+      return `ready ${event}`;
     default:
       return parsed.kind;
   }
@@ -160,8 +164,9 @@ export function appliedActions(applied: Applied, deliveries: number, maxDeliveri
   if (applied.actions.length) return applied.actions;
   if (applied.disposition !== DISPOSITION.NAK) return [{ verb: 'ack' }];
   if (applied.failed) return [{ verb: 'none', detail: 'a verb failed; the message is delivered again' }];
-  if (deliveries >= maxDeliveries) return [{ verb: 'unmatched', detail: `no row after ${deliveries} deliveries` }];
-  return [{ verb: 'none', detail: `waiting for its row (delivery ${deliveries})` }];
+  const why = applied.waitingFor ? `: ${applied.waitingFor}` : '';
+  if (deliveries >= maxDeliveries) return [{ verb: 'unmatched', detail: `no row after ${deliveries} deliveries${why}` }];
+  return [{ verb: 'none', detail: `waiting for its row (delivery ${deliveries})${why}` }];
 }
 
 /** A message no row has claimed after this many deliveries is not racing its row. */
@@ -177,6 +182,7 @@ export function plannedAction(a: Action): WireAction {
     case 'accumulate': return { verb: 'accumulate', rowId: a.rowId, itemKey: a.itemKey };
     case 'resolve': return { verb: 'resolve', rowId: a.rowId };
     case 'createAlarmRow': return { verb: 'create-row', detail: `${a.row.type} for ${a.machineId}` };
+    case 'createReadyRow': return { verb: 'create-row', detail: `${a.row.type} for ${a.machineId}` };
     case 'createRow': return { verb: 'create-row', detail: a.row.type };
     case 'watchOffline': return { verb: 'none', detail: `watching ${a.machineId} for an offline row` };
     case 'settleReply': return { verb: 'ack', detail: `${a.status} ${a.cmdId}` };

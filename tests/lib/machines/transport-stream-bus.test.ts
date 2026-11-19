@@ -9,7 +9,7 @@ vi.mock('../../../lib/machines/transport/mqtt-session', () => ({
   MqttSession: { open: async () => ({ publish: async () => undefined, retained: async () => [], close: async () => undefined }) },
 }));
 
-const mqtt = { url: 'mqtt://site' };
+const mqtt = { url: 'mqtt://site', protocolVersion: 5 as const };
 const line = genericCodec({ root: 'line/v1' });
 const other = { root: 'acme/v2', channels: { events: ['events'], telemetry: ['telemetry'], commands: ['commands'] } };
 

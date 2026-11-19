@@ -9,11 +9,11 @@
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
-import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests } from './reconcile';
+import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests, restoreSentJobs } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
-import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { PACE_BY, machineRole, type LineDef } from '../../../lib/machines/line';
+import { DISPATCH_ON, MESSAGE_KIND, OP, alarmIdsOf, declaredControlOps, declaredRowOps, rowOpArgs, rowOpSettleMs, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { publishMachineWireEvent } from '../../../lib/events/publish';
 import type { InspectResult } from '../../../types/machines-view';
@@ -28,7 +28,7 @@ import { planPacing } from './pacing';
 import { planMachineMessage } from './plan-machine';
 import { GatewayState } from './state';
 import { ReceiptBatcher } from './receipts';
-import { MAX_DELIVERIES, WireRecorder, type WireSink } from './wire';
+import { MAX_DELIVERIES, WireRecorder, eventOf, type WireSink } from './wire';
 import { WireWindow } from './wire-window';
 import { NO_WORKFLOWS, type LineWorkflows } from './workflows';
 
@@ -92,10 +92,15 @@ export class MachineGateway {
     this.codec = deps.codec ?? genericCodec({ root: deps.settings.topicRoot, line: deps.line });
     this.state.unitsPerDispatch = this.codec.unitsPerDispatch;
     this.state.dispatchOnArrival = this.codec.dispatchOn === DISPATCH_ON.ARRIVAL;
+    this.state.readyPaced = new Map(deps.line.machines.filter((m) => m.paceBy === PACE_BY.READY).map((m) => [m.machineId, machineRole(m)]));
+    this.state.controlOps = declaredControlOps(this.codec);
     this.state.rowOps = declaredRowOps(this.codec);
+    this.state.opArgs = rowOpArgs(this.codec);
+    this.state.settleMs = rowOpSettleMs(this.codec);
     this.state.oneWayOps = oneWayOps(this.codec);
     this.state.lifecycle = deps.settings.lifecycle === true;
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
+    this.state.alarmIds = alarmIdsOf(this.codec);
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
     this.window = new WireWindow(deps.settings.wireWindow);
@@ -174,6 +179,7 @@ export class MachineGateway {
     try {
       const addresses = await restoreAddresses(this.state, this.addresses, this.deps.line);
       const handoffs = await this.reconcileHandoffs();
+      const sent = await restoreSentJobs(this.state, this.deps.lt, this.deps.line, this.rows);
       await this.executor.apply(await arrivalsOnRows(this.state, this.deps.lt, this.deps.settings.dispatchTtlMs));
       await notesOnRows(this.state, this.deps.lt);
       const commands = await this.reconcileCommands();
@@ -181,7 +187,7 @@ export class MachineGateway {
       await this.executor.apply(requests.actions);
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();
-      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, requests: requests.open, addresses, ...restored });
+      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, sent, commands, requests: requests.open, addresses, ...restored });
     } finally {
       this.state.holdDispatch = false;
     }
@@ -276,6 +282,7 @@ export class MachineGateway {
     const acted: Inspection[] = [];
     let outcome: Disposition = DISPOSITION.TERM;
     let failed = false;
+    let lastWait: { seen: Inspection; waitingFor?: string } | undefined;
     for (const raw of decoded) {
       if (!raw.parsed) continue;
       const admitted = await admitSender(this.admission, msg.topic, raw);
@@ -300,11 +307,12 @@ export class MachineGateway {
       }
       failed ||= applied.failed;
       outcome = worse(outcome, applied.disposition);
+      if (applied.disposition === DISPOSITION.NAK && !applied.failed) lastWait = { seen, waitingFor: applied.waitingFor };
       this.wire.inbound(msg, seen, { ...applied, actions: [...admitted.actions, ...applied.actions] }, msg.deliveries);
     }
     // No row has claimed it after this many tries, so it is not racing its row: stop. A failed verb always retries.
     if (outcome === DISPOSITION.NAK && !failed && msg.deliveries >= MAX_DELIVERIES) {
-      this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries });
+      this.log.warn(GATEWAY_LOG.UNMATCHED, { topic: msg.topic, deliveries: msg.deliveries, ...(lastWait ? unmatchedContext(lastWait.seen, lastWait.waitingFor) : {}) });
       outcome = DISPOSITION.TERM;
     }
     if (outcome !== DISPOSITION.NAK) this.confirm(acted);
@@ -346,7 +354,7 @@ export class MachineGateway {
     try {
       const actions = await this.executor.apply(plan.actions);
       await this.pace();
-      return { disposition: plan.disposition, failed: false, actions };
+      return { disposition: plan.disposition, failed: false, actions, ...(plan.waitingFor ? { waitingFor: plan.waitingFor } : {}) };
     } catch (err: any) {
       if (!(err instanceof GatewayStopped)) this.log.error(GATEWAY_LOG.VERB_FAILED, { topic, error: err.message });
       return { disposition: DISPOSITION.NAK, failed: true, actions: [] };
@@ -355,6 +363,15 @@ export class MachineGateway {
 }
 
 const DEFAULT_RECEIPT_DELAY_MS = 250;
+
+/** What an unmatched message was and the row it waited for, so the log reads it after the wire window has rolled. */
+function unmatchedContext(seen: Inspection, waitingFor?: string): Record<string, unknown> {
+  const b: Record<string, any> = seen.body?.body ?? {};
+  return {
+    kind: seen.parsed?.kind, event: eventOf(seen), machineId: seen.parsed?.ident.machineId,
+    unitId: b.unitId ?? null, jobId: b.jobId ?? null, carrierId: b.carrierId ?? null, ...(waitingFor ? { waitingFor } : {}),
+  };
+}
 
 const RANK: Record<Disposition, number> = { [DISPOSITION.TERM]: 0, [DISPOSITION.ACK]: 1, [DISPOSITION.NAK]: 2 };
 

@@ -3,7 +3,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { setupRouteTest, authHeaders } from './setup';
 import { getPool } from '../../lib/db';
 import { registerMachineSurface } from '../../modules/machines';
-import { commandOpsOf, summarizeLine, type LineSurface, type WireProbe } from '../../services/machines/surface';
+import { summarizeLine, type LineSurface, type WireProbe } from '../../services/machines/surface';
+import { commandOpsOf, rowOpArgs } from '../../lib/machines/protocol';
 import { DEFAULT_LINE } from '../../examples/workflows/machine-line/line';
 import type { LineDef } from '../../lib/machines/line';
 import type { InspectResult, LineView, WireEvent } from '../../types/machines-view';
@@ -17,6 +18,8 @@ const { siteId, lineId } = DEFAULT_LINE;
 const LINE_PATH = `/machines/lines/${siteId}/${lineId}`;
 const COMMAND_ROLE = 'line-bond';
 
+const CODEC = { rowOps: ['probe', { op: 'setpoint', args: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } } }] };
+
 function surface(leading: boolean): LineSurface {
   const view: LineView = { siteId, lineId, leading: true, takenAt: '2026-03-01T08:00:00.000Z', machines: [], contested: [] };
   const planned = (probe: WireProbe): InspectResult => ({
@@ -29,7 +32,8 @@ function surface(leading: boolean): LineSurface {
     inspect: (s, l, probe) => (leading && declared(s, l) ? planned(probe) : null),
     wire: (s, l, query = {}) => (leading && declared(s, l) ? WIRE.filter((e) => !query.machine || e.machineId === query.machine).slice(0, query.limit ?? WIRE.length) : null),
     findLine: (s, l) => (declared(s, l) ? DEFAULT_LINE : undefined),
-    commandOps: () => commandOpsOf({ rowOps: ['probe'] }),
+    commandOps: () => commandOpsOf(CODEC),
+    commandArgs: () => rowOpArgs(CODEC),
     declare: async (line: LineDef) => { runs.push(`declare ${line.siteId}/${line.lineId}`); return 'started'; },
     retire: async (s: string, l: string) => { runs.push(`retire ${s}/${l}`); return true; },
   };
@@ -193,6 +197,9 @@ describe('machines routes', () => {
     expect((await badOp.json()).error).toMatch(/probe/);
     expect((await post('press-01', { op: 'pause', args: [] }, ctx.builderToken)).status).toBe(400);
     expect((await post('press-01', { op: 'pause' }, ctx.memberToken)).status).toBe(403);
+    const badArgs = await post('press-01', { op: 'setpoint', args: {} }, ctx.builderToken);
+    expect(badArgs.status).toBe(422);
+    expect((await badArgs.json()).error).toMatch(/^setpoint args: name/);
 
     const made = await post('press-01', { op: 'probe', args: { depth: 2 } }, ctx.builderToken);
     expect(made.status).toBe(201);

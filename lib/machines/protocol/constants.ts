@@ -32,6 +32,8 @@ export const CHANNEL = {
   REPLY: 'cmd/reply',
   /** report/<name>: production, availability, inventory and other reporting, kept in the event stream. */
   REPORT: 'report',
+  /** The machine can take one job now (`MachineDef.paceBy: 'ready'`). */
+  READY: 'ready',
 } as const;
 
 export const MODE = {

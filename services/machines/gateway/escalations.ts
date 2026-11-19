@@ -5,7 +5,7 @@
  * held) are not errors: replays and races land there.
  */
 
-import type { OpenRowQuery } from '../rows';
+import type { EndedRowQuery, OpenRowQuery } from '../rows';
 import type { Actor, CreateRowInput } from './actions';
 
 export const VERB_OUTCOME = {
@@ -54,6 +54,31 @@ export interface LineEscalations {
   get(id: string): Promise<Record<string, any> | null>;
   /** Every pending row matching each given field, oldest first, in the projection escalation events carry. */
   listOpen(query: OpenRowQuery): Promise<Record<string, any>[]>;
+  /** The most recently created resolved rows matching the query, newest first, with their resolver payloads. */
+  listEnded(query: EndedRowQuery): Promise<Record<string, any>[]>;
+}
+
+/**
+ * The list query for resolved rows, newest created first, as the escalation API takes it.
+ * Creation order reads the (status, created_at) index and stops at `limit`, however long the line's history.
+ */
+export function endedListQuery(query: EndedRowQuery): Record<string, unknown> {
+  const { facets, limit, ...fields } = query;
+  return {
+    ...fields, status: 'resolved', limit, offset: 0,
+    facets: facets ?? {}, orderBy: [{ field: 'created_at', direction: 'desc' }],
+  };
+}
+
+/** A resolver payload as the list returns it: parsed, or serialized as Long Tail stores it. */
+export function resolverPayloadOf(row: Record<string, any>): Record<string, any> {
+  const v = row.resolver_payload;
+  if (typeof v !== 'string') return v && typeof v === 'object' ? v : {};
+  try {
+    return JSON.parse(v) ?? {};
+  } catch {
+    return {};
+  }
 }
 
 /** Rows per page when reading open rows back. */
