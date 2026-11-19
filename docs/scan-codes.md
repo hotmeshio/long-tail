@@ -177,7 +177,9 @@ through the scheme facet, reads that facet from the row (an item row carrying
 metadata carries the same value, writing the item's row as the reciprocal in
 the same statement (`reciprocal: false` skips it). The container pick
 considers only pending rows that carry the accumulator declaration, so a
-release row sharing the facet during a pack-out is never the target.
+release row sharing the facet during a pack-out is never the target. The
+item is added under `params.itemKey` (a template that may read `{item.<facet>}`
+from the item's row) when the step gives one, else under the scanned target.
 `container` narrows the pick further:
 
 ```jsonc
