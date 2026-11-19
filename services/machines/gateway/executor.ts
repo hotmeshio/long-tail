@@ -25,6 +25,7 @@ import { plannedAction, type WireRecorder } from './wire';
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
+const PENDING = 'pending';
 
 export interface ExecutorDeps {
   bus: MachineBus;
@@ -132,7 +133,7 @@ export class Executor {
         return [outcomeOf('resolve', a.rowId, result)];
       }
       case 'createAlarmRow':
-        return [{ verb: 'create-row', rowId: await this.createAlarmRow(a), detail: `${a.row.type} ${a.alarmId} at ${a.machineId}` }];
+        return this.createAlarmRow(a);
       case 'createRow': {
         this.live();
         const { id } = await lt.create(CONTROLLER, a.row);
@@ -249,20 +250,32 @@ export class Executor {
     }
   }
 
-  private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<string> {
+  /**
+   * A keyed create that returns a row already ended is a raise replayed after
+   * its row closed: the alarm is not tracked again and pauses nothing.
+   */
+  private async createAlarmRow(a: Extract<Action, { kind: 'createAlarmRow' }>): Promise<WireAction[]> {
     this.live();
-    const { id } = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
-    this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: id, machine: a.machineId, alarm: a.alarmId });
-    const track = this.d.state.alarms.get(this.d.state.alarmKey(a.machineId, a.alarmId));
+    const { state } = this.d;
+    const row = await this.d.lt.create(CONTROLLER, { ...a.row, role: operatorRole(this.d.line) });
+    const created: WireAction = { verb: 'create-row', rowId: row.id, detail: `${a.row.type} ${a.alarmId} at ${a.machineId}` };
+    const key = state.alarmKey(a.machineId, a.alarmId);
+    const track = state.alarms.get(key);
     const raisedAt = a.row.metadata?.raisedAt;
-    if (track && (!track.raisedAt || !raisedAt || track.raisedAt === raisedAt)) {
-      track.rowId = id;
-      return id;
+    const current = !!track && (!track.raisedAt || !raisedAt || track.raisedAt === raisedAt);
+    if (row.status && row.status !== PENDING) {
+      if (current) state.alarms.delete(key);
+      return [{ ...created, detail: `${created.detail} (${row.status} already)` }];
+    }
+    this.d.log.info(GATEWAY_LOG.ALARM_ROW, { row: row.id, machine: a.machineId, alarm: a.alarmId });
+    if (current) {
+      track!.rowId = row.id;
+      return [created, ...await this.apply(a.paused)];
     }
     // Cleared at the machine, or raised again, while the row was being created.
     const note = track ? `${a.machineId} raised ${a.alarmId} again; this one ended` : `cleared at ${a.machineId}`;
-    await this.d.lt.resolve(CONTROLLER, id, { decision: DECISION.CLEARED, note });
-    return id;
+    await this.d.lt.resolve(CONTROLLER, row.id, { decision: DECISION.CLEARED, note });
+    return [created];
   }
 
   /** Raise a quiet row for each connected machine silent longer than `quietMs`. */

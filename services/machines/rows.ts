@@ -24,6 +24,12 @@ export interface OpenRowQuery {
   role?: string;
 }
 
+/** Rows that ended, newest first: an open-row query narrowed to metadata facets and capped at `limit`. */
+export interface EndedRowQuery extends OpenRowQuery {
+  facets?: Record<string, string>;
+  limit: number;
+}
+
 export interface HandoffRowAdapter {
   openRows(line: LineDef): OpenRowQuery[];
   /** The handoff a row asks for, or null when it is not a machine handoff. */

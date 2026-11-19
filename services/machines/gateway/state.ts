@@ -7,6 +7,7 @@
 
 import type { HandoffFacets, TraceEntry } from '../contracts';
 import type { LineDef } from '../../../lib/machines/line';
+import { ALARM_IDS, type AlarmIds } from '../../../lib/machines/protocol';
 import type { ContestedClaimView, LineView } from '../../../types/machines-view';
 import { dispatchJobs } from './jobs';
 import { projectLine } from './project';
@@ -124,6 +125,8 @@ export class GatewayState {
   lifecycle = false;
   /** Active alarms are retained on the broker; otherwise snapshots list them (codec.ts retainedAlarms). */
   retainedAlarms = false;
+  /** What an alarm id names, from the codec (codec.ts alarmIds). */
+  alarmIds: AlarmIds = ALARM_IDS.RECURRING;
   /** Reading the broker's retained messages on taking the line; a snapshot read back may be older than its alarms. */
   readingRetained = false;
   /** When this gateway took the line (epoch ms); a command for an older row may have been sent by an earlier one. */
@@ -189,12 +192,22 @@ export class GatewayState {
     if (!row) return undefined;
     this.openRows.delete(id);
     row.ended = ended;
-    this.closedRows.set(id, row);
+    this.keepClosed(row);
+    return row;
+  }
+
+  /** A row that ended before this gateway led the line, read back from Long Tail; an open row is left alone. */
+  restoreClosed(row: HandoffRow): void {
+    if (this.openRows.has(row.id) || this.closedRows.has(row.id)) return;
+    this.keepClosed(row);
+  }
+
+  private keepClosed(row: HandoffRow): void {
+    this.closedRows.set(row.id, row);
     if (this.closedRows.size > CLOSED_LIMIT) {
       const oldest = this.closedRows.keys().next().value;
       if (oldest) this.closedRows.delete(oldest);
     }
-    return row;
   }
 
   isClosed(id: string): boolean {
@@ -219,11 +232,12 @@ export class GatewayState {
     this.held.get(machineId)!.set(unitId, jobId);
   }
 
-  letGo(machineId: string, unitId: string): void {
+  /** `reported`: the job the machine named, for a unit this gateway never saw arrive (one sent before it led the line). */
+  letGo(machineId: string, unitId: string, reported?: string): void {
     const units = this.held.get(machineId);
-    const jobId = units?.get(unitId);
+    const jobId = units?.get(unitId) ?? (this.sentJobs.get(machineId)?.has(reported ?? '') ? reported : undefined);
     units?.delete(unitId);
-    if (jobId === undefined || [...units!.values()].includes(jobId)) return;
+    if (jobId === undefined || [...(units?.values() ?? [])].includes(jobId)) return;
     this.sentJobs.get(machineId)?.delete(jobId);
     if (!this.endedJobs.has(machineId)) this.endedJobs.set(machineId, new Set());
     this.endedJobs.get(machineId)!.add(jobId);
@@ -427,7 +441,7 @@ export class GatewayState {
     const copy = new GatewayState();
     Object.assign(copy, {
       unitsPerDispatch: this.unitsPerDispatch, dispatchOnArrival: this.dispatchOnArrival, rowOps: this.rowOps, oneWayOps: this.oneWayOps, lifecycle: this.lifecycle,
-      retainedAlarms: this.retainedAlarms, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
+      retainedAlarms: this.retainedAlarms, alarmIds: this.alarmIds, readingRetained: this.readingRetained, takenAt: this.takenAt, progressStep: this.progressStep, holdDispatch: this.holdDispatch,
     });
     copyInto(this.held, copy.held, (units) => new Map(units));
     copyInto(this.sentJobs, copy.sentJobs, (jobs) => new Map(jobs));

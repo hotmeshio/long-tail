@@ -9,11 +9,11 @@
 import { standardRows, type HandoffRowAdapter } from '../rows';
 import { DECISION, ROW_TYPE } from '../contracts';
 import { CONTROLLER, type Action } from './actions';
-import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests } from './reconcile';
+import { alarmsClearedMeanwhile, arrivalsOnRows, notesOnRows, restoreAddresses, restoreLineRows, restoreRequests, restoreSentJobs } from './reconcile';
 import { MemoryAddressBook, type AddressBook } from './address-book';
 import { admitSender, holdArrival, holdViolation, isArrival, isUnreadableArrival, type AdmissionContext, type Applied } from './admission';
 import type { LineDef } from '../../../lib/machines/line';
-import { DISPATCH_ON, MESSAGE_KIND, OP, declaredRowOps, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
+import { DISPATCH_ON, MESSAGE_KIND, OP, alarmIdsOf, declaredRowOps, genericCodec, lineFilter, oneWayOps, type Envelope, type Inspection, type LineCodec, type ParsedTopic } from '../../../lib/machines/protocol';
 import { DISPOSITION, type Disposition, type EscalationEvent, type EscalationFeed, type InboundMessage, type MachineBus } from '../../../lib/machines/transport';
 import { publishMachineWireEvent } from '../../../lib/events/publish';
 import type { InspectResult } from '../../../types/machines-view';
@@ -96,6 +96,7 @@ export class MachineGateway {
     this.state.oneWayOps = oneWayOps(this.codec);
     this.state.lifecycle = deps.settings.lifecycle === true;
     this.state.retainedAlarms = this.codec.retainedAlarms === true;
+    this.state.alarmIds = alarmIdsOf(this.codec);
     this.state.progressStep = deps.settings.progressStep ?? this.state.progressStep;
     this.addresses = deps.addresses ?? new MemoryAddressBook();
     this.window = new WireWindow(deps.settings.wireWindow);
@@ -174,6 +175,7 @@ export class MachineGateway {
     try {
       const addresses = await restoreAddresses(this.state, this.addresses, this.deps.line);
       const handoffs = await this.reconcileHandoffs();
+      const sent = await restoreSentJobs(this.state, this.deps.lt, this.deps.line, this.rows);
       await this.executor.apply(await arrivalsOnRows(this.state, this.deps.lt, this.deps.settings.dispatchTtlMs));
       await notesOnRows(this.state, this.deps.lt);
       const commands = await this.reconcileCommands();
@@ -181,7 +183,7 @@ export class MachineGateway {
       await this.executor.apply(requests.actions);
       const restored = await restoreLineRows(this.state, this.deps.lt, this.deps.line);
       await this.resync();
-      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, commands, requests: requests.open, addresses, ...restored });
+      this.log.info(GATEWAY_LOG.RECONCILED, { handoffs, sent, commands, requests: requests.open, addresses, ...restored });
     } finally {
       this.state.holdDispatch = false;
     }

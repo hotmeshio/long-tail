@@ -40,7 +40,8 @@ export type Action =
   /** `metadata` is merged into the row's metadata in the same statement. */
   | { kind: 'accumulate'; as: Actor; rowId: string; itemKey: string; payload: Record<string, any>; metadata?: Record<string, any>; complete?: Completion }
   | { kind: 'resolve'; as: Actor; rowId: string; payload: Record<string, any> }
-  | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput }
+  /** `paused`: the notes on the rows the alarm pauses, written only when the row it raises is open. */
+  | { kind: 'createAlarmRow'; machineId: string; alarmId: string; row: CreateRowInput; paused: Action[] }
   /** A row for a person, raised by the controller. */
   | { kind: 'createRow'; row: CreateRowInput }
   | { kind: 'watchOffline'; machineId: string }

@@ -1,8 +1,9 @@
 /**
  * What a gateway restores when it starts leading a line, read back from Long
  * Tail: the alarm, offline and quiet rows it raised before, so a clear or a
- * return that comes later still resolves them; and the units each open
- * handoff saw arrive, so the receiver holds them again.
+ * return that comes later still resolves them; the units each open handoff
+ * saw arrive, so the receiver holds them again; and the jobs recent handoffs
+ * sent, so a restarted machine gets them back.
  */
 
 import { ROW_TYPE, arrivedUnit, handoffProgress } from '../contracts';
@@ -11,10 +12,12 @@ import { learnsAddress, operatorRole, type LineDef } from '../../../lib/machines
 import type { AddressBook } from './address-book';
 import { CONTROLLER, type Action } from './actions';
 import { overdueDecision, trackRequest } from './plan-request';
-import type { LineEscalations } from './escalations';
+import { resolverPayloadOf, type LineEscalations } from './escalations';
 import { dispatchJobs } from './jobs';
 import { dispatchAction, latestArrival } from './pacing';
-import { DISPATCH_STATE, type GatewayState } from './state';
+import type { HandoffRowAdapter } from '../rows';
+import { readTrace } from './trace';
+import { DISPATCH_STATE, ROW_END, type GatewayState, type HandoffRow } from './state';
 
 export interface RestoredRows {
   alarms: number;
@@ -42,6 +45,38 @@ export async function restoreLineRows(state: GatewayState, lt: LineEscalations, 
   for (const row of quiet) state.link(row.metadata.machineId).quietRowId = row.id;
   for (const row of registrations) state.raiseClaim(row.metadata.address, row.metadata.machineId, row.id);
   return { alarms: alarms.length, offline: offline.length, quiet: quiet.length, registrations: registrations.length };
+}
+
+/** Ended handoffs read back on taking the line, newest first. */
+export const ENDED_READ = 500;
+
+/**
+ * The line's recently received handoffs, so a machine that restarts after a
+ * takeover is sent the jobs it lost: each job the receiver took is remembered
+ * by the row that sent it, and a replayed event for the row is known as done.
+ */
+export async function restoreSentJobs(state: GatewayState, lt: LineEscalations, line: LineDef, rows: HandoffRowAdapter): Promise<number> {
+  const facets = { siteId: line.siteId, lineId: line.lineId };
+  let restored = 0;
+  for (const query of rows.openRows(line)) {
+    const ended = await lt.listEnded({ ...query, facets, limit: ENDED_READ });
+    // Oldest first, so a later row for the same job is the one remembered.
+    for (const data of ended.reverse()) {
+      const handoff = rows.toHandoff({ ...data, id: data.id, role: data.role });
+      if (!handoff || handoff.siteId !== line.siteId || handoff.lineId !== line.lineId) continue;
+      const createdAt = data.created_at ? new Date(data.created_at).getTime() : NaN;
+      const row: HandoffRow = {
+        ...handoff, id: data.id, role: data.role, dispatch: DISPATCH_STATE.ACCEPTED, ended: ROW_END.RESOLVED, trace: readTrace(data.metadata),
+        ...(Number.isFinite(createdAt) ? { createdAt } : {}),
+      };
+      state.restoreClosed(row);
+      const m = row.toMachine;
+      if (!m || !line.machines.some((d) => d.machineId === m) || resolverPayloadOf(data).received !== true) continue;
+      for (const job of dispatchJobs(row.jobId, row.units, state.unitsPerDispatch)) state.rememberSent(m, job.jobId, row.id);
+      restored++;
+    }
+  }
+  return restored;
 }
 
 /** The addresses the line learned before, for the stations that still learn theirs. */

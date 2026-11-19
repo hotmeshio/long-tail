@@ -349,6 +349,9 @@ export const requestSignalKey = (siteId: string, lineId: string, machineId: stri
 /** The key a machine notice is created under, once per machine message. */
 export const noticeSignalKey = (siteId: string, lineId: string, machineId: string, ref: string) =>
   `machine-notice:${siteId}:${lineId}:${machineId}:${ref}`;
+/** The key an alarm row is created under: once per alarm id, or per raise when `raisedAt` tells raises apart. */
+export const alarmSignalKey = (siteId: string, lineId: string, machineId: string, alarmId: string, raisedAt?: string) =>
+  `machine-alarm:${siteId}:${lineId}:${machineId}:${alarmId}${raisedAt ? `:${raisedAt}` : ''}`;
 /** The id of the workflow started for a parked row, once per row. */
 export const rowWorkflowId = (rowType: string, rowId: string) => `${rowType}-${rowId}`;
 /** The key a request's overdue row is created under, once per request. */

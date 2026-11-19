@@ -91,6 +91,12 @@ export interface LineCodec {
    */
   readonly retainedAlarms?: boolean;
   /**
+   * What an alarm id names. `recurring` (the default): the id comes back, and each raise is told apart
+   * by its `raisedAt`. `occurrence`: the id names one occurrence, so a raise for an id whose row
+   * exists, open or ended, raises nothing.
+   */
+  readonly alarmIds?: AlarmIds;
+  /**
    * Commands of the machines' own, beyond the line protocol's control ops, that a machine-command row
    * may ask for. Each is sent through `encode` and the row resolves with the reply. An op declared with
    * `reply: false` is sent once and its row resolves `sent`, waiting for nothing. Every name is a
@@ -130,6 +136,18 @@ export function oneWayOps(codec: Pick<LineCodec, 'rowOps'>): ReadonlySet<string>
 
 export const DISPATCH_ON = { CREATED: 'created', ARRIVAL: 'arrival' } as const;
 export type DispatchOn = typeof DISPATCH_ON[keyof typeof DISPATCH_ON];
+
+export const ALARM_IDS = { RECURRING: 'recurring', OCCURRENCE: 'occurrence' } as const;
+export type AlarmIds = typeof ALARM_IDS[keyof typeof ALARM_IDS];
+
+/** The codec's `alarmIds`, `recurring` when left out; any other value is a misconfigured codec and throws. */
+export function alarmIdsOf(codec: Pick<LineCodec, 'alarmIds'>): AlarmIds {
+  const value = codec.alarmIds ?? ALARM_IDS.RECURRING;
+  if (!Object.values(ALARM_IDS).includes(value)) {
+    throw new Error(`codec.alarmIds must be one of ${Object.values(ALARM_IDS).join(', ')}; got ${String(value)}`);
+  }
+  return value;
+}
 
 /** Which job event counts as the receiver's receipt. */
 export const RECEIPT_FROM = { ARRIVED: 'arrived', BOUND: 'bound', STARTED: 'started' } as const;

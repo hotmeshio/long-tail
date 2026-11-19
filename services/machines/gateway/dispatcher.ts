@@ -194,7 +194,7 @@ export class Dispatcher {
     const jobs = dispatchJobs(a.args.jobId, a.args.units, state.unitsPerDispatch);
     // Known before any reply, so a failure that follows an acceptance finds its row.
     for (const job of jobs) state.rememberDispatch(`${a.cmdId}${job.suffix}`, a.rowId);
-    const since = state.get(a.rowId)?.createdAt;
+    const since = (state.get(a.rowId) ?? state.closedRow(a.rowId))?.createdAt;
     const replies = await Promise.all(jobs.map((job) => this.ask(a.machineId, OP.DISPATCH, `${a.cmdId}${job.suffix}`, { ...a.args, jobId: job.jobId, units: job.units }, since, a.issuedAt)));
     const refused = replies.find((r) => r && !took(r));
     const silent = jobs.filter((_, i) => !replies[i]);
