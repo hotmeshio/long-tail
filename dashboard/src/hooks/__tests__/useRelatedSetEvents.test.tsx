@@ -55,8 +55,8 @@ describe('useRelatedSetEvents', () => {
     subscriptions[0].handler({ type: 'system.escalation.stage.esc-1.updated', escalationId: 'esc-1' });
     act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'related'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'related-rows'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'related'] }, { cancelRefetch: false });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'related-rows'] }, { cancelRefetch: false });
   });
 
   it('subscribes to nothing when no set names a role', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 
 import { getInvalidationScheduler, REALTIME_REFRESH } from '../realtime-refresh';
+import { DEFAULT_REFRESH_POLICY, resolveRefreshPolicy, setRefreshPolicy } from '../refresh-policy';
 
 // The shared scheduler: coalesce, refractory cooldown, cross-hook dedupe,
 // and zero network for hidden tabs.
@@ -22,6 +23,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setRefreshPolicy(DEFAULT_REFRESH_POLICY);
   getInvalidationScheduler(qc).dispose();
   vi.useRealTimers();
 });
@@ -38,8 +40,8 @@ describe('coalesce + dedupe', () => {
 
     vi.advanceTimersByTime(coalesceMs + 10);
     expect(invalidateSpy).toHaveBeenCalledTimes(2);
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['jobs'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['escalations'] }, { cancelRefetch: false });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['jobs'] }, { cancelRefetch: false });
   });
 
   it('a key wanted by two tiers flushes once, on the snappier lane', () => {
@@ -104,10 +106,10 @@ describe('hidden tabs', () => {
     vi.advanceTimersByTime(coalesceMs + 10);
 
     // Stale mark, zero network.
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['escalations'],
-      refetchType: 'none',
-    });
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      { queryKey: ['escalations'], refetchType: 'none' },
+      { cancelRefetch: false },
+    );
     expect(refetchSpy).not.toHaveBeenCalled();
 
     // One catch-up when someone looks again.
@@ -119,5 +121,122 @@ describe('hidden tabs', () => {
     setVisibility('hidden');
     setVisibility('visible');
     expect(refetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('lanes', () => {
+  it('a count and a list of the same family flush on their own lanes', () => {
+    const scheduler = getInvalidationScheduler(qc);
+    const count = ['escalations', 'available', { limit: 1 }];
+    const list = ['escalations', { limit: 50 }];
+
+    scheduler.request('SUMMARY', [count]);
+    scheduler.request('LIST', [list]);
+
+    vi.advanceTimersByTime(REALTIME_REFRESH.LIST.coalesceMs + 10);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: list }, { cancelRefetch: false });
+
+    vi.advanceTimersByTime(REALTIME_REFRESH.SUMMARY.coalesceMs);
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(invalidateSpy).toHaveBeenLastCalledWith({ queryKey: count }, { cancelRefetch: false });
+  });
+});
+
+describe('in-flight queries', () => {
+  it('a query that is still fetching waits for the next window instead of stacking', async () => {
+    const scheduler = getInvalidationScheduler(qc);
+    const key = ['escalations', { limit: 50 }];
+    let release!: (value: unknown) => void;
+    const inFlight = qc.fetchQuery({ queryKey: key, queryFn: () => new Promise((resolve) => { release = resolve; }) });
+
+    scheduler.request('LIST', [key]);
+    vi.advanceTimersByTime(REALTIME_REFRESH.LIST.coalesceMs + 10);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    release({ escalations: [] });
+    await inFlight;
+
+    vi.advanceTimersByTime(REALTIME_REFRESH.LIST.minIntervalMs + 10);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: key }, { cancelRefetch: false });
+  });
+});
+
+describe('refresh policy', () => {
+  it('a deployment override changes the window the scheduler waits', () => {
+    setRefreshPolicy(resolveRefreshPolicy({ list: { coalesceMs: 4_000, minIntervalMs: 15_000 } }));
+    const scheduler = getInvalidationScheduler(qc);
+
+    scheduler.request('LIST', [['escalations', { limit: 50 }]]);
+    vi.advanceTimersByTime(REALTIME_REFRESH.LIST.coalesceMs + 10);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(4_000);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a disabled policy marks queries stale and fetches nothing', () => {
+    setRefreshPolicy(resolveRefreshPolicy({ enabled: false }));
+    const scheduler = getInvalidationScheduler(qc);
+    const refetchSpy = vi.spyOn(qc, 'refetchQueries').mockResolvedValue();
+
+    scheduler.request('LIST', [['escalations']]);
+    vi.advanceTimersByTime(REALTIME_REFRESH.LIST.coalesceMs + 10);
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      { queryKey: ['escalations'], refetchType: 'none' },
+      { cancelRefetch: false },
+    );
+    setVisibility('hidden');
+    setVisibility('visible');
+    expect(refetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('events already covered by a fetch', () => {
+  const key = ['escalations', 'esc-1'];
+
+  beforeEach(() => {
+    qc.setQueryDefaults(key, { gcTime: Infinity });
+  });
+
+  it('skips an event when the query began fetching after the event arrived', async () => {
+    const scheduler = getInvalidationScheduler(qc);
+    await qc.fetchQuery({ queryKey: key, queryFn: () => ({ id: 'esc-1' }) });
+
+    scheduler.request('DETAIL', [key]);
+    vi.advanceTimersByTime(10);
+    await qc.refetchQueries({ queryKey: key });
+
+    vi.advanceTimersByTime(REALTIME_REFRESH.DETAIL.coalesceMs + 10);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('still refreshes when the last fetch began before the event arrived', async () => {
+    const scheduler = getInvalidationScheduler(qc);
+    await qc.fetchQuery({ queryKey: key, queryFn: () => ({ id: 'esc-1' }) });
+
+    vi.advanceTimersByTime(10);
+    scheduler.request('DETAIL', [key]);
+
+    vi.advanceTimersByTime(REALTIME_REFRESH.DETAIL.coalesceMs + 10);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a later event refreshes even after an earlier one was covered', async () => {
+    const scheduler = getInvalidationScheduler(qc);
+    await qc.fetchQuery({ queryKey: key, queryFn: () => ({ id: 'esc-1' }) });
+
+    scheduler.request('DETAIL', [key]);
+    vi.advanceTimersByTime(10);
+    await qc.refetchQueries({ queryKey: key });
+    vi.advanceTimersByTime(REALTIME_REFRESH.DETAIL.coalesceMs + 10);
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(20);
+    scheduler.request('DETAIL', [key]);
+    vi.advanceTimersByTime(REALTIME_REFRESH.DETAIL.minIntervalMs + 10);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
   });
 });

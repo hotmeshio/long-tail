@@ -91,7 +91,7 @@ describe('useWorkflowListEvents', () => {
 
     act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['jobs'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['jobs'] }, { cancelRefetch: false });
   });
 });
 
@@ -120,8 +120,8 @@ describe('useWorkflowDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowExecution', 'wf-123'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowState', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowExecution', 'wf-123'] }, { cancelRefetch: false });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['workflowState', 'wf-123'] }, { cancelRefetch: false });
   });
 
   it('invalidates escalation queries for escalation events', () => {
@@ -133,7 +133,7 @@ describe('useWorkflowDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] }, { cancelRefetch: false });
   });
 
   it('matches child workflowId containing parent orchestrator id', () => {
@@ -183,9 +183,9 @@ describe('useMcpQueryDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryResult', 'wf-123'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['builderResult', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] }, { cancelRefetch: false });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryResult', 'wf-123'] }, { cancelRefetch: false });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['builderResult', 'wf-123'] }, { cancelRefetch: false });
   });
 
   it('invalidates mcpQueryExecution on task events', () => {
@@ -197,7 +197,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpQueryExecution', 'wf-123'] }, { cancelRefetch: false });
   });
 
   it('invalidates escalation keys for escalation events', () => {
@@ -209,7 +209,7 @@ describe('useMcpQueryDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'by-workflow', 'wf-123'] }, { cancelRefetch: false });
   });
 
   it('ignores events for unrelated workflowId', () => {
@@ -255,7 +255,7 @@ describe('useProcessDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['processes', 'proc-1'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['processes', 'proc-1'] }, { cancelRefetch: false });
   });
 
   it('ignores events with different originId', () => {
@@ -291,7 +291,7 @@ describe('useEscalationStatsEvents', () => {
 
     act(() => { vi.advanceTimersByTime(SUMMARY_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalationStats'] }, { cancelRefetch: false });
   });
 
   it("bounds a constant event stream to the tier's refractory rate — never starves, never exceeds", () => {
@@ -351,8 +351,15 @@ describe('useEscalationListEvents', () => {
     ]);
   });
 
-  it('debounces and invalidates escalations query', () => {
+  function seedList(qc: QueryClient, key: unknown[]) {
+    qc.setQueryDefaults(key, { gcTime: Infinity });
+    qc.setQueryData(key, { escalations: [], total: 0 });
+  }
+
+  it('debounces and refreshes the cached lists the event can change', () => {
     const { qc, Wrapper } = createWrapper();
+    const mine = ['escalations', { role: 'order-review' }];
+    seedList(qc, mine);
     const spy = vi.spyOn(qc, 'invalidateQueries');
     renderHook(() => useEscalationListEvents(), { wrapper: Wrapper });
 
@@ -360,7 +367,21 @@ describe('useEscalationListEvents', () => {
 
     act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ queryKey: mine }, { cancelRefetch: false });
+  });
+
+  it('leaves lists for other queues alone', () => {
+    const { qc, Wrapper } = createWrapper();
+    seedList(qc, ['escalations', { role: 'packing' }]);
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    renderHook(() => useEscalationListEvents(), { wrapper: Wrapper });
+
+    subscriptions[0].handler(makeEvent({ type: 'system.escalation.order-review.esc-001.resolved' }));
+
+    act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
@@ -383,9 +404,9 @@ describe('useEscalationDetailEvents', () => {
 
     act(() => { vi.advanceTimersByTime(DETAIL_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'esc-1'] });
-    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalations'] });
-    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalationStats'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations', 'esc-1'] }, { cancelRefetch: false });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalations'] }, { cancelRefetch: false });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['escalationStats'] }, { cancelRefetch: false });
   });
 
   it('ignores events for a different escalationId', () => {
@@ -423,6 +444,6 @@ describe('useProcessListEvents', () => {
 
     act(() => { vi.advanceTimersByTime(LIST_FLUSH_MS); });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['processes'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['processes'] }, { cancelRefetch: false });
   });
 });

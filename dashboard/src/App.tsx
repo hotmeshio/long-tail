@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { EventTransportProvider } from './hooks/useEventTransport';
+import { DEFAULT_REFRESH_POLICY } from './lib/refresh-policy';
 import { Shell } from './components/layout/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { ConnectAnthropicPage } from './pages/ConnectAnthropicPage';
@@ -246,6 +247,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 10_000,
+      // The deployment's refresh policy may turn focus refetch on once settings load.
+      refetchOnWindowFocus: DEFAULT_REFRESH_POLICY.refetchOnFocus,
       retry: (failureCount, error) => {
         // Don't retry auth errors — apiFetch handles refresh internally
         if (error instanceof Error && error.message === 'Session expired') return false;

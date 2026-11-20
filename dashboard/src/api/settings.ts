@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { LT_BASE } from '../lib/base-path';
+import type { ReconnectPolicy } from '../lib/nats/reconnect';
+import type { RawRefreshPolicy } from '../lib/refresh-policy';
 
 export interface AppSettings {
   telemetry: {
@@ -8,6 +10,12 @@ export interface AppSettings {
   };
   escalation?: {
     claimDurations?: number[];
+  };
+  events?: {
+    transport: string;
+    natsWsUrl?: string | null;
+    reconnect?: Partial<ReconnectPolicy>;
+    refresh?: RawRefreshPolicy;
   };
   ai?: {
     enabled: boolean;

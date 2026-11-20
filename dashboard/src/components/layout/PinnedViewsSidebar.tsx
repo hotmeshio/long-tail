@@ -6,9 +6,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRoleDetails, type RolePortal } from '../../api/roles';
 import { usePreferences, usePatchPreferences, type PinnedView } from '../../api/preferences';
 import { useEscalations, useAvailableEscalations } from '../../api/escalations';
-import { useEventSubscriptions } from '../../hooks/useEventContext';
+import { useEscalationRefresh } from '../../hooks/useEscalationRefresh';
 import { useMemberEscalationPatterns } from '../../hooks/useMemberEscalationPatterns';
-import { useThrottledInvalidation } from '../../hooks/useEventHooks';
 import { displayRoleTitle } from '../../lib/role-display';
 import { resolvePins, pinBadgeQuery, newPinId, type ResolvedPin } from '../../lib/pinned-views';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
@@ -34,11 +33,8 @@ export function PinnedViewsSidebar() {
 
   // Badge queries key on ['escalations', ...]; the member-role union keeps
   // every badge current — pins can only point at queues the viewer can read.
-  // Badges are aggregate surfaces, so the SUMMARY tier bounds the rate.
-  const invalidate = useThrottledInvalidation('SUMMARY');
-  useEventSubscriptions(useMemberEscalationPatterns(), () => {
-    invalidate([['escalations']]);
-  });
+  // An event refreshes only the badges its change can move.
+  useEscalationRefresh(useMemberEscalationPatterns());
 
   const prefs = prefsQ.data?.preferences;
   const roleDefaults = useMemo(

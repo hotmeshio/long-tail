@@ -134,13 +134,15 @@ describe('PinnedViewsSidebar — role-grouped pins', () => {
 describe('PinnedViewsSidebar — badge refresh discipline', () => {
   it('an event burst never invalidates synchronously — one SUMMARY-tier flush', () => {
     vi.useFakeTimers();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    const badgeKey = ['escalations', 'available', { role: 'print-farm', limit: 1 }];
+    qc.setQueryData(badgeKey, { escalations: [], total: 0 });
     try {
       renderSidebar(qc);
       const spy = vi.spyOn(qc, 'invalidateQueries');
 
       act(() => {
-        for (let i = 0; i < 50; i++) subscriptions[0].handler({ type: 'system.escalation.x' });
+        for (let i = 0; i < 50; i++) subscriptions[0].handler({ type: 'system.escalation.print-farm.e1.created' });
       });
       expect(spy).not.toHaveBeenCalled();
 
@@ -148,7 +150,7 @@ describe('PinnedViewsSidebar — badge refresh discipline', () => {
         vi.advanceTimersByTime(REALTIME_REFRESH.SUMMARY.coalesceMs + 50);
       });
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+      expect(spy).toHaveBeenCalledWith({ queryKey: badgeKey }, { cancelRefetch: false });
     } finally {
       getInvalidationScheduler(qc).dispose();
       vi.useRealTimers();

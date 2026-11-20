@@ -5,6 +5,7 @@ import { useAuth } from './useAuth';
 import { loadSettings } from '../api/settings';
 import { fetchNatsCredentials } from '../lib/nats/credentials';
 import { resolveReconnectPolicy, type ReconnectPolicy } from '../lib/nats/reconnect';
+import { applyRefreshPolicy, resolveRefreshPolicy } from '../lib/refresh-policy';
 import { NatsProvider } from './useNats';
 import { SocketIOProvider } from './useSocketIO';
 
@@ -44,6 +45,7 @@ export function EventTransportProvider({ children }: { children: ReactNode }) {
         const value = data?.events?.transport;
         console.log('[lt-transport] server reports:', value);
         if (!cancelled) {
+          applyRefreshPolicy(queryClient, resolveRefreshPolicy(data?.events?.refresh));
           if (value === 'nats') {
             setNatsSettings({
               url: data.events.natsWsUrl ?? null,

@@ -233,6 +233,17 @@ describe('getSettings — environment', () => {
     });
   });
 
+  it('reports the dashboard refresh policy', async () => {
+    const result = await getSettings();
+    expect(result.data.events.refresh).toEqual({
+      enabled: config.REALTIME_REFRESH_ENABLED,
+      refetchOnFocus: config.REALTIME_REFETCH_ON_FOCUS,
+      detail: { coalesceMs: 300, minIntervalMs: 2000 },
+      list: { coalesceMs: 500, minIntervalMs: 10000 },
+      summary: { coalesceMs: 1000, minIntervalMs: 10000 },
+    });
+  });
+
   it('reports the resolved event transport in the environment block', async () => {
     eventRegistry.register(new SocketIOEventAdapter());
     const result = await getSettings();
