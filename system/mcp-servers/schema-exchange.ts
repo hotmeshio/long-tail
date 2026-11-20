@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { loggerRegistry } from '../../lib/logger';
+import { formSchemaTokenError } from '../../shared/form-validation';
 import { registeredToolCount } from '../../services/mcp/registered-tools';
 import * as schemaExchange from '../activities/schema-exchange';
 
@@ -22,8 +23,11 @@ const exchangeSchema = z.object({
 });
 
 const validateSchema = z.object({
-  data: z.any().describe('The value to validate against the schema.'),
-  schema: z.record(z.any()).describe('JSON Schema to validate against.'),
+  data: z.any().optional().describe('The value to validate against the schema.'),
+  schema: z.record(z.any()).optional().describe('JSON Schema to validate against.'),
+  form_schema: z.record(z.any()).optional().describe(
+    'A resolver form schema to check instead of data: list tokens (pills, rows, x-lt-item-key, x-lt-locate and the rest) are checked as a role save checks them.',
+  ),
 });
 
 export async function createSchemaExchangeServer(options?: {
@@ -62,10 +66,18 @@ export async function createSchemaExchangeServer(options?: {
       description:
         'Validate any value against a JSON Schema without making a network call. ' +
         'Useful for pre-validating data before storage, checking API response shapes in tests, ' +
-        'or verifying that transforms produce correct output.',
+        'or verifying that transforms produce correct output. ' +
+        'Pass form_schema to check a resolver form schema\'s list tokens instead.',
       inputSchema: validateSchema,
     },
     async (args: z.infer<typeof validateSchema>) => {
+      if (args.form_schema) {
+        const problem = formSchemaTokenError(args.form_schema);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ valid: problem === null, errors: problem ? [problem] : [] }) }] };
+      }
+      if (!args.schema) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'schema or form_schema is required' }) }], isError: true };
+      }
       const result = schemaExchange.validateSchema(args.data, args.schema);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     },

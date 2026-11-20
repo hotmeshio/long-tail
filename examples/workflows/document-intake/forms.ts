@@ -10,6 +10,10 @@
  *     `facets` stamps the review summary onto the row when it resolves
  *   - x-lt-bind: the form is flat, the payload nests under applicant and
  *     address, and proposals and scores follow the same paths
+ *   - lists of each shape (docs/hitl/x-lt-lists.md): services as a closed
+ *     set of chips, co-applicant emails as pills, beneficiaries as an
+ *     editable table, and the statements the model found as read-only
+ *     evidence that scrolls the document to its quote
  */
 
 export const INTAKE_ROLE = 'intake-verifier';
@@ -17,6 +21,29 @@ export const INTAKE_ROLE = 'intake-verifier';
 export const INTAKE_SCHEMA_VERSION = 1;
 
 export const ACCOUNT_TYPES = ['individual', 'joint', 'business'] as const;
+
+export const SERVICES = [
+  { value: 'checking', label: 'Checking' },
+  { value: 'savings', label: 'Savings' },
+  { value: 'debit_card', label: 'Debit card' },
+  { value: 'online_banking', label: 'Online banking' },
+] as const;
+
+export const RELATIONSHIPS = ['spouse', 'child', 'parent', 'other'] as const;
+
+export interface Beneficiary {
+  name: string;
+  relationship: (typeof RELATIONSHIPS)[number];
+  share: number;
+}
+
+/** A statement the model found on the application: the text, where, and what kind. */
+export interface EvidenceItem {
+  quote: string;
+  section: string;
+  page: number;
+  signed?: boolean;
+}
 
 /** The payload the workflow receives once a person verifies the application. */
 export interface IntakeReviewV1 {
@@ -29,6 +56,10 @@ export interface IntakeReviewV1 {
   };
   account_type: (typeof ACCOUNT_TYPES)[number];
   address: { street: string; city: string; postal_code: string };
+  services: string[] | null;
+  co_applicants: string[] | null;
+  beneficiaries: Beneficiary[] | null;
+  evidence?: EvidenceItem[] | null;
   id_matches: 'yes' | 'no';
   notes?: string;
 }
@@ -66,7 +97,9 @@ export const INTAKE_FORM_SCHEMA = {
   'x-lt-order': [
     'application', 'id_card',
     'first_name', 'last_name', 'date_of_birth', 'email', 'phone', 'account_type',
+    'co_applicants', 'services', 'beneficiaries',
     'street', 'city', 'postal_code',
+    'evidence',
     'id_matches', 'notes',
   ],
   'x-lt-help': [
@@ -114,6 +147,55 @@ export const INTAKE_FORM_SCHEMA = {
     street: address('street', 'Street', 'Number and street name.'),
     city: address('city', 'City', 'City or town.'),
     postal_code: address('postal_code', 'Postal code', 'Five digits.'),
+    co_applicants: {
+      type: ['array', 'null'],
+      title: 'Co-applicant emails',
+      description: 'One address per co-applicant. Paste a list to add several.',
+      items: { type: 'string', format: 'email', 'x-lt-transform': 'lowercase' },
+      uniqueItems: true,
+      maxItems: 4,
+      'x-lt-unordered': true,
+      'x-lt-section': 'Applicant',
+    },
+    services: {
+      type: ['array', 'null'],
+      title: 'Services requested',
+      description: 'Tick every service the application asks for.',
+      items: { type: 'string' },
+      'x-lt-options': SERVICES.map((s) => ({ ...s })),
+      'x-lt-section': 'Account',
+    },
+    beneficiaries: {
+      type: ['array', 'null'],
+      title: 'Beneficiaries',
+      description: 'One row per beneficiary named on the application.',
+      maxItems: 6,
+      'x-lt-add-label': 'Add a beneficiary',
+      'x-lt-item-key': 'name',
+      'x-lt-section': 'Account',
+      items: {
+        type: 'object',
+        required: ['name', 'share'],
+        'x-lt-order': ['name', 'relationship', 'share'],
+        properties: {
+          name: { type: 'string', title: 'Name', 'x-lt-width': 'fill' },
+          relationship: { type: 'string', title: 'Relationship', enum: [...RELATIONSHIPS], 'x-lt-width': 'sm' },
+          share: { type: 'integer', title: 'Share %', minimum: 1, maximum: 100, 'x-lt-width': 'xs' },
+        },
+      },
+    },
+    evidence: {
+      type: ['array', 'null'],
+      title: 'Where the application says it',
+      description: 'Select a statement to find it on the application.',
+      readOnly: true,
+      'x-lt-item-layout': 'evidence',
+      'x-lt-item-title': 'quote',
+      'x-lt-collapse-after': 3,
+      'x-lt-locate': { file: 'file.application', page: 'page', quote: 'quote' },
+      'x-lt-section': 'Sign-off',
+      'x-lt-confidence': false,
+    },
     id_matches: {
       type: 'string',
       title: 'ID matches',

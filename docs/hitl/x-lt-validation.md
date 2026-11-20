@@ -149,13 +149,14 @@ When the envelope carries `left_quantity_options: [0, 1, 2, 3]`, the field rende
 
 ## Lists and Maps
 
-A `type: "array"` field with its own `x-lt-options` (path or literal) renders as a multi-select of chips; the submitted value is the array of picked values in list order. A list is validated only when it is edited this way or through the `json` widget; a list shown as read-only tags is left alone.
+A `type: "array"` field (nullable or not) is validated when it is edited through a control: chips (its own `x-lt-options`), pills or rows (declared `items`), or the `json` widget. A list with no `items` and no options is shown as read-only tags and left alone. See [x-lt-lists.md](x-lt-lists.md) for the controls.
 
 ```json
 {
   "required": ["roles"],
   "properties": {
     "roles": { "type": "array", "x-lt-options": [{ "value": "gluer", "label": "Gluer" }, { "value": "qa", "label": "QA" }], "minItems": 1, "maxItems": 2 },
+    "codes": { "type": ["array", "null"], "items": { "type": "string", "pattern": "^[A-Z][0-9]{2}$" }, "uniqueItems": true },
     "weights": {
       "type": "object",
       "x-lt-widget": "json",
@@ -166,10 +167,12 @@ A `type: "array"` field with its own `x-lt-options` (path or literal) renders as
 }
 ```
 
-- A required multi-select or `json` list needs at least one item. An empty optional list passes its constraints.
-- Every item must belong to the option list (`Must be one of: gluer, qa`); `minItems`/`maxItems` bound the length (`At least 1 item`, `At most 2 items`); a `json` list checks each item against `items`, including `items.enum` (`Item 2: Expected a number`).
+- A required list needs at least one item. An empty optional list passes its constraints; `null` passes unless the field is required.
+- Every item must belong to the option list (`Must be one of: gluer, qa`); `minItems`/`maxItems` bound the length (`At least 1 item`, `At most 2 items`); `uniqueItems` refuses a repeat (`Item 2: Duplicate value`); each item is checked against `items`, including `items.enum` and `items.pattern` (`Item 2: Invalid format`).
+- Rows check every declared property of each item: `required`, `type`, `enum` and `x-lt-options` membership, bounds, `pattern` and `format`, plus `additionalProperties: false` (`Row 2, Qty: Minimum value is 1`). A cell's `x-lt-options` and `x-lt-showIf` read its row as `row.<property>`.
+- `format` checks `email`, `uri`, `date` (`YYYY-MM-DD`) and `date-time`.
 - A map's keys must belong to `propertyNames.enum` (`Unknown key "tray". Allowed: bag, plate, spool`) and every value must satisfy an object-shaped `additionalProperties` (`"bag": Minimum value is 0`). A required map needs at least one key; a zero weight is an answer.
-- The same rules run on the wire: an API or MCP caller sending the list or map under the bound key receives the same violations as the form shows.
+- The same rules run on the wire: an API or MCP caller sending the list or map under the bound key receives the same violations as the form shows. An item-level violation also carries a JSON `pointer` into the payload (`/facts/rx/order_lines/1/quantity`).
 
 ---
 

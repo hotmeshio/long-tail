@@ -22,6 +22,10 @@
  */
 import { resolveCtxPath } from './ctx-path';
 
+/** A list type, nullable or not. */
+const isArrayType = (schema: Schema): boolean =>
+  schema.type === 'array' || (Array.isArray(schema.type) && schema.type.includes('array'));
+
 export const X_LT_SCAN = 'x-lt-scan';
 export const X_LT_SCAN_SUBMIT = 'x-lt-scan-submit';
 export const X_LT_ORDER = 'x-lt-order';
@@ -147,7 +151,7 @@ export function applyScanToField(
   const sink = readScanSink(fieldSchema);
   if (!sink) return { ok: false, error: 'This field takes no scans' };
   const scanned = sink.value === 'code' ? scan.code : scan.target;
-  const isArray = fieldSchema.type === 'array';
+  const isArray = isArrayType(fieldSchema);
   const next = isArray ? [...(Array.isArray(current) ? current : []), scanned] : scanned;
   const error = scanSinkError(next, fieldSchema, ctx);
   if (error) return { ok: false, error };
@@ -160,7 +164,7 @@ export function applyScanToField(
 
 /** True when the field has room for another scan. */
 function hasRoom(value: unknown, fieldSchema: Schema): boolean {
-  if (fieldSchema.type === 'array') {
+  if (isArrayType(fieldSchema)) {
     const max = fieldSchema.maxItems;
     return typeof max !== 'number' || !Array.isArray(value) || value.length < max;
   }

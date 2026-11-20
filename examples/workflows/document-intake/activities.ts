@@ -56,11 +56,23 @@ export async function extractApplication(_applicationId: string): Promise<Extrac
       },
       account_type: 'individual',
       address: { street: '41 Harbor Lane', city: 'Portland', postal_code: '97205' },
+      services: ['checking', 'debit_card'],
+      co_applicants: ['jane.okafor@example.com', 'j.okafor@example.com'],
+      beneficiaries: [
+        { name: 'Jane Okafor', relationship: 'spouse', share: 100 },
+      ],
+      evidence: [
+        { quote: '41 Harbor Lane', section: 'Address', page: 1 },
+        { quote: 'J. Okafor', section: 'Signature', page: 1, signed: true },
+      ],
     },
     confidence: {
       applicant: { first_name: 0.52, last_name: 0.97, date_of_birth: 0.58, email: 0.93, phone: 0.71 },
       account_type: 0.66,
       address: { street: 0.9, city: 0.96, postal_code: 0.83 },
+      services: 0.91,
+      co_applicants: [0.97, 0.58],
+      beneficiaries: [{ name: 0.95, relationship: 0.9, share: 0.55 }],
     },
   };
 }

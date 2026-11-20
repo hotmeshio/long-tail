@@ -28,6 +28,8 @@ export type LTErrorCode = (typeof LT_ERROR_CODES)[keyof typeof LT_ERROR_CODES];
 export interface LTFieldViolation {
   field: string;
   message: string;
+  /** JSON pointer into the submitted payload when the error belongs to one list item or cell. */
+  pointer?: string;
   escalationId?: string;
 }
 

@@ -1,29 +1,22 @@
+import { memo } from 'react';
 import { WIDGET_MAP } from '../widgets';
-import { JSON_WIDGET, TEXTAREA_WIDGET } from '../widgets/field-widgets';
+import { JSON_WIDGET } from '../widgets/field-widgets';
 import { type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { resolveFieldOptions } from '../../../lib/x-lt-options';
-import { resolveCtxPath } from '../../../lib/ctx-path';
 import { deriveFieldLabel } from '../../../lib/derive-field-label';
-import { FieldLabel, FieldHelper, FieldError, inputClass } from './FieldChrome';
+import { FieldLabel } from './FieldChrome';
 import { declaredKind, type JsonValue } from './form-cells';
 import type { FieldControlProps } from './field-control-props';
 import { SelectField } from './SelectField';
-import { MultiSelectField } from './MultiSelectField';
+import { ListRow } from './list/ListRow';
+import { ListDisplay } from './list/ListDisplay';
 import { JsonField } from './JsonField';
 import { ListField } from './ListField';
 import { readScanSink } from '../../../lib/x-lt-scan';
-import { useFieldNotice, FieldNoticeLine } from './field-notice';
-
-const FORMAT_INPUT_TYPES: Record<string, string> = {
-  date: 'date',
-  'date-time': 'datetime-local',
-  email: 'email',
-  uri: 'url',
-};
-const FORMAT_WIDTH: Record<string, string> = {
-  date: 'max-w-48',
-  'date-time': 'max-w-64',
-};
+import { listControlOf } from '../../../lib/x-lt-list';
+import { useFieldNotice } from './field-notice';
+import { ScalarControl, type ScalarKind } from './ScalarControl';
+import { sameFieldRow } from './field-row-equality';
 
 /**
  * Field row: the control follows the field's declared `type` and its tokens;
@@ -31,19 +24,23 @@ const FORMAT_WIDTH: Record<string, string> = {
  * `lt-field-*` ids are load-bearing: the errors panel scroll-and-focus and
  * the test suite target them.
  */
-export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired, isReadOnly, error, escalationContext, submitAttempted }: {
+function FieldRowImpl({ fieldKey, value, onChange, onBlur, schema, fieldSchema: fieldSchemaProp, isRequired, isReadOnly, locked, error, escalationContext, submitAttempted }: {
   fieldKey: string;
   value: JsonValue;
   onChange: (v: JsonValue) => void;
   onBlur?: () => void;
   schema?: Record<string, any> | null;
+  /** The field's own schema, for a control that sits outside the form's properties (a table cell). */
+  fieldSchema?: Record<string, any>;
   isRequired?: boolean;
   isReadOnly?: boolean;
+  /** The form is shown but not editable: list controls hide their add and remove controls. */
+  locked?: boolean;
   error?: string;
   escalationContext?: ShowIfContext;
   submitAttempted?: boolean;
 }) {
-  const fieldSchema = schema?.properties?.[fieldKey] as Record<string, any> | undefined;
+  const fieldSchema = fieldSchemaProp ?? (schema?.properties?.[fieldKey] as Record<string, any> | undefined);
   const notice = useFieldNotice(fieldKey);
   const label = deriveFieldLabel(fieldKey, fieldSchema);
   const widgetName = fieldSchema?.['x-lt-widget'] as string | undefined;
@@ -66,6 +63,22 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   const isMarkdown = widgetName === 'markdown' && typeof value === 'string';
   const isAttachment = (widgetName === 'attachment' || widgetName === 'image') && typeof value === 'string';
   const hasRegisteredWidget = !!(widgetName && widgetName in WIDGET_MAP);
+
+  const listValue = kind === 'array' && (Array.isArray(value) || value === null);
+  if ((isReadOnly || (locked && widgetName !== JSON_WIDGET && listControlOf(fieldSchema) !== null)) && listValue && !hasRegisteredWidget) {
+    return (
+      <ListDisplay
+        fieldKey={fieldKey}
+        label={label}
+        value={value}
+        fieldSchema={fieldSchema}
+        context={escalationContext as Record<string, unknown> | undefined}
+        helperText={helperText}
+        isRequired={isRequired}
+        ids={ids}
+      />
+    );
+  }
 
   if (isReadOnly && !isMarkdown && !isAttachment && !hasRegisteredWidget) {
     const displayValue = value === null ? 'null'
@@ -123,65 +136,39 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
   // populates when the parent answer lands.
   const options = resolveFieldOptions(fieldSchema, escalationContext as Record<string, unknown> | undefined);
   if (kind === 'array') {
-    if (options !== undefined && fieldSchema?.['x-lt-options'] !== undefined) {
-      return <MultiSelectField {...control} value={value} options={options} />;
+    const listControl = listControlOf(fieldSchema, options?.length);
+    if (listControl && listControl !== 'json' && (Array.isArray(value) || value === null)) {
+      return (
+        <ListRow
+          control={listControl}
+          options={options}
+          value={value}
+          fieldSchema={fieldSchema}
+          context={escalationContext as Record<string, unknown> | undefined}
+          locked={locked}
+          props={control}
+        />
+      );
     }
   } else if (options !== undefined && kind !== 'object') {
     return <SelectField {...control} value={value} options={options} nullable={fieldSchema?.['x-lt-nullable'] === true} />;
   }
 
+  const scalar = (as: ScalarKind, v: JsonValue) => (
+    <ScalarControl kind={as} value={v} fieldSchema={fieldSchema} context={escalationContext as Record<string, unknown> | undefined} notice={notice} control={control} />
+  );
+  const text = (v: JsonValue) => scalar('string', v === null || v === undefined ? '' : String(v));
+
   switch (kind) {
     case 'boolean':
-      return (
-        <div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={value === true}
-              onChange={(e) => { onChange(e.target.checked); onBlur?.(); }}
-              className="w-3.5 h-3.5 rounded accent-accent"
-              data-field-key={fieldKey}
-              {...ariaProps}
-            />
-            <span className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
-              {label}
-              {isRequired && <span className="text-status-error ml-0.5">*</span>}
-            </span>
-          </label>
-          {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-          <FieldError error={error} id={ids.error} />
-        </div>
-      );
-
     case 'number':
     case 'integer':
-      // Numbers are short; the input holds a hand-sized width.
-      return (
-        <div>
-          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-          {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-          <input
-            type="number"
-            value={typeof value === 'number' || typeof value === 'string' ? value : ''}
-            onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-            onBlur={onBlur}
-            step="any"
-            data-field-key={fieldKey}
-            className={`${inputClass(!!error)} max-w-48`}
-            {...ariaProps}
-          />
-          <FieldError error={error} id={ids.error} />
-        </div>
-      );
-
     case 'string':
-      return renderText(typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value));
+      return scalar(kind, value);
 
     case 'array':
       // Without an option list or the json widget a list displays; a scan list is a checklist.
-      if (!Array.isArray(value) && !(value == null && readScanSink(fieldSchema))) {
-        return renderText(value === null || value === undefined ? '' : String(value));
-      }
+      if (!Array.isArray(value) && !(value == null && readScanSink(fieldSchema))) return text(value);
       return (
         <ListField
           fieldKey={fieldKey}
@@ -199,9 +186,7 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
       );
 
     case 'object': {
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return renderText(value === null || value === undefined ? '' : String(value));
-      }
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return text(value);
       const entries = Object.entries(value);
       return (
         <div>
@@ -228,96 +213,6 @@ export function FieldRow({ fieldKey, value, onChange, onBlur, schema, isRequired
         </div>
       );
   }
-
-  function renderText(text: string) {
-    const format = fieldSchema?.format as string | undefined;
-
-    if (format === 'password') {
-      return (
-        <div>
-          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-          {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-          <input
-            type="password"
-            value={text}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={onBlur}
-            data-field-key={fieldKey}
-            className={inputClass(!!error)}
-            autoComplete="off"
-            {...ariaProps}
-          />
-          <FieldError error={error} id={ids.error} />
-        </div>
-      );
-    }
-
-    // Emails and urls fill the cell; dates hold a hand-sized width, like numbers.
-    if (format && format in FORMAT_INPUT_TYPES) {
-      return (
-        <div>
-          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-          {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-          <input
-            type={FORMAT_INPUT_TYPES[format]}
-            value={text}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={onBlur}
-            data-field-key={fieldKey}
-            className={`${inputClass(!!error)} ${FORMAT_WIDTH[format] ?? ''}`}
-            {...ariaProps}
-          />
-          <FieldError error={error} id={ids.error} />
-        </div>
-      );
-    }
-
-    // A declared textarea, multi-line text, or long content.
-    if (format === 'textarea' || widgetName === TEXTAREA_WIDGET || text.includes('\n') || text.length > 80) {
-      const staticMax = fieldSchema?.maxLength as number | undefined;
-      const dynamicMax = fieldSchema?.['x-lt-max-length'] as string | undefined;
-      const dynamicValue = dynamicMax ? Number(resolveCtxPath(dynamicMax, escalationContext as Record<string, unknown> | undefined)) : NaN;
-      const resolvedMax = staticMax ?? (Number.isFinite(dynamicValue) ? dynamicValue : undefined);
-      const isOverMax = resolvedMax !== undefined && text.length > resolvedMax;
-      return (
-        <div>
-          <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-          {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-          <textarea
-            value={text}
-            onChange={(e) => { onChange(e.target.value); onBlur?.(); }}
-            onBlur={onBlur}
-            data-field-key={fieldKey}
-            className={`${inputClass(!!error)} leading-relaxed`}
-            rows={Math.min(6, Math.max(3, Math.ceil(text.length / 60)))}
-            {...ariaProps}
-          />
-          {resolvedMax !== undefined && (
-            <p className={`text-2xs mt-0.5 text-right tabular-nums ${isOverMax ? 'text-status-error font-medium' : 'text-text-quaternary'}`}>
-              {text.length} / {resolvedMax}
-            </p>
-          )}
-          <FieldError error={error} id={ids.error} />
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        <FieldLabel isRequired={isRequired} htmlFor={fieldId}>{label}</FieldLabel>
-        {helperText && <FieldHelper id={ids.help}>{helperText}</FieldHelper>}
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          data-field-key={fieldKey}
-          className={inputClass(!!error)}
-          {...ariaProps}
-        />
-        <FieldError error={error} id={ids.error} />
-        <FieldNoticeLine notice={notice} />
-      </div>
-    );
-  }
 }
+
+export const FieldRow = memo(FieldRowImpl, sameFieldRow);

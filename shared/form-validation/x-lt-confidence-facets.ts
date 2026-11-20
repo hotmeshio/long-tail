@@ -2,7 +2,9 @@
  * Review facets: a few low-cardinality metadata keys summarizing how a
  * reviewer treated a model's proposals, stamped onto the row in the same
  * guarded UPDATE that resolves it. Opt in on the schema root with
- * `"x-lt-confidence": { "facets": true }`. Counts cover the fields the form
+ * `"x-lt-confidence": { "facets": true }`. `review_changed` counts changed
+ * fields (a changed list counts once); `review_items_changed` counts the items
+ * added, removed and edited across the form's lists, present when a list was reviewed. Counts cover the fields the form
  * shows for the submitted answer, the same set the legend counts. Values are
  * strings so `metadata @>` filters and analytics projections match exactly.
  */
@@ -13,6 +15,7 @@ export const REVIEW_FACET_KEYS = {
   OUTCOME: 'review_outcome',
   CHANGED: 'review_changed',
   WORST: 'review_worst',
+  ITEMS_CHANGED: 'review_items_changed',
 } as const;
 
 export const REVIEW_OUTCOMES = {
@@ -58,9 +61,11 @@ export function buildReviewFacets(
 
   const summary = summarizeReview(spec, review, shown);
   const worst = summary.tranches.find((t) => t.fields.length > 0)?.tranche;
+  const hasList = shown.some((key) => review[key].diff !== undefined);
   return {
     [REVIEW_FACET_KEYS.OUTCOME]: summary.changed.length > 0 ? REVIEW_OUTCOMES.CORRECTED : REVIEW_OUTCOMES.ACCEPTED,
     [REVIEW_FACET_KEYS.CHANGED]: String(summary.changed.length),
     ...(worst ? { [REVIEW_FACET_KEYS.WORST]: worst.label } : {}),
+    ...(hasList ? { [REVIEW_FACET_KEYS.ITEMS_CHANGED]: String(summary.itemsChanged) } : {}),
   };
 }

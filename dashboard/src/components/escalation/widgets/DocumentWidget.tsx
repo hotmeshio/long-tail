@@ -38,6 +38,8 @@ export function DocumentWidget({ fieldKey, value, schema, escalationContext }: W
   const found = resolveDocumentSource(schema?.['x-lt-source'], value, escalationContext as Record<string, unknown> | undefined);
   const escalationId = (escalationContext?.escalation as { id?: string } | null | undefined)?.id;
   const [failed, setFailed] = useState(false);
+  const rawSource = schema?.['x-lt-source'];
+  const locatorSources = (Array.isArray(rawSource) ? rawSource : [rawSource]).filter((v): v is string => typeof v === 'string');
 
   const source = found && !isSourceError(found) ? found : null;
   // Judged when a link arrives, not on every render: an open document
@@ -94,7 +96,7 @@ export function DocumentWidget({ fieldKey, value, schema, escalationContext }: W
       {head}
       <div className="mt-1.5 border-y border-surface-border">
         {source!.kind === DOCUMENT_KINDS.PDF && (
-          <PdfViewer url={source!.url} identity={source!.path ?? source!.url} name={source!.name} heightClass={heightClass} expiresAt={source!.expiresAt} onRefresh={refresh} />
+          <PdfViewer url={source!.url} identity={source!.path ?? source!.url} name={source!.name} heightClass={heightClass} expiresAt={source!.expiresAt} onRefresh={refresh} locator={{ key: fieldKey, sources: locatorSources }} />
         )}
         {source!.kind === DOCUMENT_KINDS.IMAGE && (
           <ImageViewer url={source!.url} name={source!.name} heightClass={heightClass} expiresAt={source!.expiresAt} onRefresh={refresh} onError={() => setFailed(true)} />

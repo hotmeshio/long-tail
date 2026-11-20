@@ -52,5 +52,6 @@ Validate any value against a JSON Schema without making a network call. Useful f
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| data | any | Yes | The value to validate |
-| schema | object | Yes | JSON Schema to validate against |
+| data | any | With `schema` | The value to validate |
+| schema | object | With `data` | JSON Schema to validate against |
+| form_schema | object | Instead of `data` and `schema` | A resolver form schema to check: its list tokens (`pills`, `rows`, `x-lt-item-key`, `x-lt-locate` and the rest, see [x-lt-lists.md](../../hitl/x-lt-lists.md)) are checked as a role save checks them. Returns `{ valid, errors }`. |

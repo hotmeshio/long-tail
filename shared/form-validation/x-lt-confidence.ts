@@ -24,6 +24,9 @@
 import { resolveCtxPath } from './ctx-path';
 import { isDisplayOnlyField } from './display-only-widgets';
 import { mapPayloadToForm } from './x-lt-bind';
+import { comparable } from './answer-compare';
+import { diffList, type ListDiff } from './x-lt-list-diff';
+import { isListSchema, itemSchemaOf } from './x-lt-list';
 
 export const CONFIDENCE_TONES = {
   ERROR: 'error',
@@ -99,34 +102,20 @@ export function trancheFor(tranches: readonly ConfidenceTranche[], score: number
   return null;
 }
 
-/** Text compared by its words: surrounding and repeated whitespace is not a change. */
-function normalizeText(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
-
-function stableJson(value: unknown): string {
-  if (typeof value === 'string') return JSON.stringify(normalizeText(value));
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const entries = Object.keys(value as Record<string, unknown>).sort()
-      .map((k) => `${JSON.stringify(k)}:${stableJson((value as Record<string, unknown>)[k])}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
+export { comparable as comparableAnswer } from './answer-compare';
 
 /**
- * A value's comparable form: empty answers compare equal, "42" equals 42,
- * whitespace-only edits are not changes, and key order is ignored.
+ * Whether an answer differs from what was proposed for it. Given the field's
+ * schema, a list compares item by item (keyed or unordered when declared).
  */
-function comparable(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'object') return stableJson(value);
-  return normalizeText(String(value));
-}
-
-/** Whether an answer differs from what was proposed for it. */
-export function differsFromProposal(proposed: unknown, current: unknown): boolean {
+export function differsFromProposal(
+  proposed: unknown,
+  current: unknown,
+  fieldSchema?: Record<string, unknown> | null,
+): boolean {
+  if (fieldSchema && isListSchema(fieldSchema) && (Array.isArray(proposed) || Array.isArray(current))) {
+    return diffList(proposed, current, fieldSchema).changed;
+  }
   return comparable(proposed) !== comparable(current);
 }
 
@@ -141,6 +130,12 @@ export interface FieldReview {
   proposed?: unknown;
   /** Whether the current answer differs from the proposal. */
   changed: boolean;
+  /** For a list: its items added, removed and edited against the proposal. */
+  diff?: ListDiff;
+  /** For a list scored per item: each item's tranche (null when confident or unscored). */
+  itemTranches?: Array<ConfidenceTranche | null>;
+  /** For a list of rows scored per cell: each row's cell tranches. */
+  cellTranches?: Array<Record<string, ConfidenceTranche | null> | null>;
 }
 
 function asFormMap(
@@ -173,20 +168,68 @@ export function buildFormReview(
   const review: Record<string, FieldReview> = {};
   for (const [key, def] of Object.entries(props)) {
     if (def?.['x-lt-confidence'] === false || isDisplayOnlyField(def)) continue;
-    const raw = scores[key];
+    const items = Array.isArray(scores[key]) ? readItemScores(scores[key] as unknown[], def, spec.tranches) : null;
+    const raw = items ? items.score : scores[key];
     const score = typeof raw === 'number' && Number.isFinite(raw) ? Math.min(Math.max(raw, 0), 1) : undefined;
     const hasProposal = key in proposals;
     if (score === undefined && !hasProposal) continue;
     const tranche = score === undefined ? null : trancheFor(spec.tranches, score);
+    const list = isListSchema(def) && hasProposal && (Array.isArray(proposals[key]) || Array.isArray(values[key]));
+    const diff = list ? diffList(proposals[key], values[key], def) : undefined;
     review[key] = {
       ...(score !== undefined ? { score } : {}),
       ...(tranche ? { tranche } : {}),
       hasProposal,
       ...(hasProposal ? { proposed: proposals[key] } : {}),
-      changed: hasProposal && differsFromProposal(proposals[key], values[key]),
+      changed: hasProposal && (diff ? diff.changed : differsFromProposal(proposals[key], values[key], def)),
+      ...(diff ? { diff } : {}),
+      ...(items?.itemTranches ? { itemTranches: items.itemTranches } : {}),
+      ...(items?.cellTranches ? { cellTranches: items.cellTranches } : {}),
     };
   }
   return review;
+}
+
+const clamp = (n: number) => Math.min(Math.max(n, 0), 1);
+const isScore = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * Per-item scores aligned with a list's value: a number scores a pill or a
+ * row, an object of numbers scores a row's cells. The field's score is the
+ * lowest one, so its tranche is the worst of its items. A column declared
+ * `x-lt-confidence: false` is not scored.
+ */
+function readItemScores(
+  raw: unknown[],
+  def: Record<string, unknown>,
+  tranches: readonly ConfidenceTranche[],
+): { score?: number; itemTranches?: Array<ConfidenceTranche | null>; cellTranches?: Array<Record<string, ConfidenceTranche | null> | null> } {
+  const columns = (itemSchemaOf(def)?.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const all: number[] = [];
+  const itemTranches: Array<ConfidenceTranche | null> = [];
+  const cellTranches: Array<Record<string, ConfidenceTranche | null> | null> = [];
+  let anyCells = false;
+  for (const entry of raw) {
+    if (isScore(entry)) {
+      all.push(clamp(entry));
+      itemTranches.push(trancheFor(tranches, clamp(entry)));
+      cellTranches.push(null);
+      continue;
+    }
+    const cells: Record<string, ConfidenceTranche | null> = {};
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      for (const [name, v] of Object.entries(entry as Record<string, unknown>)) {
+        if (!isScore(v) || columns[name]?.['x-lt-confidence'] === false) continue;
+        all.push(clamp(v));
+        cells[name] = trancheFor(tranches, clamp(v));
+        anyCells = true;
+      }
+    }
+    const worst = Object.values(cells).filter((t): t is ConfidenceTranche => t !== null).sort((a, b) => a.below - b.below)[0];
+    itemTranches.push(worst ?? null);
+    cellTranches.push(Object.keys(cells).length > 0 ? cells : null);
+  }
+  return { ...(all.length > 0 ? { score: Math.min(...all) } : {}), itemTranches, ...(anyCells ? { cellTranches } : {}) };
 }
 
 export interface ReviewSummary {
@@ -194,6 +237,8 @@ export interface ReviewSummary {
   tranches: Array<{ tranche: ConfidenceTranche; fields: string[] }>;
   /** Field keys whose answer differs from the proposal. */
   changed: string[];
+  /** List items added, removed and edited across the shown fields. */
+  itemsChanged: number;
 }
 
 /** Counts for the form's legend, over the fields actually shown, in their order. */
@@ -204,11 +249,13 @@ export function summarizeReview(
 ): ReviewSummary {
   const tranches = spec.tranches.map((tranche) => ({ tranche, fields: [] as string[] }));
   const changed: string[] = [];
+  let itemsChanged = 0;
   for (const key of shownKeys) {
     const field = review[key];
     if (!field) continue;
     if (field.tranche) tranches.find((t) => t.tranche.below === field.tranche!.below)?.fields.push(key);
     if (field.changed) changed.push(key);
+    itemsChanged += field.diff?.itemsChanged ?? 0;
   }
-  return { tranches, changed };
+  return { tranches, changed, itemsChanged };
 }
