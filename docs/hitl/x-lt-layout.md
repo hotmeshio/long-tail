@@ -53,6 +53,8 @@ By default, fields render in JSON key order. `x-lt-order` sets an explicit seque
 }
 ```
 
+`x-lt-order` on a list's `items` orders the columns of its rows, and `x-lt-width` (`xs`, `sm`, `md`, `fill`) sizes each column; see [x-lt-lists.md](x-lt-lists.md#rows).
+
 ---
 
 ## Section Groups (`x-lt-section`)

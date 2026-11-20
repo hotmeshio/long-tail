@@ -19,6 +19,7 @@ This works because the form is data: a JSON Schema stored on the role, versioned
 | Option lists shared by thousands of rows, cascading selects | Versioned lookups | [lookups.md](hitl/lookups.md) |
 | Documents the reviewer reads in place: PDFs and images, signed per reader | Stored files + `document` widget | [files.md](hitl/files.md) |
 | Values a model proposed, marked by confidence, with what each was and became | `x-lt-confidence` | [x-lt-confidence.md](hitl/x-lt-confidence.md) |
+| Lists: diagnosis codes as pills, order lines as an editable table, evidence quotes, what each item was and became | Lists | [x-lt-lists.md](hitl/x-lt-lists.md) |
 | Fields that appear based on another answer | `x-lt-showIf` | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Sections, columns, ordering, side-panel help | Layout keywords | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Runtime-driven items, files, signatures, SOP blocks | Widgets | [x-lt-widget.md](hitl/x-lt-widget.md) |
@@ -96,6 +97,7 @@ Ordered as a learning path — each file adds one capability to the same form:
 | Reviewing proposed values by confidence (`x-lt-confidence`) | [x-lt-confidence.md](hitl/x-lt-confidence.md) |
 | Field types, formats, required, read-only | [form.md](hitl/form.md) |
 | Pre-submission validation guards (min, max, pattern, dynamic bounds) | [x-lt-validation.md](hitl/x-lt-validation.md) |
+| Lists: pills, rows, evidence, not stated, item review | [x-lt-lists.md](hitl/x-lt-lists.md) |
 | Conditional visibility (`x-lt-showIf`, `x-lt-hide-if-empty`, `x-lt-hidden`) | [x-lt-show-if.md](hitl/x-lt-show-if.md) |
 | Layout, ordering, sections, binding, help panel | [x-lt-layout.md](hitl/x-lt-layout.md) |
 | Custom widgets (checklist, file upload, code editor, signature, markdown) | [x-lt-widget.md](hitl/x-lt-widget.md) |

@@ -47,7 +47,7 @@ Declare the tranches at the schema root:
 | `proposed` | The context path to the proposals. Defaults to `envelope.formDefaults` |
 | `facets` | `true` stamps a review summary onto the row's metadata when it resolves; see [Review Facets](#review-facets) |
 
-`"x-lt-confidence": true` uses the default tranches: Low under 0.6, Check under 0.85. A field opts out with `"x-lt-confidence": false`; display-only widgets never take part.
+`"x-lt-confidence": true` uses the default tranches: Low under 0.6, Check under 0.85. A field opts out with `"x-lt-confidence": false`; display-only widgets never take part. Inside a list's `items`, `false` on a property leaves that column unscored.
 
 ## What the Form Shows
 
@@ -55,6 +55,8 @@ Declare the tranches at the schema root:
 - **The review key, above the fields.** One entry per tranche with its count, and **Edited** with the count of changed answers out of the proposed ones. Each entry walks its fields: press **Low** and the next low-confidence field scrolls into view and takes focus.
 - **What it was, while editing.** Once an answer differs from its proposal, the field shows **Edited**. Press it to see the proposed value and **Restore** it.
 - **What it became, after submit.** A locked or resolved form shows each changed field as `Was ~~Jon~~ → John`, beside its tranche.
+
+Lists take part too: a score for the list marks the control; an array of scores aligned with the items marks each pill, row or cell, and the field takes the worst tranche; added, removed and edited items are marked while editing and after submit. See [Review in x-lt-lists.md](x-lt-lists.md#review).
 
 The proposal comes from the envelope, which the resolve leaves untouched, and the answer from the stored resolver payload, so a resolved row shows the same review indefinitely without storing anything extra. Answers compare as values: an empty string and a missing answer are equal, `"42"` equals `42`, text compares by its words (surrounding and repeated whitespace is not a change), and object key order is ignored. The answer is stored exactly as submitted.
 
@@ -67,6 +69,7 @@ With `"facets": true`, the server summarizes each review when the row resolves a
 | `review_outcome` | `corrected` when any shown answer differs from its proposal, else `accepted` |
 | `review_changed` | How many shown answers differ, as a string (`"3"`) |
 | `review_worst` | The lowest tranche any shown field fell into (`"Low"`); absent when every score cleared |
+| `review_items_changed` | For forms with lists: the items added, removed and edited across the lists, as a string (`"4"`); a changed list counts once in `review_changed` |
 
 The counts cover the fields the form shows for the submitted answer, the same set the review key counts, and use the comparison above. They are computed by the server from the role's schema, so an answer submitted through the form, the API or an MCP tool reports the same way, and they win over a caller's metadata of the same name. Values are strings, so `metadata @>` filters and analytics groupings match them exactly.
 

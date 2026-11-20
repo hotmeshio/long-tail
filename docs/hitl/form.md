@@ -26,7 +26,7 @@ Declare `title` on every field whose key isn't already a readable label — it i
 
 ## Field Types
 
-The control follows the field's declared `type` and its tokens; the stored value only fills it. A field with no value yet renders the empty state of its control: a number is an empty input, a boolean is an unchecked box, a select opens on **Choose…**, a multi-select has nothing picked, a JSON editor is empty. Every property starts at its `default`, or `{}` for an object, or empty text.
+The control follows the field's declared `type` and its tokens; the stored value only fills it. A field with no value yet renders the empty state of its control: a number is an empty input, a boolean is an unchecked box, a select opens on **Choose…**, a multi-select has nothing picked, a JSON editor is empty. Every property starts at its `default`, or `{}` for an object, or empty text; an editable list starts empty, or as `null` (**Not stated**) when its type admits null.
 
 | Declared type | Renders As |
 |-----------|-----------|
@@ -36,9 +36,12 @@ The control follows the field's declared `type` and its tokens; the stored value
 | `string` | Text input; `format: "textarea"` for multi-line |
 | `string`/`number` + `enum` | Select |
 | any scalar + `x-lt-options` | Select with labeled options: inline, from the context, or from a lookup (see [x-lt-validation.md](x-lt-validation.md#select-options-x-lt-options)) |
-| `array` + `x-lt-options` | Multi-select chips emitting the picked values in list order |
+| `array` + `x-lt-options` | Multi-select chips emitting the picked values in list order; from 15 options, or `x-lt-display: "picker"`, the picked values as pills with type-ahead |
+| `array` of scalars (`items`) | Pills: type, paste or pick to add (see [x-lt-lists.md](x-lt-lists.md#pills)) |
+| `array` of objects (`items.properties`) | Editable table, one cell control per property (see [x-lt-lists.md](x-lt-lists.md#rows)) |
 | `array` / `object` + `x-lt-widget: "json"` | Validated JSON editor (see [x-lt-widget.md](x-lt-widget.md#json)) |
-| `array` without options | Tag display (read-only) |
+| `array` without `items` or options | Tag display (read-only) |
+| `array` + `readOnly` (or a locked form) | Read-only list display: pills, table or evidence entries (see [x-lt-lists.md](x-lt-lists.md#evidence-and-read-only-lists)) |
 | `object` | Nested fields from `properties`, or a widget (see [x-lt-widget.md](x-lt-widget.md)) |
 | `null` | Read-only "null" display |
 

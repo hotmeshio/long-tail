@@ -7,6 +7,8 @@ For rich inputs beyond standard HTML types, set `x-lt-widget` on any field:
 | `"file-upload"` | File picker with drag-and-drop. Stores a base64 data URL. Use `accept` to filter file types. |
 | `"code-editor"` | Monospace textarea with tab-key support. Use `x-lt-language` for the syntax hint. |
 | `"json"` | Validated JSON editor for a `list` or `object` field. Unparseable text blocks submit as **Invalid JSON**; a parsed value is validated as the declared type. |
+| `"pills"` | Free-entry pills for a list of scalars; also the default for an editable list of scalars. See [x-lt-lists.md](x-lt-lists.md#pills). |
+| `"rows"` | Editable table for a list of objects; also the default for an editable list of objects. See [x-lt-lists.md](x-lt-lists.md#rows). |
 | `"signature"` | HTML5 Canvas drawing pad. Outputs a PNG data URL. |
 | `"rich-text"` | Tall textarea for formatted text input. |
 | `"markdown"` | Markdown source rendered with headings, tables, lists, code blocks. Editable by default; set `readOnly: true` for a pure content block. |
@@ -85,7 +87,7 @@ The submitted value is a base64 data URL (`data:image/png;base64,...`). `accept`
 }
 ```
 
-A monospace editor holding the raw JSON of a `type: "array"` or `"object"` field. While the text does not parse, the field reads **Invalid JSON** and blocks submit; once it parses, the value is validated as the declared type: `items` (`type`, `enum`, bounds), `minItems`, `maxItems` for lists; `propertyNames.enum` and `additionalProperties` (`type`, `minimum`, `maximum`) for maps. Empty text submits `null`. Typing never reformats the text. See [Lists and Maps](x-lt-validation.md#lists-and-maps).
+A monospace editor holding the raw JSON of a `type: "array"` or `"object"` field. While the text does not parse, the field reads **Invalid JSON** and blocks submit; once it parses, the value is validated as the declared type: `items` (`type`, `enum`, bounds), `minItems`, `maxItems` for lists; `propertyNames.enum` and `additionalProperties` (`type`, `minimum`, `maximum`) for maps. Empty text submits `null`. Typing never reformats the text. A list with declared `items` takes [pills or rows](x-lt-lists.md) without this widget; `json` keeps the raw editor for a list with no declared shape. See [Lists and Maps](x-lt-validation.md#lists-and-maps).
 
 ---
 

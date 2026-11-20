@@ -8,6 +8,7 @@ import { extractApplication, recordReview, stageSampleDocuments } from '../../ex
 import { INTAKE_FORM_SCHEMA, type IntakeReviewV1 } from '../../examples/workflows/document-intake/forms';
 import { buildApplicationPdf, SAMPLE_APPLICANT } from '../../examples/workflows/document-intake/sample-documents';
 import { buildFormReview, readConfidenceSpec } from '../../shared/form-validation/x-lt-confidence';
+import { formSchemaTokenError, listControlOf, validateResolverPayload } from '../../shared/form-validation';
 import { mapPayloadToForm } from '../../shared/form-validation/x-lt-bind';
 import { assertFileRefs } from '../../types/escalation';
 
@@ -21,6 +22,13 @@ const VERIFIED: IntakeReviewV1 = {
   },
   account_type: 'joint',
   address: { street: SAMPLE_APPLICANT.street, city: SAMPLE_APPLICANT.city, postal_code: SAMPLE_APPLICANT.postal_code },
+  services: ['checking', 'debit_card'],
+  co_applicants: ['jane.okafor@example.com'],
+  beneficiaries: [{ name: 'Jane Okafor', relationship: 'spouse', share: 60 }, { name: 'Sam Okafor', relationship: 'child', share: 40 }],
+  evidence: [
+    { quote: '41 Harbor Lane', section: 'Address', page: 1 },
+    { quote: 'J. Okafor', section: 'Signature', page: 1, signed: true },
+  ],
   id_matches: 'yes',
 };
 
@@ -56,7 +64,8 @@ describe('document-intake example', () => {
     const form = mapPayloadToForm(values, INTAKE_FORM_SCHEMA);
     const review = buildFormReview(spec, INTAKE_FORM_SCHEMA, { envelope: { formDefaults: values, confidence } }, form);
     expect(Object.keys(review).sort()).toEqual([
-      'account_type', 'city', 'date_of_birth', 'email', 'first_name', 'last_name', 'phone', 'postal_code', 'street',
+      'account_type', 'beneficiaries', 'city', 'co_applicants', 'date_of_birth', 'email', 'first_name', 'last_name',
+      'phone', 'postal_code', 'services', 'street',
     ]);
     expect(review.first_name.tranche?.label).toBe('Low');
     expect(review.postal_code.tranche?.label).toBe('Check');
@@ -69,12 +78,41 @@ describe('document-intake example', () => {
     const result = await recordReview({ proposed: values, review: VERIFIED });
     expect(result.accepted).toBe(true);
     expect(result.corrections.map((c) => c.path).sort()).toEqual([
-      'account_type', 'applicant.date_of_birth', 'applicant.first_name',
+      'account_type', 'applicant.date_of_birth', 'applicant.first_name', 'beneficiaries', 'co_applicants',
     ]);
     expect(result.corrections.find((c) => c.path === 'applicant.first_name')).toEqual({
       path: 'applicant.first_name', proposed: 'Jon', final: 'John',
     });
-    expect(result.proposedCount).toBe(9);
+    expect(result.proposedCount).toBe(13);
+  });
+
+  it('declares a list of each shape, and its list tokens pass the authoring check', () => {
+    const { properties } = INTAKE_FORM_SCHEMA;
+    expect(formSchemaTokenError(INTAKE_FORM_SCHEMA)).toBeNull();
+    expect(listControlOf(properties.services as Record<string, unknown>)).toBe('chips');
+    expect(listControlOf(properties.co_applicants as Record<string, unknown>)).toBe('pills');
+    expect(listControlOf(properties.beneficiaries as Record<string, unknown>)).toBe('rows');
+    expect((properties.evidence as Record<string, unknown>).readOnly).toBe(true);
+  });
+
+  it('scores lists per item and by list, and shows the reviewer\'s item changes', async () => {
+    const { values, confidence } = await extractApplication('APP-1');
+    const spec = readConfidenceSpec(INTAKE_FORM_SCHEMA)!;
+    const answers = { ...mapPayloadToForm(values, INTAKE_FORM_SCHEMA), co_applicants: ['jane.okafor@example.com'], beneficiaries: [{ name: 'Jane Okafor', relationship: 'spouse', share: 60 }] };
+    const review = buildFormReview(spec, INTAKE_FORM_SCHEMA, { envelope: { formDefaults: values, confidence } }, answers);
+    expect(review.services.tranche?.label).toBeUndefined();
+    expect(review.co_applicants.itemTranches?.map((t) => t?.label ?? null)).toEqual([null, 'Low']);
+    expect(review.co_applicants.diff?.removed).toHaveLength(1);
+    expect(review.beneficiaries.cellTranches?.[0]).toMatchObject({ share: { label: 'Low' } });
+    expect(review.beneficiaries.diff?.marks[0]).toMatchObject({ kind: 'edited', cells: ['share'] });
+  });
+
+  it('accepts the verified payload through the form validation the dashboard and API share', () => {
+    expect(validateResolverPayload(INTAKE_FORM_SCHEMA as Record<string, unknown>, VERIFIED as unknown as Record<string, unknown>)).toEqual([]);
+    const bad = { ...VERIFIED, beneficiaries: [{ name: 'Jane Okafor', relationship: 'spouse', share: 0 }] };
+    expect(validateResolverPayload(INTAKE_FORM_SCHEMA as Record<string, unknown>, bad as unknown as Record<string, unknown>)).toEqual([
+      { field: 'beneficiaries', message: 'Row 1, Share %: Minimum value is 1', pointer: '/beneficiaries/0/share' },
+    ]);
   });
 
   it('gives every input a title and one instruction line', () => {
