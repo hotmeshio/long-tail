@@ -85,6 +85,22 @@ export async function getSettings(req?: IncomingMessage): Promise<LTApiResult> {
             noticeAfterMs: config.NATS_LIVE_NOTICE_AFTER_MS,
             spreadMs: config.NATS_RECONNECT_SPREAD_MS,
           },
+          refresh: {
+            enabled: config.REALTIME_REFRESH_ENABLED,
+            refetchOnFocus: config.REALTIME_REFETCH_ON_FOCUS,
+            detail: {
+              coalesceMs: config.REALTIME_REFRESH_DETAIL_COALESCE_MS,
+              minIntervalMs: config.REALTIME_REFRESH_DETAIL_MIN_INTERVAL_MS,
+            },
+            list: {
+              coalesceMs: config.REALTIME_REFRESH_LIST_COALESCE_MS,
+              minIntervalMs: config.REALTIME_REFRESH_LIST_MIN_INTERVAL_MS,
+            },
+            summary: {
+              coalesceMs: config.REALTIME_REFRESH_SUMMARY_COALESCE_MS,
+              minIntervalMs: config.REALTIME_REFRESH_SUMMARY_MIN_INTERVAL_MS,
+            },
+          },
         },
         auth: {
           sso: isSSOEnabled(),

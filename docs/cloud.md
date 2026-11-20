@@ -222,6 +222,10 @@ The API Deployment sits behind a Service + Ingress. The worker Deployment has no
 | `NATS_RECONNECT_MAX_MS` | yes | — | Dashboard reconnect: backoff cap (default: 60000) |
 | `NATS_LIVE_NOTICE_AFTER_MS` | yes | — | How long live updates stay down before the dashboard shows a notice (default: 30000) |
 | `NATS_RECONNECT_SPREAD_MS` | yes | — | Window the first retry after a drop and the catch-up refetch spread across (default: 5000) |
+| `REALTIME_REFRESH_{DETAIL,LIST,SUMMARY}_COALESCE_MS` | yes | — | Dashboard refresh: how long a burst of events gathers before a lane refreshes (defaults: 300, 500, 1000) |
+| `REALTIME_REFRESH_{DETAIL,LIST,SUMMARY}_MIN_INTERVAL_MS` | yes | — | Dashboard refresh: least time between two refreshes of a lane (defaults: 2000, 10000, 10000) |
+| `REALTIME_REFRESH_ENABLED` | yes | — | `false` makes events mark open views stale without fetching (default: true) |
+| `REALTIME_REFETCH_ON_FOCUS` | yes | — | `true` refetches stale views when the window regains focus (default: false) |
 | `OPENAI_API_KEY` | — | yes | For workflows that call OpenAI (optional) |
 
 Environment variables serve as fallbacks. When using `start()`, prefer passing config directly — it's explicit and type-checked. The API container does not need telemetry, event, or AI keys — it never executes workflow code. The worker container does not need `JWT_SECRET` or `PORT` — it never serves HTTP.

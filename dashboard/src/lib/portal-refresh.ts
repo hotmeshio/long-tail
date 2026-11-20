@@ -1,27 +1,14 @@
-import type { QueryKey } from '@tanstack/react-query';
 import type { RolePin } from '../api/roles';
-import { escalationPattern, sanitizeSubjectToken } from './events/subjects';
+import { escalationPattern } from './events/subjects';
 import { parseEscalationListUrl, singleRoleOf } from './escalation-list-url';
 
-/** The subject root every escalation event shares; the role token follows it. */
-const ESCALATION_TYPE_PREFIX = 'system.escalation.';
-const WIDE_KEYS: QueryKey[] = [['escalations']];
-
-export interface PortalRefreshPlan {
-  /** One subscription pattern per queue the portal reads; one wide pattern when a URL names no single queue. */
-  patterns: string[];
-  /** The query keys an event of this type should refresh: the moved queue's lists, or every list when scope is wide. */
-  keysFor(eventType: string): QueryKey[];
-}
-
 /**
- * How a portal stays fresh. Every list query key carries its params object,
- * and the query client matches object segments partially, so an event on
- * one queue refreshes only that queue's panels and tiles (pinned by `role`
- * or by a lone `roles` entry) and the queue's related sets. A URL that names
- * several roles or none widens the plan to the whole escalation family.
+ * The subscriptions a portal needs: one pattern per queue its cells and
+ * tiles read, or the escalation family when a URL names several queues or
+ * none. Which cached panels an event refreshes is decided per event by the
+ * escalation router.
  */
-export function portalRefreshPlan(urls: Array<Pick<RolePin, 'url'>>, resolveUrl: (url: string) => string): PortalRefreshPlan {
+export function portalRefreshPatterns(urls: Array<Pick<RolePin, 'url'>>, resolveUrl: (url: string) => string): string[] {
   const roles = new Set<string>();
   let wide = false;
   for (const { url } of urls) {
@@ -30,26 +17,6 @@ export function portalRefreshPlan(urls: Array<Pick<RolePin, 'url'>>, resolveUrl:
     const scoped = singleRoleOf(params);
     if (scoped) roles.add(scoped); else wide = true;
   }
-  if (wide || roles.size === 0) {
-    return { patterns: wide ? [escalationPattern({})] : [], keysFor: () => WIDE_KEYS };
-  }
-  const byToken = new Map([...roles].map((role) => [sanitizeSubjectToken(role), role]));
-  const patterns = [...roles].sort().map((role) => escalationPattern({ role }));
-  return {
-    patterns,
-    keysFor(eventType) {
-      const token = eventType.startsWith(ESCALATION_TYPE_PREFIX) ? eventType.slice(ESCALATION_TYPE_PREFIX.length).split('.')[0] : '';
-      const role = byToken.get(token);
-      return role
-        ? [
-            ['escalations', { role }],
-            ['escalations', 'available', { role }],
-            ['escalations', { roles: [role] }],
-            ['escalations', 'available', { roles: [role] }],
-            ['escalations', 'related', role],
-            ['escalations', 'related-rows', role],
-          ]
-        : WIDE_KEYS;
-    },
-  };
+  if (wide) return [escalationPattern({})];
+  return [...roles].sort().map((role) => escalationPattern({ role }));
 }

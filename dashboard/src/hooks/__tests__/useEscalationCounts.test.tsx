@@ -31,9 +31,12 @@ vi.mock('../../api/escalations', () => ({
 }));
 
 let qc: QueryClient;
+const COUNT_KEY = ['escalations', 'available', { limit: 1 }];
+const EVENT = { type: 'system.escalation.x.e1.created' };
 
 function createWrapper() {
-  qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  qc.setQueryData(COUNT_KEY, { escalations: [], total: 0 });
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
@@ -71,7 +74,7 @@ describe('useEscalationCounts', () => {
 
     // A simulation-grade burst: many events inside one coalesce window.
     act(() => {
-      for (let i = 0; i < 50; i++) subscriptions[0].handler({ type: 'system.escalation.x' });
+      for (let i = 0; i < 50; i++) subscriptions[0].handler(EVENT);
     });
     expect(spy).not.toHaveBeenCalled();
 
@@ -79,7 +82,7 @@ describe('useEscalationCounts', () => {
       vi.advanceTimersByTime(SUMMARY_FLUSH_MS);
     });
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: COUNT_KEY }, { cancelRefetch: false });
   });
 
   it('a sustained event stream stays bounded by the SUMMARY refractory floor', () => {
@@ -91,7 +94,7 @@ describe('useEscalationCounts', () => {
     act(() => {
       const totalMs = coalesceMs + 2 * minIntervalMs;
       for (let elapsed = 0; elapsed < totalMs; elapsed += 100) {
-        subscriptions[0].handler({ type: 'system.escalation.x' });
+        subscriptions[0].handler(EVENT);
         vi.advanceTimersByTime(100);
       }
     });

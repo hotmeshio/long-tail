@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import { useRoleDetails } from '../../api/roles';
 import { useLinkVariables } from '../../hooks/useLinkVariables';
-import { useEventSubscriptions } from '../../hooks/useEventContext';
-import { useThrottledInvalidation } from '../../hooks/useEventHooks';
+import { useEscalationRefresh } from '../../hooks/useEscalationRefresh';
 import { portalPath, portalsOf } from '../../lib/portal-path';
-import { portalRefreshPlan } from '../../lib/portal-refresh';
+import { portalRefreshPatterns } from '../../lib/portal-refresh';
 import { displayRoleTitle } from '../../lib/role-display';
 import { PortalGrid } from '../../components/portal/PortalGrid';
 import { PortalCounts } from '../../components/portal/PortalCounts';
@@ -41,10 +40,9 @@ export function PortalPage() {
   const from = portal ? portalPath(role, portal.key) : portalPath(role);
 
   // One subscription per queue the cells and tiles name; an event refreshes
-  // only that queue's panels and tiles, through the LIST-tier scheduler.
-  const plan = useMemo(() => portalRefreshPlan(rows ? [...rows.flat(), ...counts] : [], resolveUrl), [rows, counts, resolveUrl]);
-  const invalidate = useThrottledInvalidation('LIST');
-  useEventSubscriptions(plan.patterns, (event) => { invalidate(plan.keysFor(event.type)); });
+  // only the panels and tiles it can change.
+  const patterns = useMemo(() => portalRefreshPatterns(rows ? [...rows.flat(), ...counts] : [], resolveUrl), [rows, counts, resolveUrl]);
+  useEscalationRefresh(patterns);
 
   const cellCount = rows ? rows.reduce((n, r) => n + r.length, 0) : 0;
   const empty = !isFetched ? null

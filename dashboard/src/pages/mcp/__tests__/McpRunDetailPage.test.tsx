@@ -71,7 +71,7 @@ describe('McpRunDetailPage — activity event refresh discipline', () => {
       vi.advanceTimersByTime(DETAIL_FLUSH_MS);
     });
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpRunExecution', 'wf-1'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['mcpRunExecution', 'wf-1'] }, { cancelRefetch: false });
   });
 
   it("another job's events never invalidate this page", () => {

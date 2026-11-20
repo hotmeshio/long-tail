@@ -158,10 +158,11 @@ export function useAggregateByFacets(
 ) {
   return useQuery<AggregateByFacetsResult>({
     queryKey: ['escAggregate', input ? canonicalStringify(input) : 'off'],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch('/escalations/aggregate-by-facets', {
         method: 'POST',
         body: JSON.stringify(input),
+        signal,
       }),
     staleTime: 15_000,
     enabled: (opts?.enabled ?? true) && !!input,
@@ -170,10 +171,11 @@ export function useAggregateByFacets(
 }
 
 /** One-shot timeline fetch — cursor pages ("load earlier") outside the query cache. */
-export function fetchTimelineByFacet(input: TimelineByFacetInput): Promise<TimelineByFacetResult> {
+export function fetchTimelineByFacet(input: TimelineByFacetInput, signal?: AbortSignal): Promise<TimelineByFacetResult> {
   return apiFetch('/escalations/timeline-by-facet', {
     method: 'POST',
     body: JSON.stringify(input),
+    signal,
   });
 }
 
@@ -183,7 +185,7 @@ export function useTimelineByFacet(
 ) {
   return useQuery<TimelineByFacetResult>({
     queryKey: ['escTimeline', input ? canonicalStringify(input) : 'off'],
-    queryFn: () => fetchTimelineByFacet(input!),
+    queryFn: ({ signal }) => fetchTimelineByFacet(input!, signal),
     staleTime: 15_000,
     enabled: (opts?.enabled ?? true) && !!input,
     retry: retryUnlessForbidden,

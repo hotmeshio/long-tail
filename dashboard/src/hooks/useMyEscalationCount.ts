@@ -1,8 +1,7 @@
 import { useAuth } from './useAuth';
 import { useEscalations } from '../api/escalations';
-import { useEventSubscriptions } from './useEventContext';
+import { useEscalationRefresh } from './useEscalationRefresh';
 import { useMemberEscalationPatterns } from './useMemberEscalationPatterns';
-import { useThrottledInvalidation } from './useEventHooks';
 
 /**
  * Returns the number of active (non-expired) escalations assigned to the current user.
@@ -12,7 +11,6 @@ import { useThrottledInvalidation } from './useEventHooks';
 export function useMyEscalationCount(): number {
   const { user } = useAuth();
   const userId = user?.userId;
-  const invalidate = useThrottledInvalidation('SUMMARY');
 
   const { data } = useEscalations({
     assigned_to: userId,
@@ -20,14 +18,9 @@ export function useMyEscalationCount(): number {
     limit: 1,
   });
 
-  // My count can only move inside queues I belong to — the subscription is
-  // the union of my member roles (global viewers span the family). A count is
-  // an aggregate surface: the SUMMARY tier bounds the refetch rate.
-  useEventSubscriptions(useMemberEscalationPatterns(), () => {
-    if (userId) {
-      invalidate([['escalations']]);
-    }
-  });
+  // My count can only move inside queues I belong to, so the subscription is
+  // the union of my member roles (global viewers span the family).
+  useEscalationRefresh(useMemberEscalationPatterns(), !!userId);
 
   return data?.total ?? 0;
 }

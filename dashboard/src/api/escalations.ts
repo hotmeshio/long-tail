@@ -108,8 +108,9 @@ export function useStationMetrics(
   const facetJson = facets && Object.keys(facets).length ? JSON.stringify(facets) : null;
   return useQuery<{ stations: StationMetric[] }>({
     queryKey: ['stationMetrics', p, facetJson],
-    queryFn: () => apiFetch(
+    queryFn: ({ signal }) => apiFetch(
       `/escalations/station-metrics?period=${p}${facetJson ? `&facets=${encodeURIComponent(facetJson)}` : ''}`,
+      { signal },
     ),
     staleTime: 5_000,
     enabled: opts?.enabled ?? true,
@@ -175,7 +176,8 @@ export function escalationListParams(rest: Omit<EscalationFilters, 'enabled' | '
 export function escalationListQuery(rest: Omit<EscalationFilters, 'enabled' | 'staleTime'>) {
   return {
     queryKey: ['escalations', rest] as const,
-    queryFn: () => apiFetch<EscalationListResponse>(`/escalations?${escalationListParams(rest)}`),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      apiFetch<EscalationListResponse>(`/escalations?${escalationListParams(rest)}`, { signal }),
   };
 }
 
@@ -204,7 +206,7 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
 
   return useQuery<EscalationListResponse>({
     queryKey: ['escalations', 'available', rest],
-    queryFn: () => apiFetch(`/escalations/available?${params}`),
+    queryFn: ({ signal }) => apiFetch(`/escalations/available?${params}`, { signal }),
     enabled,
     ...(staleTime !== undefined ? { staleTime } : {}),
   });
@@ -213,7 +215,7 @@ export function useAvailableEscalations(filters: Omit<EscalationFilters, 'status
 export function useEscalationsByWorkflowId(workflowId: string | undefined) {
   return useQuery<{ escalations: LTEscalationRecord[] }>({
     queryKey: ['escalations', 'by-workflow', workflowId],
-    queryFn: () => apiFetch(`/escalations/by-workflow/${workflowId}`),
+    queryFn: ({ signal }) => apiFetch(`/escalations/by-workflow/${workflowId}`, { signal }),
     enabled: !!workflowId,
   });
 }

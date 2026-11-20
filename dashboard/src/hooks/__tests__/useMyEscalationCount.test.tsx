@@ -33,9 +33,12 @@ vi.mock('../../api/escalations', () => ({
 }));
 
 let qc: QueryClient;
+const COUNT_KEY = ['escalations', { assigned_to: 'user-1', status: 'pending', limit: 1 }];
+const EVENT = { type: 'system.escalation.x.e1.claimed', data: { assigned_to: 'user-1' } };
 
 function createWrapper() {
-  qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  qc.setQueryData(COUNT_KEY, { escalations: [], total: 0 });
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
@@ -68,7 +71,7 @@ describe('useMyEscalationCount', () => {
     const spy = vi.spyOn(qc, 'invalidateQueries');
 
     act(() => {
-      for (let i = 0; i < 50; i++) subscriptions[0].handler({ type: 'system.escalation.x' });
+      for (let i = 0; i < 50; i++) subscriptions[0].handler(EVENT);
     });
     expect(spy).not.toHaveBeenCalled();
 
@@ -76,7 +79,7 @@ describe('useMyEscalationCount', () => {
       vi.advanceTimersByTime(SUMMARY_FLUSH_MS);
     });
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['escalations'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: COUNT_KEY }, { cancelRefetch: false });
   });
 
   it('does not invalidate when no user is signed in', () => {
@@ -86,7 +89,7 @@ describe('useMyEscalationCount', () => {
     const spy = vi.spyOn(qc, 'invalidateQueries');
 
     act(() => {
-      subscriptions[0].handler({ type: 'system.escalation.x' });
+      subscriptions[0].handler(EVENT);
       vi.advanceTimersByTime(SUMMARY_FLUSH_MS);
     });
     expect(spy).not.toHaveBeenCalled();

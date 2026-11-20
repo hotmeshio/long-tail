@@ -4,6 +4,7 @@ import { useEventSubscription, useEventSubscriptions } from './useEventContext';
 import { getInvalidationKeys } from '../lib/events/invalidation';
 import { NATS_SUBJECT_PREFIX } from '../lib/nats/config';
 import { escalationPattern, escalationPatterns, type EscalationVerb } from '../lib/events/subjects';
+import { useEscalationRefresh } from './useEscalationRefresh';
 import { getInvalidationScheduler, type RefreshTier } from '../lib/realtime-refresh';
 
 /**
@@ -196,13 +197,13 @@ export function useEscalationAnalyticsEvents(): void {
  * List pages pass the slice they render: `role` narrows to one queue's
  * subject token, `verbs` to the lifecycle moments that change the list.
  * Omitted, the subscription spans the escalation family — for summary
- * surfaces that genuinely aggregate everything.
+ * surfaces that genuinely aggregate everything. Within the slice, only the
+ * cached queries an event can change refresh.
  */
 export function useEscalationListEvents(scope?: {
   role?: string | null;
   verbs?: EscalationVerb[];
 }): void {
-  const invalidate = useThrottledInvalidation('LIST');
   const role = scope?.role ?? null;
   const verbsKey = (scope?.verbs ?? []).join(',');
 
@@ -213,9 +214,7 @@ export function useEscalationListEvents(scope?: {
       : [escalationPattern({ role })];
   }, [role, verbsKey]);
 
-  useEventSubscriptions(patterns, () => {
-    invalidate([['escalations']]);
-  });
+  useEscalationRefresh(patterns);
 }
 
 /** The query keys of related-set reads (list columns and row details). */
