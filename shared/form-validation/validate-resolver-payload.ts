@@ -26,7 +26,9 @@
  */
 import { type FieldError, validateField } from './field-validator';
 import { evaluateShowIf, isHiddenField, type ShowIfContext } from './x-lt-show-if';
-import { mapPayloadToForm } from './x-lt-bind';
+import { bindPathFor, mapPayloadToForm, parsePath } from './x-lt-bind';
+import { validateListItems } from './list-items';
+import { isListSchema } from './x-lt-list';
 import { readRequireAnyGroups, hasRequireAnyValue } from './x-lt-require-any';
 import { readRequireSumGroups, requireSumContribution } from './x-lt-require-sum';
 
@@ -38,6 +40,23 @@ export type { FieldError } from './field-validator';
  * (the flat form values under validation) — callers provide the rest.
  */
 export type ResolverValidationContext = Omit<ShowIfContext, 'resolver' | 'input'>;
+
+/** The payload pointer of a list's first failing item or cell, when the error is item-level. */
+function itemPointer(
+  field: string,
+  fieldSchema: Record<string, unknown>,
+  value: unknown,
+  ctx: ShowIfContext,
+  message: string,
+): { pointer?: string } {
+  if (!Array.isArray(value) || !isListSchema(fieldSchema)) return {};
+  const first = validateListItems(value, fieldSchema, ctx as Record<string, unknown>)[0];
+  if (!first || first.message !== message) return {};
+  const base = parsePath(bindPathFor(field, fieldSchema))
+    .map((seg) => ('key' in seg ? seg.key : String(seg.index)))
+    .join('/');
+  return { pointer: `/${base}${first.pointer}` };
+}
 
 /**
  * Validate FLAT form values against the form schema. This is the dashboard's
@@ -67,7 +86,7 @@ export function validateResolverForm(
       true,
       liveCtx as Record<string, unknown>,
     );
-    if (err) errors.push({ field, message: err });
+    if (err) errors.push({ field, message: err, ...itemPointer(field, fieldSchema, formValues[field], liveCtx, err) });
   }
 
   // Require-any groups: at least one VISIBLE member per group carries a value.

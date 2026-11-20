@@ -25,11 +25,12 @@ const err = (value: unknown, schema: Record<string, unknown>, required = false) 
   validateField(value, schema, required, true);
 
 describe('list fields', () => {
-  it('required means non-empty for a picked or json list; a display-only list is never checked', () => {
+  it('required means non-empty for an editable list; a list with no declared items is never checked', () => {
     expect(err([], ROLES, true)).toBe('Required');
     expect(err([], ROLES)).toBeUndefined();
     expect(err([], { type: 'array' }, true)).toBeUndefined();
-    expect(err(['x', 1], { type: 'array', items: { type: 'string' }, minItems: 3 })).toBeUndefined();
+    expect(err(['x', 1], { type: 'array', minItems: 3 })).toBeUndefined();
+    expect(err(['x', 1], { type: 'array', items: { type: 'string' }, minItems: 3 })).toBe('At least 3 items');
   });
 
   it('enforces membership per item from the field\'s x-lt-options', () => {

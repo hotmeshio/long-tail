@@ -48,6 +48,23 @@ describe('checkResolverPayload', () => {
     expect(await checkResolverPayload(makeRow(), {})).toBeNull();
   });
 
+  it('names the failing list item with a pointer through the bind path', async () => {
+    mockGetEnforcedFormSchema.mockResolvedValue({
+      properties: {
+        lines: {
+          type: ['array', 'null'],
+          'x-lt-bind': 'facts.lines',
+          items: { type: 'object', required: ['qty'], properties: { qty: { type: 'integer', title: 'Qty', minimum: 1 } } },
+        },
+      },
+    });
+    const report = await checkResolverPayload(makeRow(), { facts: { lines: [{ qty: 2 }, { qty: 0 }] } });
+    expect(report!.violations).toEqual([
+      { field: 'lines', message: 'Row 2, Qty: Minimum value is 1', pointer: '/facts/lines/1/qty' },
+    ]);
+    expect(toValidationErrorBody(report!).violations[0].pointer).toBe('/facts/lines/1/qty');
+  });
+
   it('reports violations with role and pinned version', async () => {
     const row = makeRow({ metadata: { schema_version: 3 } });
     const report = await checkResolverPayload(row, { count: 'two' });

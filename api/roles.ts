@@ -4,6 +4,7 @@ import { badgeGrantError } from '../services/role/badge-grant';
 import { scanDoneError } from '../services/role/scan-done';
 import { FACET_KEY } from '../services/escalation/facet-sql';
 import { listSchemaRelationsError } from '../shared/list-schema';
+import { formSchemaTokenError } from '../shared/form-validation';
 import type { LTApiResult } from '../types/sdk';
 
 /**
@@ -304,6 +305,8 @@ export async function updateRole(input: {
     if (scanDoneProblem) return { status: 400, error: scanDoneProblem };
     const listSchemaError = input.list_schema != null ? listSchemaRelationsError(input.list_schema) : null;
     if (listSchemaError) return { status: 400, error: `list_schema: ${listSchemaError}` };
+    const formSchemaError = input.form_schema != null ? formSchemaTokenError(input.form_schema) : null;
+    if (formSchemaError) return { status: 400, error: `form_schema: ${formSchemaError}` };
     if (input.portals != null && !isPortalList(input.portals)) {
       return {
         status: 400,

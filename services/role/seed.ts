@@ -14,6 +14,7 @@ import type { LTRoleConfig } from '../../types/startup';
 import { badgeGrantError } from './badge-grant';
 import { scanDoneError } from './scan-done';
 import { listSchemaRelationsError } from '../../shared/list-schema';
+import { formSchemaTokenError } from '../../shared/form-validation';
 import { ROLE_PROPERTY_KEYS } from './types';
 import type { UpdateRoleInput } from './types';
 
@@ -106,6 +107,8 @@ export async function applyRoleConfig(
   if (scanDoneProblem) throw new Error(`role ${cfg.role}: ${scanDoneProblem}`);
   const listSchemaError = cfg.list_schema != null ? listSchemaRelationsError(cfg.list_schema) : null;
   if (listSchemaError) throw new Error(`role ${cfg.role}: list_schema: ${listSchemaError}`);
+  const formSchemaError = cfg.form_schema != null ? formSchemaTokenError(cfg.form_schema) : null;
+  if (formSchemaError) throw new Error(`role ${cfg.role}: form_schema: ${formSchemaError}`);
   const created = await createRole(cfg.role);
   const pool = getPool();
   const { rows } = await pool.query(GET_ROLE_ROW, [cfg.role]);

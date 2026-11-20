@@ -1,8 +1,15 @@
 import { scanSinkError } from './x-lt-scan';
 import { resolveFieldOptions, X_LT_OPTIONS } from './x-lt-options';
 import { hasInterpolation, interpolatePath, resolveCtxPath } from './ctx-path';
+import { validateListItems } from './list-items';
+import { isEditableListSchema, singleType } from './x-lt-list';
 
-export interface FieldError { field: string; message: string }
+export interface FieldError {
+  field: string;
+  message: string;
+  /** JSON pointer into the submitted payload when the error belongs to one list item or cell. */
+  pointer?: string;
+}
 
 interface ChecklistItem { id: string; label: string; required?: boolean }
 
@@ -100,9 +107,17 @@ function isJsonWidget(fieldSchema: Record<string, unknown> | undefined): boolean
   return fieldSchema?.['x-lt-widget'] === 'json';
 }
 
-/** A list is edited through the json editor or a multi-select; any other list value is display only. */
+/** A list is edited through a control (json, chips, pills, rows); any other list value is display only. */
 function isEditableList(fieldSchema: Record<string, unknown> | undefined): boolean {
-  return isJsonWidget(fieldSchema) || fieldSchema?.[X_LT_OPTIONS] !== undefined;
+  return isJsonWidget(fieldSchema) || fieldSchema?.[X_LT_OPTIONS] !== undefined || isEditableListSchema(fieldSchema);
+}
+
+function isCalendarDate(text: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
 }
 
 function plural(n: number, noun: string): string {
@@ -119,8 +134,8 @@ export function validateFieldType(
   value: unknown,
   fieldSchema: Record<string, unknown> | undefined,
 ): string | undefined {
-  const declared = fieldSchema?.type;
-  if (typeof declared !== 'string') return undefined;
+  const declared = singleType(fieldSchema);
+  if (declared === undefined) return undefined;
   if (value === undefined || value === null || value === '') return undefined;
   switch (declared) {
     case 'string':
@@ -219,6 +234,8 @@ export function validateFieldConstraints(
     if (fmt === 'uri' && !/^https?:\/\/.+/.test(s)) {
       return 'Enter a valid URL';
     }
+    if (fmt === 'date' && !isCalendarDate(s)) return 'Enter a valid date';
+    if (fmt === 'date-time' && Number.isNaN(Date.parse(s))) return 'Enter a valid date and time';
   }
 
   if (typeof value === 'number') {
@@ -267,15 +284,7 @@ function validateListConstraints(
   if (minItems !== undefined && value.length < minItems) return `At least ${plural(minItems, 'item')}`;
   const maxItems = resolveNumericConstraint(fieldSchema.maxItems, undefined, ctx);
   if (maxItems !== undefined && value.length > maxItems) return `At most ${plural(maxItems, 'item')}`;
-  const items = fieldSchema.items;
-  if (items && typeof items === 'object' && !Array.isArray(items)) {
-    const itemSchema = items as Record<string, unknown>;
-    for (let i = 0; i < value.length; i++) {
-      const err = validateFieldType(value[i], itemSchema) ?? validateFieldConstraints(value[i], itemSchema, ctx);
-      if (err) return `Item ${i + 1}: ${err}`;
-    }
-  }
-  return undefined;
+  return validateListItems(value, fieldSchema, ctx)[0]?.message;
 }
 
 /**
