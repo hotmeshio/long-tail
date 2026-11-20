@@ -14,6 +14,7 @@ import { UserName } from '../common/display/UserName';
 import { TriageContext } from './TriageContext';
 import { ErrorsPanel } from './ErrorsPanel';
 import { buildHelpMarkdown, defaultHelpMarkdown } from '../../lib/x-lt-help';
+import { listShortcutsMarkdown } from '../../lib/x-lt-list';
 import { deriveFieldLabel } from '../../lib/derive-field-label';
 import { metadataFacetUrl } from '../../lib/facet-url';
 import { displayMetadataEntries } from '../../lib/metadata-display';
@@ -267,7 +268,9 @@ export function EscalationSidePanel({
       payload,
       resolver,
     });
-    return authored ?? defaultHelpMarkdown({ isTerminal, status: esc.status, claimed, claimedByMe });
+    const base = authored ?? defaultHelpMarkdown({ isTerminal, status: esc.status, claimed, claimedByMe });
+    const shortcuts = isTerminal ? null : listShortcutsMarkdown(schema);
+    return shortcuts ? `${base}\n\n${shortcuts}` : base;
   }, [schema, esc, envelope, payload, resolver, isTerminal, claimed, claimedByMe]);
 
   // Relative links in help markdown navigate in-app instead of reloading.

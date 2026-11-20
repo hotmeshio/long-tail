@@ -4,7 +4,7 @@ import { findUnknownWidgets, isKnownWidget } from '../field-widgets';
 
 describe('isKnownWidget', () => {
   it('knows registered widgets, the textarea alias and json', () => {
-    for (const name of ['markdown', 'checklist', 'image', 'textarea', 'json']) {
+    for (const name of ['markdown', 'checklist', 'image', 'textarea', 'json', 'pills', 'rows']) {
       expect(isKnownWidget(name)).toBe(true);
     }
   });

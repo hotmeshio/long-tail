@@ -1,6 +1,7 @@
 import { mapFormToPayload } from './x-lt-bind';
 import { validateResolverForm, type FieldError } from './field-validator';
 import type { ShowIfContext } from './x-lt-show-if';
+import { dropEmptyRowsInForm } from './list-rows';
 
 export interface ResolverPayloadResult {
   /** The resolver payload ready to submit — null when the JSON is unparseable or validation failed. */
@@ -15,7 +16,7 @@ export interface ResolverPayloadResult {
  * Build the resolver payload from the form's edited JSON string.
  *
  * 1. Parse the JSON — a malformed string yields `parseError`.
- * 2. Validate every visible field against the embedded `_form_schema` — hidden
+ * 2. Drop rows left entirely empty, then validate every visible field against the embedded `_form_schema` — hidden
  *    fields (x-lt-showIf falsy against the live context) are skipped, matching
  *    the server's enforcement pass. Any failures yield `errors`.
  * 3. Strip the UI-only schema and map flat form fields into their nested shape
@@ -36,6 +37,7 @@ export function buildResolverPayload(
   }
 
   const schema = parsed._form_schema as Record<string, unknown> | undefined;
+  parsed = dropEmptyRowsInForm(parsed, schema as Record<string, any> | undefined);
   if (schema) {
     const errors = validateResolverForm(schema, parsed, context);
     if (errors.length > 0) return { payload: null, errors, parseError: null };

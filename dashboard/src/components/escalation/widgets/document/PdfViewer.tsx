@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useContainerWidth } from '../../../../hooks/useContainerWidth';
 import { openPdf, type PDFDocumentProxy, type RenderTask } from './pdf-loader';
 import { FRAME_PAD, ViewerToolbar } from './ViewerToolbar';
+import { findQuote } from './find-quote';
+import { findQuotePage, highlightRects, pageRuns, type HighlightRect } from './pdf-text';
+import { useRegisterDocument, type DocumentTarget } from '../../resolver-form/document-pane';
 
 const PAGE_GAP = 12;
 
@@ -15,7 +18,7 @@ type LoadState =
  * then a canvas painted at device resolution. Leaving the neighborhood keeps
  * the paint; a zoom or rotation repaints only the pages in view.
  */
-function PdfPage({ doc, pageNumber, scale, rotation, ratio, baseWidth, root, onVisible }: {
+function PdfPage({ doc, pageNumber, scale, rotation, ratio, baseWidth, root, onVisible, highlight }: {
   doc: PDFDocumentProxy;
   pageNumber: number;
   scale: number;
@@ -24,6 +27,8 @@ function PdfPage({ doc, pageNumber, scale, rotation, ratio, baseWidth, root, onV
   baseWidth: number;
   root: HTMLElement | null;
   onVisible: (page: number) => void;
+  /** A quoted passage to paint on this page. */
+  highlight?: string;
 }) {
   const holderRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,14 +69,38 @@ function PdfPage({ doc, pageNumber, scale, rotation, ratio, baseWidth, root, onV
     return () => { cancelled = true; task?.cancel(); };
   }, [near, doc, pageNumber, width, rotation]);
 
+  const [rects, setRects] = useState<HighlightRect[]>([]);
+  useEffect(() => {
+    if (!highlight) { setRects([]); return; }
+    let cancelled = false;
+    (async () => {
+      const page = await doc.getPage(pageNumber);
+      const unit = page.getViewport({ scale: 1, rotation });
+      const viewport = page.getViewport({ scale: width / unit.width, rotation });
+      const runs = await pageRuns(page);
+      const matches = findQuote(runs, highlight);
+      if (!cancelled) setRects(matches ? highlightRects(runs, matches, (r) => viewport.convertToViewportRectangle(r)) : []);
+    })().catch(() => { if (!cancelled) setRects([]); });
+    return () => { cancelled = true; };
+  }, [highlight, doc, pageNumber, width, rotation]);
+
   return (
     <div
       ref={holderRef}
       data-page={pageNumber}
-      className="mx-auto bg-surface-sunken shadow-sm"
+      className="relative mx-auto bg-surface-sunken shadow-sm"
       style={{ width, minHeight: height }}
     >
       {near && <canvas ref={canvasRef} aria-label={`Page ${pageNumber}`} role="img" />}
+      {rects.map((r, i) => (
+        <div
+          key={i}
+          aria-hidden
+          data-testid="document-highlight"
+          className="absolute pointer-events-none rounded-sm bg-status-pending-graphic/35"
+          style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
+        />
+      ))}
     </div>
   );
 }
@@ -81,7 +110,7 @@ function PdfPage({ doc, pageNumber, scale, rotation, ratio, baseWidth, root, onV
  * paging, zoom and rotation. The document loads once per stored file; a
  * re-signed link for the same file keeps the open document and its scroll.
  */
-export function PdfViewer({ url, identity, name, heightClass, expiresAt, onRefresh }: {
+export function PdfViewer({ url, identity, name, heightClass, expiresAt, onRefresh, locator }: {
   url: string;
   /** Stable across re-signed links: the storage key when there is one. */
   identity: string;
@@ -89,6 +118,8 @@ export function PdfViewer({ url, identity, name, heightClass, expiresAt, onRefre
   heightClass: string;
   expiresAt?: string;
   onRefresh?: () => void;
+  /** How list items address this document: its field key and the sources it answers to. */
+  locator?: { key: string; sources: string[] };
 }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [zoom, setZoom] = useState(1);
@@ -132,6 +163,24 @@ export function PdfViewer({ url, identity, name, heightClass, expiresAt, onRefre
     if (el) frame.scrollTo({ top: el.offsetTop - FRAME_PAD, behavior: 'smooth' });
     setPage(target);
   };
+
+  const [highlight, setHighlight] = useState<{ page: number; quote: string } | null>(null);
+  const pending = useRef<DocumentTarget | null>(null);
+  const go = useCallback(async (target: DocumentTarget) => {
+    if (state.status !== 'ready') { pending.current = target; return; }
+    let page = target.page;
+    let quote: string | undefined;
+    if (target.quote) {
+      const found = await findQuotePage(state.doc, target.quote, target.page).catch(() => null);
+      if (found !== null && (page === undefined || found === page)) { page = found; quote = target.quote; }
+    }
+    setHighlight(page !== undefined && quote ? { page, quote } : null);
+    if (page !== undefined) goToPage(page);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
+  useRegisterDocument(locator, go);
+  useEffect(() => {
+    if (state.status === 'ready' && pending.current) { const target = pending.current; pending.current = null; void go(target); }
+  }, [state, go]);
 
   const quarter = rotation % 180 !== 0;
   const ready = state.status === 'ready' ? state : null;
@@ -182,6 +231,7 @@ export function PdfViewer({ url, identity, name, heightClass, expiresAt, onRefre
                 baseWidth={turnedBase}
                 root={frame}
                 onVisible={onVisible}
+                highlight={highlight?.page === i + 1 ? highlight.quote : undefined}
               />
             ))}
           </div>

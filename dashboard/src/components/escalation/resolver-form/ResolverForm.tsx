@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { useRef, type MouseEvent, type ReactNode } from 'react';
+import { useResolverFormState } from './use-resolver-form-state';
 import { LockedFormFrame } from './LockedFormFrame';
 import { HelpCircle } from 'lucide-react';
 import { evaluateShowIf, isHiddenField, isHiddenIfEmpty, type ShowIfContext } from '../../../lib/x-lt-show-if';
 import { validateField } from '../../../lib/field-validator';
+import { isListSchema } from '../../../lib/x-lt-list';
 import { DISPLAY_ONLY_WIDGET_NAMES } from '../../../lib/display-only-widgets';
 import { buildFormReview, readConfidenceSpec, summarizeReview } from '../../../lib/x-lt-confidence';
 import { FieldRow } from './FieldRow';
@@ -10,7 +12,8 @@ import { FieldReview } from './FieldReview';
 import { ReviewLegend } from './ReviewLegend';
 import { formatReviewValue } from './review-value';
 import { SectionGroup } from './SectionGroup';
-import { DocumentPaneContext } from './document-pane';
+import { DocumentPaneContext, DocumentLocatorContext, createDocumentLocator } from './document-pane';
+import { ListReviewProvider } from './list/list-review';
 import { type FormEntry, type JsonValue } from './form-cells';
 
 /** `x-lt-layout: "split"`: documents in a pane beside the fields they verify. */
@@ -45,57 +48,8 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   /** Cursor-following hint over the locked form naming the state or gesture. */
   disabledHint?: ReactNode;
 }) {
-  const [data, setData] = useState<Record<string, JsonValue>>({});
-  const [hidden, setHidden] = useState<Record<string, JsonValue>>({});
-  const [formSchema, setFormSchema] = useState<Record<string, any> | null>(null);
-  const [parseError, setParseError] = useState(false);
-  const [touched, setTouched] = useState<Set<string>>(new Set());
-
-  // Parse incoming JSON
-  useEffect(() => {
-    try {
-      const parsed = JSON.parse(value);
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        const visible: Record<string, JsonValue> = {};
-        const internal: Record<string, JsonValue> = {};
-        for (const [k, v] of Object.entries(parsed)) {
-          if (k.startsWith('_') || k.startsWith('$')) {
-            internal[k] = v as JsonValue;
-          } else {
-            visible[k] = v as JsonValue;
-          }
-        }
-        setData(visible);
-        setHidden(internal);
-        setFormSchema(
-          internal._form_schema && typeof internal._form_schema === 'object'
-            ? internal._form_schema as Record<string, any>
-            : null,
-        );
-        setParseError(false);
-      }
-    } catch {
-      setParseError(true);
-    }
-  }, [value]);
-
-  const emitChange = useCallback((updated: Record<string, JsonValue>) => {
-    setData(updated);
-    onChange(JSON.stringify({ ...updated, ...hidden }, null, 2));
-  }, [hidden, onChange]);
-
-  const updateField = useCallback((key: string, val: JsonValue) => {
-    emitChange({ ...data, [key]: val });
-  }, [data, emitChange]);
-
-  const markTouched = useCallback((key: string) => {
-    setTouched((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-  }, []);
+  const { data, formSchema, parseError, touched, updateField, handlersFor, stableReview } = useResolverFormState(value, onChange);
+  const documentLocator = useRef(createDocumentLocator());
 
   if (parseError) {
     return (
@@ -186,17 +140,19 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
     // A locked form locks each field; a document stays readable and pageable.
     const isLive = isDocumentField(key);
     const locked = !!disabled && !isLive;
-    const fieldReview = review?.[key];
+    const fieldReview = stableReview(key, review?.[key]);
+    const { change, blur } = handlersFor(key);
 
     const row = (
       <FieldRow
         fieldKey={key}
         value={val}
-        onChange={(v) => updateField(key, v)}
-        onBlur={() => markTouched(key)}
+        onChange={change}
+        onBlur={blur}
         schema={formSchema}
         isRequired={isReq}
         isReadOnly={isReadOnly}
+        locked={locked}
         error={error}
         escalationContext={liveCtx}
         submitAttempted={!!submitAttempted}
@@ -211,16 +167,18 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
         onClick={disabled && isLive ? keepClick : undefined}
       >
         {fieldReview ? (
+          <ListReviewProvider review={fieldReview} value={val} onChange={change}>
           <FieldReview
             fieldKey={key}
             review={fieldReview}
             proposedText={formatReviewValue(fieldReview.proposed, fieldSchema, liveCtx as Record<string, unknown>)}
             currentText={formatReviewValue(val, fieldSchema, liveCtx as Record<string, unknown>)}
             locked={!!disabled || isReadOnly}
-            onRestore={() => updateField(key, (fieldReview.proposed ?? '') as JsonValue)}
+            onRestore={() => updateField(key, (isListSchema(fieldSchema) ? fieldReview.proposed ?? null : fieldReview.proposed ?? '') as JsonValue)}
           >
             {row}
           </FieldReview>
+          </ListReviewProvider>
         ) : row}
       </div>
     );
@@ -299,12 +257,13 @@ export function ResolverForm({ value, onChange, disabled, submitAttempted, escal
   );
 
   const measure = isSplit ? 'max-w-[min(112rem,100%)]' : 'max-w-form';
+  const located = <DocumentLocatorContext.Provider value={documentLocator.current}>{body}</DocumentLocatorContext.Provider>;
   if (disabled) {
     return (
       <LockedFormFrame hint={disabledHint} onLockedClick={onDisabledClick} measure={measure}>
-        {body}
+        {located}
       </LockedFormFrame>
     );
   }
-  return <div className={`pb-8 ${measure}`}>{body}</div>;
+  return <div className={`pb-8 ${measure}`}>{located}</div>;
 }

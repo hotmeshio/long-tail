@@ -3,6 +3,7 @@ import type { OptionValue, ResolvedOption } from '../../../lib/x-lt-options';
 import { FieldLabel, FieldHelper, FieldError } from './FieldChrome';
 import type { FieldControlProps } from './field-control-props';
 import type { JsonValue } from './form-cells';
+import { Pill } from './list/Pill';
 
 /**
  * Pick any from an option list: chips, each a real checkbox. The submitted
@@ -13,11 +14,17 @@ export function MultiSelectField({ value, options, fieldKey, label, helperText, 
   value: JsonValue;
   options: ResolvedOption[];
 }) {
-  const picked = new Set<OptionValue>(Array.isArray(value) ? (value as OptionValue[]) : []);
+  const current = Array.isArray(value) ? (value as OptionValue[]) : [];
+  const picked = new Set<OptionValue>(current);
+  const unknown = current.filter((v) => !options.some((o) => o.value === v));
   const toggle = (v: OptionValue) => {
     const next = new Set(picked);
     if (next.has(v)) next.delete(v); else next.add(v);
-    onChange(options.filter((o) => next.has(o.value)).map((o) => o.value) as JsonValue);
+    onChange([...options.filter((o) => next.has(o.value)).map((o) => o.value), ...unknown] as JsonValue);
+    onBlur?.();
+  };
+  const dropUnknown = (v: OptionValue) => {
+    onChange(current.filter((c) => c !== v) as JsonValue);
     onBlur?.();
   };
   return (
@@ -54,6 +61,13 @@ export function MultiSelectField({ value, options, fieldKey, label, helperText, 
               </label>
             );
           })}
+        </div>
+      )}
+      {unknown.length > 0 && (
+        <div role="list" className="flex flex-wrap gap-1.5 mt-2" data-testid={`multi-select-unknown-${fieldKey}`}>
+          {unknown.map((v) => (
+            <Pill key={String(v)} text={String(v)} tone="warning" title="Not a known option" suffix="not a known option" onRemove={() => dropUnknown(v)} />
+          ))}
         </div>
       )}
       <FieldError error={error} id={ids.error} />

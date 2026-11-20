@@ -26,7 +26,7 @@ export function FieldReview({ fieldKey, review, proposedText, currentText, locke
 
   return (
     <div
-      data-confidence-tone={review.tranche?.tone}
+      data-confidence-tone={review.itemTranches ? undefined : review.tranche?.tone}
       data-review-changed={review.changed || undefined}
       data-testid={`review-${fieldKey}`}
     >
@@ -40,7 +40,7 @@ export function FieldReview({ fieldKey, review, proposedText, currentText, locke
               {review.score !== undefined && <span className="tabular-nums">· {formatScore(review.score)}</span>}
             </span>
           )}
-          {review.changed && locked && (
+          {review.changed && locked && !review.diff && (
             <span className="inline-flex items-center gap-1.5 text-text-tertiary min-w-0" data-testid={`review-was-${fieldKey}`}>
               <History className="w-3 h-3 shrink-0" strokeWidth={1.5} aria-hidden />
               <span>Was</span>

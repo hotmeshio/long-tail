@@ -3,18 +3,27 @@
  * input class recipes. One place styles every generated field.
  */
 
+import { createContext, useContext } from 'react';
+
+/**
+ * A control inside a table cell: the column header names it, so its own label
+ * is read by assistive technology only and its instruction line is dropped.
+ */
+export const BareChromeContext = createContext(false);
+
 export function FieldLabel({ children, isRequired, htmlFor }: {
   children: React.ReactNode;
   isRequired?: boolean;
   htmlFor?: string;
 }) {
+  const bare = useContext(BareChromeContext);
   // `block` is load-bearing: a <label> is inline by default, and the
   // label→instruction→control anatomy would then hold only by accident —
   // a full-width control wraps below, but a narrow control (number,
   // max-w-48) with no instruction line sits flush BESIDE the label. The
   // anatomy is a column; the label declares it.
   return (
-    <label htmlFor={htmlFor} className="block text-2xs font-semibold uppercase tracking-wider text-text-secondary">
+    <label htmlFor={htmlFor} className={bare ? 'sr-only' : 'block text-2xs font-semibold uppercase tracking-wider text-text-secondary'}>
       {children}
       {isRequired && <span className="text-status-error ml-0.5">*</span>}
     </label>
@@ -22,6 +31,7 @@ export function FieldLabel({ children, isRequired, htmlFor }: {
 }
 
 export function FieldHelper({ id, children }: { id?: string; children: React.ReactNode }) {
+  if (useContext(BareChromeContext)) return null;
   return (
     <p id={id} className="text-2xs text-text-tertiary mt-0.5 leading-snug">
       {children}

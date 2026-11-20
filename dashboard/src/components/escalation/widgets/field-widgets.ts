@@ -1,12 +1,16 @@
 import { WIDGET_MAP } from './index';
+import { LIST_WIDGETS } from '../../../lib/x-lt-list';
 
 /** `x-lt-widget: textarea` is an alias of `format: "textarea"`. */
 export const TEXTAREA_WIDGET = 'textarea';
 /** Rendered by FieldRow itself rather than through the widget registry. */
 export const JSON_WIDGET = 'json';
 
+/** List controls rendered by FieldRow: free-entry pills and an editable table. */
+export const LIST_WIDGET_NAMES: readonly string[] = [LIST_WIDGETS.PILLS, LIST_WIDGETS.ROWS];
+
 export function isKnownWidget(name: string): boolean {
-  return name in WIDGET_MAP || name === TEXTAREA_WIDGET || name === JSON_WIDGET;
+  return name in WIDGET_MAP || name === TEXTAREA_WIDGET || name === JSON_WIDGET || LIST_WIDGET_NAMES.includes(name);
 }
 
 export interface UnknownWidget {
