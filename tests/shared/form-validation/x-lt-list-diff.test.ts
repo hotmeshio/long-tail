@@ -66,3 +66,24 @@ describe('differsFromProposal with a schema', () => {
     expect(differsFromProposal(null, [], CODES)).toBe(true);
   });
 });
+
+describe('closed option lists and matched indexes', () => {
+  const OPTIONS = { type: 'array', items: { type: 'string' }, 'x-lt-options': ['a', 'b', 'c'].map((v) => ({ value: v, label: v })) };
+
+  it('compares a closed option list as a set, so option order is not a change', () => {
+    expect(diffList(['c', 'a'], ['a', 'c'], OPTIONS).changed).toBe(false);
+    const diff = diffList(['c', 'a'], ['a', 'b', 'c'], OPTIONS);
+    expect(diff.marks.map((m) => m.kind)).toEqual(['same', 'added', 'same']);
+    expect(diff.itemsChanged).toBe(1);
+  });
+
+  it('lets a schema opt a closed list back into position comparison', () => {
+    expect(diffList(['c', 'a'], ['a', 'c'], { ...OPTIONS, 'x-lt-unordered': false }).changed).toBe(true);
+  });
+
+  it('reports the proposed position each matched item came from', () => {
+    const diff = diffList(['a', 'b'], ['b', 'x'], { type: 'array', items: { type: 'string' }, 'x-lt-unordered': true });
+    expect(diff.marks.map((m) => m.proposedIndex)).toEqual([1, undefined]);
+    expect(diffList(['a', 'b'], ['a', 'z'], { type: 'array', items: { type: 'string' } }).marks.map((m) => m.proposedIndex)).toEqual([0, 1]);
+  });
+});

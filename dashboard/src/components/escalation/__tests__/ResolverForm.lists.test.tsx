@@ -98,6 +98,28 @@ describe('list review while editing', () => {
   });
 });
 
+describe('closed option lists', () => {
+  it('reads the same picks in option order as unchanged, however the model ordered them', () => {
+    const ctx = { envelope: { formDefaults: { ...PROPOSED, conditions: ['deformity', 'neuropathy'] }, confidence: {} } } as ShowIfContext;
+    render(<ResolverForm value={json({ ...PROPOSED, conditions: ['neuropathy', 'deformity'] })} onChange={vi.fn()} escalationContext={ctx} />);
+    expect(screen.getByTestId('review-conditions')).not.toHaveAttribute('data-review-changed');
+    expect(screen.queryByTestId('review-edited-conditions')).toBeNull();
+  });
+
+  it('gives an added pill no score of its own in an unordered list', () => {
+    const unordered = { ...SCHEMA, properties: { ...SCHEMA.properties, codes: { ...SCHEMA.properties.codes } } };
+    render(
+      <ResolverForm
+        value={JSON.stringify({ ...PROPOSED, codes: ['E11.65', 'Z00.0'], _form_schema: unordered })}
+        onChange={vi.fn()}
+        escalationContext={CTX({ codes: [0.97, 0.4] })}
+      />,
+    );
+    expect(screen.getByText('Z00.0').closest('[data-pill]')).not.toHaveAttribute('data-confidence-pill');
+    expect(screen.getByText('E11.65').closest('[data-pill]')).not.toHaveAttribute('data-confidence-pill');
+  });
+});
+
 describe('list review after submit', () => {
   it('shows the submitted list read-only with the same marks and option labels, never raw JSON', () => {
     render(

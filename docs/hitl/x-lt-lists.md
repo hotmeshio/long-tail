@@ -120,9 +120,9 @@ A role's `form_schema` is checked for its list tokens when it is saved, seeded, 
 A list takes part in [x-lt-confidence](x-lt-confidence.md) like any field.
 
 - **List score.** A number at the list's bound path in `envelope.confidence` marks the control with its tranche and counts in the review key.
-- **Item scores.** An array at the path, aligned with the value, scores each pill or row; the field's tranche is the worst of its items. For rows, an object per item scores cells: `[{ "hcpcs": 0.99, "quantity": 0.55 }]` marks the Qty cell Low. `x-lt-confidence: false` on an item property leaves that column unscored. An item the reviewer adds carries no mark.
+- **Item scores.** An array at the path, aligned with the value, scores each pill or row; the field's tranche is the worst of its items. For rows, an object per item scores cells: `[{ "hcpcs": 0.99, "quantity": 0.55 }]` marks the Qty cell Low. `x-lt-confidence: false` on an item property leaves that column unscored. Scores belong to the proposed items: an item the reviewer adds carries no mark, and a moved or matched item keeps its own.
 - **What changed.** While editing and after submit, added items are marked **Added**, a removed item stays visible struck through (with **Restore** while editing), and a changed cell shows **Edited** with its proposed value.
-- **Comparison.** Lists compare by position. `x-lt-item-key` (rows) compares by key and `x-lt-unordered: true` ignores order, so a reorder alone is not a change. Scalar items compare as every answer does (trimmed, `"42"` equals `42`).
+- **Comparison.** Lists compare by position. `x-lt-item-key` (rows) compares by key and `x-lt-unordered: true` ignores order, so a reorder alone is not a change. A closed option list (`x-lt-options`) compares unordered by default, since its picks return in option order; `x-lt-unordered: false` compares by position. Scalar items compare as every answer does (trimmed, `"42"` equals `42`).
 - **Facets.** `review_changed` counts a changed list as one changed field. `review_items_changed` counts the items added, removed and edited across the form's lists.
 
 ## Documents

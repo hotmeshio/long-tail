@@ -2,11 +2,12 @@
  * Review diff of a list: what a reviewer added, removed and edited against what
  * the model proposed. Items compare by position unless the schema keys rows
  * (`x-lt-item-key`) or declares the list unordered (`x-lt-unordered`), in which
- * case a reorder alone is not a change. Scalars compare as every answer does
+ * case a reorder alone is not a change. A closed option list is unordered by default. Scalars compare as every answer does
  * (trimmed, `"42"` equals `42`); `null` ("not stated") and `[]` differ.
  */
 import { comparable } from './answer-compare';
 import { isObjectItems, itemSchemaOf, readListSpec } from './x-lt-list';
+import { X_LT_OPTIONS } from './x-lt-options';
 
 type Schema = Record<string, unknown>;
 
@@ -16,6 +17,8 @@ export interface ItemMark {
   kind: 'same' | 'added' | 'edited';
   /** The proposed item it was matched with, when it was. */
   proposed?: unknown;
+  /** That proposed item's position in the proposal; scores and the proposal itself are indexed by it. */
+  proposedIndex?: number;
   /** The cells (properties) that differ, for an edited row. */
   cells?: string[];
 }
@@ -58,9 +61,19 @@ function compareItem(proposed: unknown, current: unknown, asRows: boolean): { ki
 
 type Keyer = (item: unknown, index: number) => string | null;
 
-function keyedMatcher(spec: ReturnType<typeof readListSpec>, asRows: boolean): Keyer | null {
+/**
+ * A closed option list is a set: its picks come back in option order whatever
+ * order the model proposed them in, so it compares unordered unless the
+ * schema says `x-lt-unordered: false`.
+ */
+function isUnordered(spec: ReturnType<typeof readListSpec>, fieldSchema: Schema | null | undefined): boolean {
+  if (spec.unordered) return true;
+  return fieldSchema?.[X_LT_OPTIONS] !== undefined && fieldSchema?.['x-lt-unordered'] !== false;
+}
+
+function keyedMatcher(spec: ReturnType<typeof readListSpec>, asRows: boolean, unordered: boolean): Keyer | null {
   if (spec.itemKey && asRows) return (item) => (isRecord(item) ? comparable(item[spec.itemKey!]) : null);
-  if (spec.unordered) return (item) => comparable(item);
+  if (unordered) return (item) => comparable(item);
   return null;
 }
 
@@ -77,7 +90,7 @@ function diffByKey(proposed: unknown[], current: unknown[], key: Keyer, asRows: 
     const at = k === null ? undefined : pool.get(k)?.shift();
     if (at === undefined) return { index, kind: 'added' };
     currentOf.set(at, index);
-    return { index, proposed: proposed[at], ...compareItem(proposed[at], item, asRows) };
+    return { index, proposed: proposed[at], proposedIndex: at, ...compareItem(proposed[at], item, asRows) };
   });
   const removed: RemovedItem[] = [];
   proposed.forEach((item, i) => {
@@ -94,7 +107,7 @@ function diffByKey(proposed: unknown[], current: unknown[], key: Keyer, asRows: 
 
 function diffByPosition(proposed: unknown[], current: unknown[], asRows: boolean): Pick<ListDiff, 'marks' | 'removed'> {
   const marks: ItemMark[] = current.map((item, index) =>
-    index < proposed.length ? { index, proposed: proposed[index], ...compareItem(proposed[index], item, asRows) } : { index, kind: 'added' },
+    index < proposed.length ? { index, proposed: proposed[index], proposedIndex: index, ...compareItem(proposed[index], item, asRows) } : { index, kind: 'added' },
   );
   const removed = proposed.slice(current.length).map((item) => ({ item, before: current.length }));
   return { marks, removed };
@@ -106,7 +119,7 @@ export function diffList(proposed: unknown, current: unknown, fieldSchema: Schem
   const asRows = isObjectItems(itemSchemaOf(fieldSchema));
   const p = asList(proposed);
   const c = asList(current);
-  const key = keyedMatcher(spec, asRows);
+  const key = keyedMatcher(spec, asRows, isUnordered(spec, fieldSchema));
   const { marks, removed } = key ? diffByKey(p, c, key, asRows) : diffByPosition(p, c, asRows);
   const added = marks.filter((m) => m.kind === 'added').length;
   const edited = marks.filter((m) => m.kind === 'edited').length;

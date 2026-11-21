@@ -101,7 +101,8 @@ describe('document-intake example', () => {
     const answers = { ...mapPayloadToForm(values, INTAKE_FORM_SCHEMA), co_applicants: ['jane.okafor@example.com'], beneficiaries: [{ name: 'Jane Okafor', relationship: 'spouse', share: 60 }] };
     const review = buildFormReview(spec, INTAKE_FORM_SCHEMA, { envelope: { formDefaults: values, confidence } }, answers);
     expect(review.services.tranche?.label).toBeUndefined();
-    expect(review.co_applicants.itemTranches?.map((t) => t?.label ?? null)).toEqual([null, 'Low']);
+    expect(review.co_applicants.itemTranches?.map((t) => t?.label ?? null)).toEqual([null]);
+    expect(review.co_applicants.tranche?.label).toBe('Low');
     expect(review.co_applicants.diff?.removed).toHaveLength(1);
     expect(review.beneficiaries.cellTranches?.[0]).toMatchObject({ share: { label: 'Low' } });
     expect(review.beneficiaries.diff?.marks[0]).toMatchObject({ kind: 'edited', cells: ['share'] });
