@@ -183,11 +183,21 @@ export function buildFormReview(
       ...(hasProposal ? { proposed: proposals[key] } : {}),
       changed: hasProposal && (diff ? diff.changed : differsFromProposal(proposals[key], values[key], def)),
       ...(diff ? { diff } : {}),
-      ...(items?.itemTranches ? { itemTranches: items.itemTranches } : {}),
-      ...(items?.cellTranches ? { cellTranches: items.cellTranches } : {}),
+      ...(items?.itemTranches ? { itemTranches: followMatches(items.itemTranches, diff) } : {}),
+      ...(items?.cellTranches ? { cellTranches: followMatches(items.cellTranches, diff) } : {}),
     };
   }
   return review;
+}
+
+/**
+ * Scores belong to the proposed items. Re-index them to the current list
+ * through the diff, so an item the reviewer added carries no score and a
+ * moved item keeps its own.
+ */
+function followMatches<T>(byProposed: Array<T | null>, diff: ListDiff | undefined): Array<T | null> {
+  if (!diff) return byProposed;
+  return diff.marks.map((m) => (m.proposedIndex === undefined ? null : byProposed[m.proposedIndex] ?? null));
 }
 
 const clamp = (n: number) => Math.min(Math.max(n, 0), 1);

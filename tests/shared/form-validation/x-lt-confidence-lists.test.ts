@@ -77,4 +77,22 @@ describe('list review', () => {
     const review = buildFormReview(spec, schema, ctxFor({}, proposed), values);
     expect(summarizeReview(spec, review, ['codes', 'lines']).itemsChanged).toBe(4);
   });
+
+  it('keeps each score with its own item when the reviewer replaces one in an unordered list', () => {
+    const unordered = { 'x-lt-confidence': true, properties: { codes: { type: 'array', items: { type: 'string' }, 'x-lt-unordered': true } } };
+    const unorderedSpec = readConfidenceSpec(unordered)!;
+    const ctx = ctxFor({ codes: [0.97, 0.58] }, { codes: ['E11', 'I73'] });
+    const review = buildFormReview(unorderedSpec, unordered, ctx, { codes: ['E11', 'Z00'] });
+    expect(review.codes.itemTranches?.map((t) => t?.label ?? null)).toEqual([null, null]);
+    const moved = buildFormReview(unorderedSpec, unordered, ctx, { codes: ['I73', 'E11'] });
+    expect(moved.codes.itemTranches?.map((t) => t?.label ?? null)).toEqual(['Low', null]);
+  });
+
+  it('follows keyed rows: an added row has no cell scores, a moved row keeps its own', () => {
+    const scores = { facts: { lines: [{ qty: 0.9 }, { qty: 0.55 }] } };
+    const values = { lines: [{ code: 'A3', qty: 1 }, { code: 'A2', qty: 2 }] };
+    const review = buildFormReview(spec, schema, ctxFor(scores, proposed), values);
+    expect(review.lines.cellTranches?.[0]).toBeNull();
+    expect(review.lines.cellTranches?.[1]).toMatchObject({ qty: { label: 'Low' } });
+  });
 });
